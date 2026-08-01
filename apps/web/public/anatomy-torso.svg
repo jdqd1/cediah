@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 980" role="img" aria-labelledby="title desc">
+  <title id="title">Ilustracion anatomica del torso</title>
+  <desc id="desc">Dibujo editorial estilizado de la caja toracica y el abdomen.</desc>
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0d9c7" stop-opacity=".88"/>
+      <stop offset="1" stop-color="#c69085" stop-opacity=".32"/>
+    </linearGradient>
+    <radialGradient id="organ" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#a8465e" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#6c1f34" stop-opacity=".36"/>
+    </radialGradient>
+  </defs>
+  <path d="M282 71c25-26 171-26 196 0l25 72 63 51c45 37 67 103 64 185l-18 446-92 85H240l-92-85-18-446c-3-82 19-148 64-185l63-51z" fill="url(#body)" stroke="#f5e8dc" stroke-opacity=".55" stroke-width="2"/>
+  <path d="M380 82v805M281 83c20 53 49 78 99 82 50-4 79-29 99-82" fill="none" stroke="#f5e8dc" stroke-opacity=".45" stroke-width="2"/>
+  <g fill="none" stroke="#f8eee5" stroke-opacity=".68" stroke-width="8">
+    <path d="M363 185c-51-39-122-22-151 39-31 66 15 131 151 139"/>
+    <path d="M397 185c51-39 122-22 151 39 31 66-15 131-151 139"/>
+    <path d="M354 231c-73-30-126 8-128 52-2 47 47 79 137 78"/>
+    <path d="M406 231c73-30 126 8 128 52 2 47-47 79-137 78"/>
+    <path d="M349 286c-62-13-106 12-110 50-5 44 42 72 123 65"/>
+    <path d="M411 286c62-13 106 12 110 50 5 44-42 72-123 65"/>
+    <path d="M347 345c-56-5-94 21-93 57 1 39 43 62 110 48"/>
+    <path d="M413 345c56-5 94 21 93 57-1 39-43 62-110 48"/>
+  </g>
+  <path d="M380 176c-28 78-21 179 0 274 21-95 28-196 0-274z" fill="#ead2be" stroke="#fff4ea" stroke-opacity=".7" stroke-width="3"/>
+  <path d="M362 268c-54-38-112 7-99 68 10 47 57 78 103 85zM398 268c54-38 112 7 99 68-10 47-57 78-103 85z" fill="#a94c5f" fill-opacity=".42" stroke="#ecc7cb" stroke-opacity=".58" stroke-width="2"/>
+  <path d="M381 314c-38-30-77 10-62 54 12 35 41 64 62 82 21-18 50-47 62-82 15-44-24-84-62-54z" fill="url(#organ)" stroke="#f1b9c2" stroke-opacity=".65" stroke-width="2"/>
+  <path d="M283 488c54-34 140-33 194 0 40 25 30 92-1 127-53 60-139 59-192 0-32-35-42-102-1-127z" fill="#8f3047" fill-opacity=".42" stroke="#f0b8c2" stroke-opacity=".55" stroke-width="2"/>
+  <path d="M380 466v354M280 570c57 25 143 25 200 0M273 639c62 23 152 23 214 0M268 707c66 20 158 20 224 0" fill="none" stroke="#f5e8dc" stroke-opacity=".38" stroke-width="2"/>
+  <g fill="#d5a747">
+    <circle cx="380" cy="165" r="5"/><circle cx="380" cy="450" r="5"/><circle cx="380" cy="820" r="5"/>
+  </g>
+</svg>

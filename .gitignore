@@ -1,0 +1,28 @@
+# Dependencies and build outputs
+node_modules/
+.pnpm-store/
+.next/
+dist/
+coverage/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+Cediah web.txt
+
+# Supabase local runtime
+supabase/.branches/
+supabase/.temp/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+*.log
+
+# Generated document locks
+~$*.docx

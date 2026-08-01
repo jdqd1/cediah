@@ -1,0 +1,2 @@
+-- Datos semilla pendientes de la aprobacion del curso piloto.
+-- No usar informacion personal real en ambientes local o preview.
