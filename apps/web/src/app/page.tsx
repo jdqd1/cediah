@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { SystemStatus } from "@/components/system-status";
 import { demoCourses } from "@/data/demo-courses";
 
@@ -88,20 +89,26 @@ export default function Home() {
         <div className="course-list" aria-label="Cursos de demostración">
           {demoCourses.map((course, index) => (
             <article className="course-row" key={course.code}>
-              <span className="course-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-              <div className="course-title">
-                <p>{course.region}</p>
-                <h3>{course.title}</h3>
-              </div>
-              <div className="course-detail">
-                <p>{course.summary}</p>
-                <dl>
-                  <div><dt>Módulos</dt><dd>{course.modules}</dd></div>
-                  <div><dt>Lecciones</dt><dd>{course.lessons}</dd></div>
-                  <div><dt>Duración demo</dt><dd>{course.duration}</dd></div>
-                </dl>
-              </div>
-              <span className="course-state">Sin videos aún</span>
+              <Link
+                className="course-row-link"
+                href={`/cursos/${course.slug}`}
+                aria-label={`Ver ficha de demostración de ${course.title}`}
+              >
+                <span className="course-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                <div className="course-title">
+                  <p>{course.region}</p>
+                  <h3>{course.title}</h3>
+                </div>
+                <div className="course-detail">
+                  <p>{course.summary}</p>
+                  <dl>
+                    <div><dt>Módulos</dt><dd>{course.modules}</dd></div>
+                    <div><dt>Lecciones</dt><dd>{course.lessons}</dd></div>
+                    <div><dt>Duración demo</dt><dd>{course.duration}</dd></div>
+                  </dl>
+                </div>
+                <span className="course-state">Ver ficha demo</span>
+              </Link>
             </article>
           ))}
         </div>
