@@ -28,6 +28,7 @@ export default function Home() {
             <a href="#modelo">Modelo</a>
             <a href="#cursos">Cursos</a>
             <a href="#video">Tecnología</a>
+            <Link href="/acceder">Acceder</Link>
             <a className="nav-cta" href="#cursos">Ver cursos</a>
           </nav>
         </header>

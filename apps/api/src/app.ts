@@ -1,12 +1,34 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
-import { HealthResponseSchema } from "@cediah/contracts";
+import {
+  CurrentUserResponseSchema,
+  type IdentityProvider,
+  HealthResponseSchema,
+} from "@cediah/contracts";
 import { type ApiEnvironment, readEnvironment } from "./config.js";
+import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
+
+type AppDependencies = {
+  identityProvider?: IdentityProvider;
+};
+
+function readBearerToken(authorization: string | undefined) {
+  if (!authorization) return null;
+
+  const [scheme, token, extra] = authorization.trim().split(/\s+/);
+  if (scheme !== "Bearer" || !token || extra) return null;
+
+  return token;
+}
 
 export async function buildApp(
   environment: ApiEnvironment = readEnvironment(),
+  dependencies: AppDependencies = {},
 ): Promise<FastifyInstance> {
+  const identityProvider =
+    dependencies.identityProvider ??
+    (environment.supabase ? createSupabaseIdentityProvider(environment.supabase) : undefined);
   const app = Fastify({
     bodyLimit: 1_048_576,
     logger:
@@ -50,6 +72,42 @@ export async function buildApp(
       version: "0.1.0",
     });
     return reply.header("Cache-Control", "no-store").send(response);
+  });
+
+  app.get("/v1/auth/me", async (request, reply) => {
+    const accessToken = readBearerToken(request.headers.authorization);
+    if (!accessToken) {
+      return reply
+        .status(401)
+        .header("Cache-Control", "no-store")
+        .send({ error: "unauthorized" });
+    }
+
+    if (!identityProvider) {
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "identity_unavailable" });
+    }
+
+    try {
+      const user = await identityProvider.getUser(accessToken);
+      if (!user) {
+        return reply
+          .status(401)
+          .header("Cache-Control", "no-store")
+          .send({ error: "unauthorized" });
+      }
+
+      const response = CurrentUserResponseSchema.parse({ user });
+      return reply.header("Cache-Control", "no-store").send(response);
+    } catch (error) {
+      request.log.warn({ err: error }, "Identity provider validation failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "identity_unavailable" });
+    }
   });
 
   app.setNotFoundHandler((_request, reply) => {

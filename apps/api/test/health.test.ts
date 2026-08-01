@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { IdentityProvider } from "@cediah/contracts";
 import { buildApp } from "../src/app.js";
+import { readEnvironment } from "../src/config.js";
 
 const testEnvironment = {
   HOST: "127.0.0.1",
@@ -33,5 +35,53 @@ describe("GET /health", () => {
     expect(response.json()).toEqual({ error: "not_found" });
 
     await app.close();
+  });
+
+  it("validates a bearer token through the configured identity provider", async () => {
+    const identityProvider: IdentityProvider = {
+      getUser: async (accessToken) =>
+        accessToken === "valid-access-token"
+          ? { email: "estudiante@example.test", id: "04761a7d-4c02-48d7-b3a2-94b8baadf021" }
+          : null,
+      revokeSessions: async () => undefined,
+    };
+    const app = await buildApp(testEnvironment, { identityProvider });
+
+    const allowed = await app.inject({
+      headers: { authorization: "Bearer valid-access-token" },
+      method: "GET",
+      url: "/v1/auth/me",
+    });
+    const denied = await app.inject({ method: "GET", url: "/v1/auth/me" });
+
+    expect(allowed.statusCode).toBe(200);
+    expect(allowed.headers["cache-control"]).toBe("no-store");
+    expect(allowed.json()).toEqual({
+      user: { email: "estudiante@example.test", id: "04761a7d-4c02-48d7-b3a2-94b8baadf021" },
+    });
+    expect(denied.statusCode).toBe(401);
+    expect(denied.json()).toEqual({ error: "unauthorized" });
+
+    await app.close();
+  });
+
+  it("fails closed when no identity provider is configured", async () => {
+    const app = await buildApp(testEnvironment);
+    const response = await app.inject({
+      headers: { authorization: "Bearer valid-access-token" },
+      method: "GET",
+      url: "/v1/auth/me",
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: "identity_unavailable" });
+
+    await app.close();
+  });
+
+  it("requires the Supabase URL and secret key to be configured together", () => {
+    expect(() => readEnvironment({ SUPABASE_URL: "https://project.supabase.co" })).toThrow(
+      "SUPABASE_URL and SUPABASE_SECRET_KEY must be configured together",
+    );
   });
 });

@@ -24,6 +24,9 @@ importers:
       '@fastify/helmet':
         specifier: 13.1.0
         version: 13.1.0
+      '@supabase/supabase-js':
+        specifier: 2.111.0
+        version: 2.111.0
       fastify:
         specifier: 5.11.0
         version: 5.11.0

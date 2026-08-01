@@ -50,3 +50,13 @@ El proyecto de Vercel debe usar `apps/web` como Root Directory. El archivo `apps
 - deja que Vercel administre la salida nativa `.next`.
 
 En el panel de Vercel selecciona el preset Next.js, configura Root Directory como `apps/web` y no fuerces `public` como Output Directory. La API se despliega por separado en Render.
+
+## Configuración de acceso
+
+La web usa Supabase Auth solo para crear y mantener la sesión. Los datos académicos siguen pasando por la API y no se conceden permisos directos a tablas desde el navegador.
+
+- En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- En Render: `WEB_ORIGINS`, `SUPABASE_URL` y `SUPABASE_SECRET_KEY`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
+- En Supabase Auth: define la URL del sitio y las URL de redirección exactas para `http://localhost:3000/auth/callback`, previews autorizados y `https://cediah.vercel.app/auth/callback`; configura SMTP antes del piloto.
+
+Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y el acceso a `/panel` con una cuenta de prueba. La API debe validar siempre el bearer token antes de servir datos protegidos.

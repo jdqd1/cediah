@@ -13,3 +13,7 @@ services:
         value: 0.0.0.0
       - key: WEB_ORIGINS
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false

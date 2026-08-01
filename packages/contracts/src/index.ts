@@ -10,6 +10,18 @@ export const HealthResponseSchema = z.object({
 
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
+export const CurrentUserSchema = z.object({
+  email: z.string().email(),
+  id: z.string().uuid(),
+});
+
+export const CurrentUserResponseSchema = z.object({
+  user: CurrentUserSchema,
+});
+
+export type CurrentUser = z.infer<typeof CurrentUserSchema>;
+export type CurrentUserResponse = z.infer<typeof CurrentUserResponseSchema>;
+
 export type ProviderUser = {
   email: string;
   id: string;

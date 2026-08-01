@@ -13,6 +13,7 @@ El archivo local historico sigue ignorado por Git. El responsable confirmo que M
 - CSP por solicitud con nonce en la web, mas protecciones contra framing y MIME sniffing.
 - Proxy same-origin para el health check; la URL privada de la API no se expone al navegador.
 - API con limites de cuerpo, CORS allowlist, cabeceras seguras y redaccion de logs.
+- La web usa solo URL y clave publicable de Supabase para sesiones; `SUPABASE_SECRET_KEY` queda únicamente en entornos de API, como Render, para validar tokens.
 - Respuestas de error genericas y validacion con Zod.
 - Dependencias reproducibles mediante lockfile despues de la instalacion.
 
@@ -20,6 +21,7 @@ El archivo local historico sigue ignorado por Git. El responsable confirmo que M
 
 - Confirmar que el archivo local historico nunca entro en Git y eliminarlo de forma segura.
 - Configurar secretos en Vercel, Render y Supabase, nunca en el repositorio.
+- Configurar URL del sitio, redirecciones exactas y SMTP en Supabase Auth antes de habilitar registro real.
 - Separar proyectos y claves de preview/produccion.
 - Habilitar RLS en cada tabla expuesta y probar acceso negativo.
 - Agregar rate limiting a autenticacion y operaciones costosas.

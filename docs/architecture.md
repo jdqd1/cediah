@@ -29,6 +29,12 @@ La primera migracion de Supabase crea perfiles minimos, roles gestionados por se
 
 Todas las tablas de `public` tienen RLS activado y no conceden privilegios a `anon` ni `authenticated`. La API sera el unico limite inicial de autorizacion; una pantalla no accedera a una tabla directamente hasta que su migracion incorpore grants minimos, politicas RLS y pruebas de acceso positivo y negativo.
 
+## Identidad y sesión
+
+La web crea la sesión de Supabase Auth con la clave publicable y la conserva en cookies SSR. El proxy refresca claims verificados con `getClaims`; el servidor reenvía el access token a `GET /v1/auth/me` y Fastify lo valida de nuevo mediante `auth.getUser` con una clave secreta que solo existe en Render. Ninguna decisión de autorización usa `user_metadata`, una sesión sin token validado no habilita el panel y la web no consulta tablas directamente.
+
+El registro, confirmación por callback, recuperación y actualización de contraseña requieren que Supabase tenga autorizadas las URL de redirección del ambiente y SMTP configurado antes de probar con usuarios reales.
+
 Las migraciones iniciales son `20260801172906_initial_platform_foundation.sql` y `20260801173029_add_platform_foreign_key_indexes.sql`. Sus indices cubren todas las claves foraneas y los asesores de Supabase no reportan defectos de seguridad ni claves foraneas sin indice.
 
 ## Ambientes

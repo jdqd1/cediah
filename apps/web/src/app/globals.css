@@ -938,6 +938,138 @@ footer p {
   margin: 0;
 }
 
+.auth-page,
+.dashboard-page {
+  min-height: 100svh;
+  background:
+    linear-gradient(135deg, rgb(21 34 53 / 98%), rgb(14 24 39 / 92%)),
+    repeating-linear-gradient(90deg, transparent 0 119px, var(--line-dark) 120px),
+    var(--ink);
+  color: var(--white);
+}
+
+.auth-header {
+  display: flex;
+  min-height: var(--header-height);
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem clamp(1.25rem, 5vw, 5rem);
+  border-bottom: 1px solid var(--line-dark);
+}
+
+.auth-header > a:not(.brand),
+.text-button {
+  color: rgb(255 253 248 / 76%);
+  font-size: 0.82rem;
+}
+
+.text-button {
+  min-height: 2.75rem;
+  border: 0;
+  padding: 0.5rem 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.auth-content,
+.dashboard-content {
+  display: grid;
+  min-height: calc(100svh - var(--header-height));
+  place-items: center;
+  padding: clamp(3rem, 8vw, 7rem) 1.25rem;
+}
+
+.auth-form,
+.dashboard-content > * {
+  width: min(100%, 34rem);
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.8rem;
+  padding: clamp(1.75rem, 5vw, 3.5rem);
+  border: 1px solid var(--line-dark);
+  background: rgb(255 253 248 / 7%);
+  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 18%);
+}
+
+.auth-form h1,
+.dashboard-content h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+}
+
+.auth-form > div > p:last-child,
+.dashboard-content > p:not(.eyebrow) {
+  color: rgb(255 253 248 / 70%);
+  line-height: 1.65;
+}
+
+.auth-form label {
+  margin-top: 0.75rem;
+  color: rgb(255 253 248 / 84%);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.auth-form input {
+  min-height: 3.2rem;
+  border: 1px solid rgb(255 253 248 / 38%);
+  border-radius: 0;
+  padding: 0.75rem 0.9rem;
+  background: rgb(255 253 248 / 96%);
+  color: var(--ink);
+  font: inherit;
+}
+
+.auth-form input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.auth-form .button {
+  width: fit-content;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.auth-form .button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+}
+
+.auth-message {
+  margin: 0.5rem 0 0;
+  border-left: 2px solid var(--gold);
+  padding-left: 0.8rem;
+  color: rgb(255 253 248 / 82%);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.auth-helper {
+  margin-top: 1.25rem;
+  color: rgb(255 253 248 / 72%);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+
+.dashboard-content {
+  place-content: center start;
+  max-width: 70rem;
+  margin: auto;
+}
+
+.dashboard-content > p:not(.eyebrow) {
+  max-width: 42rem;
+  margin: 1.75rem 0 2rem;
+  font-size: 1.05rem;
+}
+
 @keyframes enter-up {
   from { opacity: 0; transform: translateY(1.5rem); }
   to { opacity: 1; transform: translateY(0); }
@@ -1024,7 +1156,8 @@ footer p {
   }
 
   .site-header { padding-inline: 1.1rem; }
-  nav a:not(.nav-cta) { display: none; }
+  nav a:not(.nav-cta):not([href="/acceder"]) { display: none; }
+  nav a[href="/acceder"] { padding-inline: 0.15rem; }
   nav .nav-cta { padding: 0.55rem 0.75rem; }
   .hero-grid { padding-inline: 1.1rem; padding-bottom: 5rem; }
   h1 { font-size: clamp(3.15rem, 15vw, 5rem); }
