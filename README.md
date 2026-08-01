@@ -42,11 +42,11 @@ El nombre oficial confirmado es CEDIAH. La identidad visual y los contenidos act
 
 ## Despliegue en Vercel
 
-El proyecto de Vercel se configura desde la raiz del repositorio mediante `vercel.json`. Esa configuracion:
+El proyecto de Vercel debe usar `apps/web` como Root Directory. El archivo `apps/web/vercel.json`:
 
 - identifica el frontend como Next.js;
-- instala el monorepo con el lockfile congelado;
+- instala el monorepo desde la raiz con el lockfile congelado;
 - compila primero `@cediah/contracts` y despues `@cediah/web`;
-- publica la salida de Next.js ubicada en `apps/web/.next`.
+- deja que Vercel administre la salida nativa `.next`.
 
-En el panel de Vercel no se debe forzar `public` como Output Directory. El archivo versionado `vercel.json` reemplaza ese valor para que los despliegues sean reproducibles. La API se despliega por separado en Render.
+En el panel de Vercel selecciona el preset Next.js, configura Root Directory como `apps/web` y no fuerces `public` como Output Directory. La API se despliega por separado en Render.
