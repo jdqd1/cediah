@@ -39,3 +39,14 @@ También se pueden iniciar por separado con `pnpm dev:web` y `pnpm dev:api`.
 El archivo local `Cediah web.txt` esta ignorado por Git, pero eso no reemplaza la rotacion de las credenciales que contiene. No debe eliminarse hasta confirmar la rotacion y MFA. Consulta `docs/security.md`.
 
 El nombre oficial confirmado es CEDIAH. La identidad visual y los contenidos actuales siguen siendo provisionales hasta la aprobacion de la coordinacion.
+
+## Despliegue en Vercel
+
+El proyecto de Vercel se configura desde la raiz del repositorio mediante `vercel.json`. Esa configuracion:
+
+- identifica el frontend como Next.js;
+- instala el monorepo con el lockfile congelado;
+- compila primero `@cediah/contracts` y despues `@cediah/web`;
+- publica la salida de Next.js ubicada en `apps/web/.next`.
+
+En el panel de Vercel no se debe forzar `public` como Output Directory. El archivo versionado `vercel.json` reemplaza ese valor para que los despliegues sean reproducibles. La API se despliega por separado en Render.
