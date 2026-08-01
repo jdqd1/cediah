@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CEDIAH | Anatomia semivirtual",
+  title: "CEDIAH | Anatomía semivirtual",
   description:
-    "Plataforma educativa de anatomia para conectar estudio teorico, practica presencial y seguimiento del aprendizaje.",
+    "Plataforma educativa de anatomía para conectar estudio teórico, práctica presencial y seguimiento del aprendizaje.",
 };
 
 export const viewport: Viewport = {

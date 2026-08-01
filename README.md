@@ -38,4 +38,4 @@ También se pueden iniciar por separado con `pnpm dev:web` y `pnpm dev:api`.
 
 El archivo local `Cediah web.txt` esta ignorado por Git, pero eso no reemplaza la rotacion de las credenciales que contiene. No debe eliminarse hasta confirmar la rotacion y MFA. Consulta `docs/security.md`.
 
-El nombre y la identidad visual son provisionales hasta la aprobacion de la coordinacion.
+El nombre oficial confirmado es CEDIAH. La identidad visual y los contenidos actuales siguen siendo provisionales hasta la aprobacion de la coordinacion.

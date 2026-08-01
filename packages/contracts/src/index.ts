@@ -26,9 +26,30 @@ export interface StorageProvider {
   upload(path: string, body: Uint8Array, contentType: string): Promise<void>;
 }
 
+export const VideoAssetStatusSchema = z.enum([
+  "waiting_for_upload",
+  "uploading",
+  "processing",
+  "ready",
+  "failed",
+]);
+
+export type VideoAssetStatus = z.infer<typeof VideoAssetStatusSchema>;
+
+export type DirectVideoUpload = {
+  expiresAt: string;
+  externalVideoId: string;
+  uploadUrl: string;
+};
+
 export interface VideoProvider {
+  createDirectUpload(input: {
+    creatorId: string;
+    fileName: string;
+    maxDurationSeconds: number;
+  }): Promise<DirectVideoUpload>;
   createPlaybackToken(videoId: string, expiresInSeconds: number): Promise<string>;
-  getPlaybackStatus(videoId: string): Promise<"processing" | "ready" | "failed">;
+  getPlaybackStatus(videoId: string): Promise<VideoAssetStatus>;
 }
 
 export interface PaymentProvider {

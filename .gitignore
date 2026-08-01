@@ -1,5 +1,6 @@
 # Dependencies and build outputs
 node_modules/
+node_modules.corrupt-*/
 .pnpm-store/
 .next/
 dist/
