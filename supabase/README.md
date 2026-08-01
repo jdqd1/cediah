@@ -12,4 +12,6 @@ Esta carpeta fue creada con la CLI oficial de Supabase. La configuracion usa Pos
 6. Escribir politicas con `TO authenticated` mas predicados de propietario; no usar `user_metadata` para autorizacion.
 7. Probar acceso permitido y denegado, ejecutar asesores y verificar la lista de migraciones antes de cerrar el cambio.
 
-No se crea todavia el esquema del dominio: los roles, el curso piloto y los criterios academicos deben aprobarse antes para evitar una migracion prematura.
+La coordinacion aprobo el alcance de la plataforma el 1 de agosto de 2026. La primera migracion crea solo la fundacion de identidad, roles, cursos, lecciones, recursos, inscripciones, progreso y auditoria; no incluye contenido academico, estudiantes ni archivos reales.
+
+Las tablas no otorgan acceso directo a `anon` ni `authenticated`. La API sera el limite inicial de autorizacion. Cada flujo que se abra al navegador debera incorporar grants minimos, politicas RLS y pruebas de acceso permitido y denegado en una migracion posterior.

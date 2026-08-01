@@ -23,6 +23,14 @@ Next.js / Vercel  ----->  Fastify / Render  ----->  Postgres / Supabase
 - Las migraciones usan SQL compatible con Postgres y se versionan en `supabase/migrations`.
 - Los archivos de usuario no se guardaran en el filesystem efimero de Render.
 
+## Fundacion de datos
+
+La primera migracion de Supabase crea perfiles minimos, roles gestionados por servidor, cursos, modulos, lecciones, recursos, inscripciones, progreso y auditoria. No incorpora contenido academico, estudiantes ni archivos reales.
+
+Todas las tablas de `public` tienen RLS activado y no conceden privilegios a `anon` ni `authenticated`. La API sera el unico limite inicial de autorizacion; una pantalla no accedera a una tabla directamente hasta que su migracion incorpore grants minimos, politicas RLS y pruebas de acceso positivo y negativo.
+
+Las migraciones iniciales son `20260801172906_initial_platform_foundation.sql` y `20260801173029_add_platform_foreign_key_indexes.sql`. Sus indices cubren todas las claves foraneas y los asesores de Supabase no reportan defectos de seguridad ni claves foraneas sin indice.
+
 ## Ambientes
 
 | Ambiente | Web | API | Datos | Uso |
