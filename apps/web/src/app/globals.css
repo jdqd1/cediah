@@ -4138,3 +4138,22 @@ img {
   .role-management-grid { grid-template-columns: 1fr; }
   .role-management-max-badge { align-self: flex-start; }
 }
+
+.dashboard-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  margin-top: 0.7rem;
+  border: 1px solid #c99a58;
+  border-radius: 999px;
+  background: #fff7e7;
+  padding: 0.38rem 0.68rem;
+  color: #80510c;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.dashboard-admin-badge svg {
+  flex: 0 0 auto;
+}

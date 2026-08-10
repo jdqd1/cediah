@@ -102,9 +102,11 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
 export function DashboardScreen({
   available,
   items,
+  isAdministrator = false,
 }: {
   available: boolean;
   items: ContentItem[];
+  isAdministrator?: boolean;
 }) {
   const videos = items
     .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
@@ -117,6 +119,7 @@ export function DashboardScreen({
   return (
     <AppShell
       activeKey="dashboard"
+      isAdministrator={isAdministrator}
       headerTitle="¡Bienvenido de vuelta!"
       headerSubtitle="Contenido académico publicado por la comunidad CEDIAH."
       searchPlaceholder="Buscar contenido..."

@@ -33,6 +33,7 @@ type AppShellProps = {
   activeKey: string;
   canManageContent?: boolean;
   canManageRoles?: boolean;
+  isAdministrator?: boolean;
   centeredSearch?: boolean;
   children: ReactNode;
   headerSubtitle?: string;
@@ -96,6 +97,7 @@ export function AppShell({
   breadcrumbs,
   canManageContent = false,
   canManageRoles = false,
+  isAdministrator = false,
   centeredSearch = false,
   children,
   headerSubtitle,
@@ -204,6 +206,12 @@ export function AppShell({
               <>
                 <h1>{headerTitle}</h1>
                 {headerSubtitle && <p>{headerSubtitle}</p>}
+                {isAdministrator && (
+                  <span className="dashboard-admin-badge" aria-label="Rol: administrador">
+                    <ShieldCheck size={16} weight="fill" />
+                    Administrador
+                  </span>
+                )}
               </>
             )}
           </div>
