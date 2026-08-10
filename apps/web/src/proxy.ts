@@ -17,6 +17,7 @@ export async function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
+    `media-src 'self'${supabaseUrl ? ` ${new URL(supabaseUrl).origin}` : ""} blob:`,
     `connect-src 'self'${supabaseUrl ? ` ${new URL(supabaseUrl).origin}` : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
