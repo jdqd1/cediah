@@ -25,6 +25,7 @@ COPY --from=build --chown=cediah:cediah /app/apps/api/node_modules ./apps/api/no
 COPY --from=build --chown=cediah:cediah /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build --chown=cediah:cediah /app/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=cediah:cediah /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=build --chown=cediah:cediah /app/packages/contracts/node_modules ./packages/contracts/node_modules
 COPY --from=build --chown=cediah:cediah /app/packages/contracts/dist ./packages/contracts/dist
 
 USER cediah
