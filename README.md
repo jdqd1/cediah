@@ -63,16 +63,18 @@ Después de configurar los ambientes, prueba registro, confirmación de correo, 
 
 ## Pruebas privadas de video
 
-La ruta `/pruebas/video` está pensada para que una cuenta de prueba autorizada suba un video propio y compruebe carga, procesamiento y reproducción antes de introducir contenido académico real. Está desactivada por defecto y no crea cursos, matrículas ni publicaciones.
+La ruta `/pruebas/video` está pensada para que una cuenta de prueba autorizada suba un video propio y compruebe carga y reproducción antes de introducir contenido académico real. Está desactivada por defecto y no crea cursos, matrículas ni publicaciones.
 
 Configura únicamente en el servidor de la API:
 
-- `CLOUDFLARE_STREAM_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN` y `CLOUDFLARE_STREAM_CUSTOMER_CODE`. El token debe tener los permisos mínimos `Stream Read` y `Stream Write`; nunca se declara en Vercel ni con el prefijo `NEXT_PUBLIC_`.
+- `VIDEO_TEST_PROVIDER=supabase` para usar el flujo gratuito de prueba. El valor `cloudflare` queda disponible para una futura cuenta de Stream con plan activo.
+- `SUPABASE_STORAGE_BUCKET=video-test`, un bucket privado creado en Supabase Storage con un límite de 50 MB y los MIME `video/mp4`, `video/quicktime` y `video/webm`.
+- `SUPABASE_URL` y `SUPABASE_SECRET_KEY`; la clave secreta nunca se declara en Vercel ni con el prefijo `NEXT_PUBLIC_`.
 - `VIDEO_TEST_UPLOAD_ENABLED=true`.
 - `VIDEO_TEST_UPLOADER_IDS` con los UUID de Supabase, separados por coma, de las cuentas que podrán realizar la prueba.
-- `VIDEO_TEST_MAX_DURATION_SECONDS` y `VIDEO_TEST_MAX_FILE_BYTES` si se requieren límites menores que los valores de prueba predeterminados (15 minutos y 190 MB).
-- `WEB_ORIGINS` con cada origen exacto que podrá embeber el reproductor, incluido el sitio de Vercel y `localhost` durante la prueba local.
+- `VIDEO_TEST_MAX_DURATION_SECONDS` y `VIDEO_TEST_MAX_FILE_BYTES` si se requieren límites menores que los valores de prueba predeterminados (15 minutos y 50 MB).
+- `WEB_ORIGINS` con cada origen exacto que podrá solicitar la prueba, incluido el sitio de Vercel y `localhost` durante la prueba local.
 
-La API emite un enlace de carga de un solo uso que vence a los 15 minutos, asigna el activo a la cuenta autorizada y exige URL firmada para reproducirlo. El reproductor recibe una sesión de 10 minutos y no habilita descargas. Cloudflare Stream impone un máximo de 200 MB para esta forma de carga directa; los videos mayores requerirán el protocolo TUS, que no se habilita en esta primera prueba.
+La API emite un enlace firmado de carga, asigna el archivo a la cuenta autorizada y vuelve a emitir una URL firmada de reproducción por 10 minutos. El navegador usa el reproductor nativo HTML5 sobre Supabase Storage; no es el iframe de Cloudflare, pero permite validar el flujo real de archivo privado sin contratar Stream.
 
-Al terminar la validación, elimina manualmente los videos de prueba desde Cloudflare Stream. No se deben usar grabaciones de clases, datos de pacientes, materiales de terceros ni archivos que puedan confundirse con contenido académico publicado.
+Al terminar la validación, elimina manualmente los videos de prueba desde Supabase Storage. No se deben usar grabaciones de clases, datos de pacientes, materiales de terceros ni archivos que puedan confundirse con contenido académico publicado.

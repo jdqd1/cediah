@@ -85,9 +85,9 @@ describe("GET /health", () => {
     );
   });
 
-  it("fails closed when private video testing is enabled without Cloudflare Stream configuration", () => {
+  it("fails closed when private video testing is enabled without Supabase configuration", () => {
     expect(() => readEnvironment({ VIDEO_TEST_UPLOAD_ENABLED: "true" })).toThrow(
-      "Cloudflare Stream must be configured when VIDEO_TEST_UPLOAD_ENABLED is true",
+      "Supabase must be configured when VIDEO_TEST_PROVIDER is supabase",
     );
   });
 
@@ -97,6 +97,7 @@ describe("GET /health", () => {
       CLOUDFLARE_STREAM_API_TOKEN: "test-token",
       CLOUDFLARE_STREAM_CUSTOMER_CODE: "test-customer",
       VIDEO_TEST_UPLOAD_ENABLED: "true",
+      VIDEO_TEST_PROVIDER: "cloudflare",
       VIDEO_TEST_UPLOADER_IDS: "04761A7D-4C02-48D7-B3A2-94B8BAADF021",
     });
 

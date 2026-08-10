@@ -11,9 +11,11 @@ const EnvironmentSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
     SUPABASE_SECRET_KEY: z.string().min(1).optional(),
+    SUPABASE_STORAGE_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,62}$/).default("video-test"),
     SUPABASE_URL: z.string().url().optional(),
+    VIDEO_TEST_PROVIDER: z.enum(["cloudflare", "supabase"]).default("supabase"),
     VIDEO_TEST_MAX_DURATION_SECONDS: z.coerce.number().int().min(60).max(36_000).default(900),
-    VIDEO_TEST_MAX_FILE_BYTES: z.coerce.number().int().min(1_000_000).max(200_000_000).default(190_000_000),
+    VIDEO_TEST_MAX_FILE_BYTES: z.coerce.number().int().min(1_000_000).max(200_000_000).default(50_000_000),
     VIDEO_TEST_UPLOAD_ENABLED: z.enum(["true", "false"]).default("false"),
     VIDEO_TEST_UPLOADER_IDS: z.string().optional(),
     WEB_ORIGINS: z.string().default("http://localhost:3000,http://127.0.0.1:3000"),
@@ -46,10 +48,17 @@ const EnvironmentSchema = z
     }
 
     if (environment.VIDEO_TEST_UPLOAD_ENABLED === "true") {
-      if (!hasCompleteCloudflareConfiguration) {
+      if (environment.VIDEO_TEST_PROVIDER === "cloudflare" && !hasCompleteCloudflareConfiguration) {
         context.addIssue({
           code: "custom",
-          message: "Cloudflare Stream must be configured when VIDEO_TEST_UPLOAD_ENABLED is true",
+          message: "Cloudflare Stream must be configured when VIDEO_TEST_PROVIDER is cloudflare",
+        });
+      }
+
+      if (environment.VIDEO_TEST_PROVIDER === "supabase" && !hasSupabaseUrl && !hasSupabaseSecret) {
+        context.addIssue({
+          code: "custom",
+          message: "Supabase must be configured when VIDEO_TEST_PROVIDER is supabase",
         });
       }
 
@@ -85,6 +94,14 @@ export type CloudflareStreamConfiguration = {
   customerCode: string;
 };
 
+export type VideoTestProvider = "cloudflare" | "supabase";
+
+export type SupabaseStorageConfiguration = {
+  bucket: string;
+  secretKey: string;
+  url: string;
+};
+
 export type TestVideoUploadConfiguration = {
   maxDurationSeconds: number;
   maxFileSizeBytes: number;
@@ -97,9 +114,12 @@ export type ApiEnvironment = {
   NODE_ENV: "development" | "test" | "production";
   PORT: number;
   SUPABASE_SECRET_KEY?: string;
+  SUPABASE_STORAGE_BUCKET?: string;
   SUPABASE_URL?: string;
+  VIDEO_TEST_PROVIDER?: VideoTestProvider;
   WEB_ORIGINS: string;
   supabase?: { secretKey: string; url: string };
+  supabaseStorage?: SupabaseStorageConfiguration;
   testVideoUpload?: TestVideoUploadConfiguration;
   webOrigins: Set<string>;
 };
@@ -129,6 +149,14 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
         }
       : undefined;
 
+  const supabaseStorage = supabase
+    ? {
+        bucket: environment.SUPABASE_STORAGE_BUCKET,
+        secretKey: supabase.secretKey,
+        url: supabase.url,
+      }
+    : undefined;
+
   const testVideoUpload =
     environment.VIDEO_TEST_UPLOAD_ENABLED === "true"
       ? {
@@ -138,5 +166,5 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
         }
       : undefined;
 
-  return { ...environment, cloudflareStream, supabase, testVideoUpload, webOrigins };
+  return { ...environment, cloudflareStream, supabase, supabaseStorage, testVideoUpload, webOrigins };
 }

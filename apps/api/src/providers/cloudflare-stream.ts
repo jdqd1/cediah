@@ -106,6 +106,7 @@ export function createCloudflareStreamVideoProvider(
       return {
         expiresAt: input.expiresAt,
         externalVideoId: result.uid,
+        uploadType: "multipart_post",
         uploadUrl: result.uploadURL,
       };
     },

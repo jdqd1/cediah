@@ -52,6 +52,10 @@ export type DirectVideoUpload = {
   expiresAt: string;
   externalVideoId: string;
   uploadUrl: string;
+  uploadType?: "multipart_post" | "supabase_signed";
+  uploadPath?: string;
+  uploadToken?: string;
+  storageBucket?: string;
 };
 
 export type VideoAsset = {
@@ -61,7 +65,8 @@ export type VideoAsset = {
 
 export type VideoPlaybackSession = {
   expiresAt: string;
-  iframeUrl: string;
+  iframeUrl?: string;
+  playbackUrl?: string;
 };
 
 const UnsafeFileNameCharacters = /[\\/\u0000-\u001F]/;
@@ -88,14 +93,35 @@ export const TestVideoUploadResponseSchema = z.object({
     expiresAt: z.string().datetime(),
     externalVideoId: z.string().min(1).max(64),
     uploadUrl: z.string().url(),
+    uploadType: z.enum(["multipart_post", "supabase_signed"]).default("multipart_post"),
+    uploadPath: z.string().min(1).optional(),
+    uploadToken: z.string().min(1).optional(),
+    storageBucket: z.string().min(1).optional(),
+  }).superRefine((upload, context) => {
+    if (upload.uploadType === "supabase_signed") {
+      if (!upload.uploadPath || !upload.uploadToken || !upload.storageBucket) {
+        context.addIssue({
+          code: "custom",
+          message: "Supabase signed uploads must include their path, token and bucket",
+        });
+      }
+    }
   }),
 });
 
 export const TestVideoAssetResponseSchema = z.object({
   expiresAt: z.string().datetime().optional(),
   iframeUrl: z.string().url().optional(),
+  playbackUrl: z.string().url().optional(),
   status: VideoAssetStatusSchema,
   videoId: z.string().min(1).max(64),
+}).superRefine((asset, context) => {
+  if (asset.status === "ready" && !asset.iframeUrl && !asset.playbackUrl) {
+    context.addIssue({
+      code: "custom",
+      message: "Ready video assets must include a playback URL",
+    });
+  }
 });
 
 export type TestVideoUploadRequest = z.infer<typeof TestVideoUploadRequestSchema>;
@@ -108,8 +134,12 @@ export interface VideoProvider {
     expiresAt: string;
     maxDurationSeconds: number;
   }): Promise<DirectVideoUpload>;
-  createPlaybackSession(videoId: string, expiresInSeconds: number): Promise<VideoPlaybackSession>;
-  getVideoAsset(videoId: string): Promise<VideoAsset | null>;
+  createPlaybackSession(
+    videoId: string,
+    expiresInSeconds: number,
+    creatorId?: string,
+  ): Promise<VideoPlaybackSession>;
+  getVideoAsset(videoId: string, creatorId?: string): Promise<VideoAsset | null>;
 }
 
 export interface PaymentProvider {

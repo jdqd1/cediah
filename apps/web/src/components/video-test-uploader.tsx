@@ -92,16 +92,23 @@ function isTestVideoAssetResponse(value: unknown): value is TestVideoAssetRespon
 }
 
 function uploadFile(
-  uploadUrl: string,
+  upload: TestVideoUploadResponse["upload"],
   file: File,
   onProgress: (percent: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     const formData = new FormData();
-    formData.append("file", file);
-
-    request.open("POST", uploadUrl);
+    const isSupabaseUpload = upload.uploadType === "supabase_signed";
+    if (isSupabaseUpload) {
+      formData.append("cacheControl", "3600");
+      formData.append("", file);
+      request.open("PUT", upload.uploadUrl);
+      request.setRequestHeader("x-upsert", "false");
+    } else {
+      formData.append("file", file);
+      request.open("POST", upload.uploadUrl);
+    }
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
     });
@@ -139,7 +146,7 @@ export function VideoTestUploader() {
 
       setAsset(body);
       setVideoId(body.videoId);
-      if (body.status === "ready" && body.iframeUrl) {
+      if (body.status === "ready" && (body.iframeUrl || body.playbackUrl)) {
         setErrorMessage(undefined);
         setPhase("ready");
         return;
@@ -227,7 +234,7 @@ export function VideoTestUploader() {
       setConstraints(provisionBody.constraints);
       setVideoId(provisionBody.upload.externalVideoId);
       setPhase("uploading");
-      await uploadFile(provisionBody.upload.uploadUrl, file, setProgress);
+      await uploadFile(provisionBody.upload, file, setProgress);
       setProgress(100);
       setPhase("processing");
       void checkStatus(provisionBody.upload.externalVideoId);
@@ -327,20 +334,30 @@ export function VideoTestUploader() {
         </div>
       </dl>
 
-      {asset?.iframeUrl && phase === "ready" ? (
+      {(asset?.iframeUrl || asset?.playbackUrl) && phase === "ready" ? (
         <section className="video-test-player" aria-labelledby="video-test-player-title">
           <div>
             <p className="eyebrow dark">Reproductor privado</p>
             <h3 id="video-test-player-title">El video está listo para la prueba.</h3>
           </div>
           <div className="video-test-iframe-shell">
-            <iframe
-              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-              src={asset.iframeUrl}
-              title="Reproductor privado de video de prueba"
-            />
+            {asset.playbackUrl ? (
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                src={asset.playbackUrl}
+                title="Reproductor privado de video de prueba"
+              />
+            ) : (
+              <iframe
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                src={asset.iframeUrl ?? ""}
+                title="Reproductor privado de video de prueba"
+              />
+            )}
           </div>
           <div className="video-test-player-meta">
             <p>

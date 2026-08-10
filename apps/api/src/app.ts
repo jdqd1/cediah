@@ -14,6 +14,7 @@ import {
 import { type ApiEnvironment, readEnvironment } from "./config.js";
 import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
 import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
+import { createSupabaseStorageVideoProvider } from "./providers/supabase-storage.js";
 
 type AppDependencies = {
   identityProvider?: IdentityProvider;
@@ -74,12 +75,16 @@ export async function buildApp(
     (environment.supabase ? createSupabaseIdentityProvider(environment.supabase) : undefined);
   const videoProvider =
     dependencies.videoProvider ??
-    (environment.cloudflareStream
-      ? createCloudflareStreamVideoProvider(
-          environment.cloudflareStream,
-          [...environment.webOrigins].map((origin) => new URL(origin).host),
-        )
-      : undefined);
+    (environment.VIDEO_TEST_PROVIDER === "supabase"
+      ? environment.supabaseStorage
+        ? createSupabaseStorageVideoProvider(environment.supabaseStorage)
+        : undefined
+      : environment.cloudflareStream
+        ? createCloudflareStreamVideoProvider(
+            environment.cloudflareStream,
+            [...environment.webOrigins].map((origin) => new URL(origin).host),
+          )
+        : undefined);
   const app = Fastify({
     bodyLimit: 1_048_576,
     logger:
@@ -195,7 +200,7 @@ export async function buildApp(
     }
 
     try {
-      const asset = await videoProvider.getVideoAsset(request.params.videoId);
+      const asset = await videoProvider.getVideoAsset(request.params.videoId, resolution.user.id);
       if (!asset || asset.creatorId !== resolution.user.id) {
         return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
       }
@@ -204,10 +209,12 @@ export async function buildApp(
         const playback = await videoProvider.createPlaybackSession(
           request.params.videoId,
           playbackLifetimeSeconds,
+          resolution.user.id,
         );
         const response = TestVideoAssetResponseSchema.parse({
           expiresAt: playback.expiresAt,
           iframeUrl: playback.iframeUrl,
+          playbackUrl: playback.playbackUrl,
           status: asset.status,
           videoId: request.params.videoId,
         });

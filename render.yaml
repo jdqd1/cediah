@@ -18,6 +18,8 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: video-test
       - key: CLOUDFLARE_STREAM_ACCOUNT_ID
         sync: false
       - key: CLOUDFLARE_STREAM_API_TOKEN
@@ -25,6 +27,12 @@ services:
       - key: CLOUDFLARE_STREAM_CUSTOMER_CODE
         sync: false
       - key: VIDEO_TEST_UPLOAD_ENABLED
-        value: "false"
+        value: "true"
+      - key: VIDEO_TEST_PROVIDER
+        value: supabase
       - key: VIDEO_TEST_UPLOADER_IDS
         sync: false
+      - key: VIDEO_TEST_MAX_DURATION_SECONDS
+        value: "900"
+      - key: VIDEO_TEST_MAX_FILE_BYTES
+        value: "50000000"
