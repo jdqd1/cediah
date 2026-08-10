@@ -5,19 +5,25 @@ import {
   CurrentUserResponseSchema,
   type IdentityProvider,
   HealthResponseSchema,
+  LessonProgressRouteParamsSchema,
+  LessonProgressResponseSchema,
+  type LearningProvider,
   TestVideoAssetResponseSchema,
   TestVideoUploadRequestSchema,
   TestVideoUploadResponseSchema,
+  UpdateLessonProgressRequestSchema,
   type ProviderUser,
   type VideoProvider,
 } from "@cediah/contracts";
 import { type ApiEnvironment, readEnvironment } from "./config.js";
 import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
 import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
+import { createSupabaseLearningProvider } from "./providers/supabase-learning.js";
 import { createSupabaseStorageVideoProvider } from "./providers/supabase-storage.js";
 
 type AppDependencies = {
   identityProvider?: IdentityProvider;
+  learningProvider?: LearningProvider;
   videoProvider?: VideoProvider;
 };
 
@@ -73,6 +79,9 @@ export async function buildApp(
   const identityProvider =
     dependencies.identityProvider ??
     (environment.supabase ? createSupabaseIdentityProvider(environment.supabase) : undefined);
+  const learningProvider =
+    dependencies.learningProvider ??
+    (environment.supabase ? createSupabaseLearningProvider(environment.supabase) : undefined);
   const videoProvider =
     dependencies.videoProvider ??
     (environment.VIDEO_TEST_PROVIDER === "supabase"
@@ -109,7 +118,7 @@ export async function buildApp(
 
   await app.register(cors, {
     credentials: false,
-    methods: ["GET", "HEAD", "OPTIONS", "POST"],
+    methods: ["GET", "HEAD", "OPTIONS", "PATCH", "POST"],
     origin(origin, callback) {
       if (!origin || environment.webOrigins.has(origin)) {
         callback(null, true);
@@ -137,6 +146,61 @@ export async function buildApp(
     const response = CurrentUserResponseSchema.parse({ user: resolution.user });
     return reply.header("Cache-Control", "no-store").send(response);
   });
+
+  app.get("/v1/learning/dashboard", async (request, reply) => {
+    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
+    if (!learningProvider) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "learning_unavailable" });
+    }
+
+    try {
+      const response = await learningProvider.getStudentDashboard(resolution.user.id);
+      return reply.header("Cache-Control", "no-store").send(response);
+    } catch {
+      request.log.error("Learning dashboard request failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "learning_unavailable" });
+    }
+  });
+
+  app.patch<{ Body: unknown; Params: { lessonId: string } }>(
+    "/v1/learning/lessons/:lessonId/progress",
+    async (request, reply) => {
+      const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+      if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
+      if (!learningProvider) {
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "learning_unavailable" });
+      }
+
+      const params = LessonProgressRouteParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      const input = UpdateLessonProgressRequestSchema.safeParse(request.body);
+      if (!input.success) {
+        return reply
+          .status(400)
+          .header("Cache-Control", "no-store")
+          .send({ error: "invalid_lesson_progress" });
+      }
+
+      try {
+        const progress = await learningProvider.updateLessonProgress({
+          lessonId: params.data.lessonId,
+          userId: resolution.user.id,
+          watchedSeconds: input.data.watchedSeconds,
+        });
+        if (!progress) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+
+        const response = LessonProgressResponseSchema.parse(progress);
+        return reply.header("Cache-Control", "no-store").send(response);
+      } catch {
+        request.log.error("Lesson-progress update failed");
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "learning_unavailable" });
+      }
+    },
+  );
 
   app.post<{ Body: unknown }>("/v1/videos/test-uploads", async (request, reply) => {
     const testVideoUpload = environment.testVideoUpload;

@@ -4,7 +4,7 @@ import { getServerEnvironment } from "./env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type CurrentUserResult =
-  | { status: "authenticated"; user: CurrentUser }
+  | { accessToken: string; status: "authenticated"; user: CurrentUser }
   | { status: "anonymous" }
   | { status: "unavailable" };
 
@@ -41,7 +41,7 @@ export async function getCurrentUser(): Promise<CurrentUserResult> {
     const result = CurrentUserResponseSchema.parse(await response.json());
     if (result.user.id !== claims.sub) return { status: "anonymous" };
 
-    return { status: "authenticated", user: result.user };
+    return { accessToken: session.access_token, status: "authenticated", user: result.user };
   } catch {
     return { status: "unavailable" };
   } finally {

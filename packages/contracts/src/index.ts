@@ -142,6 +142,57 @@ export interface VideoProvider {
   getVideoAsset(videoId: string, creatorId?: string): Promise<VideoAsset | null>;
 }
 
+export const LearningProgressStatusSchema = z.enum(["not_started", "in_progress", "completed"]);
+
+export type LearningProgressStatus = z.infer<typeof LearningProgressStatusSchema>;
+
+export const StudentLearningCourseSchema = z.object({
+  accessEndsAt: z.string().datetime().nullable(),
+  id: z.string().uuid(),
+  progress: z.object({
+    completedLessons: z.number().int().nonnegative(),
+    totalLessons: z.number().int().nonnegative(),
+    watchedSeconds: z.number().int().nonnegative(),
+  }),
+  slug: z.string().min(1).max(200),
+  title: z.string().min(1).max(200),
+});
+
+export const StudentLearningDashboardResponseSchema = z.object({
+  courses: z.array(StudentLearningCourseSchema),
+});
+
+export type StudentLearningCourse = z.infer<typeof StudentLearningCourseSchema>;
+export type StudentLearningDashboardResponse = z.infer<typeof StudentLearningDashboardResponseSchema>;
+
+export const UpdateLessonProgressRequestSchema = z.object({
+  watchedSeconds: z.number().int().min(0).max(86_400),
+});
+
+export type UpdateLessonProgressRequest = z.infer<typeof UpdateLessonProgressRequestSchema>;
+
+export const LessonProgressRouteParamsSchema = z.object({
+  lessonId: z.string().uuid(),
+});
+
+export const LessonProgressResponseSchema = z.object({
+  completedAt: z.string().datetime().nullable(),
+  lessonId: z.string().uuid(),
+  status: LearningProgressStatusSchema,
+  watchedSeconds: z.number().int().nonnegative(),
+});
+
+export type LessonProgressResponse = z.infer<typeof LessonProgressResponseSchema>;
+
+export interface LearningProvider {
+  getStudentDashboard(userId: string): Promise<StudentLearningDashboardResponse>;
+  updateLessonProgress(input: {
+    lessonId: string;
+    userId: string;
+    watchedSeconds: number;
+  }): Promise<LessonProgressResponse | null>;
+}
+
 export interface PaymentProvider {
   createPaymentIntent(input: {
     amountMinor: number;

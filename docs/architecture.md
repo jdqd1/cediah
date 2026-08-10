@@ -29,6 +29,10 @@ La primera migracion de Supabase crea perfiles minimos, roles gestionados por se
 
 Todas las tablas de `public` tienen RLS activado y no conceden privilegios a `anon` ni `authenticated`. La API sera el unico limite inicial de autorizacion; una pantalla no accedera a una tabla directamente hasta que su migracion incorpore grants minimos, politicas RLS y pruebas de acceso positivo y negativo.
 
+## Recorrido academico inicial
+
+La primera lectura academica se expone como `GET /v1/learning/dashboard` y solo devuelve cursos cuya matricula esta activa y dentro de su ventana de acceso. `PATCH /v1/learning/lessons/{lessonId}/progress` valida la identidad, comprueba la matricula del mismo usuario antes de persistir el progreso y responde como recurso inexistente cuando la leccion no le corresponde. La web solo reenvia el bearer token desde su componente de servidor; no recibe la clave secreta ni consulta tablas. Recursos, reproduccion academica y publicacion de contenido continuan fuera de este corte hasta recibir material y permisos autorizados.
+
 ## Identidad y sesión
 
 La web crea la sesión de Supabase Auth con la clave publicable y la conserva en cookies SSR. El proxy refresca claims verificados con `getClaims`; el servidor reenvía el access token a `GET /v1/auth/me` y Fastify lo valida de nuevo mediante `auth.getUser` con una clave secreta que solo existe en Render. Ninguna decisión de autorización usa `user_metadata`, una sesión sin token validado no habilita el panel y la web no consulta tablas directamente.
