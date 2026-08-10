@@ -1,17 +1,33 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } from "fastify";
 import {
   CurrentUserResponseSchema,
   type IdentityProvider,
   HealthResponseSchema,
+  TestVideoAssetResponseSchema,
+  TestVideoUploadRequestSchema,
+  TestVideoUploadResponseSchema,
+  type ProviderUser,
+  type VideoProvider,
 } from "@cediah/contracts";
 import { type ApiEnvironment, readEnvironment } from "./config.js";
+import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
 import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
 
 type AppDependencies = {
   identityProvider?: IdentityProvider;
+  videoProvider?: VideoProvider;
 };
+
+type UserResolution =
+  | { kind: "authenticated"; user: ProviderUser }
+  | { kind: "identity_unavailable" }
+  | { kind: "unauthorized" };
+
+const directUploadLifetimeMilliseconds = 15 * 60 * 1_000;
+const playbackLifetimeSeconds = 10 * 60;
+const VideoIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
 
 function readBearerToken(authorization: string | undefined) {
   if (!authorization) return null;
@@ -22,6 +38,33 @@ function readBearerToken(authorization: string | undefined) {
   return token;
 }
 
+async function resolveRequestUser(
+  authorization: string | undefined,
+  identityProvider: IdentityProvider | undefined,
+): Promise<UserResolution> {
+  const accessToken = readBearerToken(authorization);
+  if (!accessToken) return { kind: "unauthorized" };
+  if (!identityProvider) return { kind: "identity_unavailable" };
+
+  try {
+    const user = await identityProvider.getUser(accessToken);
+    return user ? { kind: "authenticated", user } : { kind: "unauthorized" };
+  } catch {
+    return { kind: "identity_unavailable" };
+  }
+}
+
+function sendUserResolutionError(
+  resolution: Exclude<UserResolution, { kind: "authenticated" }>,
+  reply: FastifyReply,
+) {
+  if (resolution.kind === "unauthorized") {
+    return reply.status(401).header("Cache-Control", "no-store").send({ error: "unauthorized" });
+  }
+
+  return reply.status(503).header("Cache-Control", "no-store").send({ error: "identity_unavailable" });
+}
+
 export async function buildApp(
   environment: ApiEnvironment = readEnvironment(),
   dependencies: AppDependencies = {},
@@ -29,6 +72,14 @@ export async function buildApp(
   const identityProvider =
     dependencies.identityProvider ??
     (environment.supabase ? createSupabaseIdentityProvider(environment.supabase) : undefined);
+  const videoProvider =
+    dependencies.videoProvider ??
+    (environment.cloudflareStream
+      ? createCloudflareStreamVideoProvider(
+          environment.cloudflareStream,
+          [...environment.webOrigins].map((origin) => new URL(origin).host),
+        )
+      : undefined);
   const app = Fastify({
     bodyLimit: 1_048_576,
     logger:
@@ -53,7 +104,7 @@ export async function buildApp(
 
   await app.register(cors, {
     credentials: false,
-    methods: ["GET", "HEAD", "OPTIONS"],
+    methods: ["GET", "HEAD", "OPTIONS", "POST"],
     origin(origin, callback) {
       if (!origin || environment.webOrigins.has(origin)) {
         callback(null, true);
@@ -75,38 +126,105 @@ export async function buildApp(
   });
 
   app.get("/v1/auth/me", async (request, reply) => {
-    const accessToken = readBearerToken(request.headers.authorization);
-    if (!accessToken) {
-      return reply
-        .status(401)
-        .header("Cache-Control", "no-store")
-        .send({ error: "unauthorized" });
+    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
+
+    const response = CurrentUserResponseSchema.parse({ user: resolution.user });
+    return reply.header("Cache-Control", "no-store").send(response);
+  });
+
+  app.post<{ Body: unknown }>("/v1/videos/test-uploads", async (request, reply) => {
+    const testVideoUpload = environment.testVideoUpload;
+    if (!testVideoUpload || !videoProvider) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
     }
 
-    if (!identityProvider) {
+    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
+    if (!testVideoUpload.uploaderIds.has(resolution.user.id.toLowerCase())) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
+
+    const input = TestVideoUploadRequestSchema.safeParse(request.body);
+    if (!input.success) {
       return reply
-        .status(503)
+        .status(400)
         .header("Cache-Control", "no-store")
-        .send({ error: "identity_unavailable" });
+        .send({ error: "invalid_video_test_upload" });
+    }
+    if (input.data.fileSizeBytes > testVideoUpload.maxFileSizeBytes) {
+      return reply
+        .status(413)
+        .header("Cache-Control", "no-store")
+        .send({ error: "video_test_file_too_large" });
     }
 
     try {
-      const user = await identityProvider.getUser(accessToken);
-      if (!user) {
-        return reply
-          .status(401)
-          .header("Cache-Control", "no-store")
-          .send({ error: "unauthorized" });
-      }
-
-      const response = CurrentUserResponseSchema.parse({ user });
+      const upload = await videoProvider.createDirectUpload({
+        creatorId: resolution.user.id,
+        expiresAt: new Date(Date.now() + directUploadLifetimeMilliseconds).toISOString(),
+        maxDurationSeconds: testVideoUpload.maxDurationSeconds,
+      });
+      const response = TestVideoUploadResponseSchema.parse({
+        constraints: {
+          maxDurationSeconds: testVideoUpload.maxDurationSeconds,
+          maxFileSizeBytes: testVideoUpload.maxFileSizeBytes,
+        },
+        upload,
+      });
       return reply.header("Cache-Control", "no-store").send(response);
-    } catch (error) {
-      request.log.warn({ err: error }, "Identity provider validation failed");
+    } catch {
+      request.log.error("Test-video direct-upload provisioning failed");
       return reply
         .status(503)
         .header("Cache-Control", "no-store")
-        .send({ error: "identity_unavailable" });
+        .send({ error: "video_test_unavailable" });
+    }
+  });
+
+  app.get<{ Params: { videoId: string } }>("/v1/videos/test-assets/:videoId", async (request, reply) => {
+    const testVideoUpload = environment.testVideoUpload;
+    if (!testVideoUpload || !videoProvider || !VideoIdPattern.test(request.params.videoId)) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    }
+
+    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
+    if (!testVideoUpload.uploaderIds.has(resolution.user.id.toLowerCase())) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
+
+    try {
+      const asset = await videoProvider.getVideoAsset(request.params.videoId);
+      if (!asset || asset.creatorId !== resolution.user.id) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      if (asset.status === "ready") {
+        const playback = await videoProvider.createPlaybackSession(
+          request.params.videoId,
+          playbackLifetimeSeconds,
+        );
+        const response = TestVideoAssetResponseSchema.parse({
+          expiresAt: playback.expiresAt,
+          iframeUrl: playback.iframeUrl,
+          status: asset.status,
+          videoId: request.params.videoId,
+        });
+        return reply.header("Cache-Control", "no-store").send(response);
+      }
+
+      const response = TestVideoAssetResponseSchema.parse({
+        status: asset.status,
+        videoId: request.params.videoId,
+      });
+      return reply.header("Cache-Control", "no-store").send(response);
+    } catch {
+      request.log.error("Test-video status or playback request failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "video_test_unavailable" });
     }
   });
 

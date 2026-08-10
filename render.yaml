@@ -17,3 +17,13 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
+      - key: CLOUDFLARE_STREAM_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_STREAM_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_STREAM_CUSTOMER_CODE
+        sync: false
+      - key: VIDEO_TEST_UPLOAD_ENABLED
+        value: "false"
+      - key: VIDEO_TEST_UPLOADER_IDS
+        sync: false

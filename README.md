@@ -60,3 +60,19 @@ La web usa Supabase Auth solo para crear y mantener la sesión. Los datos acadé
 - En Supabase Auth: define la URL del sitio y las URL de redirección exactas para `http://localhost:3000/auth/callback`, previews autorizados y `https://cediah.vercel.app/auth/callback`; configura SMTP antes del piloto.
 
 Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y el acceso a `/panel` con una cuenta de prueba. La API debe validar siempre el bearer token antes de servir datos protegidos.
+
+## Pruebas privadas de video
+
+La ruta `/pruebas/video` está pensada para que una cuenta de prueba autorizada suba un video propio y compruebe carga, procesamiento y reproducción antes de introducir contenido académico real. Está desactivada por defecto y no crea cursos, matrículas ni publicaciones.
+
+Configura únicamente en el servidor de la API:
+
+- `CLOUDFLARE_STREAM_ACCOUNT_ID`, `CLOUDFLARE_STREAM_API_TOKEN` y `CLOUDFLARE_STREAM_CUSTOMER_CODE`. El token debe tener los permisos mínimos `Stream Read` y `Stream Write`; nunca se declara en Vercel ni con el prefijo `NEXT_PUBLIC_`.
+- `VIDEO_TEST_UPLOAD_ENABLED=true`.
+- `VIDEO_TEST_UPLOADER_IDS` con los UUID de Supabase, separados por coma, de las cuentas que podrán realizar la prueba.
+- `VIDEO_TEST_MAX_DURATION_SECONDS` y `VIDEO_TEST_MAX_FILE_BYTES` si se requieren límites menores que los valores de prueba predeterminados (15 minutos y 190 MB).
+- `WEB_ORIGINS` con cada origen exacto que podrá embeber el reproductor, incluido el sitio de Vercel y `localhost` durante la prueba local.
+
+La API emite un enlace de carga de un solo uso que vence a los 15 minutos, asigna el activo a la cuenta autorizada y exige URL firmada para reproducirlo. El reproductor recibe una sesión de 10 minutos y no habilita descargas. Cloudflare Stream impone un máximo de 200 MB para esta forma de carga directa; los videos mayores requerirán el protocolo TUS, que no se habilita en esta primera prueba.
+
+Al terminar la validación, elimina manualmente los videos de prueba desde Cloudflare Stream. No se deben usar grabaciones de clases, datos de pacientes, materiales de terceros ni archivos que puedan confundirse con contenido académico publicado.

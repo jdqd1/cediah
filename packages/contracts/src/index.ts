@@ -54,14 +54,62 @@ export type DirectVideoUpload = {
   uploadUrl: string;
 };
 
+export type VideoAsset = {
+  creatorId: string | null;
+  status: VideoAssetStatus;
+};
+
+export type VideoPlaybackSession = {
+  expiresAt: string;
+  iframeUrl: string;
+};
+
+const UnsafeFileNameCharacters = /[\\/\u0000-\u001F]/;
+
+export const TestVideoUploadRequestSchema = z.object({
+  fileName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(255)
+    .refine((value) => !UnsafeFileNameCharacters.test(value), {
+      message: "fileName must be a file basename",
+    }),
+  fileSizeBytes: z.number().int().positive().max(200_000_000),
+  mimeType: z.enum(["video/mp4", "video/quicktime", "video/webm"]),
+});
+
+export const TestVideoUploadResponseSchema = z.object({
+  constraints: z.object({
+    maxDurationSeconds: z.number().int().positive(),
+    maxFileSizeBytes: z.number().int().positive(),
+  }),
+  upload: z.object({
+    expiresAt: z.string().datetime(),
+    externalVideoId: z.string().min(1).max(64),
+    uploadUrl: z.string().url(),
+  }),
+});
+
+export const TestVideoAssetResponseSchema = z.object({
+  expiresAt: z.string().datetime().optional(),
+  iframeUrl: z.string().url().optional(),
+  status: VideoAssetStatusSchema,
+  videoId: z.string().min(1).max(64),
+});
+
+export type TestVideoUploadRequest = z.infer<typeof TestVideoUploadRequestSchema>;
+export type TestVideoUploadResponse = z.infer<typeof TestVideoUploadResponseSchema>;
+export type TestVideoAssetResponse = z.infer<typeof TestVideoAssetResponseSchema>;
+
 export interface VideoProvider {
   createDirectUpload(input: {
     creatorId: string;
-    fileName: string;
+    expiresAt: string;
     maxDurationSeconds: number;
   }): Promise<DirectVideoUpload>;
-  createPlaybackToken(videoId: string, expiresInSeconds: number): Promise<string>;
-  getPlaybackStatus(videoId: string): Promise<VideoAssetStatus>;
+  createPlaybackSession(videoId: string, expiresInSeconds: number): Promise<VideoPlaybackSession>;
+  getVideoAsset(videoId: string): Promise<VideoAsset | null>;
 }
 
 export interface PaymentProvider {

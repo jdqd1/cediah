@@ -84,4 +84,24 @@ describe("GET /health", () => {
       "SUPABASE_URL and SUPABASE_SECRET_KEY must be configured together",
     );
   });
+
+  it("fails closed when private video testing is enabled without Cloudflare Stream configuration", () => {
+    expect(() => readEnvironment({ VIDEO_TEST_UPLOAD_ENABLED: "true" })).toThrow(
+      "Cloudflare Stream must be configured when VIDEO_TEST_UPLOAD_ENABLED is true",
+    );
+  });
+
+  it("normalizes the explicit video-test uploader allowlist", () => {
+    const environment = readEnvironment({
+      CLOUDFLARE_STREAM_ACCOUNT_ID: "a".repeat(32),
+      CLOUDFLARE_STREAM_API_TOKEN: "test-token",
+      CLOUDFLARE_STREAM_CUSTOMER_CODE: "test-customer",
+      VIDEO_TEST_UPLOAD_ENABLED: "true",
+      VIDEO_TEST_UPLOADER_IDS: "04761A7D-4C02-48D7-B3A2-94B8BAADF021",
+    });
+
+    expect(environment.testVideoUpload?.uploaderIds.has("04761a7d-4c02-48d7-b3a2-94b8baadf021")).toBe(
+      true,
+    );
+  });
 });

@@ -46,6 +46,9 @@ export default async function DashboardPage() {
         <h1 id="dashboard-title">Hola, {result.user.email}.</h1>
         <p>Tu acceso fue validado por la API. El curso vertical aparecerá aquí cuando coordinación entregue el contenido autorizado.</p>
         <Link className="button button-primary" href="/cursos">Explorar catálogo demo</Link>
+        <Link className="text-link" href="/pruebas/video">
+          Abrir laboratorio de video de prueba <span aria-hidden="true">→</span>
+        </Link>
       </section>
     </main>
   );
