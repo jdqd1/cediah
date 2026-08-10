@@ -15,10 +15,12 @@ import {
   MagnifyingGlass,
   Notebook,
   PlayCircle,
+  PencilSimpleLine,
   Question,
   X,
   UserCircle,
   UsersThree,
+  ShieldCheck,
 } from "@phosphor-icons/react";
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
@@ -29,6 +31,8 @@ import { CediahLogo } from "./cediah-logo";
 
 type AppShellProps = {
   activeKey: string;
+  canManageContent?: boolean;
+  canManageRoles?: boolean;
   centeredSearch?: boolean;
   children: ReactNode;
   headerSubtitle?: string;
@@ -51,14 +55,13 @@ type NavItem = {
 
 const mainNavigation: NavItem[] = [
   { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
-  { key: "classes", label: "Clases teóricas", href: "/clases/reproductor", icon: PlayCircle },
-  { key: "study", label: "Material de estudio", href: "/guias", icon: BookOpen },
+  { key: "video", label: "Clases teóricas", href: "/biblioteca?tipo=video", icon: PlayCircle },
+  { key: "study", label: "Material de estudio", href: "/biblioteca", icon: BookOpen },
   { key: "guides", label: "Guías", href: "/guias", icon: Notebook },
-  { key: "flashcards", label: "Flashcards", href: "/dashboard", icon: CardsThree },
-  { key: "quizzes", label: "Cuestionarios", href: "/dashboard", icon: ClipboardText },
-  { key: "atlas", label: "Atlas anatómicos", href: "/dashboard", icon: UserCircle },
+  { key: "flashcards", label: "Flashcards", href: "/biblioteca?tipo=flashcards", icon: CardsThree },
+  { key: "quiz", label: "Cuestionarios", href: "/biblioteca?tipo=quiz", icon: ClipboardText },
+  { key: "topic", label: "Temas anatómicos", href: "/biblioteca?tipo=topic", icon: UserCircle },
 ];
-
 const utilityNavigation: NavItem[] = [
   { key: "favorites", label: "Favoritos", href: "/dashboard", icon: BookmarkSimple },
   { key: "progress", label: "Mi progreso", href: "/dashboard", icon: ChartLineUp },
@@ -91,6 +94,8 @@ function NavigationItem({ item, activeKey, onNavigate }: { item: NavItem; active
 export function AppShell({
   activeKey,
   breadcrumbs,
+  canManageContent = false,
+  canManageRoles = false,
   centeredSearch = false,
   children,
   headerSubtitle,
@@ -129,6 +134,30 @@ export function AppShell({
             {includeCourses && (
               <NavigationItem
                 item={{ key: "courses", label: "Mis cursos", href: "/cursos", icon: CheckSquareOffset }}
+                activeKey={activeKey}
+                onNavigate={closeSidebar}
+              />
+            )}
+            {canManageContent && (
+              <NavigationItem
+                item={{
+                  key: "editor",
+                  label: "Gestión de contenido",
+                  href: "/panel/contenido",
+                  icon: PencilSimpleLine,
+                }}
+                activeKey={activeKey}
+                onNavigate={closeSidebar}
+              />
+            )}
+            {canManageRoles && (
+              <NavigationItem
+                item={{
+                  key: "roles",
+                  label: "Administrar roles",
+                  href: "/panel/administracion/roles",
+                  icon: ShieldCheck,
+                }}
                 activeKey={activeKey}
                 onNavigate={closeSidebar}
               />

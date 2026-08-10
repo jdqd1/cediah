@@ -5,60 +5,120 @@ import {
   BookOpen,
   CardsThree,
   CheckSquareOffset,
+  Compass,
   PlayCircle,
-  Skull,
 } from "@phosphor-icons/react/dist/ssr";
+import type { ContentItem, ContentKind } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
 import { BrandFooter } from "./brand-footer";
 
-const recentVideos = [
-  { title: "Músculos del cuello", region: "Región cervical", progress: 75, time: "28:45", image: "/anatomy/neck-muscles.png" },
-  { title: "Fosa craneal media", region: "Cabeza y cuello", progress: 60, time: "34:12", image: "/anatomy/skull.png" },
-  { title: "Cavidad pélvica", region: "Región pélvica", progress: 90, time: "41:08", image: "/anatomy/pelvis.png" },
+const kindLabels: Record<ContentKind, string> = {
+  flashcards: "Flashcards",
+  guide: "Guía",
+  quiz: "Cuestionario",
+  topic: "Tema",
+  video: "Video",
+};
+
+const kindImages: Record<ContentKind, string> = {
+  flashcards: "/anatomy/thigh.png",
+  guide: "/anatomy/back-muscles.png",
+  quiz: "/anatomy/heart.png",
+  topic: "/anatomy/skull.png",
+  video: "/anatomy/neck-muscles.png",
+};
+
+const materialDefinitions = [
+  {
+    description: "Documentos y lecturas",
+    href: "/guias",
+    icon: BookOpen,
+    kind: "guide" as const,
+    title: "Guías",
+  },
+  {
+    description: "Repasos rápidos",
+    href: "/biblioteca?tipo=flashcards",
+    icon: CardsThree,
+    kind: "flashcards" as const,
+    title: "Flashcards",
+  },
+  {
+    description: "Evalúa tu conocimiento",
+    href: "/biblioteca?tipo=quiz",
+    icon: CheckSquareOffset,
+    kind: "quiz" as const,
+    title: "Cuestionarios",
+  },
+  {
+    description: "Recorridos por tema",
+    href: "/biblioteca?tipo=topic",
+    icon: Compass,
+    kind: "topic" as const,
+    title: "Temas",
+  },
 ] as const;
 
-const mostViewed = [
-  { title: "Miembro inferior: músculos", region: "Región inferior", views: "128K visualizaciones", image: "/anatomy/thigh.png" },
-  { title: "Corazón: anatomía externa", region: "Tórax", views: "97K visualizaciones", image: "/anatomy/heart.png" },
-  { title: "Nervios del plexo braquial", region: "Miembro superior", views: "86K visualizaciones", image: "/anatomy/back-muscles.png" },
-  { title: "Huesos del cráneo", region: "Cabeza y cuello", views: "74K visualizaciones", image: "/anatomy/skull.png" },
-  { title: "Anatomía del abdomen", region: "Abdomen y pelvis", views: "62K visualizaciones", image: "/anatomy/intestines.png" },
-] as const;
+function contentHref(item: ContentItem) {
+  return item.kind === "guide"
+    ? "/guias/" + item.slug
+    : "/biblioteca/" + item.slug;
+}
 
-const studyMaterials = [
-  { title: "Guías", description: "Documentos PDF", icon: BookOpen, image: "/anatomy/back-muscles.png", href: "/guias" },
-  { title: "Flashcards", description: "Repasos rápidos", icon: CardsThree, image: "/anatomy/thigh.png", href: "/dashboard" },
-  { title: "Cuestionarios", description: "Evalúa tu conocimiento", icon: CheckSquareOffset, image: "/anatomy/heart.png", href: "/dashboard" },
-  { title: "Atlas anatómicos", description: "Imágenes y diagramas", icon: Skull, image: "/anatomy/skull.png", href: "/dashboard" },
-] as const;
+function formatDuration(item: ContentItem) {
+  if (item.kind === "video" && item.content.durationSeconds) {
+    const minutes = Math.max(1, Math.round(item.content.durationSeconds / 60));
+    return minutes + " min";
+  }
+  if (item.estimatedMinutes) return item.estimatedMinutes + " min";
+  return kindLabels[item.kind];
+}
 
-function VideoCard({ item }: { item: (typeof recentVideos)[number] }) {
+function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
   return (
-    <Link className="dashboard-video-card" href="/clases/reproductor">
+    <Link className="dashboard-video-card" href={contentHref(item)}>
       <div className="dashboard-video-media">
-        <Image src={item.image} alt="" fill sizes="(max-width: 900px) 80vw, 28vw" />
+        <Image
+          src={kindImages.video}
+          alt=""
+          fill
+          sizes="(max-width: 900px) 80vw, 28vw"
+        />
         <span className="dashboard-video-shade" />
-        <span className="dashboard-play-button" aria-hidden="true"><PlayCircle size={49} weight="thin" /></span>
-        <span className="dashboard-video-duration">{item.time}</span>
+        <span className="dashboard-play-button" aria-hidden="true">
+          <PlayCircle size={49} weight="thin" />
+        </span>
+        <span className="dashboard-video-duration">{formatDuration(item)}</span>
       </div>
       <div className="dashboard-video-copy">
         <h3>{item.title}</h3>
-        <p>{item.region}</p>
-        <div className="progress-line">
-          <span><span style={{ width: `${item.progress}%` }} /></span>
-          <strong>{item.progress}%</strong>
-        </div>
+        <p>{item.topic}</p>
+        <span className="dynamic-content-summary">{item.summary}</span>
       </div>
     </Link>
   );
 }
 
-export function DashboardScreen() {
+export function DashboardScreen({
+  available,
+  items,
+}: {
+  available: boolean;
+  items: ContentItem[];
+}) {
+  const videos = items
+    .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
+    .slice(0, 3);
+  const highlighted = [
+    ...items.filter((item) => item.featured),
+    ...items.filter((item) => !item.featured),
+  ].slice(0, 5);
+
   return (
     <AppShell
       activeKey="dashboard"
       headerTitle="¡Bienvenido de vuelta!"
-      headerSubtitle="Sigue aprendiendo anatomía con CEDIAH."
+      headerSubtitle="Contenido académico publicado por la comunidad CEDIAH."
       searchPlaceholder="Buscar contenido..."
       welcome
       mainClassName="dashboard-main"
@@ -67,57 +127,92 @@ export function DashboardScreen() {
         <div className="dashboard-primary">
           <section className="dashboard-section dashboard-recent" aria-labelledby="recent-title">
             <div className="section-heading-row">
-              <h2 id="recent-title">Últimos videos vistos</h2>
-              <Link href="/clases/reproductor">Ver todo <ArrowRight size={17} /></Link>
+              <h2 id="recent-title">Videos recientes</h2>
+              <Link href="/biblioteca?tipo=video">
+                Ver todo <ArrowRight size={17} />
+              </Link>
             </div>
-            <div className="dashboard-video-grid">
-              {recentVideos.map((item) => <VideoCard key={item.title} item={item} />)}
-            </div>
+            {videos.length > 0 ? (
+              <div className="dashboard-video-grid">
+                {videos.map((item) => <VideoCard key={item.id} item={item} />)}
+              </div>
+            ) : (
+              <div className="dynamic-empty-state" role="status">
+                <PlayCircle size={30} />
+                <div>
+                  <strong>
+                    {available ? "Aún no hay videos publicados." : "No pudimos cargar el catálogo."}
+                  </strong>
+                  <span>
+                    {available
+                      ? "Los videos aprobados aparecerán aquí automáticamente."
+                      : "La interfaz sigue disponible; intenta actualizar en unos minutos."}
+                  </span>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="dashboard-section dashboard-materials" aria-labelledby="materials-title">
             <div className="section-heading-row">
               <h2 id="materials-title">Material de estudio</h2>
-              <Link href="/guias">Ver todo <ArrowRight size={17} /></Link>
+              <Link href="/biblioteca">
+                Abrir biblioteca <ArrowRight size={17} />
+              </Link>
             </div>
             <div className="study-material-grid">
-              {studyMaterials.map(({ title, description, icon: Icon, image, href }) => (
-                <Link className="study-material-card" href={href} key={title}>
-                  <Image src={image} alt="" fill sizes="200px" />
-                  <span className="study-material-wash" />
-                  <span className="study-material-icon"><Icon size={31} weight="regular" /></span>
-                  <span className="study-material-copy">
-                    <strong>{title}</strong>
-                    <small>{description}</small>
-                  </span>
-                </Link>
-              ))}
+              {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
+                const count = items.filter((item) => item.kind === kind).length;
+                return (
+                  <Link className="study-material-card" href={href} key={kind}>
+                    <Image src={kindImages[kind]} alt="" fill sizes="200px" />
+                    <span className="study-material-wash" />
+                    <span className="study-material-icon">
+                      <Icon size={31} weight="regular" />
+                    </span>
+                    <span className="study-material-copy">
+                      <strong>{title}</strong>
+                      <small>{count > 0 ? count + " publicados" : description}</small>
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
 
           <BrandFooter />
         </div>
 
-        <aside className="dashboard-most-viewed" aria-labelledby="most-viewed-title">
+        <aside className="dashboard-most-viewed" aria-labelledby="featured-content-title">
           <div className="section-heading-row">
-            <h2 id="most-viewed-title">Más vistos</h2>
-            <Link href="/clases/reproductor">Ver todo <ArrowRight size={17} /></Link>
+            <h2 id="featured-content-title">Destacados</h2>
+            <Link href="/biblioteca">
+              Ver todo <ArrowRight size={17} />
+            </Link>
           </div>
-          <ol className="most-viewed-list">
-            {mostViewed.map((item, index) => (
-              <li key={item.title}>
-                <span className="most-viewed-rank">{index + 1}</span>
-                <Link href="/clases/reproductor" className="most-viewed-link">
-                  <span className="most-viewed-image"><Image src={item.image} alt="" fill sizes="100px" /></span>
-                  <span className="most-viewed-copy">
-                    <strong>{item.title}</strong>
-                    <small>{item.region}</small>
-                    <small>{item.views}</small>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ol>
+          {highlighted.length > 0 ? (
+            <ol className="most-viewed-list">
+              {highlighted.map((item, index) => (
+                <li key={item.id}>
+                  <span className="most-viewed-rank">{index + 1}</span>
+                  <Link href={contentHref(item)} className="most-viewed-link">
+                    <span className="most-viewed-image">
+                      <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
+                    </span>
+                    <span className="most-viewed-copy">
+                      <strong>{item.title}</strong>
+                      <small>{item.topic}</small>
+                      <small>{kindLabels[item.kind]} · {formatDuration(item)}</small>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="dynamic-aside-empty">
+              La selección destacada se llenará desde el panel editorial.
+            </p>
+          )}
         </aside>
       </div>
     </AppShell>

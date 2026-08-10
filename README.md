@@ -56,7 +56,7 @@ En el panel de Vercel selecciona el preset Next.js, configura Root Directory com
 La web usa Supabase Auth solo para crear y mantener la sesión. Los datos académicos siguen pasando por la API y no se conceden permisos directos a tablas desde el navegador.
 
 - En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-- En Render: `WEB_ORIGINS`, `SUPABASE_URL` y `SUPABASE_SECRET_KEY`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
+- En Render: `WEB_ORIGINS`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_CONTENT_BUCKET=content-assets`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
 - En Supabase Auth: define la URL del sitio y las URL de redirección exactas para `http://localhost:3000/auth/callback`, previews autorizados y `https://cediah.vercel.app/auth/callback`; configura SMTP antes del piloto.
 
 Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y el acceso a `/panel` con una cuenta de prueba. La API debe validar siempre el bearer token antes de servir datos protegidos.
@@ -78,3 +78,52 @@ Configura únicamente en el servidor de la API:
 La API emite un enlace firmado de carga, asigna el archivo a la cuenta autorizada y vuelve a emitir una URL firmada de reproducción por 10 minutos. El navegador usa el reproductor nativo HTML5 sobre Supabase Storage; no es el iframe de Cloudflare, pero permite validar el flujo real de archivo privado sin contratar Stream.
 
 Al terminar la validación, elimina manualmente los videos de prueba desde Supabase Storage. No se deben usar grabaciones de clases, datos de pacientes, materiales de terceros ni archivos que puedan confundirse con contenido académico publicado.
+
+## Contenido dinámico y espacio editorial
+
+Después de aplicar las migraciones de Supabase, una cuenta autorizada puede abrir `/panel/contenido` para crear videos, guías, cuestionarios, flashcards y temas. El contenido comienza como borrador, pasa por revisión y solo aparece en `/dashboard`, `/guias` y `/biblioteca` después de que coordinación o un administrador lo publique.
+
+Los roles se asignan en `public.user_roles` desde un proceso administrativo de servidor o el SQL Editor de Supabase. Para autorizar a un miembro de la comunidad, usa UUID reales de `auth.users`:
+
+```sql
+insert into public.user_roles (user_id, role, assigned_by)
+values ('UUID_DEL_COLABORADOR', 'community_contributor', 'UUID_DEL_ADMINISTRADOR')
+on conflict (user_id, role) do nothing;
+```
+
+`community_contributor` y `presenter` administran contenido propio; `academic_editor` revisa y aprueba; `coordination` y `administrator` publican. No concedas `service_role` al navegador ni abras grants directos a `authenticated` para este flujo.
+
+El bucket `content-assets` se crea privado con límites de MIME y tamaño. La API reserva la ruta, entrega una URL firmada y valida el objeto antes de finalizarlo. Configura `SUPABASE_CONTENT_BUCKET=content-assets` solo en Render o en el proceso local de la API.
+
+### Bootstrap del primer administrador
+
+La primera cuenta administradora se crea una sola vez desde el SQL Editor porque todavía no existe una cuenta con permiso para abrir la pantalla de roles:
+
+1. Crea y confirma la cuenta en Supabase Auth (Authentication > Users).
+2. Sustituye el correo del siguiente bloque y ejecútalo en el proyecto correcto:
+
+```sql
+do $$
+declare
+  admin_id uuid;
+begin
+  select id into admin_id
+  from auth.users
+  where lower(email) = lower('admin@universidad.edu')
+  limit 1;
+
+  if admin_id is null then
+    raise exception 'Primero crea y confirma la cuenta en Supabase Auth';
+  end if;
+
+  insert into public.user_roles (user_id, role, assigned_by)
+  values (admin_id, 'administrator', admin_id)
+  on conflict (user_id, role) do nothing;
+end;
+$$;
+```
+
+3. Inicia sesión con esa cuenta y abre `/panel/administracion/roles` (también aparece en el menú de Gestión de contenido).
+4. Escribe el correo exacto de una cuenta existente, pulsa **Consultar cuenta**, elige **Asignar rol** o **Revocar rol**, selecciona el rol y guarda.
+
+El rol `administrator` es el máximo y es el único que puede gestionar roles. La API vuelve a comprobarlo en cada petición, registra la acción en `audit_log` y la migración `20260810215000_add_administrator_role_guard.sql` impide eliminar al último administrador. Asignar o revocar un rol no crea ni elimina cuentas; tampoco concede `service_role` al navegador.

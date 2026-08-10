@@ -15,3 +15,25 @@ Esta carpeta fue creada con la CLI oficial de Supabase. La configuracion usa Pos
 La coordinacion aprobo el alcance de la plataforma el 1 de agosto de 2026. La primera migracion crea solo la fundacion de identidad, roles, cursos, lecciones, recursos, inscripciones, progreso y auditoria; no incluye contenido academico, estudiantes ni archivos reales.
 
 Las tablas no otorgan acceso directo a `anon` ni `authenticated`. La API sera el limite inicial de autorizacion. Cada flujo que se abra al navegador debera incorporar grants minimos, politicas RLS y pruebas de acceso permitido y denegado en una migracion posterior.
+
+## Estudio de contenido dinámico
+
+La migración `20260810211907_add_dynamic_content_studio.sql` crea el catálogo publicable, los assets privados y el rol `community_contributor`. El acceso desde navegador permanece revocado para `anon` y `authenticated`; `service_role` es utilizado únicamente por Fastify.
+
+El bucket `content-assets` se crea o corrige como privado, con límite de 500 MB y una allowlist para MP4, MOV, WebM, PDF, JPEG, PNG y WebP. La API valida nuevamente clase, MIME, tamaño, propietario y estado editorial antes de finalizar cada carga.
+
+Antes de promover la migración, ejecuta la lista y los asesores contra el proyecto de destino, prueba una carga con una cuenta colaboradora y confirma que una cuenta estudiante recibe `403` en `/v1/editor/content`.
+
+## Administración de roles
+
+La migración `20260810215000_add_administrator_role_guard.sql` protege el último administrador. Para el bootstrap inicial crea y confirma una cuenta en Auth y ejecuta en el SQL Editor:
+
+```sql
+insert into public.user_roles (user_id, role, assigned_by)
+select id, 'administrator', id
+from auth.users
+where lower(email) = lower('admin@universidad.edu')
+on conflict (user_id, role) do nothing;
+```
+
+Después de ese paso, la pantalla `/panel/administracion/roles` permite consultar por correo y asignar o revocar `student`, `community_contributor`, `presenter`, `academic_editor`, `coordination`, `finance_readonly` o `administrator`. Sólo `administrator` puede abrirla; nunca se puede eliminar el último administrador.

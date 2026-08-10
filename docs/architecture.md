@@ -31,7 +31,7 @@ Todas las tablas de `public` tienen RLS activado y no conceden privilegios a `an
 
 ## Recorrido academico inicial
 
-La primera lectura academica se expone como `GET /v1/learning/dashboard` y solo devuelve cursos cuya matricula esta activa y dentro de su ventana de acceso. `PATCH /v1/learning/lessons/{lessonId}/progress` valida la identidad, comprueba la matricula del mismo usuario antes de persistir el progreso y responde como recurso inexistente cuando la leccion no le corresponde. La web solo reenvia el bearer token desde su componente de servidor; no recibe la clave secreta ni consulta tablas. Recursos, reproduccion academica y publicacion de contenido continuan fuera de este corte hasta recibir material y permisos autorizados.
+La primera lectura academica se expone como `GET /v1/learning/dashboard` y solo devuelve cursos cuya matricula esta activa y dentro de su ventana de acceso. `PATCH /v1/learning/lessons/{lessonId}/progress` valida la identidad, comprueba la matricula del mismo usuario antes de persistir el progreso y responde como recurso inexistente cuando la leccion no le corresponde. La web solo reenvia el bearer token desde su componente de servidor; no recibe la clave secreta ni consulta tablas. Las superficies publicas de contenido y el espacio editorial se incorporan en la migracion y el corte descritos a continuacion.
 
 ## Identidad y sesión
 
@@ -50,3 +50,22 @@ Las migraciones iniciales son `20260801172906_initial_platform_foundation.sql` y
 | Produccion | Vercel | Render | Proyecto Supabase de produccion | Piloto aprobado |
 
 Los ambientes no comparten bases de datos, buckets ni secretos.
+
+## Contenido editorial dinámico
+
+La migración `20260810211907_add_dynamic_content_studio.sql` incorpora `content_items`, `content_assets`, el rol `community_contributor` y un bucket privado `content-assets`. Guías, videos, cuestionarios, flashcards y temas comparten metadatos publicables, mientras su contenido específico permanece tipado y validado por los contratos Zod de la plataforma.
+
+Fastify sigue siendo el único límite de autorización. La web obtiene la sesión SSR y la reenvía mediante rutas BFF; el navegador nunca recibe `SUPABASE_SECRET_KEY` ni escribe directamente en Postgres. La matriz de capacidades es:
+
+- `community_contributor` y `presenter`: crean, editan y adjuntan archivos a contenido propio; pueden enviarlo a revisión.
+- `academic_editor`: edita cualquier contenido, solicita cambios y aprueba.
+- `coordination` y `administrator`: además pueden publicar y archivar.
+- `student`, `finance_readonly` y cuentas anónimas: no acceden al espacio editorial.
+
+El workflow permitido es `draft -> in_review -> changes_requested|approved -> published -> archived`. Toda mutación vuelve a consultar `user_roles`, aplica control de propiedad, usa versión optimista y registra una entrada en `audit_log`.
+
+Los videos y PDF se cargan directamente al bucket privado con una URL firmada reservada por la API. El endpoint de finalización verifica propietario, permiso, existencia, tamaño y MIME reales antes de marcar el asset como listo. Las lecturas públicas solo devuelven elementos con estado `published` y emiten URLs de descarga temporales.
+
+Las rutas públicas `/dashboard`, `/guias`, `/biblioteca` y `/biblioteca/[slug]` consumen el catálogo real. El área protegida `/panel/contenido` ofrece bandeja, filtros, formularios por tipo, carga con progreso y controles de workflow según las capacidades del usuario.
+
+La administración de roles está separada del estudio editorial. `/panel/administracion/roles` sólo se renderiza para una identidad validada cuyo `user_roles` incluye `administrator`; permite consultar cuentas por correo y asignar o revocar un único rol por operación. La cuenta debe existir en Supabase Auth. La primera cuenta se bootstrappea una vez mediante el SQL Editor; después todas las mutaciones pasan por Fastify, se auditan y mantienen al menos un administrador.

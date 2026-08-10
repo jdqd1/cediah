@@ -10,6 +10,7 @@ const EnvironmentSchema = z
     HOST: z.string().min(1).default("0.0.0.0"),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+    SUPABASE_CONTENT_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,62}$/).default("content-assets"),
     SUPABASE_SECRET_KEY: z.string().min(1).optional(),
     SUPABASE_STORAGE_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,62}$/).default("video-test"),
     SUPABASE_URL: z.string().url().optional(),
@@ -110,9 +111,11 @@ export type TestVideoUploadConfiguration = {
 
 export type ApiEnvironment = {
   cloudflareStream?: CloudflareStreamConfiguration;
+  contentStorage?: SupabaseStorageConfiguration;
   HOST: string;
   NODE_ENV: "development" | "test" | "production";
   PORT: number;
+  SUPABASE_CONTENT_BUCKET?: string;
   SUPABASE_SECRET_KEY?: string;
   SUPABASE_STORAGE_BUCKET?: string;
   SUPABASE_URL?: string;
@@ -157,6 +160,14 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
       }
     : undefined;
 
+  const contentStorage = supabase
+    ? {
+        bucket: environment.SUPABASE_CONTENT_BUCKET,
+        secretKey: supabase.secretKey,
+        url: supabase.url,
+      }
+    : undefined;
+
   const testVideoUpload =
     environment.VIDEO_TEST_UPLOAD_ENABLED === "true"
       ? {
@@ -166,5 +177,13 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
         }
       : undefined;
 
-  return { ...environment, cloudflareStream, supabase, supabaseStorage, testVideoUpload, webOrigins };
+  return {
+    ...environment,
+    cloudflareStream,
+    contentStorage,
+    supabase,
+    supabaseStorage,
+    testVideoUpload,
+    webOrigins,
+  };
 }

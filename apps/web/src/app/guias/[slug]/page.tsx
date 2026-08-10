@@ -4,8 +4,13 @@ import { getPublishedContentItem } from "@/lib/server/content-api";
 
 export const dynamic = "force-dynamic";
 
-export default async function LegacyGuidePage() {
-  const result = await getPublishedContentItem("musculos-compartimento-anterior");
+type GuidePageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+export default async function GuidePage({ params }: GuidePageProps) {
+  const { slug } = await params;
+  const result = await getPublishedContentItem(slug);
 
   if (result.status === "ready") {
     if (result.item.kind !== "guide") notFound();

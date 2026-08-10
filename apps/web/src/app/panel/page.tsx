@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getContentWorkspace } from "@/lib/server/content-api";
 import { getCurrentUser } from "@/lib/server/current-user";
 import { getLearningDashboard } from "@/lib/server/learning-dashboard";
 import { signOut } from "./actions";
@@ -31,7 +32,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const learning = await getLearningDashboard(result.accessToken);
+  const [learning, editorial] = await Promise.all([
+    getLearningDashboard(result.accessToken),
+    getContentWorkspace(result.accessToken),
+  ]);
 
   return (
     <main className="dashboard-page">
@@ -97,7 +101,16 @@ export default async function DashboardPage() {
             No pudimos cargar tus matrículas en este momento. Tu sesión sigue protegida; intenta actualizar la página más tarde.
           </p>
         )}
-        <Link className="button button-primary" href="/cursos">Explorar catálogo demo</Link>
+        {editorial.status === "ready" && (
+          <Link className="button button-primary" href="/panel/contenido">
+            Gestionar contenido académico
+          </Link>
+        )}
+        {editorial.status === "ready" && editorial.workspace.roles.includes("administrator") && (
+          <Link className="button button-secondary" href="/panel/administracion/roles">
+            Administrar roles
+          </Link>
+        )}        <Link className="button button-primary" href="/cursos">Explorar catálogo</Link>
         <Link className="text-link" href="/pruebas/video">
           Abrir laboratorio de video de prueba <span aria-hidden="true">→</span>
         </Link>

@@ -4,18 +4,22 @@ import { getPublishedContentItem } from "@/lib/server/content-api";
 
 export const dynamic = "force-dynamic";
 
-export default async function LegacyGuidePage() {
-  const result = await getPublishedContentItem("musculos-compartimento-anterior");
+type ContentPageProps = {
+  params: Promise<{ slug: string }>;
+};
+
+export default async function ContentPage({ params }: ContentPageProps) {
+  const { slug } = await params;
+  const result = await getPublishedContentItem(slug);
 
   if (result.status === "ready") {
-    if (result.item.kind !== "guide") notFound();
     return <ContentDetailScreen item={result.item} />;
   }
   if (result.status === "not_found") notFound();
 
   return (
     <main className="content-unavailable-page">
-      <h1>No pudimos cargar esta guía.</h1>
+      <h1>No pudimos cargar este contenido.</h1>
       <p>Intenta actualizar la página en unos minutos.</p>
     </main>
   );

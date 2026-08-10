@@ -1,9 +1,25 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } from "fastify";
+import { z } from "zod";
 import {
+  AdminRoleLookupQuerySchema,
+  AdminRoleMutationRequestSchema,
+  AdminRoleResponseSchema,
+  ContentAssetSchema,
+  ContentAssetUploadRequestSchema,
+  ContentAssetUploadResponseSchema,
+  ContentCatalogResponseSchema,
+  ContentDraftSchema,
+  ContentItemSchema,
+  ContentKindSchema,
+  ContentTransitionRequestSchema,
+  ContentWorkspaceResponseSchema,
   CurrentUserResponseSchema,
+  type ContentMutationFailure,
+  type ContentProvider,
   type IdentityProvider,
+  type RoleManagementProvider,
   HealthResponseSchema,
   LessonProgressRouteParamsSchema,
   LessonProgressResponseSchema,
@@ -16,12 +32,17 @@ import {
   type VideoProvider,
 } from "@cediah/contracts";
 import { type ApiEnvironment, readEnvironment } from "./config.js";
+import { getContentCapabilities } from "./content-authorization.js";
 import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
+import { createSupabaseContentProvider } from "./providers/supabase-content.js";
+import { createSupabaseRoleManagementProvider } from "./providers/supabase-role-management.js";
 import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
 import { createSupabaseLearningProvider } from "./providers/supabase-learning.js";
 import { createSupabaseStorageVideoProvider } from "./providers/supabase-storage.js";
 
 type AppDependencies = {
+  contentProvider?: ContentProvider;
+  roleManagementProvider?: RoleManagementProvider;
   identityProvider?: IdentityProvider;
   learningProvider?: LearningProvider;
   videoProvider?: VideoProvider;
@@ -31,6 +52,36 @@ type UserResolution =
   | { kind: "authenticated"; user: ProviderUser }
   | { kind: "identity_unavailable" }
   | { kind: "unauthorized" };
+
+type EditorResolution =
+  | {
+      capabilities: ReturnType<typeof getContentCapabilities>;
+      kind: "authenticated";
+      roles: Awaited<ReturnType<ContentProvider["getRoles"]>>;
+      user: ProviderUser;
+    }
+  | { kind: "content_unavailable" }
+  | Exclude<UserResolution, { kind: "authenticated" }>;
+
+type AdministratorResolution =
+  | {
+      kind: "authenticated";
+      roles: Awaited<ReturnType<RoleManagementProvider["getRoles"]>>;
+      user: ProviderUser;
+    }
+  | { kind: "forbidden" }
+  | { kind: "role_unavailable" }
+  | Exclude<UserResolution, { kind: "authenticated" }>;
+
+const ContentIdParamsSchema = z.object({ contentId: z.string().uuid() });
+const ContentAssetIdParamsSchema = z.object({ assetId: z.string().uuid() });
+const ContentSlugParamsSchema = z.object({
+  slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+});
+const ContentListQuerySchema = z.object({
+  kind: ContentKindSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(40),
+});
 
 const directUploadLifetimeMilliseconds = 15 * 60 * 1_000;
 const playbackLifetimeSeconds = 10 * 60;
@@ -61,6 +112,46 @@ async function resolveRequestUser(
   }
 }
 
+async function resolveEditorUser(
+  authorization: string | undefined,
+  identityProvider: IdentityProvider | undefined,
+  contentProvider: ContentProvider | undefined,
+): Promise<EditorResolution> {
+  const resolution = await resolveRequestUser(authorization, identityProvider);
+  if (resolution.kind !== "authenticated") return resolution;
+  if (!contentProvider) return { kind: "content_unavailable" };
+
+  try {
+    const roles = await contentProvider.getRoles(resolution.user.id);
+    return {
+      capabilities: getContentCapabilities(roles),
+      kind: "authenticated",
+      roles,
+      user: resolution.user,
+    };
+  } catch {
+    return { kind: "content_unavailable" };
+  }
+}
+
+async function resolveAdministratorUser(
+  authorization: string | undefined,
+  identityProvider: IdentityProvider | undefined,
+  roleManagementProvider: RoleManagementProvider | undefined,
+): Promise<AdministratorResolution> {
+  const resolution = await resolveRequestUser(authorization, identityProvider);
+  if (resolution.kind !== "authenticated") return resolution;
+  if (!roleManagementProvider) return { kind: "role_unavailable" };
+
+  try {
+    const roles = await roleManagementProvider.getRoles(resolution.user.id);
+    if (!roles.includes("administrator")) return { kind: "forbidden" };
+    return { kind: "authenticated", roles, user: resolution.user };
+  } catch {
+    return { kind: "role_unavailable" };
+  }
+}
+
 function sendUserResolutionError(
   resolution: Exclude<UserResolution, { kind: "authenticated" }>,
   reply: FastifyReply,
@@ -72,10 +163,80 @@ function sendUserResolutionError(
   return reply.status(503).header("Cache-Control", "no-store").send({ error: "identity_unavailable" });
 }
 
+function sendEditorResolutionError(
+  resolution: Exclude<EditorResolution, { kind: "authenticated" }>,
+  reply: FastifyReply,
+) {
+  if (resolution.kind === "content_unavailable") {
+    return reply
+      .status(503)
+      .header("Cache-Control", "no-store")
+      .send({ error: "content_unavailable" });
+  }
+
+  return sendUserResolutionError(resolution, reply);
+}
+
+function sendAdministratorResolutionError(
+  resolution: Exclude<AdministratorResolution, { kind: "authenticated" }>,
+  reply: FastifyReply,
+) {
+  if (resolution.kind === "forbidden") {
+    return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+  }
+  if (resolution.kind === "role_unavailable") {
+    return reply
+      .status(503)
+      .header("Cache-Control", "no-store")
+      .send({ error: "role_management_unavailable" });
+  }
+  return sendUserResolutionError(resolution, reply);
+}
+
+function sendRoleManagementError(
+  error: "forbidden" | "last_administrator" | "not_found" | "conflict",
+  reply: FastifyReply,
+) {
+  if (error === "forbidden") {
+    return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+  }
+  if (error === "not_found") {
+    return reply.status(404).header("Cache-Control", "no-store").send({ error: "user_not_found" });
+  }
+  if (error === "last_administrator") {
+    return reply.status(409).header("Cache-Control", "no-store").send({ error: "last_administrator" });
+  }
+  return reply.status(409).header("Cache-Control", "no-store").send({ error: "role_conflict" });
+}
+
+function sendContentMutationError(error: ContentMutationFailure, reply: FastifyReply) {
+  if (error === "not_found") {
+    return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+  }
+  if (error === "forbidden") {
+    return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+  }
+
+  return reply
+    .status(409)
+    .header("Cache-Control", "no-store")
+    .send({ error: error === "not_publishable" ? "content_not_publishable" : "content_conflict" });
+}
+
 export async function buildApp(
   environment: ApiEnvironment = readEnvironment(),
   dependencies: AppDependencies = {},
 ): Promise<FastifyInstance> {
+  const contentProvider =
+    dependencies.contentProvider ??
+    (environment.contentStorage
+      ? createSupabaseContentProvider(environment.contentStorage)
+      : undefined);
+  const roleManagementProvider =
+    dependencies.roleManagementProvider ??
+    (environment.supabase
+      ? createSupabaseRoleManagementProvider(environment.supabase)
+      : undefined);
   const identityProvider =
     dependencies.identityProvider ??
     (environment.supabase ? createSupabaseIdentityProvider(environment.supabase) : undefined);
@@ -201,6 +362,387 @@ export async function buildApp(
       }
     },
   );
+
+  app.get<{ Querystring: unknown }>("/v1/content", async (request, reply) => {
+    if (!contentProvider) {
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "content_unavailable" });
+    }
+
+    const query = ContentListQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply
+        .status(400)
+        .header("Cache-Control", "no-store")
+        .send({ error: "invalid_content_query" });
+    }
+
+    try {
+      const items = await contentProvider.listPublished(query.data);
+      const response = ContentCatalogResponseSchema.parse({ items });
+      return reply
+        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .send(response);
+    } catch {
+      request.log.error("Published-content request failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "content_unavailable" });
+    }
+  });
+
+  app.get<{ Params: { slug: string } }>("/v1/content/:slug", async (request, reply) => {
+    if (!contentProvider) {
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "content_unavailable" });
+    }
+
+    const params = ContentSlugParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    }
+
+    try {
+      const item = await contentProvider.getPublishedBySlug(params.data.slug);
+      if (!item) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      return reply
+        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .send(ContentItemSchema.parse(item));
+    } catch {
+      request.log.error("Published-content detail request failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "content_unavailable" });
+    }
+  });
+
+  app.get("/v1/editor/content", async (request, reply) => {
+    const editor = await resolveEditorUser(
+      request.headers.authorization,
+      identityProvider,
+      contentProvider,
+    );
+    if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+    if (!editor.capabilities.canCreate && !editor.capabilities.canEditAll) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
+
+    try {
+      const items = await contentProvider!.getWorkspace({
+        actorUserId: editor.user.id,
+        roles: editor.roles,
+      });
+      return reply.header("Cache-Control", "no-store").send(
+        ContentWorkspaceResponseSchema.parse({
+          capabilities: editor.capabilities,
+          items,
+          roles: editor.roles,
+        }),
+      );
+    } catch {
+      request.log.error("Content workspace request failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "content_unavailable" });
+    }
+  });
+
+  app.post<{ Body: unknown }>("/v1/editor/content", async (request, reply) => {
+    const editor = await resolveEditorUser(
+      request.headers.authorization,
+      identityProvider,
+      contentProvider,
+    );
+    if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+    if (!editor.capabilities.canCreate) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
+
+    const draft = ContentDraftSchema.safeParse(request.body);
+    if (!draft.success) {
+      return reply
+        .status(400)
+        .header("Cache-Control", "no-store")
+        .send({ error: "invalid_content" });
+    }
+
+    try {
+      const result = await contentProvider!.createContent({
+        actorUserId: editor.user.id,
+        draft: draft.data,
+      });
+      if (result.status !== "success") return sendContentMutationError(result.status, reply);
+
+      return reply
+        .status(201)
+        .header("Cache-Control", "no-store")
+        .send(ContentItemSchema.parse(result.value));
+    } catch {
+      request.log.error("Content creation failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "content_unavailable" });
+    }
+  });
+
+  app.patch<{ Body: unknown; Params: { contentId: string } }>(
+    "/v1/editor/content/:contentId",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canCreate && !editor.capabilities.canEditAll) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const params = ContentIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      const draft = ContentDraftSchema.safeParse(request.body);
+      if (!draft.success) {
+        return reply
+          .status(400)
+          .header("Cache-Control", "no-store")
+          .send({ error: "invalid_content" });
+      }
+
+      try {
+        const result = await contentProvider!.updateContent({
+          actorUserId: editor.user.id,
+          contentId: params.data.contentId,
+          draft: draft.data,
+          roles: editor.roles,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(ContentItemSchema.parse(result.value));
+      } catch {
+        request.log.error("Content update failed");
+        return reply
+          .status(503)
+          .header("Cache-Control", "no-store")
+          .send({ error: "content_unavailable" });
+      }
+    },
+  );
+
+  app.post<{ Body: unknown; Params: { contentId: string } }>(
+    "/v1/editor/content/:contentId/transition",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canCreate && !editor.capabilities.canEditAll) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const params = ContentIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      const transition = ContentTransitionRequestSchema.safeParse(request.body);
+      if (!transition.success) {
+        return reply
+          .status(400)
+          .header("Cache-Control", "no-store")
+          .send({ error: "invalid_content_transition" });
+      }
+
+      try {
+        const result = await contentProvider!.transitionContent({
+          actorUserId: editor.user.id,
+          contentId: params.data.contentId,
+          roles: editor.roles,
+          status: transition.data.status,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(ContentItemSchema.parse(result.value));
+      } catch {
+        request.log.error("Content transition failed");
+        return reply
+          .status(503)
+          .header("Cache-Control", "no-store")
+          .send({ error: "content_unavailable" });
+      }
+    },
+  );
+
+  app.post<{ Body: unknown; Params: { contentId: string } }>(
+    "/v1/editor/content/:contentId/assets",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canUpload) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const params = ContentIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      const file = ContentAssetUploadRequestSchema.safeParse(request.body);
+      if (!file.success) {
+        return reply
+          .status(400)
+          .header("Cache-Control", "no-store")
+          .send({ error: "invalid_content_asset" });
+      }
+
+      try {
+        const result = await contentProvider!.createAssetUpload({
+          actorUserId: editor.user.id,
+          contentId: params.data.contentId,
+          file: file.data,
+          roles: editor.roles,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .status(201)
+          .header("Cache-Control", "no-store")
+          .send(ContentAssetUploadResponseSchema.parse(result.value));
+      } catch {
+        request.log.error("Content-asset upload provisioning failed");
+        return reply
+          .status(503)
+          .header("Cache-Control", "no-store")
+          .send({ error: "content_unavailable" });
+      }
+    },
+  );
+
+  app.post<{ Params: { assetId: string } }>(
+    "/v1/editor/assets/:assetId/finalize",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canUpload) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const params = ContentAssetIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      try {
+        const result = await contentProvider!.finalizeAsset({
+          actorUserId: editor.user.id,
+          assetId: params.data.assetId,
+          roles: editor.roles,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(ContentAssetSchema.parse(result.value));
+      } catch {
+        request.log.error("Content-asset finalization failed");
+        return reply
+          .status(503)
+          .header("Cache-Control", "no-store")
+          .send({ error: "content_unavailable" });
+      }
+    },
+  );
+
+  app.get<{ Querystring: unknown }>("/v1/admin/roles", async (request, reply) => {
+    const administrator = await resolveAdministratorUser(
+      request.headers.authorization,
+      identityProvider,
+      roleManagementProvider,
+    );
+    if (administrator.kind !== "authenticated") {
+      return sendAdministratorResolutionError(administrator, reply);
+    }
+
+    const query = AdminRoleLookupQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply
+        .status(400)
+        .header("Cache-Control", "no-store")
+        .send({ error: "invalid_role_lookup" });
+    }
+
+    try {
+      const user = await roleManagementProvider!.lookupUserByEmail(query.data.email);
+      if (!user) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "user_not_found" });
+      }
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(AdminRoleResponseSchema.parse({ user }));
+    } catch {
+      request.log.error("Administrator role lookup failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "role_management_unavailable" });
+    }
+  });
+
+  app.post<{ Body: unknown }>("/v1/admin/roles", async (request, reply) => {
+    const administrator = await resolveAdministratorUser(
+      request.headers.authorization,
+      identityProvider,
+      roleManagementProvider,
+    );
+    if (administrator.kind !== "authenticated") {
+      return sendAdministratorResolutionError(administrator, reply);
+    }
+
+    const input = AdminRoleMutationRequestSchema.safeParse(request.body);
+    if (!input.success) {
+      return reply
+        .status(400)
+        .header("Cache-Control", "no-store")
+        .send({ error: "invalid_role_assignment" });
+    }
+
+    try {
+      const result = await roleManagementProvider!.mutateRole({
+        ...input.data,
+        actorUserId: administrator.user.id,
+      });
+      if (result.status !== "success") return sendRoleManagementError(result.status, reply);
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(AdminRoleResponseSchema.parse({ user: result.value }));
+    } catch {
+      request.log.error("Administrator role mutation failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "role_management_unavailable" });
+    }
+  });
 
   app.post<{ Body: unknown }>("/v1/videos/test-uploads", async (request, reply) => {
     const testVideoUpload = environment.testVideoUpload;
