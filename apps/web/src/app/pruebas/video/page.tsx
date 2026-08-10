@@ -23,8 +23,8 @@ export default async function VideoTestPage() {
             <p className="eyebrow">Laboratorio de video</p>
             <h1 id="video-test-setup-title">La prueba privada aún no está disponible.</h1>
             <p>
-              Este ambiente necesita Supabase, la API y Cloudflare Stream configurados antes de
-              emitir enlaces de carga de prueba.
+              Este ambiente necesita Supabase Storage y la API configurados antes de emitir
+              enlaces de carga de prueba.
             </p>
             <Link className="button button-primary" href="/">
               Volver al inicio
@@ -57,7 +57,7 @@ export default async function VideoTestPage() {
             <p className="eyebrow">Laboratorio interno / Video</p>
             <h1 id="video-test-title">Prueba el reproductor con tu propio video.</h1>
             <p>
-              Esta área sirve únicamente para validar carga, procesamiento y reproducción privada
+              Esta área sirve únicamente para validar carga y reproducción privada
               antes de publicar contenido académico.
             </p>
           </div>
@@ -77,8 +77,8 @@ export default async function VideoTestPage() {
           <h2>Un entorno aislado para comprobar el flujo completo.</h2>
           <ol>
             <li>El servidor confirma que esta cuenta está permitida para probar.</li>
-            <li>Cloudflare Stream recibe el archivo mediante un enlace de un solo uso.</li>
-            <li>Cuando termine el procesamiento, la misma cuenta recibe un reproductor firmado.</li>
+            <li>Supabase Storage recibe el archivo mediante un enlace firmado de un solo uso.</li>
+            <li>La misma cuenta recibe una URL firmada para reproducirlo en el navegador.</li>
           </ol>
           <p className="video-test-warning">
             Usa solo material de prueba propio. No subas clases, datos de pacientes, material con
