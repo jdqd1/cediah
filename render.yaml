@@ -2,6 +2,7 @@ services:
   - type: web
     name: cediah-api
     runtime: docker
+    plan: free
     dockerContext: .
     dockerfilePath: ./apps/api/Dockerfile
     healthCheckPath: /health
