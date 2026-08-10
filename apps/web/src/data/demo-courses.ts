@@ -9,6 +9,17 @@ export type DemoCourse = {
   title: string;
 };
 
+export type DemoLesson = {
+  course: DemoCourse;
+  duration: string;
+  lessonSlug: string;
+  module: string;
+  objectives: readonly string[];
+  resourceTitle: string;
+  summary: string;
+  title: string;
+};
+
 export const demoCourses: readonly DemoCourse[] = [
   {
     code: "REG-01",
@@ -94,4 +105,24 @@ export const demoCourses: readonly DemoCourse[] = [
 
 export function getDemoCourse(slug: string) {
   return demoCourses.find((course) => course.slug === slug);
+}
+
+export function getDemoLesson(courseSlug: string, lessonSlug: string): DemoLesson | undefined {
+  const course = getDemoCourse(courseSlug);
+  if (!course || lessonSlug !== "introduccion") return undefined;
+
+  return {
+    course,
+    duration: "12 min",
+    lessonSlug,
+    module: "Módulo demo / Orientación",
+    objectives: [
+      "Reconocer el alcance provisional del recorrido.",
+      "Identificar cómo se organizarán las lecciones y los recursos.",
+      "Preparar una pregunta para la práctica presencial.",
+    ],
+    resourceTitle: `Guía de muestra / ${course.title}`,
+    summary: `Lección de demostración para revisar la estructura de ${course.title}; no contiene material académico aprobado.`,
+    title: `Introducción a ${course.title}`,
+  };
 }

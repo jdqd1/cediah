@@ -74,6 +74,9 @@ export default async function CoursePage({ params }: CoursePageProps) {
             <p className="course-summary">{course.summary}</p>
             <div className="course-hero-actions">
               <Link className="button button-primary" href="/#cursos">Volver al catálogo</Link>
+              <Link className="button button-outline" href={`/cursos/${course.slug}/lecciones/introduccion`}>
+                Ver lección demo
+              </Link>
               <span className="course-pending">Contenido por aprobar</span>
             </div>
           </div>

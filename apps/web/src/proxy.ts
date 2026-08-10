@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getPublicSupabaseConfiguration } from "@/lib/supabase/environment";
 import { updateSupabaseSession } from "@/lib/supabase/proxy";
 
