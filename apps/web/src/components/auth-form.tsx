@@ -11,7 +11,7 @@ type AuthFormProps = {
 };
 
 function safeNextPath(value: string | undefined) {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/panel";
+  return value?.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
 }
 
 export function AuthForm({ mode, nextPath }: AuthFormProps) {
@@ -45,12 +45,16 @@ export function AuthForm({ mode, nextPath }: AuthFormProps) {
       }
 
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: callbackUrl.toString() },
         });
         if (error) throw error;
+        if (data.session) {
+          window.location.assign(targetPath);
+          return;
+        }
         setMessage("Revisa tu correo para confirmar la cuenta antes de continuar.");
         return;
       }

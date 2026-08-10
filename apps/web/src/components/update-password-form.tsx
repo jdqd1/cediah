@@ -19,7 +19,7 @@ export function UpdatePasswordForm() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      window.location.assign("/panel");
+      window.location.assign("/dashboard");
     } catch {
       setMessage("El enlace no es válido o expiró. Solicita uno nuevo.");
     } finally {

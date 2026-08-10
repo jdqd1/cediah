@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 function safeNextPath(value: string | null) {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/panel";
+  return value?.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
 }
 
 export async function GET(request: NextRequest) {

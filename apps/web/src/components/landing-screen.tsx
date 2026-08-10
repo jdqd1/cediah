@@ -96,7 +96,7 @@ function LandingAuthForm() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      window.location.assign("/panel");
+      window.location.assign("/dashboard");
     } catch {
       setMessage("No fue posible completar el acceso. Verifica los datos e inténtalo de nuevo.");
     } finally {
