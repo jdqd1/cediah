@@ -105,7 +105,7 @@ function LandingAuthForm() {
   }
 
   return (
-    <form className="landing-auth-form" onSubmit={onSubmit} noValidate>
+    <form className="landing-auth-form" method="post" onSubmit={onSubmit} noValidate>
       <div className="social-buttons">
         <button type="button" onClick={() => setMessage("El acceso con Google estará disponible próximamente.")}><GoogleLogo size={24} weight="regular" /> Continuar con Google</button>
         <button type="button" onClick={() => setMessage("El acceso con GitHub estará disponible próximamente.")}><GithubLogo size={24} weight="fill" /> Continuar con GitHub</button>

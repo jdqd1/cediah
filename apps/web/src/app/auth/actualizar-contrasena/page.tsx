@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { UpdatePasswordForm } from "@/components/update-password-form";
 
+export const dynamic = "force-dynamic";
+
 export default function UpdatePasswordPage() {
   return (
     <main className="auth-page">

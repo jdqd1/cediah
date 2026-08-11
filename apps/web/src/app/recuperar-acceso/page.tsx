@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
 
+export const dynamic = "force-dynamic";
+
 export default function RecoverAccessPage() {
   return (
     <main className="auth-page">

@@ -28,7 +28,7 @@ export function UpdatePasswordForm() {
   }
 
   return (
-    <form className="auth-form" onSubmit={onSubmit}>
+    <form className="auth-form" method="post" onSubmit={onSubmit}>
       <div>
         <p className="eyebrow">Acceso protegido</p>
         <h1>Elige una nueva contraseña</h1>

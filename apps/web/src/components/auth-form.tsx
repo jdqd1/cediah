@@ -77,7 +77,7 @@ export function AuthForm({ mode, nextPath }: AuthFormProps) {
   const submitLabel = isRecovery ? "Enviar enlace" : isSignUp ? "Crear cuenta" : "Iniciar sesión";
 
   return (
-    <form className="auth-form" onSubmit={onSubmit} noValidate>
+    <form className="auth-form" method="post" onSubmit={onSubmit} noValidate>
       <div>
         <p className="eyebrow">Acceso protegido</p>
         <h1>{heading}</h1>
