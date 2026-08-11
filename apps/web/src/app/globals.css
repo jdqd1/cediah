@@ -3014,9 +3014,58 @@ img {
   .dashboard-layout { display: block; }
   .dashboard-primary { padding-right: 0; }
   .dashboard-most-viewed { padding-top: 1.5rem; }
-  .dashboard-video-grid { grid-template-columns: 1fr; }
-  .study-material-grid { grid-template-columns: 1fr; }
-  .most-viewed-list { grid-template-columns: 1fr; }
+  .dashboard-video-grid,
+  .study-material-grid,
+  .most-viewed-list {
+    display: flex;
+    gap: 1.1rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 0 0 0.65rem;
+    scroll-padding-inline: 0.15rem;
+    scroll-snap-type: x proximity;
+    scrollbar-color: var(--line-strong) transparent;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-video-grid::-webkit-scrollbar,
+  .study-material-grid::-webkit-scrollbar,
+  .most-viewed-list::-webkit-scrollbar {
+    height: 0.42rem;
+  }
+
+  .dashboard-video-grid::-webkit-scrollbar-track,
+  .study-material-grid::-webkit-scrollbar-track,
+  .most-viewed-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dashboard-video-grid::-webkit-scrollbar-thumb,
+  .study-material-grid::-webkit-scrollbar-thumb,
+  .most-viewed-list::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--line-strong);
+  }
+
+  .dashboard-video-card {
+    flex: 0 0 min(82vw, 20rem);
+    scroll-snap-align: start;
+  }
+
+  .study-material-card {
+    flex: 0 0 min(74vw, 18rem);
+    scroll-snap-align: start;
+  }
+
+  .most-viewed-list {
+    padding-inline: 0.15rem 0;
+  }
+
+  .most-viewed-list li {
+    flex: 0 0 min(86vw, 21rem);
+    scroll-snap-align: start;
+  }
   .brand-footer { align-items: flex-start; flex-direction: column; padding-inline: 0; }
   .brand-footer-lockup p { max-width: 18rem; line-height: 1.4; }
   .brand-footer-socials { align-self: flex-end; }
