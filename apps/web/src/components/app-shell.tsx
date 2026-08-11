@@ -152,12 +152,15 @@ export function AppShell({
       subscription.unsubscribe();
     };
   }, []);
-  const showHeaderHeading = showBreadcrumbs || Boolean(headerTitle || headerSubtitle || isAdministrator);
+  const showHeaderHeading = showBreadcrumbs || Boolean(headerTitle || headerSubtitle);
 
   return (
     <div className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""}`.trim()}>
       <aside className="app-sidebar" aria-label="Navegación principal">
         <div className="sidebar-topline">
+          <Link className="sidebar-brand" href="/dashboard" aria-label="CEDIAH, inicio" onClick={closeSidebar}>
+            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+          </Link>
           <button className="sidebar-close" type="button" aria-label="Cerrar menú" onClick={closeSidebar}>
             <X size={22} />
           </button>
@@ -223,9 +226,6 @@ export function AppShell({
           <button className="menu-trigger" type="button" aria-label="Abrir menú" onClick={() => setSidebarOpen(true)}>
             <List size={28} />
           </button>
-          <Link className="topbar-brand" href="/dashboard" aria-label="CEDIAH, inicio" onClick={closeSidebar}>
-            <CediahLogo variant={activeKey === "dashboard" ? "light" : "dark"} priority={activeKey === "dashboard"} />
-          </Link>
           {showHeaderHeading && (
             <div className="topbar-heading">
               {showBreadcrumbs ? (
@@ -241,12 +241,6 @@ export function AppShell({
                 <>
                   <h1>{headerTitle}</h1>
                   {headerSubtitle && <p>{headerSubtitle}</p>}
-                  {isAdministrator && (
-                    <span className="dashboard-admin-badge" aria-label="Rol: administrador">
-                      <ShieldCheck size={16} weight="fill" />
-                      Administrador
-                    </span>
-                  )}
                 </>
               )}
             </div>
@@ -256,7 +250,7 @@ export function AppShell({
             <input type="search" placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
           </label>
           <div className="topbar-actions">
-            <div className="topbar-popover-wrap">
+            <div className="topbar-popover-wrap topbar-notification-wrap">
               <button
                 className={`icon-button ${notificationsOpen ? "is-active" : ""}`.trim()}
                 type="button"
@@ -267,6 +261,12 @@ export function AppShell({
                 <Bell size={24} />
                 <span className="notification-dot" />
               </button>
+              {isAdministrator && (
+                <span className="dashboard-admin-badge topbar-admin-badge" aria-label="Rol: administrador">
+                  <ShieldCheck size={14} weight="fill" />
+                  Administrador
+                </span>
+              )}
               {notificationsOpen && (
                 <div className="topbar-popover notification-popover">
                   <strong>Notificaciones</strong>

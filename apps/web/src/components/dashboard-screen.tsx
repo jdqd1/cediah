@@ -220,9 +220,6 @@ export function DashboardScreen({
               La selección destacada se llenará desde el panel editorial.
             </p>
           )}
-          <Link className="featured-more" href="/biblioteca">
-            Ver más destacados <ArrowRight size={16} />
-          </Link>
         </aside>
       </div>
 
