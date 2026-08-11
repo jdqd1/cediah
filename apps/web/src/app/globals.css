@@ -694,6 +694,11 @@ img {
   margin-left: auto;
 }
 
+.dashboard-shell .topbar-notification-wrap > .icon-button,
+.dashboard-shell .topbar-actions > .topbar-popover-wrap:last-child > .profile-trigger {
+  transform: translateY(0.6rem);
+}
+
 .dashboard-shell .profile-avatar {
   border-color: rgb(255 255 255 / 38%);
   background: rgb(255 255 255 / 12%);
@@ -3117,6 +3122,8 @@ img {
   .topbar-actions { margin-left: auto; gap: 0.6rem; }
   .profile-avatar { width: 2.3rem; height: 2.3rem; }
   .app-main { padding: 1.1rem 1rem 1.5rem; }
+  .dashboard-recent { padding-bottom: 1.45rem; }
+  .dashboard-materials { padding-bottom: 0.7rem; }
   .dashboard-main .section-heading-row { gap: 0.6rem; }
   .dashboard-main .section-heading-row h2 { font-size: 1.12rem; }
   .dashboard-main .section-heading-row a { gap: 0.28rem; padding: 0.34rem 0.55rem; font-size: 0.72rem; }
@@ -3130,7 +3137,9 @@ img {
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
-    padding: 0 1.5rem 0.55rem 0;
+    margin-top: 0.65rem;
+    margin-inline: -0.5rem;
+    padding: 0.5rem 1.5rem 1.35rem 0.5rem;
     scroll-padding-inline: 0.25rem;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
