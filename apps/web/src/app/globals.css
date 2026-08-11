@@ -530,29 +530,6 @@ img {
   display: none;
 }
 
-.sidebar-brand {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 0.75rem 1.45rem 0.8rem;
-}
-
-.sidebar-brand .cediah-logo-light {
-  width: 8.25rem;
-  height: 7.25rem;
-  margin-left: 0.15rem;
-}
-
-.sidebar-brand > span:last-child {
-  max-width: 11.8rem;
-  margin-top: 0.25rem;
-  color: rgb(255 249 245 / 94%);
-  font-size: 0.8rem;
-  line-height: 1.45;
-}
-
 .sidebar-nav {
   position: relative;
   z-index: 2;
@@ -561,9 +538,15 @@ img {
   flex: 1;
   align-content: start;
   gap: 0.65rem;
-  margin-top: 1.2rem;
+  margin-top: 0.9rem;
   overflow-y: auto;
-  padding: 0 0.95rem 1rem;
+  overflow-x: hidden;
+  padding: 0.35rem 0.95rem 1rem;
+  scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-nav-group {
@@ -605,28 +588,13 @@ img {
   background: rgb(255 255 255 / 16%);
 }
 
-.sidebar-quote {
-  position: relative;
-  z-index: 2;
-  flex: 0 0 auto;
-  padding: 1rem 1.45rem 1.6rem;
-}
-
-.sidebar-quote p {
-  max-width: 10rem;
-  color: rgb(255 248 242 / 90%);
-  font-family: Georgia, serif;
-  font-size: 0.88rem;
-  font-style: italic;
-  line-height: 1.55;
-}
-
 .sidebar-watermark {
   position: absolute;
   right: -2.5rem;
   bottom: -1.4rem;
   width: 11rem;
-  opacity: 0.1;
+  pointer-events: none;
+  opacity: 0.07;
 }
 
 .sidebar-watermark img {
@@ -662,6 +630,63 @@ img {
   height: 2.1rem;
   place-items: center;
   color: var(--ink);
+}
+
+.topbar-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-brand .cediah-logo {
+  width: 4.2rem;
+  height: 3.2rem;
+  border-radius: 0.45rem;
+}
+
+.dashboard-shell .app-topbar {
+  min-height: 4.7rem;
+  border-bottom-color: rgb(255 255 255 / 12%);
+  background: var(--wine);
+  color: #fff;
+}
+
+.dashboard-shell .menu-trigger,
+.dashboard-shell .topbar-heading h1,
+.dashboard-shell .topbar-actions,
+.dashboard-shell .profile-trigger,
+.dashboard-shell .topbar-search {
+  color: #fff;
+}
+
+.dashboard-shell .topbar-search {
+  border-color: rgb(255 255 255 / 30%);
+  background: rgb(255 255 255 / 8%);
+}
+
+.dashboard-shell .topbar-search input {
+  color: #fff;
+}
+
+.dashboard-shell .topbar-search input::placeholder {
+  color: rgb(255 255 255 / 72%);
+}
+
+.dashboard-shell .topbar-search:focus-within {
+  border-color: rgb(255 255 255 / 62%);
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 10%);
+}
+
+.dashboard-shell .profile-avatar {
+  border-color: rgb(255 255 255 / 38%);
+  background: rgb(255 255 255 / 12%);
+  color: #fff;
+}
+
+.dashboard-shell .icon-button.is-active,
+.dashboard-shell .icon-button:hover {
+  color: #f4c7b7;
 }
 
 .topbar-heading {
@@ -866,18 +891,24 @@ img {
   letter-spacing: -0.03em;
 }
 
-.section-heading-row a {
+.dashboard-main .section-heading-row a {
   display: inline-flex;
   align-items: center;
   gap: 0.38rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.42rem 0.7rem;
   color: var(--wine);
   font-size: 0.78rem;
   white-space: nowrap;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
 }
 
-.section-heading-row a:hover {
-  text-decoration: underline;
-  text-underline-offset: 0.2rem;
+.dashboard-main .section-heading-row a:hover {
+  border-color: var(--wine-soft);
+  background: var(--wine-pale);
+  text-decoration: none;
+  transform: translateY(-1px);
 }
 
 .panel-surface {
@@ -903,6 +934,7 @@ img {
 }
 
 .dashboard-most-viewed {
+  align-self: start;
   min-width: 0;
   border-left: 1px solid var(--line);
   padding: 2rem 0 0 2rem;
@@ -925,12 +957,18 @@ img {
 }
 
 .dashboard-video-card {
+  display: block;
   min-width: 0;
+  transition: transform 180ms ease;
+}
+
+.dashboard-video-card:hover {
+  transform: translateY(-0.2rem);
 }
 
 .dashboard-video-media {
   position: relative;
-  aspect-ratio: 1.16;
+  aspect-ratio: 1.32;
   overflow: hidden;
   border-radius: 0.8rem;
   background: #1c1514;
@@ -999,7 +1037,7 @@ img {
 }
 
 .dashboard-video-copy {
-  padding: 0.95rem 0.25rem 0;
+  padding: 0.78rem 0.15rem 0;
 }
 
 .dashboard-video-copy h3 {
@@ -1060,7 +1098,7 @@ img {
 .study-material-card {
   position: relative;
   display: flex;
-  min-height: 8.7rem;
+  min-height: 8.2rem;
   align-items: center;
   overflow: hidden;
   border: 1px solid #eadfd8;
@@ -1120,8 +1158,8 @@ img {
   justify-content: space-between;
   gap: 1.5rem;
   border-top: 1px solid var(--line-strong);
-  margin: 3rem 0 0;
-  padding: 1.1rem 2rem 0.5rem;
+  margin: 2.4rem 0 0;
+  padding: 1.1rem 0.4rem 0.5rem;
 }
 
 .brand-footer-lockup {
@@ -1162,8 +1200,25 @@ img {
   display: grid;
   gap: 1.1rem;
   margin-top: 1.8rem;
-  padding: 0;
+  max-height: min(24rem, 52vh);
+  overflow-y: auto;
+  padding: 0 0.35rem 0.4rem 0;
   list-style: none;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.most-viewed-list::-webkit-scrollbar {
+  width: 0.4rem;
+}
+
+.most-viewed-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.most-viewed-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--line-strong);
 }
 
 .most-viewed-list li {
@@ -1216,6 +1271,24 @@ img {
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.featured-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 0.2rem;
+  color: var(--wine);
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+
+.featured-more:hover {
+  border-color: var(--wine);
+  color: var(--wine-soft);
 }
 
 /* Courses */
@@ -3004,6 +3077,7 @@ img {
   .sidebar-close { display: grid; width: 2rem; height: 2rem; place-items: center; color: #fff; }
   .app-topbar { position: sticky; z-index: 5; top: 0; min-height: 4.7rem; padding: 0 1rem; }
   .app-topbar-welcome { min-height: 5.8rem; }
+  .topbar-brand .cediah-logo { width: 3.65rem; height: 2.75rem; }
   .topbar-heading h1 { font-size: 1.05rem; }
   .topbar-heading p { font-size: 0.72rem; }
   .topbar-breadcrumbs { max-width: 13rem; font-size: 0.7rem; }
@@ -3013,59 +3087,55 @@ img {
   .app-main { padding: 1.1rem 1rem 1.5rem; }
   .dashboard-layout { display: block; }
   .dashboard-primary { padding-right: 0; }
-  .dashboard-most-viewed { padding-top: 1.5rem; }
+  .dashboard-most-viewed { margin-top: 0.4rem; padding-top: 1.5rem; }
   .dashboard-video-grid,
-  .study-material-grid,
-  .most-viewed-list {
+  .study-material-grid {
     display: flex;
-    gap: 1.1rem;
+    gap: 0.9rem;
     overflow-x: auto;
+    overflow-y: hidden;
     overscroll-behavior-inline: contain;
-    padding: 0 0 0.65rem;
-    scroll-padding-inline: 0.15rem;
+    padding: 0 1.5rem 0.55rem 0;
+    scroll-padding-inline: 0.25rem;
     scroll-snap-type: x proximity;
-    scrollbar-color: var(--line-strong) transparent;
-    scrollbar-width: thin;
+    scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
 
   .dashboard-video-grid::-webkit-scrollbar,
-  .study-material-grid::-webkit-scrollbar,
-  .most-viewed-list::-webkit-scrollbar {
-    height: 0.42rem;
-  }
-
-  .dashboard-video-grid::-webkit-scrollbar-track,
-  .study-material-grid::-webkit-scrollbar-track,
-  .most-viewed-list::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .dashboard-video-grid::-webkit-scrollbar-thumb,
-  .study-material-grid::-webkit-scrollbar-thumb,
-  .most-viewed-list::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: var(--line-strong);
+  .study-material-grid::-webkit-scrollbar {
+    display: none;
   }
 
   .dashboard-video-card {
-    flex: 0 0 min(82vw, 20rem);
+    flex: 0 0 min(72vw, 18rem);
     scroll-snap-align: start;
   }
 
   .study-material-card {
-    flex: 0 0 min(74vw, 18rem);
+    flex: 0 0 min(70vw, 16rem);
     scroll-snap-align: start;
   }
 
   .most-viewed-list {
-    padding-inline: 0.15rem 0;
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    max-height: 18rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    margin-top: 1.1rem;
+    padding: 0 0.3rem 0.35rem 0;
   }
 
   .most-viewed-list li {
-    flex: 0 0 min(86vw, 21rem);
-    scroll-snap-align: start;
+    grid-template-columns: 1.35rem minmax(0, 1fr);
   }
+
+  .most-viewed-link {
+    grid-template-columns: 5.2rem minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
   .brand-footer { align-items: flex-start; flex-direction: column; padding-inline: 0; }
   .brand-footer-lockup p { max-width: 18rem; line-height: 1.4; }
   .brand-footer-socials { align-self: flex-end; }

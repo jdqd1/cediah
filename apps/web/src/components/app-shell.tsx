@@ -152,6 +152,8 @@ export function AppShell({
       subscription.unsubscribe();
     };
   }, []);
+  const showHeaderHeading = showBreadcrumbs || Boolean(headerTitle || headerSubtitle || isAdministrator);
+
   return (
     <div className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""}`.trim()}>
       <aside className="app-sidebar" aria-label="Navegación principal">
@@ -160,11 +162,6 @@ export function AppShell({
             <X size={22} />
           </button>
         </div>
-        <Link className="sidebar-brand" href="/dashboard" aria-label="CEDIAH, inicio" onClick={closeSidebar}>
-          <CediahLogo variant="light" priority />
-          <span>Comunidad Estudiantil para la Difusión e Investigación de la Anatomía Humana</span>
-        </Link>
-
         <nav className="sidebar-nav">
           <div className="sidebar-nav-group">
             {mainNavigation.map((item) => (
@@ -216,9 +213,6 @@ export function AppShell({
           </div>
         </nav>
 
-        <div className="sidebar-quote">
-          <p>“La anatomía es la base de la medicina y el mapa de la vida.”</p>
-        </div>
         <div className="sidebar-watermark" aria-hidden="true">
           <Image src="/anatomy/skull.png" alt="" width={220} height={220} />
         </div>
@@ -229,29 +223,34 @@ export function AppShell({
           <button className="menu-trigger" type="button" aria-label="Abrir menú" onClick={() => setSidebarOpen(true)}>
             <List size={28} />
           </button>
-          <div className="topbar-heading">
-            {showBreadcrumbs ? (
-              <div className="topbar-breadcrumbs" aria-label="Ruta actual">
-                {breadcrumbs?.map((breadcrumb, index) => (
-                  <span key={`${breadcrumb}-${index}`} className={index === breadcrumbs.length - 1 ? "current" : ""}>
-                    {breadcrumb}
-                    {index < breadcrumbs.length - 1 && <span className="breadcrumb-chevron">›</span>}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <>
-                <h1>{headerTitle}</h1>
-                {headerSubtitle && <p>{headerSubtitle}</p>}
-                {isAdministrator && (
-                  <span className="dashboard-admin-badge" aria-label="Rol: administrador">
-                    <ShieldCheck size={16} weight="fill" />
-                    Administrador
-                  </span>
-                )}
-              </>
-            )}
-          </div>
+          <Link className="topbar-brand" href="/dashboard" aria-label="CEDIAH, inicio" onClick={closeSidebar}>
+            <CediahLogo variant={activeKey === "dashboard" ? "light" : "dark"} priority={activeKey === "dashboard"} />
+          </Link>
+          {showHeaderHeading && (
+            <div className="topbar-heading">
+              {showBreadcrumbs ? (
+                <div className="topbar-breadcrumbs" aria-label="Ruta actual">
+                  {breadcrumbs?.map((breadcrumb, index) => (
+                    <span key={`${breadcrumb}-${index}`} className={index === breadcrumbs.length - 1 ? "current" : ""}>
+                      {breadcrumb}
+                      {index < breadcrumbs.length - 1 && <span className="breadcrumb-chevron">›</span>}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <h1>{headerTitle}</h1>
+                  {headerSubtitle && <p>{headerSubtitle}</p>}
+                  {isAdministrator && (
+                    <span className="dashboard-admin-badge" aria-label="Rol: administrador">
+                      <ShieldCheck size={16} weight="fill" />
+                      Administrador
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <label className="topbar-search">
             <MagnifyingGlass size={21} />
             <input type="search" placeholder={searchPlaceholder} aria-label={searchPlaceholder} />

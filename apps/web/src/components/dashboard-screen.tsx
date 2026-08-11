@@ -118,7 +118,7 @@ export function DashboardScreen({
   const highlighted = [
     ...items.filter((item) => item.featured),
     ...items.filter((item) => !item.featured),
-  ].slice(0, 5);
+  ].slice(0, 8);
 
   return (
     <AppShell
@@ -127,10 +127,8 @@ export function DashboardScreen({
       canManageRoles={isAdministrator}
       isAdministrator={isAdministrator}
       viewer={viewer}
-      headerTitle="¡Bienvenido de vuelta!"
-      headerSubtitle="Contenido académico publicado por la comunidad CEDIAH."
+      headerTitle=""
       searchPlaceholder="Buscar contenido..."
-      welcome
       mainClassName="dashboard-main"
     >
       <div className="dashboard-layout">
@@ -190,7 +188,6 @@ export function DashboardScreen({
             </div>
           </section>
 
-          <BrandFooter />
         </div>
 
         <aside className="dashboard-most-viewed" aria-labelledby="featured-content-title">
@@ -223,8 +220,13 @@ export function DashboardScreen({
               La selección destacada se llenará desde el panel editorial.
             </p>
           )}
+          <Link className="featured-more" href="/biblioteca">
+            Ver más destacados <ArrowRight size={16} />
+          </Link>
         </aside>
       </div>
+
+      <BrandFooter />
     </AppShell>
   );
 }
