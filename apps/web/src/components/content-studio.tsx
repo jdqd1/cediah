@@ -718,7 +718,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   }
 
   async function upload() {
-    if (!item || !draft || !file || !editable || !capabilities.canUpload) return;
+    if (!draft || !file || !editable || !capabilities.canUpload) return;
     const isVideo = draft.kind === "video";
     const isGuide = draft.kind === "guide";
     const valid =
@@ -733,8 +733,24 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setBusy("upload");
     setNotice(null);
     try {
+      // Assets require a content ID, but authors should not have to save a
+      // separate draft just to reveal the video picker. Create it as part of
+      // the upload action when this is a new item.
+      const target =
+        item ??
+        (await json<ContentItem>("/api/editor/content", {
+          body: JSON.stringify(draft),
+          method: "POST",
+        }));
+      if (!item) {
+        upsert(target);
+        setDraft(itemDraft(target));
+        setEditingId(target.id);
+        setIsNew(false);
+      }
+
       const reservation = await json<ContentAssetUploadResponse>(
-        `/api/editor/content/${encodeURIComponent(item.id)}/assets`,
+        `/api/editor/content/${encodeURIComponent(target.id)}/assets`,
         {
           body: JSON.stringify({
             fileName: file.name,
@@ -755,7 +771,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       );
       setItems((current) =>
         current.map((value) =>
-          value.id === item.id ? ({ ...value, asset } as ContentItem) : value,
+          value.id === target.id ? ({ ...value, asset } as ContentItem) : value,
         ),
       );
       setFile(null);
@@ -1014,13 +1030,16 @@ export function ContentStudio({ initialWorkspace }: Props) {
                 )}
               </form>
 
-              {accepts && item && capabilities.canUpload && editable && (
+              {accepts && capabilities.canUpload && editable && (
                 <section className="studio-assets">
                   <div>
                     <h4>Archivo asociado</h4>
-                    <p>{draft.kind === "video" ? "MP4, MOV o WebM." : "Documento PDF."}</p>
+                    <p>
+                      {draft.kind === "video" ? "MP4, MOV o WebM." : "Documento PDF."}
+                      {isNew ? " El borrador se guardará automáticamente al subirlo." : ""}
+                    </p>
                   </div>
-                  {item.asset && (
+                  {item?.asset && (
                     <p className="studio-current-file">
                       {item.asset.fileName} · {item.asset.status}
                     </p>
@@ -1039,7 +1058,11 @@ export function ContentStudio({ initialWorkspace }: Props) {
                     onClick={upload}
                   >
                     <CloudArrowUp size={17} />
-                    {busy === "upload" ? "Subiendo..." : "Subir archivo"}
+                    {busy === "upload"
+                      ? "Subiendo..."
+                      : isNew
+                        ? "Guardar y subir archivo"
+                        : "Subir archivo"}
                   </button>
                 </section>
               )}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ContentItemSchema } from "@cediah/contracts";
 import type {
   ContentAsset,
   ContentAssetUploadRequest,
@@ -93,6 +94,21 @@ function contentProvider(
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("content API", () => {
+  it("accepts RFC 3339 offsets returned by Supabase for content timestamps", () => {
+    const item = ContentItemSchema.safeParse({
+      ...guideDraft,
+      asset: null,
+      authorUserId: users.contributor.id,
+      createdAt: "2026-08-11T18:29:21.25481+00:00",
+      id: contentId,
+      publishedAt: null,
+      status: "draft",
+      updatedAt: "2026-08-11T18:29:21.25481+00:00",
+    });
+
+    expect(item.success).toBe(true);
+  });
+
   it("serves the published catalog without authentication", async () => {
     const published = guideItem({ publishedAt, status: "published", updatedAt: publishedAt });
     const requests: Parameters<ContentProvider["listPublished"]>[0][] = [];

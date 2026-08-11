@@ -340,11 +340,14 @@ export type ContentAssetKind = z.infer<typeof ContentAssetKindSchema>;
 const ContentRecordSchema = z.object({
   asset: ContentAssetSchema.nullable().default(null),
   authorUserId: z.string().uuid(),
-  createdAt: z.string().datetime(),
+  // Supabase serializes `timestamptz` values with a UTC offset (`+00:00`),
+  // while other providers commonly use the equivalent `Z` suffix. Both are
+  // valid RFC 3339 timestamps and must be accepted at this service boundary.
+  createdAt: z.string().datetime({ offset: true }),
   id: z.string().uuid(),
-  publishedAt: z.string().datetime().nullable(),
+  publishedAt: z.string().datetime({ offset: true }).nullable(),
   status: ContentStatusSchema,
-  updatedAt: z.string().datetime(),
+  updatedAt: z.string().datetime({ offset: true }),
 });
 
 export const ContentItemSchema = z.intersection(ContentDraftSchema, ContentRecordSchema);
