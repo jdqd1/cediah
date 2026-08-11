@@ -831,6 +831,18 @@ img {
   line-height: 1.45;
 }
 
+.profile-sign-out {
+  width: fit-content;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.profile-sign-out:hover {
+  color: var(--wine);
+}
+
 .topbar-popover a:hover {
   color: var(--wine);
 }

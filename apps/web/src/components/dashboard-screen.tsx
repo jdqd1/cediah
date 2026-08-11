@@ -103,10 +103,12 @@ export function DashboardScreen({
   available,
   items,
   isAdministrator = false,
+  viewer,
 }: {
   available: boolean;
   items: ContentItem[];
   isAdministrator?: boolean;
+  viewer?: { email: string };
 }) {
   const videos = items
     .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
@@ -120,6 +122,7 @@ export function DashboardScreen({
     <AppShell
       activeKey="dashboard"
       isAdministrator={isAdministrator}
+      viewer={viewer}
       headerTitle="¡Bienvenido de vuelta!"
       headerSubtitle="Contenido académico publicado por la comunidad CEDIAH."
       searchPlaceholder="Buscar contenido..."

@@ -21,6 +21,7 @@ export default async function DashboardPage() {
       available={result.status === "ready"}
       items={result.status === "ready" ? result.catalog.items : []}
       isAdministrator={isAdministrator}
+      viewer={current.status === "authenticated" ? { email: current.user.email } : undefined}
     />
   );
 }

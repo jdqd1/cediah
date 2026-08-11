@@ -26,7 +26,9 @@ import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import { signOut } from "@/app/panel/actions";
+import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CediahLogo } from "./cediah-logo";
 
 type AppShellProps = {
@@ -34,6 +36,9 @@ type AppShellProps = {
   canManageContent?: boolean;
   canManageRoles?: boolean;
   isAdministrator?: boolean;
+  viewer?: {
+    email: string;
+  };
   centeredSearch?: boolean;
   children: ReactNode;
   headerSubtitle?: string;
@@ -75,6 +80,11 @@ const supportNavigation: NavItem[] = [
   { key: "help", label: "Ayuda", href: "/dashboard", icon: Question },
 ];
 
+function getProfileInitials(email: string) {
+  const localPart = email.split("@", 1)[0]?.replace(/[^a-z0-9]/gi, "") ?? "";
+  return (localPart.slice(0, 2) || "US").toUpperCase();
+}
+
 function NavigationItem({ item, activeKey, onNavigate }: { item: NavItem; activeKey: string; onNavigate: () => void }) {
   const Icon = item.icon;
   const active = item.key === activeKey;
@@ -98,6 +108,7 @@ export function AppShell({
   canManageContent = false,
   canManageRoles = false,
   isAdministrator = false,
+  viewer: initialViewer,
   centeredSearch = false,
   children,
   headerSubtitle,
@@ -110,11 +121,37 @@ export function AppShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [viewer, setViewer] = useState<{ email: string } | null>(initialViewer ?? null);
   const pathname = usePathname();
 
   const closeSidebar = () => setSidebarOpen(false);
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
 
+  useEffect(() => {
+    let active = true;
+    const supabase = getBrowserSupabaseClient();
+
+    if (!supabase) return;
+
+    const synchronizeViewer = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (!active) return;
+      setViewer(error || !data.user?.email ? null : { email: data.user.email });
+    };
+
+    void synchronizeViewer();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setViewer(session?.user.email ? { email: session.user.email } : null);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
   return (
     <div className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""}`.trim()}>
       <aside className="app-sidebar" aria-label="Navegación principal">
@@ -239,21 +276,34 @@ export function AppShell({
               )}
             </div>
             <div className="topbar-popover-wrap">
-              <button
-                className="profile-trigger"
-                type="button"
-                aria-label="Abrir menú de perfil"
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((open) => !open)}
-              >
-                <span className="profile-avatar">JD</span>
-                <CaretDown size={17} weight="bold" />
-              </button>
-              {profileOpen && (
-                <div className="topbar-popover profile-popover">
-                  <strong>José Díaz</strong>
-                  <Link href="/acceder">Cerrar sesión</Link>
-                </div>
+              {viewer ? (
+                <>
+                  <button
+                    className="profile-trigger"
+                    type="button"
+                    aria-label={"Abrir menú de perfil de " + viewer.email}
+                    aria-expanded={profileOpen}
+                    onClick={() => setProfileOpen((open) => !open)}
+                  >
+                    <span className="profile-avatar">{getProfileInitials(viewer.email)}</span>
+                    <CaretDown size={17} weight="bold" />
+                  </button>
+                  {profileOpen && (
+                    <div className="topbar-popover profile-popover">
+                      <strong>{viewer.email}</strong>
+                      <form action={signOut}>
+                        <button className="profile-sign-out" type="submit">Cerrar sesión</button>
+                      </form>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link className="profile-trigger profile-sign-in" href="/acceder">
+                  <span className="profile-avatar" aria-hidden="true">
+                    <UserCircle size={20} weight="fill" />
+                  </span>
+                  <span>Acceder</span>
+                </Link>
               )}
             </div>
           </div>
