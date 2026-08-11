@@ -11,15 +11,27 @@ export default async function DashboardPage() {
     getCurrentUser(),
   ]);
   let isAdministrator = false;
+  let canManageContent = false;
   if (current.status === "authenticated") {
     const admin = await getAdminRoleUser(current.accessToken, current.user.email);
-    isAdministrator = admin.status === "ready" && admin.user.roles.includes("administrator");
+    if (admin.status === "ready") {
+      isAdministrator = admin.user.roles.includes("administrator");
+      canManageContent = admin.user.roles.some(
+        (role) =>
+          role === "community_contributor" ||
+          role === "presenter" ||
+          role === "academic_editor" ||
+          role === "coordination" ||
+          role === "administrator",
+      );
+    }
   }
 
   return (
     <DashboardScreen
       available={result.status === "ready"}
       items={result.status === "ready" ? result.catalog.items : []}
+      canManageContent={canManageContent}
       isAdministrator={isAdministrator}
       viewer={current.status === "authenticated" ? { email: current.user.email } : undefined}
     />

@@ -101,11 +101,13 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
 
 export function DashboardScreen({
   available,
+  canManageContent = false,
   items,
   isAdministrator = false,
   viewer,
 }: {
   available: boolean;
+  canManageContent?: boolean;
   items: ContentItem[];
   isAdministrator?: boolean;
   viewer?: { email: string };
@@ -121,6 +123,8 @@ export function DashboardScreen({
   return (
     <AppShell
       activeKey="dashboard"
+      canManageContent={canManageContent}
+      canManageRoles={isAdministrator}
       isAdministrator={isAdministrator}
       viewer={viewer}
       headerTitle="¡Bienvenido de vuelta!"

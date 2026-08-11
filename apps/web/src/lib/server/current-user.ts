@@ -1,6 +1,5 @@
 import "server-only";
-import { CurrentUserResponseSchema, type CurrentUser } from "@cediah/contracts";
-import { getServerEnvironment } from "./env";
+import type { CurrentUser } from "@cediah/contracts";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type CurrentUserResult =
@@ -21,30 +20,13 @@ export async function getCurrentUser(): Promise<CurrentUserResult> {
   } = await supabase.auth.getSession();
   if (!session?.access_token) return { status: "anonymous" };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2_500);
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (userError || !user?.email || user.id !== claims.sub) return { status: "anonymous" };
 
-  try {
-    const environment = getServerEnvironment();
-    const response = await fetch(new URL("/v1/auth/me", environment.API_BASE_URL), {
-      cache: "no-store",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      signal: controller.signal,
-    });
-
-    if (response.status === 401) return { status: "anonymous" };
-    if (!response.ok) return { status: "unavailable" };
-
-    const result = CurrentUserResponseSchema.parse(await response.json());
-    if (result.user.id !== claims.sub) return { status: "anonymous" };
-
-    return { accessToken: session.access_token, status: "authenticated", user: result.user };
-  } catch {
-    return { status: "unavailable" };
-  } finally {
-    clearTimeout(timeout);
-  }
+  return {
+    accessToken: session.access_token,
+    status: "authenticated",
+    user: { email: user.email, id: user.id },
+  };
 }
