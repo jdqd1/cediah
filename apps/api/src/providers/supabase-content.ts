@@ -13,6 +13,7 @@ import {
   type ContentItem,
   type ContentProvider,
   type ContentStatus,
+  type ContentTransitionRequest,
   type PlatformRole,
 } from "@cediah/contracts";
 import { canEditContent, getContentCapabilities } from "../content-authorization.js";
@@ -102,15 +103,26 @@ function validTransition(input: {
   return capabilities.canPublish && input.currentStatus === "published";
 }
 
-function isPublishable(item: ContentItem) {
+export function isContentReadyForTransition(
+  item: ContentItem,
+  targetStatus: ContentTransitionRequest["status"],
+) {
   if (item.kind === "video") {
-    return Boolean(
-      item.content.externalUrl ||
-        (item.asset?.status === "ready" && item.asset.kind === "video"),
+    if (targetStatus !== "in_review" && targetStatus !== "published") return true;
+
+    const hasReadyVideo =
+      item.asset?.status === "ready" && item.asset.kind === "video";
+    const hasLegacyExternalVideo = Boolean(item.content.externalUrl);
+
+    return (
+      (hasReadyVideo || hasLegacyExternalVideo) &&
+      item.content.keyPoints.length > 0 &&
+      item.content.guide.sections.length > 0 &&
+      item.content.quiz.questions.length > 0
     );
   }
 
-  if (item.kind === "guide") {
+  if (targetStatus === "published" && item.kind === "guide") {
     return (
       item.content.sections.length > 0 ||
       (item.asset?.status === "ready" && item.asset.kind === "document")
@@ -161,7 +173,10 @@ export function createSupabaseContentProvider(
     });
   }
 
-  async function parseContentItem(rowValue: unknown): Promise<ContentItem> {
+  async function parseContentItem(
+    rowValue: unknown,
+    includeDownloadUrl: boolean,
+  ): Promise<ContentItem> {
     const row = asRecord(rowValue);
     if (!row) throw new Error("Supabase returned an invalid content row");
 
@@ -174,7 +189,9 @@ export function createSupabaseContentProvider(
         return rightDate - leftDate;
       });
     const selectedAsset = assets.find((asset) => asset.status === "ready") ?? assets[0] ?? null;
-    const asset = selectedAsset ? await parseAsset(selectedAsset, true) : null;
+    const asset = selectedAsset
+      ? await parseAsset(selectedAsset, includeDownloadUrl)
+      : null;
     const draft = ContentDraftSchema.parse({
       content: row.content,
       estimatedMinutes: row.estimated_minutes ?? null,
@@ -198,8 +215,10 @@ export function createSupabaseContentProvider(
     });
   }
 
-  async function parseContentRows(data: unknown) {
-    return Promise.all(asArray(data).map(parseContentItem));
+  async function parseContentRows(data: unknown, includeDownloadUrl: boolean) {
+    return Promise.all(
+      asArray(data).map((row) => parseContentItem(row, includeDownloadUrl)),
+    );
   }
 
   async function getItemById(contentId: string) {
@@ -209,7 +228,7 @@ export function createSupabaseContentProvider(
       .eq("id", contentId)
       .maybeSingle();
     if (error) throw error;
-    return data ? parseContentItem(data) : null;
+    return data ? parseContentItem(data, false) : null;
   }
 
   async function getStoredAccess(contentId: string) {
@@ -359,7 +378,7 @@ export function createSupabaseContentProvider(
         throw error;
       }
 
-      const item = await parseContentItem(data);
+      const item = await parseContentItem(data, true);
       await writeAudit({
         action: "content_created",
         actorUserId: input.actorUserId,
@@ -458,7 +477,7 @@ export function createSupabaseContentProvider(
         .eq("status", "published")
         .maybeSingle();
       if (error) throw error;
-      return data ? parseContentItem(data) : null;
+      return data ? parseContentItem(data, true) : null;
     },
 
     async getRoles(userId) {
@@ -489,7 +508,7 @@ export function createSupabaseContentProvider(
 
       const { data, error } = await query;
       if (error) throw error;
-      return parseContentRows(data);
+      return parseContentRows(data, false);
     },
 
     async listPublished(input) {
@@ -503,7 +522,7 @@ export function createSupabaseContentProvider(
 
       const { data, error } = await query;
       if (error) throw error;
-      return parseContentRows(data);
+      return parseContentRows(data, false);
     },
 
     async transitionContent(input) {
@@ -521,10 +540,12 @@ export function createSupabaseContentProvider(
         return { status: "forbidden" };
       }
 
-      if (input.status === "published") {
+      if (input.status === "in_review" || input.status === "published") {
         const item = await getItemById(input.contentId);
         if (!item) return { status: "not_found" };
-        if (!isPublishable(item)) return { status: "not_publishable" };
+        if (!isContentReadyForTransition(item, input.status)) {
+          return { status: "not_publishable" };
+        }
       }
 
       const now = new Date().toISOString();
@@ -556,7 +577,7 @@ export function createSupabaseContentProvider(
       if (error) throw error;
       if (!data) return { status: "conflict" };
 
-      const item = await parseContentItem(data);
+      const item = await parseContentItem(data, true);
       await writeAudit({
         action: "content_" + input.status,
         actorUserId: input.actorUserId,
@@ -612,7 +633,7 @@ export function createSupabaseContentProvider(
       }
       if (!data) return { status: "conflict" };
 
-      const item = await parseContentItem(data);
+      const item = await parseContentItem(data, true);
       await writeAudit({
         action: "content_updated",
         actorUserId: input.actorUserId,

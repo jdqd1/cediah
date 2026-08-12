@@ -11,10 +11,13 @@ type ContentPageProps = {
 
 export default async function ContentPage({ params }: ContentPageProps) {
   const { slug } = await params;
-  const result = await getPublishedContentItem(slug);
+  const [result, isAdministrator] = await Promise.all([
+    getPublishedContentItem(slug),
+    currentUserIsAdministrator(),
+  ]);
 
   if (result.status === "ready") {
-    return <ContentDetailScreen item={result.item} isAdministrator={await currentUserIsAdministrator()} />;
+    return <ContentDetailScreen item={result.item} isAdministrator={isAdministrator} />;
   }
   if (result.status === "not_found") notFound();
 

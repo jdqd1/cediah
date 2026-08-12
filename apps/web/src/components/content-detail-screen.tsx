@@ -14,7 +14,7 @@ import {
   SealCheck,
 } from "@phosphor-icons/react";
 import type { ContentItem } from "@cediah/contracts";
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 import { AppShell } from "./app-shell";
 
 export function ContentDetailScreen({ item, isAdministrator = false }: { item: ContentItem; isAdministrator?: boolean }) {
@@ -89,37 +89,7 @@ function ContentBody({ item }: { item: ContentItem }) {
   }
 
   if (item.kind === "video") {
-    return (
-      <section className="published-video">
-        {item.asset?.downloadUrl ? (
-          <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl}>
-            Tu navegador no puede reproducir este video.
-          </video>
-        ) : item.content.externalUrl ? (
-          <div className="published-external-video">
-            <PlayCircle size={58} />
-            <h3>Video alojado externamente</h3>
-            <a href={item.content.externalUrl} target="_blank" rel="noreferrer">
-              Abrir video <ArrowRight size={18} />
-            </a>
-          </div>
-        ) : null}
-        <div className="published-video-copy">
-          <h3>Sobre esta clase</h3>
-          <p>{item.content.description}</p>
-          {item.content.keyPoints.length > 0 && (
-            <>
-              <h4>Puntos clave de la clase</h4>
-              <ul>
-                {item.content.keyPoints.map((point) => (
-                  <li key={point}><CheckCircle size={19} />{point}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      </section>
-    );
+    return <VideoBody item={item} />;
   }
 
   if (item.kind === "quiz") return <QuizBody item={item} />;
@@ -145,33 +115,139 @@ function ContentBody({ item }: { item: ContentItem }) {
   );
 }
 
+type VideoItem = ContentItem & { kind: "video" };
+type VideoResource = "guide" | "key-points" | "quiz";
+
+function VideoBody({ item }: { item: VideoItem }) {
+  const [resource, setResource] = useState<VideoResource>("guide");
+  const tabs: { id: VideoResource; label: string }[] = [
+    { id: "guide", label: "Guía" },
+    { id: "key-points", label: "Puntos clave" },
+    { id: "quiz", label: "Cuestionario" },
+  ];
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const lastIndex = tabs.length - 1;
+    const nextIndex =
+      event.key === "ArrowRight" ? (index === lastIndex ? 0 : index + 1)
+      : event.key === "ArrowLeft" ? (index === 0 ? lastIndex : index - 1)
+      : event.key === "Home" ? 0
+      : event.key === "End" ? lastIndex
+      : null;
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = tabs[nextIndex]!;
+    setResource(next.id);
+    document.getElementById(`video-resource-tab-${next.id}`)?.focus();
+  }
+
+  return (
+    <section className="published-video published-video-package">
+      {item.asset?.downloadUrl ? (
+        <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl}>
+          Tu navegador no puede reproducir este video.
+        </video>
+      ) : item.content.externalUrl ? (
+        <div className="published-external-video">
+          <PlayCircle size={58} />
+          <h3>Video</h3>
+          <a href={item.content.externalUrl} target="_blank" rel="noreferrer">
+            Abrir video <ArrowRight size={18} />
+          </a>
+        </div>
+      ) : null}
+
+      <div className="published-video-copy">
+        <p>{item.content.description}</p>
+      </div>
+
+      <div className="video-resource-tabs" role="tablist" aria-label="Recursos del video">
+        {tabs.map((tab, index) => (
+          <button
+            aria-controls={`video-resource-${tab.id}`}
+            aria-selected={resource === tab.id}
+            className={resource === tab.id ? "is-active" : ""}
+            id={`video-resource-tab-${tab.id}`}
+            key={tab.id}
+            onClick={() => setResource(tab.id)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
+            role="tab"
+            tabIndex={resource === tab.id ? 0 : -1}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <section
+        aria-labelledby={`video-resource-tab-${resource}`}
+        className="video-resource-panel"
+        id={`video-resource-${resource}`}
+        role="tabpanel"
+      >
+        {resource === "guide" && (
+          <div className="video-guide-sections">
+            {item.content.guide.sections.map((section, index) => (
+              <article key={`${section.heading}-${index}`}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <div>
+                  <h3>{section.heading}</h3>
+                  {section.body.split(/\n{2,}/).map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        {resource === "key-points" && (
+          <ul className="video-key-points">
+            {item.content.keyPoints.map((point) => (
+              <li key={point}><CheckCircle size={19} />{point}</li>
+            ))}
+          </ul>
+        )}
+        {resource === "quiz" && <QuizPractice questions={item.content.quiz.questions} />}
+      </section>
+    </section>
+  );
+}
+
 function QuizBody({
   item,
 }: {
   item: ContentItem & { kind: "quiz" };
 }) {
+  return <QuizPractice questions={item.content.questions} />;
+}
+
+type QuizQuestion = Extract<ContentItem, { kind: "quiz" }>["content"]["questions"][number];
+
+function QuizPractice({ questions }: { questions: QuizQuestion[] }) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const score = useMemo(
     () =>
-      item.content.questions.reduce(
+      questions.reduce(
         (total, question, index) =>
           total + (answers[index] === question.correctOptionIndex ? 1 : 0),
         0,
       ),
-    [answers, item.content.questions],
+    [answers, questions],
   );
 
   return (
     <section className="published-quiz">
       <div className="published-tool-heading">
-        <ClipboardText size={34} />
+          <ClipboardText size={34} />
         <div>
           <h3>Comprueba lo aprendido</h3>
-          <p>{item.content.questions.length} preguntas · un intento de práctica</p>
+          <p>{questions.length} preguntas</p>
         </div>
       </div>
-      {item.content.questions.map((question, questionIndex) => (
+      {questions.map((question, questionIndex) => (
         <fieldset key={question.prompt}>
           <legend><span>{questionIndex + 1}</span>{question.prompt}</legend>
           {question.options.map((option, optionIndex) => {
@@ -202,7 +278,7 @@ function QuizBody({
       {submitted ? (
         <div className="quiz-result" role="status">
           <SealCheck size={28} />
-          <strong>{score} de {item.content.questions.length} respuestas correctas</strong>
+          <strong>{score} de {questions.length} respuestas correctas</strong>
           <button
             type="button"
             onClick={() => {
@@ -216,7 +292,7 @@ function QuizBody({
       ) : (
         <button
           className="published-primary-action"
-          disabled={Object.keys(answers).length !== item.content.questions.length}
+          disabled={Object.keys(answers).length !== questions.length}
           onClick={() => setSubmitted(true)}
           type="button"
         >

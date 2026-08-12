@@ -25,7 +25,7 @@ import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CediahLogo } from "./cediah-logo";
 
 const featureItems = [
-  { label: "Clases\nteóricas", icon: PlayCircle },
+  { label: "Videos", icon: PlayCircle },
   { label: "Material\nde estudio", icon: BookOpen },
   { label: "Flashcards\ninteractivas", icon: CardsThree },
   { label: "Cuestionarios\npor tema", icon: ClipboardText },
@@ -63,7 +63,7 @@ export function LandingScreen() {
         <div className="landing-brand-seal" aria-hidden="true"><CediahLogo variant="light" /></div>
         <div className="landing-stat-bar">
           <div><UsersThree size={36} weight="thin" /><strong>+15.000</strong><span>Estudiantes</span></div>
-          <div><PlayCircle size={36} weight="thin" /><strong>+300</strong><span>Clases</span></div>
+          <div><PlayCircle size={36} weight="thin" /><strong>+300</strong><span>Videos</span></div>
           <div><BookOpen size={36} weight="thin" /><strong>+800</strong><span>Recursos</span></div>
           <div><GraduationCap size={36} weight="thin" /><strong>100%</strong><span>Hecho para<br />estudiantes</span></div>
         </div>

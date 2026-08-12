@@ -50,11 +50,10 @@ export function PlayerScreen({ isAdministrator = false }: { isAdministrator?: bo
 
   return (
     <AppShell
-      activeKey="classes"
-      breadcrumbs={["Clases teóricas", "Miembro inferior", "Músculos", "Músculos del muslo: compartimento anterior"]}
+      activeKey="video"
+      breadcrumbs={["Videos", "Miembro inferior", "Músculos", "Músculos del muslo: compartimento anterior"]}
       headerTitle="Músculos del muslo: compartimento anterior"
       isAdministrator={isAdministrator}
-      searchPlaceholder="Buscar contenido..."
       mainClassName="player-main"
     >
       <div className="player-layout">
@@ -62,7 +61,7 @@ export function PlayerScreen({ isAdministrator = false }: { isAdministrator?: bo
           <div className="player-title-row">
             <div>
               <h2>Músculos del muslo: compartimento anterior</h2>
-              <p className="player-summary">Clase teórica · 28 min · Nivel intermedio</p>
+              <p className="player-summary">Video · Nivel intermedio</p>
             </div>
             <button className={`complete-class ${completed ? "is-complete" : ""}`} type="button" onClick={() => setCompleted((value) => !value)}>{completed ? <CheckCircle size={19} weight="fill" /> : <CheckCircle size={19} />} {completed ? "Completada" : "Marcar como completada"}</button>
           </div>
@@ -71,19 +70,19 @@ export function PlayerScreen({ isAdministrator = false }: { isAdministrator?: bo
             <Image src="/anatomy/thigh.png" alt="Ilustración del compartimento anterior del muslo" fill sizes="(max-width: 1100px) 100vw, 780px" priority />
             <div className="video-player-overlay" />
             <div className="video-controls">
-              <input aria-label="Progreso de la clase" type="range" min={0} max={100} value={progress} onChange={(event) => setProgress(Number(event.target.value))} />
+              <input aria-label="Progreso del video" type="range" min={0} max={100} value={progress} onChange={(event) => setProgress(Number(event.target.value))} />
               <div className="video-control-row"><button className="player-icon-control" type="button" aria-label={isPlaying ? "Pausar" : "Reproducir"} onClick={() => setIsPlaying((value) => !value)}>{isPlaying ? <Pause size={24} weight="fill" /> : <Play size={24} weight="fill" />}</button><button className="player-icon-control" type="button" aria-label="Volumen"><SpeakerHigh size={23} /></button><span className="video-time">08:12 / 28:45</span><span className="video-control-spacer" /><button className="player-icon-control" type="button" aria-label="Pantalla completa"><SquaresFour size={23} weight="fill" /></button></div>
             </div>
           </div>
 
-          <div className="player-tabs" role="tablist" aria-label="Contenido de la clase">
+          <div className="player-tabs" role="tablist" aria-label="Contenido del video">
             <button className={activeTab === "questions" ? "is-active" : ""} type="button" role="tab" aria-selected={activeTab === "questions"} onClick={() => setActiveTab("questions")}><ClipboardText size={21} /> Preguntas de repaso</button>
             <button className={activeTab === "points" ? "is-active" : ""} type="button" role="tab" aria-selected={activeTab === "points"} onClick={() => setActiveTab("points")}><Question size={21} /> Puntos clave</button>
           </div>
 
           {activeTab === "questions" ? (
             <section className="question-section" aria-labelledby="question-title">
-              <div className="question-heading"><div><h3 id="question-title"><Question size={20} /> Preguntas y respuestas</h3><p>Repasa los conceptos clave de esta clase.</p></div><button className="outline-action small" type="button"><Printer size={17} /> Imprimir</button></div>
+              <div className="question-heading"><div><h3 id="question-title"><Question size={20} /> Preguntas y respuestas</h3><p>Repasa los conceptos clave del video.</p></div><button className="outline-action small" type="button"><Printer size={17} /> Imprimir</button></div>
               <div className="question-list">{questions.map(([question, answer]) => <details className="question-row" key={question}><summary><span className="question-mark">?</span><span><strong>{question}</strong><small>{answer}</small></span><CaretDown size={17} /></summary></details>)}</div>
               <button className="show-more-questions" type="button">Ver más preguntas <CaretDown size={17} /></button>
             </section>
@@ -94,7 +93,7 @@ export function PlayerScreen({ isAdministrator = false }: { isAdministrator?: bo
 
         <aside className="player-sidebar">
           <section className="resource-panel" aria-labelledby="resource-title"><h2 id="resource-title"><SquaresFour size={23} /> Material complementario</h2><div className="resource-filters"><button className="is-selected" type="button">Todos</button><button type="button">Guías</button><button type="button">Flashcards</button><button type="button">Cuestionarios</button></div><div className="resource-list">{resources.map(({ title, meta, icon: Icon, color }) => <Link className="resource-row" href="/guias/musculos-compartimento-anterior" key={title}><span className={`resource-icon resource-icon-${color}`}><Icon size={27} /></span><span><strong>{title}</strong><small>{meta}</small></span><ArrowRight size={18} /></Link>)}</div></section>
-          <section className="related-classes" aria-labelledby="related-title"><div className="section-heading-row"><h2 id="related-title">Clases relacionadas</h2><Link href="/clases/reproductor">Ver todo</Link></div><div>{relatedClasses.map((item) => <Link className="related-class-row" href="/clases/reproductor" key={item.title}><span className="related-class-image"><Image src={item.image} alt="" fill sizes="100px" /><small>{item.time}</small></span><span><strong>{item.title}</strong><small>{item.meta}</small></span></Link>)}</div></section>
+          <section className="related-classes" aria-labelledby="related-title"><div className="section-heading-row"><h2 id="related-title">Videos relacionados</h2><Link href="/biblioteca?tipo=video">Ver todos</Link></div><div>{relatedClasses.map((item) => <Link className="related-class-row" href="/clases/reproductor" key={item.title}><span className="related-class-image"><Image src={item.image} alt="" fill sizes="100px" /><small>{item.time}</small></span><span><strong>{item.title}</strong><small>{item.meta}</small></span></Link>)}</div></section>
         </aside>
       </div>
       <BrandFooter />

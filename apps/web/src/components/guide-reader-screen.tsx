@@ -63,7 +63,6 @@ export function GuideReaderScreen({ isAdministrator = false }: { isAdministrator
       isAdministrator={isAdministrator}
       breadcrumbs={["Guías de estudio", "Miembro inferior", "Músculos", "Guía: Músculos del compartimento anterior"]}
       headerTitle="Guía: Músculos del compartimento anterior del muslo"
-      searchPlaceholder="Buscar en la guía..."
       mainClassName="guide-reader-main"
     >
       <section className="guide-reader-toolbar">

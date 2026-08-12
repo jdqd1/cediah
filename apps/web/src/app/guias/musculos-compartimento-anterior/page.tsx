@@ -6,11 +6,14 @@ import { currentUserIsAdministrator } from "@/lib/server/current-user";
 export const dynamic = "force-dynamic";
 
 export default async function LegacyGuidePage() {
-  const result = await getPublishedContentItem("musculos-compartimento-anterior");
+  const [result, isAdministrator] = await Promise.all([
+    getPublishedContentItem("musculos-compartimento-anterior"),
+    currentUserIsAdministrator(),
+  ]);
 
   if (result.status === "ready") {
     if (result.item.kind !== "guide") notFound();
-    return <ContentDetailScreen item={result.item} isAdministrator={await currentUserIsAdministrator()} />;
+    return <ContentDetailScreen item={result.item} isAdministrator={isAdministrator} />;
   }
   if (result.status === "not_found") notFound();
 

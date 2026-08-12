@@ -11,11 +11,14 @@ type GuidePageProps = {
 
 export default async function GuidePage({ params }: GuidePageProps) {
   const { slug } = await params;
-  const result = await getPublishedContentItem(slug);
+  const [result, isAdministrator] = await Promise.all([
+    getPublishedContentItem(slug),
+    currentUserIsAdministrator(),
+  ]);
 
   if (result.status === "ready") {
     if (result.item.kind !== "guide") notFound();
-    return <ContentDetailScreen item={result.item} isAdministrator={await currentUserIsAdministrator()} />;
+    return <ContentDetailScreen item={result.item} isAdministrator={isAdministrator} />;
   }
   if (result.status === "not_found") notFound();
 

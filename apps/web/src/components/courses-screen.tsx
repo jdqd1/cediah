@@ -105,10 +105,8 @@ export function CoursesScreen({ isAdministrator = false }: { isAdministrator?: b
   return (
     <AppShell
       activeKey="courses"
-      centeredSearch
       isAdministrator={isAdministrator}
       headerTitle="Mis cursos"
-      searchPlaceholder="Buscar cursos por nombre o tema..."
       includeCourses
       mainClassName="courses-main"
     >

@@ -1,14 +1,17 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import {
-  BookmarkSimple,
+  ArrowRight,
   BookOpen,
-  CaretRight,
-  DotsNine,
   FilePdf,
+  MagnifyingGlass,
   Star,
-} from "@phosphor-icons/react/dist/ssr";
+  X,
+} from "@phosphor-icons/react";
 import type { ContentItem } from "@cediah/contracts";
+import { useMemo, useState } from "react";
 import { AppShell } from "./app-shell";
 
 type GuideItem = ContentItem & { kind: "guide" };
@@ -25,16 +28,25 @@ function guideHref(guide: GuideItem) {
   return "/guias/" + guide.slug;
 }
 
-function guideImage(index: number) {
-  return guideImages[index % guideImages.length]!;
+function guideImage(guide: GuideItem) {
+  const position = Array.from(guide.slug).reduce(
+    (total, character) => total + character.codePointAt(0)!,
+    0,
+  );
+  return guideImages[position % guideImages.length]!;
 }
 
-function guideExtent(guide: GuideItem) {
-  if (guide.content.sections.length > 0) {
-    return guide.content.sections.length + (guide.content.sections.length === 1 ? " sección" : " secciones");
-  }
-  if (guide.asset?.mimeType === "application/pdf") return "Documento PDF";
-  return guide.estimatedMinutes ? guide.estimatedMinutes + " min" : "Lectura";
+function normalize(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es");
+}
+
+function sectionCount(guide: GuideItem) {
+  const count = guide.content.sections.length;
+  if (count === 0) return null;
+  return `${count} ${count === 1 ? "sección" : "secciones"}`;
 }
 
 export function GuideDashboardScreen({
@@ -46,170 +58,169 @@ export function GuideDashboardScreen({
   guides: GuideItem[];
   isAdministrator?: boolean;
 }) {
-  const topics = Array.from(new Set(guides.map((guide) => guide.topic))).slice(0, 5);
-  const recent = guides.slice(0, 3);
-  const featured = [
-    ...guides.filter((guide) => guide.featured),
-    ...guides.filter((guide) => !guide.featured),
-  ].slice(0, 4);
+  const [query, setQuery] = useState("");
+  const [topic, setTopic] = useState("");
+  const topics = useMemo(
+    () =>
+      Array.from(new Set(guides.map((guide) => guide.topic))).sort((left, right) =>
+        left.localeCompare(right, "es"),
+      ),
+    [guides],
+  );
+  const visibleGuides = useMemo(() => {
+    const search = normalize(query.trim());
+
+    return guides.filter((guide) => {
+      const matchesTopic = !topic || guide.topic === topic;
+      const matchesSearch =
+        !search ||
+        normalize(`${guide.title} ${guide.summary} ${guide.topic}`).includes(search);
+      return matchesTopic && matchesSearch;
+    });
+  }, [guides, query, topic]);
+  const hasFilters = Boolean(query.trim() || topic);
+
+  function clearFilters() {
+    setQuery("");
+    setTopic("");
+  }
 
   return (
     <AppShell
       activeKey="guides"
-      centeredSearch
       isAdministrator={isAdministrator}
       headerTitle="Guías de estudio"
-      searchPlaceholder="Buscar guías por tema, región o palabra clave..."
-      mainClassName="guides-main"
+      mainClassName="guide-catalog-main"
     >
-      <div className="guides-top-grid">
-        <section className="region-explorer panel-surface" aria-labelledby="region-title">
-          <h2 id="region-title">Explorar por tema</h2>
-          {topics.length > 0 ? (
-            <div className="region-grid">
-              {topics.map((topic) => (
-                <Link
-                  className="region-card"
-                  href={"/biblioteca?tema=" + encodeURIComponent(topic)}
-                  key={topic}
-                >
-                  <span className="region-icon">
-                    <BookOpen size={32} weight="regular" />
-                  </span>
-                  <strong>{topic}</strong>
-                  <small>{guides.filter((guide) => guide.topic === topic).length} guías</small>
-                </Link>
-              ))}
-              <Link className="region-card" href="/biblioteca?tipo=guide">
-                <span className="region-icon">
-                  <DotsNine size={32} weight="regular" />
-                </span>
-                <strong>Ver todas</strong>
-              </Link>
+      <section className="guide-catalog" aria-labelledby="guide-catalog-title">
+        <header className="guide-catalog-header">
+          <div className="guide-catalog-heading">
+            <span className="guide-catalog-heading-icon" aria-hidden="true">
+              <BookOpen size={24} weight="duotone" />
+            </span>
+            <div>
+              <h2 id="guide-catalog-title">Guías de estudio</h2>
+              <span className="guide-catalog-total">
+                {guides.length} {guides.length === 1 ? "guía publicada" : "guías publicadas"}
+              </span>
             </div>
-          ) : (
-            <div className="dynamic-empty-state compact" role="status">
-              <BookOpen size={28} />
-              <div>
-                <strong>{available ? "Todavía no hay temas publicados." : "Catálogo no disponible."}</strong>
-                <span>Los temas se crean automáticamente a partir de las guías aprobadas.</span>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="continue-panel panel-surface" aria-labelledby="recent-guides-title">
-          <div className="section-heading-row">
-            <h2 id="recent-guides-title">Publicaciones recientes</h2>
-            <Link href="/biblioteca?tipo=guide">Ver todo</Link>
           </div>
-          <div className="continue-list">
-            {recent.map((guide, index) => (
-              <Link className="continue-row" href={guideHref(guide)} key={guide.id}>
-                <span className="continue-image">
-                  <Image src={guideImage(index)} alt="" fill sizes="54px" />
-                </span>
-                <span className="continue-copy">
-                  <strong>{guide.title}</strong>
-                  <small>{guide.topic}</small>
-                </span>
-                <span className="continue-progress">
-                  <small>{guideExtent(guide)}</small>
-                </span>
-                <CaretRight className="continue-more" size={19} />
-              </Link>
-            ))}
-            {recent.length === 0 && (
-              <p className="dynamic-list-empty">Las nuevas guías publicadas aparecerán aquí.</p>
+        </header>
+
+        <div className="guide-catalog-filters" role="search" aria-label="Buscar y filtrar guías">
+          <label className="guide-catalog-search" htmlFor="guide-catalog-search">
+            <span>Buscar</span>
+            <span className="guide-catalog-search-control">
+              <MagnifyingGlass size={19} aria-hidden="true" />
+              <input
+                id="guide-catalog-search"
+                type="search"
+                placeholder="Título, región o palabra clave"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </span>
+          </label>
+
+          <label className="guide-catalog-topic" htmlFor="guide-catalog-topic">
+            <span>Región o tema</span>
+            <select
+              id="guide-catalog-topic"
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+            >
+              <option value="">Todos</option>
+              {topics.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {hasFilters && (
+            <button className="guide-catalog-clear" type="button" onClick={clearFilters}>
+              <X size={17} aria-hidden="true" />
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        <div className="guide-catalog-results-heading">
+          <h3>{topic || "Todas las guías"}</h3>
+          <span aria-live="polite">
+            {visibleGuides.length} {visibleGuides.length === 1 ? "resultado" : "resultados"}
+          </span>
+        </div>
+
+        {visibleGuides.length > 0 ? (
+          <ul className="guide-catalog-grid">
+            {visibleGuides.map((guide) => {
+              const sections = sectionCount(guide);
+              const isPdf = guide.asset?.mimeType === "application/pdf";
+
+              return (
+                <li className="guide-catalog-item" key={guide.id}>
+                  <Link className="guide-catalog-card" href={guideHref(guide)}>
+                    <span className="guide-catalog-card-media">
+                      <Image
+                        src={guideImage(guide)}
+                        alt=""
+                        fill
+                        sizes="(max-width: 720px) 100vw, (max-width: 1180px) 50vw, 33vw"
+                      />
+                      {guide.featured && (
+                        <span className="guide-catalog-featured">
+                          <Star size={14} weight="fill" aria-hidden="true" />
+                          Destacada
+                        </span>
+                      )}
+                    </span>
+
+                    <span className="guide-catalog-card-body">
+                      <span className="guide-catalog-card-meta">
+                        <span>{guide.topic}</span>
+                        <span>
+                          {isPdf ? (
+                            <FilePdf size={16} aria-hidden="true" />
+                          ) : (
+                            <BookOpen size={16} aria-hidden="true" />
+                          )}
+                          {isPdf ? "PDF" : "Lectura web"}
+                        </span>
+                      </span>
+                      <strong>{guide.title}</strong>
+                      <span className="guide-catalog-card-summary">{guide.summary}</span>
+                      <span className="guide-catalog-card-footer">
+                        <span>{sections ?? (isPdf ? "Documento" : "Guía")}</span>
+                        <span className="guide-catalog-card-action">
+                          Abrir guía
+                          <ArrowRight size={17} aria-hidden="true" />
+                        </span>
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="guide-catalog-empty" role="status">
+            <BookOpen size={36} aria-hidden="true" />
+            <h3>
+              {hasFilters
+                ? "No encontramos guías con esos filtros."
+                : available
+                  ? "Aún no hay guías publicadas."
+                  : "No pudimos cargar las guías."}
+            </h3>
+            {hasFilters && (
+              <button type="button" onClick={clearFilters}>
+                Limpiar filtros
+              </button>
             )}
           </div>
-        </section>
-      </div>
-
-      <section className="guide-section" aria-labelledby="featured-title">
-        <div className="section-heading-row section-heading-with-icon">
-          <div>
-            <Star size={22} weight="regular" />
-            <h2 id="featured-title">Guías destacadas</h2>
-          </div>
-          <Link href="/biblioteca?tipo=guide">Ver todas</Link>
-        </div>
-        {featured.length > 0 ? (
-          <div className="featured-guide-row">
-            {featured.map((guide, index) => (
-              <Link className="featured-guide-card" href={guideHref(guide)} key={guide.id}>
-                <span className="featured-guide-image">
-                  <Image src={guideImage(index + 1)} alt="" fill sizes="90px" />
-                </span>
-                <span className="featured-guide-copy">
-                  <strong>{guide.title}</strong>
-                  <span>
-                    <small>{guide.topic}</small>
-                    <small>{guideExtent(guide)}</small>
-                    <BookmarkSimple size={18} />
-                  </span>
-                </span>
-              </Link>
-            ))}
-            <Link className="carousel-next" href="/biblioteca?tipo=guide" aria-label="Ver más guías">
-              <CaretRight size={23} />
-            </Link>
-          </div>
-        ) : (
-          <p className="dynamic-list-empty">Coordinación puede marcar guías como destacadas al publicarlas.</p>
         )}
-      </section>
-
-      <section className="guide-section all-guides-section" aria-labelledby="all-guides-title">
-        <div className="section-heading-row section-heading-with-icon">
-          <div>
-            <span className="section-title-icon">
-              <BookOpen size={22} weight="regular" />
-            </span>
-            <h2 id="all-guides-title">Todas las guías</h2>
-          </div>
-        </div>
-        <div className="guide-table panel-surface">
-          <div className="guide-table-header">
-            <span>Guía</span>
-            <span>Tema</span>
-            <span>Formato</span>
-            <span>Extensión</span>
-            <span />
-          </div>
-          {guides.map((guide, index) => (
-            <Link className="guide-table-row" href={guideHref(guide)} key={guide.id}>
-              <span className="guide-name-cell">
-                <span className="guide-table-image">
-                  <Image src={guideImage(index)} alt="" fill sizes="48px" />
-                </span>
-                <strong>{guide.title}</strong>
-              </span>
-              <span className="guide-region-cell">
-                <BookOpen size={20} />
-                {guide.topic}
-              </span>
-              <span>
-                <small className="guide-type-pill">
-                  {guide.asset?.mimeType === "application/pdf" ? "PDF" : "Web"}
-                </small>
-              </span>
-              <span>{guideExtent(guide)}</span>
-              {guide.asset?.mimeType === "application/pdf" ? (
-                <FilePdf size={20} />
-              ) : (
-                <BookmarkSimple size={20} />
-              )}
-            </Link>
-          ))}
-          {guides.length === 0 && (
-            <div className="dynamic-table-empty">
-              {available
-                ? "No hay guías publicadas todavía."
-                : "No pudimos consultar las guías en este momento."}
-            </div>
-          )}
-        </div>
       </section>
     </AppShell>
   );

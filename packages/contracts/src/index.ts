@@ -279,7 +279,17 @@ export const ContentDraftSchema = z.discriminatedUnion("kind", [
       description: z.string().trim().min(1).max(10_000),
       durationSeconds: z.number().int().min(0).max(86_400).nullable().default(null),
       externalUrl: HttpsUrlSchema.nullable().default(null),
+      guide: z
+        .object({
+          sections: z.array(GuideSectionSchema).max(100).default([]),
+        })
+        .default({ sections: [] }),
       keyPoints: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+      quiz: z
+        .object({
+          questions: z.array(QuizQuestionSchema).max(100).default([]),
+        })
+        .default({ questions: [] }),
     }),
     kind: z.literal("video"),
   }),

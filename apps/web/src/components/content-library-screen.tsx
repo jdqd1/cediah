@@ -2,24 +2,36 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ArrowRight,
   BookOpen,
   CardsThree,
   ClipboardText,
-  Clock,
   Compass,
   MagnifyingGlass,
   PlayCircle,
+  X,
 } from "@phosphor-icons/react";
 import type { ContentItem, ContentKind } from "@cediah/contracts";
-import { useMemo, useState } from "react";
+import { type MouseEvent, useMemo, useState } from "react";
 import { AppShell } from "./app-shell";
+
+type CatalogKind = ContentKind | "all";
+
+type ContentLibraryScreenProps = {
+  available: boolean;
+  initialKind?: ContentKind;
+  initialTopic?: string;
+  isAdministrator?: boolean;
+  items: ContentItem[];
+};
 
 const kindLabels: Record<ContentKind, string> = {
   flashcards: "Flashcards",
   guide: "Guías",
   quiz: "Cuestionarios",
-  topic: "Temas",
+  topic: "Temas anatómicos",
   video: "Videos",
 };
 
@@ -39,32 +51,113 @@ const kindImages: Record<ContentKind, string> = {
   video: "/anatomy/neck-muscles.png",
 };
 
+const contentKinds = Object.keys(kindLabels) as ContentKind[];
+const kindOptions: { icon: typeof BookOpen; label: string; value: CatalogKind }[] = [
+  { icon: BookOpen, label: "Todo", value: "all" },
+  { icon: PlayCircle, label: "Videos", value: "video" },
+  { icon: Compass, label: "Temas anatómicos", value: "topic" },
+  { icon: BookOpen, label: "Guías", value: "guide" },
+  { icon: ClipboardText, label: "Cuestionarios", value: "quiz" },
+  { icon: CardsThree, label: "Flashcards", value: "flashcards" },
+];
+
 function itemHref(item: ContentItem) {
   return item.kind === "guide"
     ? "/guias/" + item.slug
     : "/biblioteca/" + item.slug;
 }
 
+function isContentKind(value: string | null): value is ContentKind {
+  return value !== null && contentKinds.includes(value as ContentKind);
+}
+
+function catalogTitle(kind: CatalogKind) {
+  if (kind === "video") return "Videos";
+  if (kind === "topic") return "Temas anatómicos";
+  return "Biblioteca";
+}
+
+function catalogSearchPlaceholder(kind: CatalogKind) {
+  if (kind === "video") return "Buscar videos";
+  if (kind === "topic") return "Buscar temas anatómicos";
+  return "Buscar en la biblioteca";
+}
+
+function CatalogCard({ item, video = false }: { item: ContentItem; video?: boolean }) {
+  const Icon = kindIcons[item.kind];
+
+  return (
+    <Link
+      className={`content-catalog-card ${video ? "content-catalog-video-card" : "content-catalog-resource-card"}`}
+      href={itemHref(item)}
+    >
+      <span className="content-catalog-card-media">
+        <Image
+          alt=""
+          fill
+          sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
+          src={kindImages[item.kind]}
+        />
+        <span className="content-catalog-card-icon" aria-hidden="true">
+          <Icon size={video ? 30 : 24} weight={video ? "fill" : "regular"} />
+        </span>
+        {item.featured && <span className="content-catalog-featured">Destacado</span>}
+      </span>
+      <div className="content-catalog-card-body">
+        <span className="content-catalog-card-meta">
+          <span>{kindLabels[item.kind]}</span>
+          <span>{item.topic}</span>
+        </span>
+        <strong>{item.title}</strong>
+        <p>{item.summary}</p>
+      </div>
+    </Link>
+  );
+}
+
+function TopicDirectoryItem({ item }: { item: ContentItem }) {
+  return (
+    <Link className="content-catalog-topic-link" href={itemHref(item)}>
+      <span className="content-catalog-topic-icon" aria-hidden="true">
+        <Compass size={24} />
+      </span>
+      <div className="content-catalog-topic-copy">
+        <span className="content-catalog-topic-meta">
+          <span>{item.topic}</span>
+          {item.featured && <span>Destacado</span>}
+        </span>
+        <strong>{item.title}</strong>
+        <p>{item.summary}</p>
+      </div>
+      <span className="content-catalog-topic-action" aria-hidden="true">
+        Ver tema <ArrowRight size={18} />
+      </span>
+    </Link>
+  );
+}
+
 export function ContentLibraryScreen({
   available,
-  initialKind,
-  initialTopic,
   isAdministrator = false,
   items,
-}: {
-  available: boolean;
-  initialKind?: ContentKind;
-  initialTopic?: string;
-  isAdministrator?: boolean;
-  items: ContentItem[];
-}) {
-  const [kind, setKind] = useState<ContentKind | "all">(initialKind ?? "all");
+}: ContentLibraryScreenProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [topic, setTopic] = useState(initialTopic ?? "");
+  const requestedKind = searchParams.get("tipo");
+  const kind: CatalogKind = isContentKind(requestedKind) ? requestedKind : "all";
+  const topic = searchParams.get("tema")?.trim() ?? "";
+  const title = catalogTitle(kind);
+
   const topics = useMemo(
-    () => Array.from(new Set(items.map((item) => item.topic))).sort(),
+    () => Array.from(new Set(items.map((item) => item.topic))).sort((left, right) => left.localeCompare(right, "es")),
     [items],
   );
+  const kindCounts = useMemo(() => {
+    const counts = Object.fromEntries(contentKinds.map((value) => [value, 0])) as Record<ContentKind, number>;
+    for (const item of items) counts[item.kind] += 1;
+    return counts;
+  }, [items]);
   const visibleItems = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase("es");
     return items.filter((item) => {
@@ -79,125 +172,159 @@ export function ContentLibraryScreen({
     });
   }, [items, kind, search, topic]);
 
+  function catalogHref(nextKind: CatalogKind, nextTopic: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextKind === "all") params.delete("tipo");
+    else params.set("tipo", nextKind);
+    if (nextTopic) params.set("tema", nextTopic);
+    else params.delete("tema");
+    const query = params.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }
+
+  function navigateCatalog(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (
+      event.button !== 0 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    ) {
+      return false;
+    }
+
+    event.preventDefault();
+    const currentHref = window.location.pathname + window.location.search;
+    if (currentHref !== href) window.history.pushState(null, "", href);
+    return true;
+  }
+
+  const activeKey = kind === "all" ? "study" : kind === "guide" ? "guides" : kind;
+  const clearHref = catalogHref("all", "");
+  const hasFilters = kind !== "all" || Boolean(topic) || Boolean(search);
+
   return (
     <AppShell
-      activeKey={kind === "all" ? "study" : kind}
-      centeredSearch
+      activeKey={activeKey}
       isAdministrator={isAdministrator}
-      headerTitle="Biblioteca"
-      searchPlaceholder="Buscar en toda la biblioteca..."
-      mainClassName="library-main"
+      headerTitle={title}
+      mainClassName="content-catalog-main"
     >
-      <section className="library-toolbar" aria-labelledby="library-title">
-        <div>
-          <p className="eyebrow dark">Contenido publicado</p>
-          <h2 id="library-title">Biblioteca académica</h2>
-          <p>Videos, guías y herramientas de estudio revisadas por CEDIAH.</p>
-        </div>
-        <label className="library-inline-search">
-          <MagnifyingGlass size={20} />
-          <input
-            aria-label="Buscar contenido"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Título, resumen o tema"
-            type="search"
-            value={search}
-          />
-        </label>
-      </section>
+      <section className="content-catalog-page" aria-label={title}>
+        <nav className="content-catalog-kind-nav" aria-label="Tipo de contenido">
+          <div className="content-catalog-kind-chips">
+            {kindOptions.map((option) => {
+              const Icon = option.icon;
+              const href = catalogHref(option.value, topic);
+              const count = option.value === "all" ? items.length : kindCounts[option.value];
 
-      <div className="library-filter-row">
-        <div className="library-kind-tabs" role="tablist" aria-label="Filtrar por formato">
-          <button
-            className={kind === "all" ? "is-active" : ""}
-            onClick={() => setKind("all")}
-            role="tab"
-            aria-selected={kind === "all"}
-            type="button"
-          >
-            Todos <span>{items.length}</span>
-          </button>
-          {(Object.keys(kindLabels) as ContentKind[]).map((value) => {
-            const Icon = kindIcons[value];
-            return (
-              <button
-                className={kind === value ? "is-active" : ""}
-                key={value}
-                onClick={() => setKind(value)}
-                role="tab"
-                aria-selected={kind === value}
-                type="button"
-              >
-                <Icon size={18} />
-                {kindLabels[value]}
-                <span>{items.filter((item) => item.kind === value).length}</span>
+              return (
+                <Link
+                  aria-current={kind === option.value ? "page" : undefined}
+                  className={`content-catalog-kind-chip ${kind === option.value ? "is-active" : ""}`.trim()}
+                  href={href}
+                  key={option.value}
+                  onClick={(event) => navigateCatalog(event, href)}
+                  prefetch={false}
+                >
+                  <Icon aria-hidden="true" size={18} />
+                  <span>{option.label}</span>
+                  <small aria-label={`${count} publicaciones`}>{count}</small>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div className="content-catalog-toolbar">
+          <label className="content-catalog-search" htmlFor="content-catalog-search-input">
+            <MagnifyingGlass aria-hidden="true" size={20} />
+            <input
+              aria-label={catalogSearchPlaceholder(kind)}
+              aria-controls="content-catalog-results"
+              autoComplete="off"
+              id="content-catalog-search-input"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={catalogSearchPlaceholder(kind)}
+              type="search"
+              value={search}
+            />
+            {search && (
+              <button aria-label="Limpiar búsqueda" onClick={() => setSearch("")} type="button">
+                <X aria-hidden="true" size={17} />
               </button>
-            );
-          })}
+            )}
+          </label>
+          <span className="content-catalog-result-count" aria-live="polite">
+            {visibleItems.length === 1 ? "1 resultado" : `${visibleItems.length} resultados`}
+          </span>
         </div>
-        <label className="library-topic-filter">
-          <span>Tema</span>
-          <select value={topic} onChange={(event) => setTopic(event.target.value)}>
-            <option value="">Todos los temas</option>
-            {topics.map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
-      </div>
 
-      {visibleItems.length > 0 ? (
-        <div className="library-list">
-          {visibleItems.map((item) => {
-            const Icon = kindIcons[item.kind];
-            return (
-              <Link className="library-row" href={itemHref(item)} key={item.id}>
-                <span className="library-row-image">
-                  <Image src={kindImages[item.kind]} alt="" fill sizes="150px" />
-                  <span><Icon size={24} /></span>
-                </span>
-                <span className="library-row-copy">
-                  <span className="library-row-meta">
-                    <small>{kindLabels[item.kind]}</small>
-                    <small>{item.topic}</small>
-                    {item.featured && <small className="is-featured">Destacado</small>}
-                  </span>
-                  <strong>{item.title}</strong>
-                  <p>{item.summary}</p>
-                </span>
-                <span className="library-row-duration">
-                  <Clock size={17} />
-                  {item.estimatedMinutes ? item.estimatedMinutes + " min" : "A tu ritmo"}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="library-empty-state" role="status">
-          <Compass size={42} />
-          <h3>
-            {available
-              ? "No hay publicaciones que coincidan con estos filtros."
-              : "La biblioteca no está disponible en este momento."}
-          </h3>
-          <p>
-            {available
-              ? "Prueba otro tipo, tema o palabra clave."
-              : "Intenta actualizar la página dentro de unos minutos."}
-          </p>
-          {(search || topic || kind !== "all") && (
-            <button
-              type="button"
-              onClick={() => {
-                setKind("all");
-                setSearch("");
-                setTopic("");
-              }}
+        {topics.length > 0 && (
+          <nav className="content-catalog-topic-nav" aria-label="Temas">
+            <span className="content-catalog-topic-label">Tema</span>
+            <div className="content-catalog-topic-chips">
+              {["", ...topics].map((value) => {
+                const href = catalogHref(kind, value);
+                const label = value || "Todos los temas";
+                return (
+                  <Link
+                    aria-current={topic === value ? "page" : undefined}
+                    className={`content-catalog-topic-chip ${topic === value ? "is-active" : ""}`.trim()}
+                    href={href}
+                    key={value || "all-topics"}
+                    onClick={(event) => navigateCatalog(event, href)}
+                    prefetch={false}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+
+        {visibleItems.length > 0 ? (
+          kind === "topic" ? (
+            <ul className="content-catalog-topic-directory" id="content-catalog-results">
+              {visibleItems.map((item) => (
+                <li key={item.id}>
+                  <TopicDirectoryItem item={item} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul
+              className={kind === "video" ? "content-catalog-video-grid" : "content-catalog-resource-grid"}
+              id="content-catalog-results"
             >
-              Limpiar filtros
-            </button>
-          )}
-        </div>
-      )}
+              {visibleItems.map((item) => (
+                <li key={item.id}>
+                  <CatalogCard item={item} video={kind === "video"} />
+                </li>
+              ))}
+            </ul>
+          )
+        ) : (
+          <div className="content-catalog-empty" id="content-catalog-results" role="status">
+            <Compass aria-hidden="true" size={38} />
+            <h2>{available ? "No encontramos contenido" : "La biblioteca no está disponible"}</h2>
+            <p>{available ? "Prueba con otros filtros." : "Intenta de nuevo en unos minutos."}</p>
+            {hasFilters && (
+              <Link
+                className="content-catalog-clear-filters"
+                href={clearHref}
+                onClick={(event) => {
+                  if (navigateCatalog(event, clearHref)) setSearch("");
+                }}
+                prefetch={false}
+              >
+                Limpiar filtros
+              </Link>
+            )}
+          </div>
+        )}
+      </section>
     </AppShell>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContentItemSchema } from "@cediah/contracts";
+import { ContentDraftSchema, ContentItemSchema } from "@cediah/contracts";
 import type {
   ContentAsset,
   ContentAssetUploadRequest,
@@ -13,6 +13,7 @@ import type {
 } from "@cediah/contracts";
 import { buildApp } from "../src/app.js";
 import type { ApiEnvironment } from "../src/config.js";
+import { isContentReadyForTransition } from "../src/providers/supabase-content.js";
 
 const contentId = "7a8a6513-9384-4b5d-a825-439f42355714";
 const assetId = "86bc79c0-c73b-4aa6-9257-f22f0d89b080";
@@ -59,6 +60,62 @@ function guideItem(overrides: Partial<ContentItem> = {}): ContentItem {
   } as ContentItem;
 }
 
+type VideoDraft = Extract<ContentDraft, { kind: "video" }>;
+
+const completeVideoDraft: VideoDraft = {
+  content: {
+    description: "A complete anatomy video package.",
+    durationSeconds: null,
+    externalUrl: null,
+    guide: {
+      sections: [{ body: "Review the anatomical relationships.", heading: "Study guide" }],
+    },
+    keyPoints: ["Identify the principal anatomical landmark."],
+    quiz: {
+      questions: [
+        {
+          correctOptionIndex: 0,
+          explanation: "The first option identifies the landmark.",
+          options: ["Correct landmark", "Distractor"],
+          prompt: "Which option identifies the landmark?",
+        },
+      ],
+    },
+  },
+  estimatedMinutes: null,
+  featured: false,
+  kind: "video",
+  slug: "anatomy-video",
+  summary: "A video package used by the content readiness tests.",
+  title: "Anatomy video",
+  topic: "Anatomy",
+};
+
+const readyVideoAsset: ContentAsset = {
+  contentId,
+  downloadUrl: "https://storage.example.test/anatomy-video.mp4",
+  fileName: "anatomy-video.mp4",
+  id: assetId,
+  kind: "video",
+  mimeType: "video/mp4",
+  sizeBytes: 2048,
+  status: "ready",
+};
+
+function videoItem(overrides: Partial<ContentItem> = {}): ContentItem {
+  return {
+    ...completeVideoDraft,
+    asset: readyVideoAsset,
+    authorUserId: users.contributor.id,
+    createdAt,
+    id: contentId,
+    publishedAt: null,
+    status: "draft",
+    updatedAt: createdAt,
+    ...overrides,
+  } as ContentItem;
+}
+
 function identityProvider(): IdentityProvider {
   const byToken = new Map<string, ProviderUser>([
     ["contributor-token", users.contributor],
@@ -94,6 +151,70 @@ function contentProvider(
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("content API", () => {
+  it("hydrates empty companion content when parsing a legacy video draft", () => {
+    const draft = ContentDraftSchema.parse({
+      content: {
+        description: "A legacy video without companion fields.",
+        durationSeconds: null,
+        externalUrl: null,
+        keyPoints: [],
+      },
+      estimatedMinutes: null,
+      featured: false,
+      kind: "video",
+      slug: "legacy-video",
+      summary: "Legacy video fixture.",
+      title: "Legacy video",
+      topic: "Anatomy",
+    });
+
+    expect(draft.kind).toBe("video");
+    if (draft.kind !== "video") throw new Error("Expected a video draft");
+    expect(draft.content.guide).toEqual({ sections: [] });
+    expect(draft.content.quiz).toEqual({ questions: [] });
+  });
+
+  it("requires every video companion before review and publication", () => {
+    const incompleteVideos = [
+      videoItem({ asset: null }),
+      videoItem({
+        content: { ...completeVideoDraft.content, keyPoints: [] },
+      }),
+      videoItem({
+        content: {
+          ...completeVideoDraft.content,
+          guide: { sections: [] },
+        },
+      }),
+      videoItem({
+        content: {
+          ...completeVideoDraft.content,
+          quiz: { questions: [] },
+        },
+      }),
+    ];
+
+    expect(isContentReadyForTransition(videoItem(), "in_review")).toBe(true);
+    expect(isContentReadyForTransition(videoItem(), "published")).toBe(true);
+    for (const item of incompleteVideos) {
+      expect(isContentReadyForTransition(item, "in_review")).toBe(false);
+      expect(isContentReadyForTransition(item, "published")).toBe(false);
+    }
+  });
+
+  it("keeps complete legacy externally hosted videos publishable", () => {
+    const item = videoItem({
+      asset: null,
+      content: {
+        ...completeVideoDraft.content,
+        externalUrl: "https://videos.example.test/anatomy-video",
+      },
+    });
+
+    expect(isContentReadyForTransition(item, "in_review")).toBe(true);
+    expect(isContentReadyForTransition(item, "published")).toBe(true);
+  });
+
   it("accepts RFC 3339 offsets returned by Supabase for content timestamps", () => {
     const item = ContentItemSchema.safeParse({
       ...guideDraft,

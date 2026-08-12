@@ -128,7 +128,6 @@ export function DashboardScreen({
       isAdministrator={isAdministrator}
       viewer={viewer}
       headerTitle=""
-      searchPlaceholder="Buscar contenido..."
       mainClassName="dashboard-main"
     >
       <div className="dashboard-layout">

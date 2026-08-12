@@ -1,32 +1,25 @@
 "use client";
 
 import {
-  Bell,
   BookOpen,
-  BookmarkSimple,
-  CalendarBlank,
   CardsThree,
-  ChartLineUp,
   CheckSquareOffset,
+  CircleNotch,
   ClipboardText,
-  GearSix,
   House,
   List,
-  MagnifyingGlass,
   Notebook,
   PlayCircle,
   PencilSimpleLine,
-  Question,
   X,
   UserCircle,
-  UsersThree,
   ShieldCheck,
 } from "@phosphor-icons/react";
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/panel/actions";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CediahLogo } from "./cediah-logo";
@@ -39,13 +32,11 @@ type AppShellProps = {
   viewer?: {
     email: string;
   };
-  centeredSearch?: boolean;
   children: ReactNode;
   headerSubtitle?: string;
   headerTitle: string;
   includeCourses?: boolean;
   mainClassName?: string;
-  searchPlaceholder?: string;
   breadcrumbs?: string[];
   welcome?: boolean;
 };
@@ -61,23 +52,12 @@ type NavItem = {
 
 const mainNavigation: NavItem[] = [
   { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
-  { key: "video", label: "Clases teóricas", href: "/biblioteca?tipo=video", icon: PlayCircle },
+  { key: "video", label: "Videos", href: "/biblioteca?tipo=video", icon: PlayCircle },
   { key: "study", label: "Material de estudio", href: "/biblioteca", icon: BookOpen },
   { key: "guides", label: "Guías", href: "/guias", icon: Notebook },
   { key: "flashcards", label: "Flashcards", href: "/biblioteca?tipo=flashcards", icon: CardsThree },
   { key: "quiz", label: "Cuestionarios", href: "/biblioteca?tipo=quiz", icon: ClipboardText },
   { key: "topic", label: "Temas anatómicos", href: "/biblioteca?tipo=topic", icon: UserCircle },
-];
-const utilityNavigation: NavItem[] = [
-  { key: "favorites", label: "Favoritos", href: "/dashboard", icon: BookmarkSimple },
-  { key: "progress", label: "Mi progreso", href: "/dashboard", icon: ChartLineUp },
-  { key: "calendar", label: "Calendario", href: "/dashboard", icon: CalendarBlank },
-  { key: "community", label: "Comunidad", href: "/dashboard", icon: UsersThree },
-];
-
-const supportNavigation: NavItem[] = [
-  { key: "settings", label: "Ajustes", href: "/dashboard", icon: GearSix },
-  { key: "help", label: "Ayuda", href: "/dashboard", icon: Question },
 ];
 
 function getProfileInitials(email: string) {
@@ -85,10 +65,35 @@ function getProfileInitials(email: string) {
   return (localPart.slice(0, 2) || "US").toUpperCase();
 }
 
-function NavigationItem({ item, activeKey, onNavigate }: { item: NavItem; activeKey: string; onNavigate: () => void }) {
+function NavigationItemStatus({ label }: { label: string }) {
+  const { pending } = useLinkStatus();
+
+  if (!pending) return null;
+
+  return (
+    <span
+      className="sidebar-link-pending"
+      role="status"
+      aria-label={`Abriendo ${label}`}
+    >
+      <span className="sidebar-link-spinner" aria-hidden="true">
+        <CircleNotch size={16} />
+      </span>
+    </span>
+  );
+}
+
+function NavigationItem({
+  item,
+  activeKey,
+  onNavigate,
+}: {
+  item: NavItem;
+  activeKey: string;
+  onNavigate: () => void;
+}) {
   const Icon = item.icon;
   const active = item.key === activeKey;
-
   return (
     <Link
       className={`sidebar-link ${active ? "is-active" : ""}`.trim()}
@@ -98,6 +103,7 @@ function NavigationItem({ item, activeKey, onNavigate }: { item: NavItem; active
     >
       <Icon size={21} weight={active ? "fill" : "regular"} />
       <span>{item.label}</span>
+      <NavigationItemStatus label={item.label} />
     </Link>
   );
 }
@@ -109,20 +115,20 @@ export function AppShell({
   canManageRoles = false,
   isAdministrator = false,
   viewer: initialViewer,
-  centeredSearch = false,
   children,
   headerSubtitle,
   headerTitle,
   includeCourses = false,
   mainClassName = "",
-  searchPlaceholder = "Buscar contenido...",
   welcome = false,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [viewer, setViewer] = useState<{ email: string } | null>(initialViewer ?? null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
+  const shouldFetchViewer = !initialViewer;
 
   const closeSidebar = () => setSidebarOpen(false);
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
@@ -141,7 +147,7 @@ export function AppShell({
       setViewer(error || !data.user?.email ? null : { email: data.user.email });
     };
 
-    void synchronizeViewer();
+    if (shouldFetchViewer) void synchronizeViewer();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -153,17 +159,57 @@ export function AppShell({
       active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [shouldFetchViewer]);
+
+  useEffect(() => {
+    if (!sidebarOpen || !window.matchMedia("(max-width: 960px)").matches) return;
+
+    const focusable = sidebarRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable?.[0];
+    const last = focusable?.[focusable.length - 1];
+    first?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSidebarOpen(false);
+        menuTriggerRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [sidebarOpen]);
   const showHeaderHeading = showBreadcrumbs || Boolean(headerTitle || headerSubtitle);
 
   return (
     <div className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""}`.trim()}>
-      <aside className="app-sidebar" aria-label="Navegación principal">
+      <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
         <div className="sidebar-topline">
           <Link className="sidebar-brand" href="/dashboard" aria-label="CEDIAH, inicio" onClick={closeSidebar}>
             <CediahLogo variant="light" priority={activeKey === "dashboard"} />
           </Link>
-          <button className="sidebar-close" type="button" aria-label="Cerrar menú" onClick={closeSidebar}>
+          <button
+            className="sidebar-close"
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => {
+              closeSidebar();
+              menuTriggerRef.current?.focus();
+            }}
+          >
             <X size={22} />
           </button>
         </div>
@@ -204,18 +250,6 @@ export function AppShell({
               />
             )}
           </div>
-          <div className="sidebar-divider" />
-          <div className="sidebar-nav-group">
-            {utilityNavigation.map((item) => (
-              <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
-            ))}
-          </div>
-          <div className="sidebar-divider" />
-          <div className="sidebar-nav-group">
-            {supportNavigation.map((item) => (
-              <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
-            ))}
-          </div>
         </nav>
 
         <div className="sidebar-watermark" aria-hidden="true">
@@ -223,9 +257,30 @@ export function AppShell({
         </div>
       </aside>
 
+      {sidebarOpen && (
+        <button
+          aria-label="Cerrar menú"
+          className="sidebar-backdrop"
+          onClick={() => {
+            closeSidebar();
+            menuTriggerRef.current?.focus();
+          }}
+          tabIndex={-1}
+          type="button"
+        />
+      )}
+
       <div className="app-body">
-        <header className={`app-topbar ${welcome ? "app-topbar-welcome" : ""} ${centeredSearch ? "app-topbar-centered-search" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
-          <button className="menu-trigger" type="button" aria-label="Abrir menú" onClick={() => setSidebarOpen(true)}>
+        <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
+          <button
+            className="menu-trigger"
+            ref={menuTriggerRef}
+            type="button"
+            aria-label="Abrir menú"
+            aria-controls="app-sidebar"
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen(true)}
+          >
             <List size={28} />
           </button>
           {showHeaderHeading && (
@@ -247,35 +302,7 @@ export function AppShell({
               )}
             </div>
           )}
-          <label className="topbar-search">
-            <MagnifyingGlass size={21} />
-            <input type="search" placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
-          </label>
           <div className="topbar-actions">
-            <div className="topbar-popover-wrap topbar-notification-wrap">
-              <button
-                className={`icon-button ${notificationsOpen ? "is-active" : ""}`.trim()}
-                type="button"
-                aria-label="Notificaciones"
-                aria-expanded={notificationsOpen}
-                onClick={() => setNotificationsOpen((open) => !open)}
-              >
-                <Bell size={24} />
-                <span className="notification-dot" />
-              </button>
-              {isAdministrator && (
-                <span className="dashboard-admin-badge topbar-admin-badge" aria-label="Rol: administrador">
-                  <ShieldCheck size={14} weight="fill" />
-                  Administrador
-                </span>
-              )}
-              {notificationsOpen && (
-                <div className="topbar-popover notification-popover">
-                  <strong>Notificaciones</strong>
-                  <p>Tu siguiente guía está lista para continuar.</p>
-                </div>
-              )}
-            </div>
             <div className="topbar-popover-wrap">
               {viewer ? (
                 <>
@@ -292,6 +319,12 @@ export function AppShell({
                   {profileOpen && (
                     <div className="topbar-popover profile-popover">
                       <strong>{viewer.email}</strong>
+                      {isAdministrator && (
+                        <span className="dashboard-admin-badge profile-role-badge">
+                          <ShieldCheck size={14} weight="fill" />
+                          Administrador
+                        </span>
+                      )}
                       <form action={signOut}>
                         <button className="profile-sign-out" type="submit">Cerrar sesión</button>
                       </form>
