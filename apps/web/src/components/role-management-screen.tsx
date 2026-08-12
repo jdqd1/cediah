@@ -127,6 +127,7 @@ export function RoleManagementScreen({ initialUser }: Props) {
       activeKey="roles"
       canManageContent
       canManageRoles
+      isAdministrator={initialUser.roles.includes("administrator")}
       headerSubtitle="Asigna permisos por correo desde un único lugar."
       headerTitle="Administración de roles"
       mainClassName="role-management-main"

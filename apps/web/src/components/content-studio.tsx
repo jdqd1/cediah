@@ -800,6 +800,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       activeKey="editor"
       canManageContent
       canManageRoles={initialWorkspace.roles.includes("administrator")}
+      isAdministrator={initialWorkspace.roles.includes("administrator")}
       headerTitle="Gestión de contenido"
       headerSubtitle="Crea, revisa y publica material académico."
       mainClassName="studio-main"
