@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
 import { getPublishedContentItem } from "@/lib/server/content-api";
+import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export default async function LegacyGuidePage() {
 
   if (result.status === "ready") {
     if (result.item.kind !== "guide") notFound();
-    return <ContentDetailScreen item={result.item} />;
+    return <ContentDetailScreen item={result.item} isAdministrator={await currentUserIsAdministrator()} />;
   }
   if (result.status === "not_found") notFound();
 

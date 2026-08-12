@@ -17,39 +17,31 @@ import type { ContentItem } from "@cediah/contracts";
 import { useMemo, useState } from "react";
 import { AppShell } from "./app-shell";
 
-const kindLabels = {
-  flashcards: "Flashcards",
-  guide: "Guía",
-  quiz: "Cuestionario",
-  topic: "Tema",
-  video: "Video",
-} as const;
-
-export function ContentDetailScreen({ item }: { item: ContentItem }) {
+export function ContentDetailScreen({ item, isAdministrator = false }: { item: ContentItem; isAdministrator?: boolean }) {
+  const libraryLabel = item.kind === "guide" ? "Guías" : "Biblioteca";
   return (
     <AppShell
       activeKey={item.kind === "guide" ? "guides" : item.kind}
-      breadcrumbs={["Biblioteca", item.topic, item.title]}
-      headerTitle={item.title}
+      headerTitle={libraryLabel}
+      isAdministrator={isAdministrator}
       mainClassName="content-detail-main"
     >
       <article className="published-content">
         <header className="published-content-header">
-          <Link href={item.kind === "guide" ? "/guias" : "/biblioteca"}>
-            <ArrowLeft size={17} /> Volver
-          </Link>
-          <div className="published-content-kicker">
-            <span>{kindLabels[item.kind]}</span>
-            <span>{item.topic}</span>
-            <span><SealCheck size={16} weight="fill" /> Publicado</span>
+          <div className="published-content-context">
+            <Link href={item.kind === "guide" ? "/guias" : "/biblioteca"}>
+              <ArrowLeft size={17} /> Volver
+            </Link>
+            <nav className="published-content-breadcrumbs" aria-label="Ruta actual">
+              <span>{libraryLabel}</span>
+              <span aria-hidden="true">›</span>
+              <span>{item.topic}</span>
+              <span aria-hidden="true">›</span>
+              <span className="current">{item.title}</span>
+            </nav>
           </div>
           <h2>{item.title}</h2>
           <p>{item.summary}</p>
-          <dl>
-            <div><dt>Formato</dt><dd>{kindLabels[item.kind]}</dd></div>
-            <div><dt>Tiempo estimado</dt><dd>{item.estimatedMinutes ? item.estimatedMinutes + " min" : "A tu ritmo"}</dd></div>
-            <div><dt>Actualizado</dt><dd>{new Intl.DateTimeFormat("es-CO", { dateStyle: "medium" }).format(new Date(item.updatedAt))}</dd></div>
-          </dl>
         </header>
         <ContentBody item={item} />
       </article>
@@ -100,7 +92,7 @@ function ContentBody({ item }: { item: ContentItem }) {
     return (
       <section className="published-video">
         {item.asset?.downloadUrl ? (
-          <video controls preload="metadata" src={item.asset.downloadUrl}>
+          <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl}>
             Tu navegador no puede reproducir este video.
           </video>
         ) : item.content.externalUrl ? (
@@ -113,11 +105,11 @@ function ContentBody({ item }: { item: ContentItem }) {
           </div>
         ) : null}
         <div className="published-video-copy">
-          <h3>Acerca de esta clase</h3>
+          <h3>Sobre esta clase</h3>
           <p>{item.content.description}</p>
           {item.content.keyPoints.length > 0 && (
             <>
-              <h4>Puntos clave</h4>
+              <h4>Puntos clave de la clase</h4>
               <ul>
                 {item.content.keyPoints.map((point) => (
                   <li key={point}><CheckCircle size={19} />{point}</li>

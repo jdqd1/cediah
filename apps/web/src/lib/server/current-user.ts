@@ -1,6 +1,7 @@
 import "server-only";
 import type { CurrentUser } from "@cediah/contracts";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getAdminRoleUser } from "./admin-role-api";
 
 export type CurrentUserResult =
   | { accessToken: string; status: "authenticated"; user: CurrentUser }
@@ -29,4 +30,11 @@ export async function getCurrentUser(): Promise<CurrentUserResult> {
     status: "authenticated",
     user: { email: user.email, id: user.id },
   };
+}
+
+export async function currentUserIsAdministrator(): Promise<boolean> {
+  const current = await getCurrentUser();
+  if (current.status !== "authenticated") return false;
+  const result = await getAdminRoleUser(current.accessToken, current.user.email);
+  return result.status === "ready" && result.user.roles.includes("administrator");
 }
