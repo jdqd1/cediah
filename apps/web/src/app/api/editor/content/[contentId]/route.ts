@@ -1,3 +1,4 @@
+import { ContentItemSchema } from "@cediah/contracts";
 import {
   forwardEditorContentRequest,
   noStoreContentJson,
@@ -21,5 +22,6 @@ export async function PATCH(request: Request, { params }: ContentRouteProps) {
     body: parsed.body,
     method: "PATCH",
     path: "/v1/editor/content/" + encodeURIComponent(contentId),
+    responseSchema: ContentItemSchema,
   });
 }

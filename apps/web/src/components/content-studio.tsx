@@ -17,13 +17,14 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react";
-import type {
-  ContentAssetUploadResponse,
-  ContentDraft,
-  ContentItem,
-  ContentKind,
-  ContentStatus,
-  ContentWorkspaceResponse,
+import {
+  ContentItemSchema,
+  type ContentAssetUploadResponse,
+  type ContentDraft,
+  type ContentItem,
+  type ContentKind,
+  type ContentStatus,
+  type ContentWorkspaceResponse,
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
 
@@ -181,6 +182,12 @@ async function json<T>(url: string, init: RequestInit = {}) {
     throw new Error(errors[code] ?? `No fue posible completar la acción (${response.status}).`);
   }
   return body as T;
+}
+
+async function contentItemJson(url: string, init: RequestInit = {}) {
+  const parsed = ContentItemSchema.safeParse(await json<unknown>(url, init));
+  if (!parsed.success) throw new Error(errors.content_unavailable);
+  return parsed.data;
 }
 
 function signedPut(url: string, file: File, onProgress: (value: number) => void) {
@@ -790,7 +797,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
     try {
       const payload = prepareDraft(draft);
-      const current = await json<ContentItem>(
+      const current = await contentItemJson(
         isNew ? "/api/editor/content" : `/api/editor/content/${encodeURIComponent(editingId!)}`,
         { body: JSON.stringify(payload), method: isNew ? "POST" : "PATCH" },
       );
@@ -820,7 +827,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setNotice(null);
 
     try {
-      const current = await json<ContentItem>(
+      const current = await contentItemJson(
         `/api/editor/content/${encodeURIComponent(item.id)}/transition`,
         { body: JSON.stringify({ status }), method: "POST" },
       );
@@ -891,7 +898,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       // the upload action when this is a new item.
       const target =
         item ??
-        (await json<ContentItem>("/api/editor/content", {
+        (await contentItemJson("/api/editor/content", {
           body: JSON.stringify(prepareDraft(draft)),
           method: "POST",
         }));

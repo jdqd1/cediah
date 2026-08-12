@@ -26,6 +26,11 @@ export async function forwardEditorContentRequest(input: {
   body?: unknown;
   method: "GET" | "PATCH" | "POST";
   path: string;
+  responseSchema?: {
+    safeParse: (body: unknown) =>
+      | { data: unknown; success: true }
+      | { success: false };
+  };
 }) {
   const session = await getApiAccessToken();
   if (session.status === "anonymous") {
@@ -46,6 +51,14 @@ export async function forwardEditorContentRequest(input: {
       { error: getContentApiError(response.body) },
       safeContentApiStatus(response.status),
     );
+  }
+
+  if (input.responseSchema) {
+    const parsed = input.responseSchema.safeParse(response.body);
+    if (!parsed.success) {
+      return noStoreContentJson({ error: "content_unavailable" }, 502);
+    }
+    return noStoreContentJson(parsed.data, response.status);
   }
 
   return noStoreContentJson(response.body, response.status);

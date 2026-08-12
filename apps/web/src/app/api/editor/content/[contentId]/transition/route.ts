@@ -1,3 +1,4 @@
+import { ContentItemSchema } from "@cediah/contracts";
 import {
   forwardEditorContentRequest,
   noStoreContentJson,
@@ -27,5 +28,6 @@ export async function POST(
       "/v1/editor/content/" +
       encodeURIComponent(contentId) +
       "/transition",
+    responseSchema: ContentItemSchema,
   });
 }
