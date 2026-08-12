@@ -222,7 +222,7 @@ export function AppShell({
       </aside>
 
       <div className="app-body">
-        <header className={`app-topbar ${welcome ? "app-topbar-welcome" : ""} ${centeredSearch ? "app-topbar-centered-search" : ""}`.trim()} data-active-key={activeKey}>
+        <header className={`app-topbar ${welcome ? "app-topbar-welcome" : ""} ${centeredSearch ? "app-topbar-centered-search" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
           <button className="menu-trigger" type="button" aria-label="Abrir menú" onClick={() => setSidebarOpen(true)}>
             <List size={28} />
           </button>

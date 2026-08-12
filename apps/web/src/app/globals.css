@@ -694,8 +694,8 @@ img {
   margin-left: auto;
 }
 
-.dashboard-shell .topbar-notification-wrap > .icon-button,
-.dashboard-shell .topbar-actions > .topbar-popover-wrap:last-child > .profile-trigger {
+.dashboard-shell .app-topbar-admin .topbar-notification-wrap > .icon-button,
+.dashboard-shell .app-topbar-admin .topbar-actions > .topbar-popover-wrap:last-child > .profile-trigger {
   transform: translateY(0.6rem);
 }
 
