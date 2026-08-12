@@ -49,11 +49,13 @@ export function ContentLibraryScreen({
   available,
   initialKind,
   initialTopic,
+  isAdministrator = false,
   items,
 }: {
   available: boolean;
   initialKind?: ContentKind;
   initialTopic?: string;
+  isAdministrator?: boolean;
   items: ContentItem[];
 }) {
   const [kind, setKind] = useState<ContentKind | "all">(initialKind ?? "all");
@@ -81,6 +83,7 @@ export function ContentLibraryScreen({
     <AppShell
       activeKey={kind === "all" ? "study" : kind}
       centeredSearch
+      isAdministrator={isAdministrator}
       headerTitle="Biblioteca"
       searchPlaceholder="Buscar en toda la biblioteca..."
       mainClassName="library-main"

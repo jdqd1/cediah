@@ -1,6 +1,7 @@
 import { ContentKindSchema } from "@cediah/contracts";
 import { ContentLibraryScreen } from "@/components/content-library-screen";
 import { getPublishedContent } from "@/lib/server/content-api";
+import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,10 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const requestedKind = Array.isArray(params.tipo) ? params.tipo[0] : params.tipo;
   const requestedTopic = Array.isArray(params.tema) ? params.tema[0] : params.tema;
   const kind = ContentKindSchema.safeParse(requestedKind);
-  const result = await getPublishedContent({ limit: 100 });
+  const [result, isAdministrator] = await Promise.all([
+    getPublishedContent({ limit: 100 }),
+    currentUserIsAdministrator(),
+  ]);
 
   return (
     <ContentLibraryScreen
@@ -21,6 +25,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
       initialKind={kind.success ? kind.data : undefined}
       initialTopic={requestedTopic}
       items={result.status === "ready" ? result.catalog.items : []}
+      isAdministrator={isAdministrator}
     />
   );
 }

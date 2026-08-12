@@ -89,7 +89,7 @@ function ProgressRing({ percentage, color }: { percentage: number; color: string
   );
 }
 
-export function CoursesScreen() {
+export function CoursesScreen({ isAdministrator = false }: { isAdministrator?: boolean }) {
   const [tab, setTab] = useState<(typeof tabs)[number]["key"]>("all");
   const [search, setSearch] = useState("");
 
@@ -106,6 +106,7 @@ export function CoursesScreen() {
     <AppShell
       activeKey="courses"
       centeredSearch
+      isAdministrator={isAdministrator}
       headerTitle="Mis cursos"
       searchPlaceholder="Buscar cursos por nombre o tema..."
       includeCourses

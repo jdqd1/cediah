@@ -126,6 +126,8 @@ export function AppShell({
 
   const closeSidebar = () => setSidebarOpen(false);
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
+  const showContentManagement = canManageContent || isAdministrator;
+  const showRoleManagement = canManageRoles || isAdministrator;
 
   useEffect(() => {
     let active = true;
@@ -177,7 +179,7 @@ export function AppShell({
                 onNavigate={closeSidebar}
               />
             )}
-            {canManageContent && (
+            {showContentManagement && (
               <NavigationItem
                 item={{
                   key: "editor",
@@ -189,7 +191,7 @@ export function AppShell({
                 onNavigate={closeSidebar}
               />
             )}
-            {canManageRoles && (
+            {showRoleManagement && (
               <NavigationItem
                 item={{
                   key: "roles",

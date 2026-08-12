@@ -40,9 +40,11 @@ function guideExtent(guide: GuideItem) {
 export function GuideDashboardScreen({
   available,
   guides,
+  isAdministrator = false,
 }: {
   available: boolean;
   guides: GuideItem[];
+  isAdministrator?: boolean;
 }) {
   const topics = Array.from(new Set(guides.map((guide) => guide.topic))).slice(0, 5);
   const recent = guides.slice(0, 3);
@@ -55,6 +57,7 @@ export function GuideDashboardScreen({
     <AppShell
       activeKey="guides"
       centeredSearch
+      isAdministrator={isAdministrator}
       headerTitle="Guías de estudio"
       searchPlaceholder="Buscar guías por tema, región o palabra clave..."
       mainClassName="guides-main"

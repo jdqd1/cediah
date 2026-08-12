@@ -51,7 +51,7 @@ const bookmarks = [
   { color: "purple", text: "Inervación: nervio femoral (L2–L4).", page: "p. 5" },
 ] as const;
 
-export function GuideReaderScreen() {
+export function GuideReaderScreen({ isAdministrator = false }: { isAdministrator?: boolean }) {
   const [highlightImportant, setHighlightImportant] = useState(true);
   const [summaryMode, setSummaryMode] = useState(false);
   const [fontScale, setFontScale] = useState(100);
@@ -60,6 +60,7 @@ export function GuideReaderScreen() {
   return (
     <AppShell
       activeKey="guides"
+      isAdministrator={isAdministrator}
       breadcrumbs={["Guías de estudio", "Miembro inferior", "Músculos", "Guía: Músculos del compartimento anterior"]}
       headerTitle="Guía: Músculos del compartimento anterior del muslo"
       searchPlaceholder="Buscar en la guía..."
