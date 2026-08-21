@@ -131,6 +131,13 @@ function summaryFromText(value: string) {
   return compact.length > 280 ? compact.slice(0, 277).trimEnd() + "…" : compact;
 }
 
+// Keep this callback stable. BubbleMenu updates its plugin whenever this prop
+// changes; recreating it on every editor transaction can otherwise create an
+// update/render loop when edit mode is enabled.
+function showBubbleMenuForSelection({ from, to }: { from: number; to: number }) {
+  return from !== to;
+}
+
 function guideDocument(draft: EditableGuideDraft) {
   const guide = draft.kind === "video" ? draft.content.guide : draft.content;
   return guide.document ?? sectionsToRichTextDocument(guide.sections);
@@ -1354,7 +1361,7 @@ export function GuideEditorScreen({
         <BubbleMenu
           className="guide-selection-toolbar"
           editor={editor}
-          shouldShow={({ from, to }) => from !== to}
+          shouldShow={showBubbleMenuForSelection}
         >
           <ToolbarButton active={editor.isActive("bold")} label="Negrita" onClick={() => editor.chain().focus().toggleBold().run()}><TextB size={17} weight="bold" /></ToolbarButton>
           <ToolbarButton active={editor.isActive("italic")} label="Cursiva" onClick={() => editor.chain().focus().toggleItalic().run()}><TextItalic size={17} /></ToolbarButton>
