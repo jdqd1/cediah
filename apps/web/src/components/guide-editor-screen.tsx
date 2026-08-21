@@ -824,7 +824,9 @@ export function GuideEditorScreen({
   const [documentState, setDocumentState] = useState<RichTextDocument>(initialDocument);
   const [exitPrompt, setExitPrompt] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [editMode, setEditMode] = useState(
+    () => isNew || (editable && status !== "published" && status !== "archived"),
+  );
   const [editingTitle, setEditingTitle] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [companionsCollapsed, setCompanionsCollapsed] = useState(false);
@@ -843,6 +845,7 @@ export function GuideEditorScreen({
   const pendingNavigationRef = useRef<PendingNavigationIntent | null>(null);
   const outline = useMemo(() => extractGuideOutline(documentState), [documentState]);
   const numberedOutline = useMemo(() => numberGuideOutline(outline), [outline]);
+  const isEditing = editable && editMode;
   const releaseFallbackSentinel = useCallback((continuation?: () => void) => {
     const state = historyStateRecord(window.history.state);
     if (state[fallbackGuardStateKey] !== fallbackGuardId || fallbackReleasingRef.current) {
@@ -911,8 +914,8 @@ export function GuideEditorScreen({
   });
 
   useEffect(() => {
-    editor?.setEditable(editable && !preview);
-  }, [editable, editor, preview]);
+    editor?.setEditable(isEditing && !preview);
+  }, [editor, isEditing, preview]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -1171,7 +1174,7 @@ export function GuideEditorScreen({
   }
 
   function handlePlainPaste(event: ReactClipboardEvent<HTMLDivElement>) {
-    if (!editor || !editable || preview) return;
+    if (!editor || !isEditing || preview) return;
     const text = event.clipboardData.getData("text/plain");
     const html = event.clipboardData.getData("text/html");
     if (!text && !html) return;
@@ -1180,7 +1183,7 @@ export function GuideEditorScreen({
     editor.chain().focus().insertContent(pastedContent(text, html)).run();
   }
 
-  const disabled = !editable || busy || preview || !editor;
+  const disabled = !isEditing || busy || preview || !editor;
 
   return (
     <div className="guide-editor-page">
@@ -1194,7 +1197,7 @@ export function GuideEditorScreen({
               <input
                 aria-label="Título de la guía"
                 autoFocus
-                disabled={!editable || busy}
+                disabled={!isEditing || busy}
                 maxLength={200}
                 placeholder="Título de la guía"
                 value={draft.title}
@@ -1214,7 +1217,7 @@ export function GuideEditorScreen({
               <button
                 aria-label="Cambiar título de la guía"
                 className="guide-editor-title-trigger"
-                disabled={!editable || busy}
+                disabled={!isEditing || busy}
                 type="button"
                 onClick={() => setEditingTitle(true)}
               >
@@ -1231,14 +1234,23 @@ export function GuideEditorScreen({
         </div>
         <div className="guide-editor-heading-actions">
           {!preview && (
-            <button aria-expanded={detailsOpen} type="button" onClick={() => setDetailsOpen((value) => !value)}>
-              <NotePencil size={17} /> <span>Detalles de publicación</span> {detailsOpen ? <CaretUp size={14} /> : <CaretDown size={14} />}
+            <button
+              aria-pressed={isEditing}
+              className={isEditing ? "is-active" : ""}
+              disabled={!editable || busy}
+              type="button"
+              onClick={() => {
+                setEditMode(true);
+                window.requestAnimationFrame(() => editor?.commands.focus());
+              }}
+            >
+              <NotePencil size={17} /> <span>{isEditing ? "Editando" : "Editar"}</span>
             </button>
           )}
           <button aria-label={preview ? "Volver al editor" : "Vista previa de lector"} className={preview ? "is-active" : ""} type="button" onClick={() => setPreview((value) => !value)}>
             <Eye size={17} /> {preview ? "Seguir editando" : "Vista previa"}
           </button>
-          {editable && (
+          {isEditing && (
             <button className="guide-editor-save" disabled={busy || !hasUnsavedChanges} type="button" onClick={() => void onSave()}>
               {busy ? <span className="guide-editor-saving" /> : <Check size={17} weight="bold" />}
               {busy ? "Guardando…" : "Guardar"}
@@ -1247,12 +1259,12 @@ export function GuideEditorScreen({
         </div>
       </header>
 
-      {!preview && detailsOpen && (
+      {!preview && isEditing && (
         <section className="guide-editor-summary guide-editor-summary-strip">
             <label>
               <span>Resumen</span>
               <textarea
-                disabled={!editable || busy}
+                disabled={!isEditing || busy}
                 maxLength={2000}
                 placeholder="Este texto aparecerá en el catálogo de guías."
                 rows={2}
@@ -1269,7 +1281,7 @@ export function GuideEditorScreen({
         </section>
       )}
 
-      {!preview && <div className="guide-format-toolbar" aria-label="Formato del texto" role="toolbar">
+      {!preview && isEditing && <div className="guide-format-toolbar" aria-label="Formato del texto" role="toolbar">
         <div className="guide-toolbar-group">
           <ToolbarButton disabled={disabled || !editor?.can().undo()} label="Deshacer" onClick={() => editor?.chain().focus().undo().run()}><ArrowUUpLeft size={18} /></ToolbarButton>
           <ToolbarButton disabled={disabled || !editor?.can().redo()} label="Rehacer" onClick={() => editor?.chain().focus().redo().run()}><ArrowUDownLeft size={18} /></ToolbarButton>
@@ -1378,7 +1390,7 @@ export function GuideEditorScreen({
 
           <main className="guide-editor-canvas" ref={canvasRef}>
             <div className="guide-editor-canvas-label">
-              <span>Documento editable</span>
+              <span>{isEditing ? "Documento editable" : "Documento de la guía"}</span>
               <span>{richTextDocumentToPlainText(documentState).trim().split(/\s+/).filter(Boolean).length} palabras</span>
             </div>
             <div onPasteCapture={handlePlainPaste}>
@@ -1398,13 +1410,13 @@ export function GuideEditorScreen({
               {!companionsCollapsed && (
                 <div className="guide-editor-companions-content" id="guide-editor-companions-content">
                   <KeyPointsPanel
-                    disabled={!editable || busy}
+                    disabled={!isEditing || busy}
                     editor={editor}
                     values={guideKeyPoints(draft)}
                     onChange={(values) => onChange(withKeyPoints(draft, values))}
                   />
                   <QuizPanel
-                    disabled={!editable || busy}
+                    disabled={!isEditing || busy}
                     questions={guideQuestions(draft)}
                     onChange={(questions) => onChange(withQuestions(draft, questions))}
                   />

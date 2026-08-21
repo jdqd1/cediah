@@ -6,6 +6,8 @@ import {
   ArrowRight,
   BookOpen,
   CaretDown,
+  CaretLeft,
+  CaretRight,
   CardsThree,
   CheckCircle,
   ClipboardText,
@@ -231,9 +233,8 @@ function GuideBody({ item }: { item: GuideItem }) {
         </div>
 
         <div className="published-reader-actionbar-group published-reader-tools-group" role="group" aria-label="Herramientas de lectura">
-          <span className="published-reader-tool-title">
+          <span aria-hidden="true" className="published-reader-tool-title" title="Tamaño de texto">
             <TextAa aria-hidden="true" size={17} />
-            <strong>Tamaño de texto</strong>
           </span>
           <span className="published-reader-text-size">
             <button
@@ -289,12 +290,19 @@ function GuideBody({ item }: { item: GuideItem }) {
         )}
       </section>
 
-      <div className="published-rich-guide-layout">
-        <nav className="published-rich-guide-outline" aria-label="Índice de la guía">
+      <div
+        className={`published-rich-guide-layout${outlineExpanded ? "" : " is-outline-collapsed"}${supportExpanded ? "" : " is-support-collapsed"}`}
+      >
+        <nav
+          className={`published-rich-guide-outline${outlineExpanded ? "" : " is-collapsed"}`}
+          aria-label="Índice de la guía"
+        >
           <button
             aria-controls="published-guide-outline-links"
             aria-expanded={outlineExpanded}
+            aria-label={outlineExpanded ? "Contraer índice de la guía" : "Expandir índice de la guía"}
             className="published-rich-guide-outline-heading"
+            title={outlineExpanded ? "Contraer índice" : "Expandir índice"}
             type="button"
             onClick={() => setOutlineExpanded((current) => !current)}
           >
@@ -302,7 +310,11 @@ function GuideBody({ item }: { item: GuideItem }) {
               <ListBullets aria-hidden="true" size={19} />
               <strong>Índice de la guía</strong>
             </span>
-            <CaretDown aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
+            {outlineExpanded ? (
+              <CaretLeft aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
+            ) : (
+              <CaretRight aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
+            )}
           </button>
           <div
             className="published-rich-guide-outline-content"
@@ -359,11 +371,16 @@ function GuideBody({ item }: { item: GuideItem }) {
         )}
         </section>
 
-        <aside className="published-rich-guide-support" aria-label="Recursos de estudio">
+        <aside
+          className={`published-rich-guide-support${supportExpanded ? "" : " is-collapsed"}`}
+          aria-label="Recursos de estudio"
+        >
           <button
             aria-controls="published-guide-support-content"
             aria-expanded={supportExpanded}
+            aria-label={supportExpanded ? "Contraer recursos de estudio" : "Expandir recursos de estudio"}
             className="published-rich-guide-support-heading"
+            title={supportExpanded ? "Contraer recursos" : "Expandir recursos"}
             type="button"
             onClick={() => setSupportExpanded((current) => !current)}
           >
@@ -371,7 +388,11 @@ function GuideBody({ item }: { item: GuideItem }) {
               <BookOpen aria-hidden="true" size={18} />
               <strong>Recursos de estudio</strong>
             </span>
-            <CaretDown aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
+            {supportExpanded ? (
+              <CaretRight aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
+            ) : (
+              <CaretLeft aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
+            )}
           </button>
           <div
             className="published-rich-guide-support-content"

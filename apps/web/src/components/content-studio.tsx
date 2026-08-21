@@ -14,6 +14,7 @@ import {
   FilePdf,
   FileVideo,
   MagnifyingGlass,
+  NotePencil,
   Notebook,
   PlayCircle,
   Plus,
@@ -506,6 +507,53 @@ function QuizQuestionsEditor({
   );
 }
 
+function GuideEditorLaunch({
+  description,
+  label,
+  onOpen,
+}: {
+  description: string;
+  label: string;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      aria-label={`${label}. Abrir editor visual`}
+      className="studio-type-editor studio-guide-launch studio-guide-cta"
+      type="button"
+      onClick={onOpen}
+    >
+      <span aria-hidden="true" className="studio-guide-preview">
+        <span className="studio-guide-preview-toolbar">
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="studio-guide-preview-layout">
+          <span className="studio-guide-preview-outline"><i /><i /><i /><i /></span>
+          <span className="studio-guide-preview-document">
+            <i className="is-title" /><i /><i /><i className="is-short" />
+            <i className="is-subtitle" /><i /><i /><i className="is-short" />
+          </span>
+          <span className="studio-guide-preview-companions"><i /><i /><i /></span>
+        </span>
+      </span>
+      <span className="studio-guide-preview-cta">
+        <span className="studio-guide-launch-icon"><NotePencil size={22} /></span>
+        <span className="studio-guide-cta-copy">
+          <strong>{label}</strong>
+          <small>{description}</small>
+        </span>
+        <span className="studio-guide-preview-action">
+          Ir al editor <CaretRight aria-hidden="true" size={16} />
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function TypeEditor({
   draft,
   onOpenGuide,
@@ -517,39 +565,21 @@ function TypeEditor({
 }) {
   if (draft.kind === "video") {
     return (
-      <button
-        aria-label="Abrir editor de guía y recursos"
-        className="studio-type-editor studio-guide-launch studio-guide-cta"
-        type="button"
-        onClick={onOpenGuide}
-      >
-        <span className="studio-guide-launch-icon"><Notebook size={24} /></span>
-        <span className="studio-guide-cta-copy">
-          <strong>Editar guía y recursos</strong>
-          <small>
-            {draft.content.guide.sections.length} secciones · {draft.content.keyPoints.length} puntos clave · {draft.content.quiz.questions.length} preguntas
-          </small>
-        </span>
-        <CaretRight aria-hidden="true" size={20} />
-      </button>
+      <GuideEditorLaunch
+        description={`${draft.content.guide.sections.length} secciones · ${draft.content.keyPoints.length} puntos clave · ${draft.content.quiz.questions.length} preguntas`}
+        label="Editar guía y recursos"
+        onOpen={onOpenGuide}
+      />
     );
   }
 
   if (draft.kind === "guide") {
     return (
-      <button
-        aria-label="Abrir editor de guía"
-        className="studio-type-editor studio-guide-launch studio-guide-cta"
-        type="button"
-        onClick={onOpenGuide}
-      >
-        <span className="studio-guide-launch-icon"><Notebook size={24} /></span>
-        <span className="studio-guide-cta-copy">
-          <strong>Editar contenido de la guía</strong>
-          <small>Abre el editor visual para organizar secciones y contenido.</small>
-        </span>
-        <CaretRight aria-hidden="true" size={20} />
-      </button>
+      <GuideEditorLaunch
+        description="Organiza el documento, el índice y los recursos de estudio."
+        label="Editar contenido de la guía"
+        onOpen={onOpenGuide}
+      />
     );
   }
   if (draft.kind === "quiz") {
@@ -725,10 +755,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       ? capabilities.canCreate
       : Boolean(
           item &&
-            (capabilities.canEditAll
-              ? item.status !== "published" && item.status !== "archived"
-              : capabilities.canCreate &&
-                (item.status === "draft" || item.status === "changes_requested")),
+            (capabilities.canEditAll ||
+              (capabilities.canCreate &&
+                (item.status === "draft" || item.status === "changes_requested"))),
         ));
   const draftBaseline = draft
     ? isNew
@@ -903,6 +932,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   async function save(event?: FormEvent): Promise<boolean> {
     event?.preventDefault();
     if (!draft || !editable || busy) return false;
+    if (!hasUnsavedChanges) return true;
     setBusy("save");
     setNotice(null);
 
@@ -956,6 +986,44 @@ export function ContentStudio({ initialWorkspace }: Props) {
     } catch (error) {
       setNotice({
         text: error instanceof Error ? error.message : "No fue posible actualizar el estado.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeGuide() {
+    if (!item || item.kind !== "guide" || !capabilities.canPublish || busy) return;
+    const confirmed = window.confirm(
+      `¿Eliminar permanentemente la guía “${item.title}”?\n\nSe borrarán su contenido y sus archivos asociados. Esta acción no se puede deshacer.`,
+    );
+    if (!confirmed) return;
+
+    setBusy("delete");
+    setNotice(null);
+    try {
+      const deleted = await json<{ id: string }>(
+        `/api/editor/content/${encodeURIComponent(item.id)}`,
+        { method: "DELETE" },
+      );
+      if (deleted.id !== item.id) throw new Error(errors.content_unavailable);
+
+      const remaining = items.filter((current) => current.id !== item.id);
+      const next = remaining[0] ?? null;
+      setItems(remaining);
+      setDraft(next ? itemDraft(next) : null);
+      setEditingId(next?.id ?? null);
+      setIsNew(false);
+      setGuideEditing(false);
+      guideEntryDraftRef.current = null;
+      setFile(null);
+      setProgress(0);
+      if (fileRef.current) fileRef.current.value = "";
+      setNotice({ text: "Guía eliminada permanentemente.", tone: "success" });
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error ? error.message : "No fue posible eliminar la guía.",
         tone: "error",
       });
     } finally {
@@ -1279,40 +1347,26 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
           aria-label="Editor de contenido"
         >
           {!draft ? (
-            <div className="studio-empty">
-              <Notebook size={30} />
-              <h3>Elige una publicación</h3>
-            </div>
+            <>
+              {notice && (
+                <p
+                  className={`studio-notice studio-notice-${notice.tone}`}
+                  role={notice.tone === "error" ? "alert" : "status"}
+                >
+                  {notice.text}
+                </p>
+              )}
+              <div className="studio-empty">
+                <Notebook size={30} />
+                <h3>Elige una publicación</h3>
+              </div>
+            </>
           ) : (
             <>
               <header className="studio-editor-heading">
                 <div className="studio-editor-title-block">
                   <small>{labelOf(kinds, draft.kind)}</small>
-                  {editable ? (
-                    <label className="studio-editor-title-field">
-                      <span className="sr-only">Título</span>
-                      <input
-                        aria-label="Título"
-                        autoFocus={isNew}
-                        className="studio-editor-title-input"
-                        disabled={busy !== null}
-                        form="studio-content-form"
-                        maxLength={200}
-                        required
-                        value={draft.title}
-                        onChange={(event) => {
-                          const title = event.target.value;
-                          setDraft({
-                            ...draft,
-                            slug: isNew ? slugify(title) : draft.slug,
-                            title,
-                          } as ContentDraft);
-                        }}
-                      />
-                    </label>
-                  ) : (
-                    <h3>{draft.title}</h3>
-                  )}
+                  <h3>{draft.title || `${labelOf(kinds, draft.kind)} sin título`}</h3>
                 </div>
                 <div className="studio-editor-heading-actions">
                   {item && (
@@ -1341,6 +1395,19 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                       {action.label}
                     </button>
                   ))}
+                  {item?.kind === "guide" && capabilities.canPublish && (
+                    <button
+                      aria-label={`Eliminar guía ${item.title}`}
+                      className="studio-button studio-editor-action studio-guide-delete"
+                      disabled={busy !== null}
+                      title="Eliminar guía permanentemente"
+                      type="button"
+                      onClick={() => void removeGuide()}
+                    >
+                      <Trash aria-hidden="true" size={16} />
+                      <span>{busy === "delete" ? "Eliminando…" : "Eliminar"}</span>
+                    </button>
+                  )}
                   <button
                     className="studio-editor-close"
                     aria-label="Cerrar editor"
@@ -1446,6 +1513,25 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                   <section className="studio-form-section">
                     <h4>Información básica</h4>
                     <div className="studio-form-grid">
+                      <label className="studio-field studio-field-wide">
+                        <span>Título</span>
+                        <input
+                          aria-label="Título"
+                          autoFocus={isNew}
+                          maxLength={200}
+                          placeholder="Escribe el título de la publicación"
+                          required
+                          value={draft.title}
+                          onChange={(event) => {
+                            const title = event.target.value;
+                            setDraft({
+                              ...draft,
+                              slug: isNew ? slugify(title) : draft.slug,
+                              title,
+                            } as ContentDraft);
+                          }}
+                        />
+                      </label>
                       <RegionTagsInput
                         disabled={!editable || busy !== null}
                         suggestions={regionSuggestions}

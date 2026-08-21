@@ -1022,6 +1022,11 @@ export interface ContentProvider {
     actorUserId: string;
     draft: ContentDraft;
   }): Promise<ContentMutationResult<ContentItem>>;
+  deleteContent(input: {
+    actorUserId: string;
+    contentId: string;
+    roles: PlatformRole[];
+  }): Promise<ContentMutationResult<{ id: string }>>;
   finalizeAsset(input: {
     actorUserId: string;
     assetId: string;

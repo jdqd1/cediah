@@ -13,7 +13,7 @@ import { getServerEnvironment } from "./env";
 type ContentApiRequest = {
   accessToken?: string;
   body?: unknown;
-  method: "GET" | "PATCH" | "POST";
+  method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
 };
 

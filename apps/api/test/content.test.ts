@@ -17,6 +17,7 @@ import type {
   ProviderUser,
 } from "@cediah/contracts";
 import { buildApp } from "../src/app.js";
+import { canEditContent } from "../src/content-authorization.js";
 import type { ApiEnvironment } from "../src/config.js";
 import { isContentReadyForTransition } from "../src/providers/supabase-content.js";
 
@@ -182,6 +183,7 @@ function contentProvider(
   return {
     createAssetUpload: async () => ({ status: "not_found" }),
     createContent: async () => ({ status: "conflict" }),
+    deleteContent: async () => ({ status: "not_found" }),
     finalizeAsset: async () => ({ status: "not_found" }),
     getPublishedBySlug: async () => null,
     getRoles: async () => roles,
@@ -768,6 +770,80 @@ describe("content API", () => {
     expect(requests).toEqual([
       { actorUserId: users.contributor.id, draft: partialGuideDraft },
     ]);
+    await app.close();
+  });
+
+  it("allows editorial roles to edit published and archived content", () => {
+    for (const status of ["published", "archived"] as const) {
+      expect(
+        canEditContent({
+          actorUserId: users.editor.id,
+          authorUserId: users.contributor.id,
+          roles: ["academic_editor"],
+          status,
+        }),
+      ).toBe(true);
+    }
+
+    expect(
+      canEditContent({
+        actorUserId: users.contributor.id,
+        authorUserId: users.contributor.id,
+        roles: ["community_contributor"],
+        status: "published",
+      }),
+    ).toBe(false);
+  });
+
+  it("allows coordination to delete a guide independently of its status", async () => {
+    const requests: Parameters<ContentProvider["deleteContent"]>[0][] = [];
+    const provider = contentProvider(["coordination"], {
+      deleteContent: async (input) => {
+        requests.push(input);
+        return { status: "success", value: { id: input.contentId } };
+      },
+    });
+    const app = await buildApp(testEnvironment, {
+      contentProvider: provider,
+      identityProvider: identityProvider(),
+    });
+
+    const response = await app.inject({
+      headers: auth("coordination-token"),
+      method: "DELETE",
+      url: `/v1/editor/content/${contentId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ id: contentId });
+    expect(requests).toEqual([
+      { actorUserId: users.coordinator.id, contentId, roles: ["coordination"] },
+    ]);
+    await app.close();
+  });
+
+  it("rejects guide deletion without publication permission", async () => {
+    let deletions = 0;
+    const provider = contentProvider(["academic_editor"], {
+      deleteContent: async () => {
+        deletions += 1;
+        return { status: "success", value: { id: contentId } };
+      },
+    });
+    const app = await buildApp(testEnvironment, {
+      contentProvider: provider,
+      identityProvider: identityProvider(),
+    });
+
+    const response = await app.inject({
+      headers: auth("editor-token"),
+      method: "DELETE",
+      url: `/v1/editor/content/${contentId}`,
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "forbidden" });
+    expect(deletions).toBe(0);
     await app.close();
   });
 

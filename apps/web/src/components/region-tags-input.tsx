@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Tag, X } from "@phosphor-icons/react";
+import { CaretDown, Plus, Tag, X } from "@phosphor-icons/react";
 import { useId, useMemo, useRef, useState } from "react";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 
@@ -39,6 +39,7 @@ export function RegionTagsInput({
   const showCreate = Boolean(input.trim()) &&
     !available.some((value) => normalizeRegion(value) === normalizeRegion(input));
   const optionCount = available.length + (showCreate ? 1 : 0);
+  const hasInput = Boolean(input.trim());
   const suggestionsVisible =
     listOpen && !disabled && cleanValues.length < MAX_REGIONS && optionCount > 0;
 
@@ -153,13 +154,27 @@ export function RegionTagsInput({
           }}
         />
         <button
-          className="region-tags-add"
-          aria-label="Añadir región"
-          disabled={disabled || !input.trim() || cleanValues.length >= MAX_REGIONS}
+          aria-controls={listId}
+          aria-expanded={hasInput ? undefined : suggestionsVisible}
+          aria-haspopup={hasInput ? undefined : "listbox"}
+          aria-label={hasInput ? "Añadir región" : "Mostrar regiones disponibles"}
+          className={`region-tags-add${hasInput ? "" : " is-menu"}`}
+          disabled={
+            disabled ||
+            cleanValues.length >= MAX_REGIONS ||
+            (!hasInput && available.length === 0)
+          }
           type="button"
-          onClick={() => add()}
+          onClick={() => {
+            if (hasInput) {
+              add();
+              return;
+            }
+            setListOpen(true);
+            inputRef.current?.focus();
+          }}
         >
-          <Plus size={15} />
+          {hasInput ? <Plus size={15} /> : <CaretDown size={15} />}
         </button>
       </div>
       {suggestionsVisible && (

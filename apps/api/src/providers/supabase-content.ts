@@ -435,6 +435,63 @@ export function createSupabaseContentProvider(
       return { status: "success", value: item };
     },
 
+    async deleteContent(input) {
+      const access = await getStoredAccess(input.contentId);
+      if (!access) return { status: "not_found" };
+      if (access.kind !== "guide" || !getContentCapabilities(input.roles).canPublish) {
+        return { status: "not_found" };
+      }
+
+      const { data: assetData, error: assetError } = await client
+        .from("content_assets")
+        .select("storage_bucket, storage_path")
+        .eq("content_item_id", input.contentId);
+      if (assetError) throw assetError;
+
+      const { data, error } = await client
+        .from("content_items")
+        .delete()
+        .eq("id", input.contentId)
+        .eq("kind", "guide")
+        .eq("version", access.version)
+        .select("id")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return { status: "conflict" };
+
+      const storageObjects = new Map<string, string[]>();
+      for (const asset of asArray(assetData).map(asRecord)) {
+        const bucket = readString(asset?.storage_bucket);
+        const path = readString(asset?.storage_path);
+        if (!bucket || !path) continue;
+        storageObjects.set(bucket, [...(storageObjects.get(bucket) ?? []), path]);
+      }
+
+      const failedStorageBuckets: string[] = [];
+      for (const [bucket, paths] of storageObjects) {
+        const { error: storageError } = await client.storage.from(bucket).remove(paths);
+        if (storageError) failedStorageBuckets.push(bucket);
+      }
+
+      try {
+        await writeAudit({
+          action: "content_deleted",
+          actorUserId: input.actorUserId,
+          contentId: input.contentId,
+          metadata: {
+            kind: access.kind,
+            status: access.status,
+            storageCleanupFailed: failedStorageBuckets,
+          },
+        });
+      } catch {
+        // The record is already deleted; audit availability must not turn a
+        // completed destructive action into a misleading error response.
+      }
+
+      return { status: "success", value: { id: input.contentId } };
+    },
+
     async finalizeAsset(input) {
       const { data, error } = await client
         .from("content_assets")
@@ -653,6 +710,12 @@ export function createSupabaseContentProvider(
         })
       ) {
         return { status: "not_found" };
+      }
+      if (
+        (access.status === "published" || access.status === "archived") &&
+        !PublishableContentDraftSchema.safeParse(input.draft).success
+      ) {
+        return { status: "not_publishable" };
       }
 
       const nextStatus =

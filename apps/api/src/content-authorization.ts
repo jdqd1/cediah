@@ -43,8 +43,8 @@ export function canEditContent(input: {
   status: ContentStatus;
 }) {
   const capabilities = getContentCapabilities(input.roles);
-  if (input.status === "published" || input.status === "archived") return false;
   if (capabilities.canEditAll) return true;
+  if (input.status === "published" || input.status === "archived") return false;
 
   return (
     capabilities.canCreate &&

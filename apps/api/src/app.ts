@@ -74,6 +74,7 @@ type AdministratorResolution =
   | Exclude<UserResolution, { kind: "authenticated" }>;
 
 const ContentIdParamsSchema = z.object({ contentId: z.string().uuid() });
+const DeletedContentSchema = z.object({ id: z.string().uuid() });
 const ContentAssetIdParamsSchema = z.object({ assetId: z.string().uuid() });
 const ContentSlugParamsSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -535,6 +536,44 @@ export async function buildApp(
           .send(ContentItemSchema.parse(result.value));
       } catch {
         request.log.error("Content update failed");
+        return reply
+          .status(503)
+          .header("Cache-Control", "no-store")
+          .send({ error: "content_unavailable" });
+      }
+    },
+  );
+
+  app.delete<{ Params: { contentId: string } }>(
+    "/v1/editor/content/:contentId",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canPublish) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const params = ContentIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      try {
+        const result = await contentProvider!.deleteContent({
+          actorUserId: editor.user.id,
+          contentId: params.data.contentId,
+          roles: editor.roles,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(DeletedContentSchema.parse(result.value));
+      } catch {
+        request.log.error("Content deletion failed");
         return reply
           .status(503)
           .header("Cache-Control", "no-store")
