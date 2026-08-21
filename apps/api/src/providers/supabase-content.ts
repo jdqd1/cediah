@@ -8,10 +8,13 @@ import {
   ContentKindSchema,
   ContentStatusSchema,
   PlatformRoleSchema,
+  PublishableContentDraftSchema,
   type ContentAsset,
   type ContentAssetKind,
   type ContentItem,
   type ContentProvider,
+  type RichTextDocument,
+  type RichTextNode,
   type ContentStatus,
   type ContentTransitionRequest,
   type PlatformRole,
@@ -28,6 +31,39 @@ const contentSelection =
 
 const signedDownloadLifetimeSeconds = 60 * 60;
 const maximumFileSizeBytes = 500_000_000;
+
+function richTextNodeHasBody(node: RichTextNode, insideHeading = false): boolean {
+  const nextInsideHeading = insideHeading || node.type === "heading";
+
+  if (node.type === "text") {
+    return !nextInsideHeading && node.text.trim().length > 0;
+  }
+
+  if ("content" in node && node.content) {
+    return node.content.some((child) => richTextNodeHasBody(child, nextInsideHeading));
+  }
+
+  return false;
+}
+
+function richTextDocumentHasBody(document: RichTextDocument | null): boolean {
+  return Boolean(document?.content.some((node) => richTextNodeHasBody(node)));
+}
+
+function companionQuestionsAreComplete(questions: Array<{
+  correctOptionIndex: number;
+  options: string[];
+  prompt: string;
+}>) {
+  return questions.every(
+    (question) =>
+      question.prompt.trim().length > 0 &&
+      question.options.length >= 2 &&
+      question.options.every((option) => option.trim().length > 0) &&
+      question.correctOptionIndex >= 0 &&
+      question.correctOptionIndex < question.options.length,
+  );
+}
 
 function asArray(value: unknown) {
   return Array.isArray(value) ? value : [];
@@ -107,9 +143,14 @@ export function isContentReadyForTransition(
   item: ContentItem,
   targetStatus: ContentTransitionRequest["status"],
 ) {
-  if (item.kind === "video") {
-    if (targetStatus !== "in_review" && targetStatus !== "published") return true;
+  const requiresCompleteContent =
+    targetStatus === "in_review" ||
+    targetStatus === "approved" ||
+    targetStatus === "published";
+  if (!requiresCompleteContent) return true;
+  if (!PublishableContentDraftSchema.safeParse(item).success) return false;
 
+  if (item.kind === "video") {
     const hasReadyVideo =
       item.asset?.status === "ready" && item.asset.kind === "video";
     const hasLegacyExternalVideo = Boolean(item.content.externalUrl);
@@ -117,15 +158,21 @@ export function isContentReadyForTransition(
     return (
       (hasReadyVideo || hasLegacyExternalVideo) &&
       item.content.keyPoints.length > 0 &&
-      item.content.guide.sections.length > 0 &&
-      item.content.quiz.questions.length > 0
+      item.content.keyPoints.every((point) => point.trim().length > 0) &&
+      (item.content.guide.sections.length > 0 ||
+        richTextDocumentHasBody(item.content.guide.document)) &&
+      item.content.quiz.questions.length > 0 &&
+      companionQuestionsAreComplete(item.content.quiz.questions)
     );
   }
 
-  if (targetStatus === "published" && item.kind === "guide") {
+  if (item.kind === "guide") {
     return (
-      item.content.sections.length > 0 ||
-      (item.asset?.status === "ready" && item.asset.kind === "document")
+      (item.content.sections.length > 0 ||
+        richTextDocumentHasBody(item.content.document) ||
+        (item.asset?.status === "ready" && item.asset.kind === "document")) &&
+      item.content.keyPoints.every((point) => point.trim().length > 0) &&
+      companionQuestionsAreComplete(item.content.quiz.questions)
     );
   }
 
@@ -519,6 +566,9 @@ export function createSupabaseContentProvider(
         .order("published_at", { ascending: false })
         .limit(Math.min(Math.max(input.limit, 1), 100));
       if (input.kind) query = query.eq("kind", input.kind);
+      if (input.linkedVideoId) {
+        query = query.eq("content->>linkedVideoId", input.linkedVideoId);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -540,7 +590,11 @@ export function createSupabaseContentProvider(
         return { status: "forbidden" };
       }
 
-      if (input.status === "in_review" || input.status === "published") {
+      if (
+        input.status === "in_review" ||
+        input.status === "approved" ||
+        input.status === "published"
+      ) {
         const item = await getItemById(input.contentId);
         if (!item) return { status: "not_found" };
         if (!isContentReadyForTransition(item, input.status)) {

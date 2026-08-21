@@ -5,19 +5,49 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  CaretDown,
   CardsThree,
   CheckCircle,
   ClipboardText,
   Compass,
+  CornersIn,
+  CornersOut,
   DownloadSimple,
+  Highlighter,
+  Lightbulb,
+  ListBullets,
+  Minus,
   PlayCircle,
+  Plus,
+  Printer,
   SealCheck,
+  ShareNetwork,
+  Star,
+  TextAa,
 } from "@phosphor-icons/react";
 import type { ContentItem } from "@cediah/contracts";
-import { type KeyboardEvent, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { extractGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
 import { AppShell } from "./app-shell";
+import { RichTextRenderer } from "./rich-text-renderer";
 
-export function ContentDetailScreen({ item, isAdministrator = false }: { item: ContentItem; isAdministrator?: boolean }) {
+export function ContentDetailScreen({
+  item,
+  isAdministrator = false,
+  linkedGuide,
+}: {
+  item: ContentItem;
+  isAdministrator?: boolean;
+  linkedGuide?: Extract<ContentItem, { kind: "guide" }>;
+}) {
   const libraryLabel = item.kind === "guide" ? "Guías" : "Biblioteca";
   return (
     <AppShell
@@ -27,7 +57,7 @@ export function ContentDetailScreen({ item, isAdministrator = false }: { item: C
       mainClassName="content-detail-main"
     >
       <article className="published-content">
-        <header className="published-content-header">
+        <header className={`published-content-header${item.kind === "guide" ? " published-rich-guide-header" : ""}`}>
           <div className="published-content-context">
             <Link href={item.kind === "guide" ? "/guias" : "/biblioteca"}>
               <ArrowLeft size={17} /> Volver
@@ -40,56 +70,25 @@ export function ContentDetailScreen({ item, isAdministrator = false }: { item: C
               <span className="current">{item.title}</span>
             </nav>
           </div>
-          <h2>{item.title}</h2>
+          <div className="published-guide-title-row">
+            <h2>{item.title}</h2>
+            {item.kind === "guide" && <span>Versión extensa</span>}
+          </div>
           <p>{item.summary}</p>
         </header>
-        <ContentBody item={item} />
+        <ContentBody item={item} linkedGuide={linkedGuide} />
       </article>
     </AppShell>
   );
 }
 
-function ContentBody({ item }: { item: ContentItem }) {
+function ContentBody({ item, linkedGuide }: { item: ContentItem; linkedGuide?: GuideItem }) {
   if (item.kind === "guide") {
-    return (
-      <div className="published-guide-layout">
-        <nav aria-label="Contenido de la guía">
-          <strong>En esta guía</strong>
-          {item.content.sections.map((section, index) => (
-            <a href={"#section-" + index} key={section.heading}>{section.heading}</a>
-          ))}
-          {item.asset?.downloadUrl && (
-            <a className="published-download" href={item.asset.downloadUrl}>
-              <DownloadSimple size={18} /> Descargar {item.asset.fileName}
-            </a>
-          )}
-        </nav>
-        <div className="published-guide-body">
-          {item.content.sections.map((section, index) => (
-            <section id={"section-" + index} key={section.heading}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <h3>{section.heading}</h3>
-              {section.body.split(/\n{2,}/).map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </section>
-          ))}
-          {item.content.sections.length === 0 && item.asset?.downloadUrl && (
-            <div className="published-asset-callout">
-              <BookOpen size={38} />
-              <h3>Esta guía está disponible como documento.</h3>
-              <a href={item.asset.downloadUrl}>
-                <DownloadSimple size={19} /> Abrir {item.asset.fileName}
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <GuideBody item={item} />;
   }
 
   if (item.kind === "video") {
-    return <VideoBody item={item} />;
+    return <VideoBody item={item} linkedGuide={linkedGuide} />;
   }
 
   if (item.kind === "quiz") return <QuizBody item={item} />;
@@ -115,11 +114,403 @@ function ContentBody({ item }: { item: ContentItem }) {
   );
 }
 
+type GuideItem = Extract<ContentItem, { kind: "guide" }>;
+
+function GuideBody({ item }: { item: GuideItem }) {
+  const guideDocument = useMemo(
+    () => item.content.document ?? sectionsToRichTextDocument(item.content.sections),
+    [item.content.document, item.content.sections],
+  );
+  const outline = useMemo(() => extractGuideOutline(guideDocument), [guideDocument]);
+  const numberedOutline = useMemo(() => {
+    let sectionNumber = 0;
+    return outline.map((outlineItem) => ({
+      ...outlineItem,
+      sectionNumber: outlineItem.level === 2 ? ++sectionNumber : null,
+    }));
+  }, [outline]);
+  const [activeHeadingId, setActiveHeadingId] = useState("");
+  const [fontScale, setFontScale] = useState(100);
+  const [focusMode, setFocusMode] = useState(false);
+  const [highlightImportant, setHighlightImportant] = useState(true);
+  const [favorite, setFavorite] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState("");
+  const manualNavigationRef = useRef(false);
+  const manualNavigationTimerRef = useRef<number | null>(null);
+  const visibleActiveHeadingId = outline.some(({ id }) => id === activeHeadingId)
+    ? activeHeadingId
+    : outline[0]?.id;
+  const activeOutlineIndex = Math.max(
+    0,
+    outline.findIndex(({ id }) => id === visibleActiveHeadingId),
+  );
+  const previousOutlineItem = activeOutlineIndex > 0 ? outline[activeOutlineIndex - 1] : undefined;
+  const nextOutlineItem = activeOutlineIndex < outline.length - 1
+    ? outline[activeOutlineIndex + 1]
+    : undefined;
+  const readingProgress = outline.length > 0
+    ? Math.round(((activeOutlineIndex + 1) / outline.length) * 100)
+    : 0;
+  const hasGuideContent = item.content.document !== null || item.content.sections.length > 0;
+  const readerStyle = {
+    "--reader-font-size": `${(0.91 * fontScale / 100).toFixed(3)}rem`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined" || outline.length === 0) return;
+
+    const headings = outline
+      .map(({ id }) => document.getElementById(id))
+      .filter((heading): heading is HTMLElement => heading !== null);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (manualNavigationRef.current) return;
+        const nearestVisibleHeading = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((first, second) => first.boundingClientRect.top - second.boundingClientRect.top)[0];
+
+        if (nearestVisibleHeading?.target.id) {
+          setActiveHeadingId(nearestVisibleHeading.target.id);
+        }
+      },
+      { rootMargin: "-18% 0px -70% 0px", threshold: 0 },
+    );
+
+    headings.forEach((heading) => observer.observe(heading));
+    return () => observer.disconnect();
+  }, [outline]);
+
+  useEffect(
+    () => () => {
+      if (manualNavigationTimerRef.current !== null) {
+        window.clearTimeout(manualNavigationTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  function goToHeading(id: string) {
+    manualNavigationRef.current = true;
+    if (manualNavigationTimerRef.current !== null) {
+      window.clearTimeout(manualNavigationTimerRef.current);
+    }
+    manualNavigationTimerRef.current = window.setTimeout(() => {
+      manualNavigationRef.current = false;
+      manualNavigationTimerRef.current = null;
+    }, 1_000);
+    setActiveHeadingId(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function shareGuide() {
+    const url = window.location.href;
+    const shareData = { text: item.summary, title: item.title, url };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShareFeedback("Guía compartida.");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard_unavailable");
+      await navigator.clipboard.writeText(url);
+      setShareFeedback("Enlace copiado.");
+    } catch {
+      window.prompt("Copia este enlace para compartir la guía:", url);
+    }
+  }
+
+  function toggleFavorite() {
+    setFavorite((current) => !current);
+  }
+
+  return (
+    <div
+      className={`published-rich-guide-reader${highlightImportant ? " is-highlighting" : ""}${focusMode ? " is-focus-mode" : ""}`}
+      style={readerStyle}
+    >
+      <section className="published-reader-actionbar" aria-label="Herramientas de lectura">
+        <div className="published-reader-actionbar-group">
+          <button
+            aria-label="Resaltar lo importante"
+            aria-pressed={highlightImportant}
+            className="published-reader-toggle"
+            type="button"
+            onClick={() => setHighlightImportant((current) => !current)}
+          >
+            <Highlighter aria-hidden="true" size={18} />
+            <span>Resaltar lo importante</span>
+            <span aria-hidden="true" className="published-reader-switch" />
+          </button>
+        </div>
+
+        <div className="published-reader-actionbar-group published-reader-actions">
+          {item.asset?.downloadUrl && (
+            <a aria-label="Descargar guía" href={item.asset.downloadUrl}>
+              <DownloadSimple aria-hidden="true" size={18} />
+              <span>Descargar</span>
+            </a>
+          )}
+          <button aria-label="Imprimir guía" type="button" onClick={() => window.print()}>
+            <Printer aria-hidden="true" size={18} />
+            <span>Imprimir</span>
+          </button>
+          <button
+            aria-pressed={favorite}
+            aria-label="Favorito"
+            title="Marcar durante esta lectura"
+            type="button"
+            onClick={toggleFavorite}
+          >
+            <Star aria-hidden="true" size={18} weight={favorite ? "fill" : "regular"} />
+            <span>Favorito</span>
+          </button>
+          <button aria-label="Compartir guía" type="button" onClick={() => void shareGuide()}>
+            <ShareNetwork aria-hidden="true" size={18} />
+            <span>Compartir</span>
+          </button>
+        </div>
+        {shareFeedback && (
+          <span className="published-reader-share-feedback" role="status">
+            {shareFeedback}
+          </span>
+        )}
+      </section>
+
+      <div className="published-rich-guide-layout">
+        <nav className="published-rich-guide-outline" aria-label="Índice de la guía">
+        <div className="published-rich-guide-outline-heading">
+          <ListBullets aria-hidden="true" size={19} />
+          <strong>Índice de la guía</strong>
+        </div>
+        <div className="published-rich-guide-outline-links">
+          {numberedOutline.map((outlineItem) => (
+            <a
+              aria-current={visibleActiveHeadingId === outlineItem.id ? "location" : undefined}
+              className={`${outlineItem.level === 3 ? "is-subsection" : "is-section"}${visibleActiveHeadingId === outlineItem.id ? " is-active" : ""}`}
+              href={`#${outlineItem.id}`}
+              key={outlineItem.id}
+              onClick={(event) => {
+                event.preventDefault();
+                goToHeading(outlineItem.id);
+              }}
+            >
+              <span aria-hidden="true">
+                {outlineItem.sectionNumber ?? "•"}
+              </span>
+              {outlineItem.label}
+            </a>
+          ))}
+          {outline.length === 0 && (
+            <p className="published-rich-guide-outline-empty">La guía no contiene apartados.</p>
+          )}
+        </div>
+        {item.asset?.downloadUrl && (
+          <a className="published-rich-guide-download" href={item.asset.downloadUrl}>
+            <DownloadSimple aria-hidden="true" size={18} />
+            <span>Descargar guía</span>
+          </a>
+        )}
+        </nav>
+
+        <section className="published-rich-guide-article" aria-label="Contenido de la guía">
+        {hasGuideContent ? (
+          <RichTextRenderer document={guideDocument} />
+        ) : item.asset?.downloadUrl ? (
+          <div className="published-asset-callout">
+            <BookOpen size={38} />
+            <h3>Esta guía está disponible como documento.</h3>
+            <a href={item.asset.downloadUrl}>
+              <DownloadSimple size={19} /> Abrir {item.asset.fileName}
+            </a>
+          </div>
+        ) : (
+          <div className="published-rich-guide-empty">
+            <BookOpen aria-hidden="true" size={34} />
+            <h3>El contenido de esta guía aún no está disponible.</h3>
+          </div>
+        )}
+        </section>
+
+        <aside className="published-rich-guide-support" aria-label="Recursos de estudio">
+        <section className="published-reader-tools" aria-labelledby="published-reader-tools-title">
+          <header>
+            <TextAa aria-hidden="true" size={19} />
+            <strong id="published-reader-tools-title">Herramientas de lectura</strong>
+          </header>
+          <div className="published-reader-tools-body">
+            <div className="published-reader-tool-row">
+              <span>
+                <TextAa aria-hidden="true" size={18} />
+                <span>
+                  <strong>Tamaño de texto</strong>
+                  <small>Ajusta la lectura a tu comodidad</small>
+                </span>
+              </span>
+              <div className="published-reader-text-size">
+                <button
+                  aria-label="Reducir tamaño de texto"
+                  disabled={fontScale <= 90}
+                  type="button"
+                  onClick={() => setFontScale((current) => Math.max(90, current - 10))}
+                >
+                  <Minus aria-hidden="true" size={14} />
+                </button>
+                <output aria-live="polite">{fontScale}%</output>
+                <button
+                  aria-label="Aumentar tamaño de texto"
+                  disabled={fontScale >= 130}
+                  type="button"
+                  onClick={() => setFontScale((current) => Math.min(130, current + 10))}
+                >
+                  <Plus aria-hidden="true" size={14} />
+                </button>
+              </div>
+            </div>
+            <button
+              aria-pressed={focusMode}
+              className="published-reader-focus"
+              type="button"
+              onClick={() => setFocusMode((current) => !current)}
+            >
+              <span className="published-reader-focus-icon">
+                {focusMode ? <CornersOut aria-hidden="true" size={18} /> : <CornersIn aria-hidden="true" size={18} />}
+              </span>
+              <span>
+                <strong>{focusMode ? "Salir del enfoque" : "Modo enfoque"}</strong>
+                <small>{focusMode ? "Recupera el índice y los recursos" : "Oculta los elementos secundarios"}</small>
+              </span>
+              <span aria-hidden="true" className="published-reader-switch" />
+            </button>
+          </div>
+        </section>
+
+        <ReaderSupportPanel
+          count={item.content.keyPoints.length}
+          defaultExpanded
+          icon={<Lightbulb aria-hidden="true" size={20} />}
+          id="published-guide-key-points"
+          title="Puntos clave"
+        >
+          {item.content.keyPoints.length > 0 ? (
+            <ul className="published-rich-guide-key-points">
+              {item.content.keyPoints.map((point) => (
+                <li key={point}>
+                  <Lightbulb aria-hidden="true" size={17} />
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="published-rich-guide-resource-empty">Esta guía no incluye puntos clave.</p>
+          )}
+        </ReaderSupportPanel>
+
+        <ReaderSupportPanel
+          count={item.content.quiz.questions.length}
+          icon={<ClipboardText aria-hidden="true" size={20} />}
+          id="published-guide-quiz"
+          title="Cuestionario"
+        >
+          {item.content.quiz.questions.length > 0 ? (
+            <QuizPractice questions={item.content.quiz.questions} />
+          ) : (
+            <p className="published-rich-guide-resource-empty">Esta guía no incluye cuestionario.</p>
+          )}
+        </ReaderSupportPanel>
+        </aside>
+      </div>
+
+      {outline.length > 0 && (
+        <footer className="published-reader-progress" aria-label="Progreso de lectura">
+          <div className="published-reader-progress-heading">
+            <strong>{readingProgress}% completado</strong>
+            <progress aria-label={`${readingProgress}% de la guía completado`} max={100} value={readingProgress} />
+          </div>
+          <nav aria-label="Navegación entre secciones">
+            <button
+              disabled={!previousOutlineItem}
+              type="button"
+              onClick={() => previousOutlineItem && goToHeading(previousOutlineItem.id)}
+            >
+              <ArrowLeft aria-hidden="true" size={18} />
+              <span>
+                <small>Sección anterior</small>
+                <strong>{previousOutlineItem?.label ?? "Inicio de la guía"}</strong>
+              </span>
+            </button>
+            <button
+              className="is-next"
+              disabled={!nextOutlineItem}
+              type="button"
+              onClick={() => nextOutlineItem && goToHeading(nextOutlineItem.id)}
+            >
+              <span>
+                <small>Siguiente sección</small>
+                <strong>{nextOutlineItem?.label ?? "Guía completada"}</strong>
+              </span>
+              <ArrowRight aria-hidden="true" size={18} />
+            </button>
+          </nav>
+        </footer>
+      )}
+    </div>
+  );
+}
+
+function ReaderSupportPanel({
+  children,
+  count,
+  defaultExpanded = false,
+  icon,
+  id,
+  title,
+}: {
+  children: ReactNode;
+  count: number;
+  defaultExpanded?: boolean;
+  icon: ReactNode;
+  id: string;
+  title: string;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  return (
+    <section className="published-rich-guide-resource">
+      <button
+        aria-controls={id}
+        aria-expanded={expanded}
+        className="published-rich-guide-resource-trigger"
+        onClick={() => setExpanded((current) => !current)}
+        type="button"
+      >
+        <span className="published-rich-guide-resource-icon">{icon}</span>
+        <span>
+          <strong>{title}</strong>
+          <small>{count === 1 ? "1 elemento" : `${count} elementos`}</small>
+        </span>
+        <CaretDown aria-hidden="true" className="published-rich-guide-resource-caret" size={17} />
+      </button>
+      <div className="published-rich-guide-resource-content" hidden={!expanded} id={id}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
 type VideoItem = ContentItem & { kind: "video" };
 type VideoResource = "guide" | "key-points" | "quiz";
 
-function VideoBody({ item }: { item: VideoItem }) {
+function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: GuideItem }) {
   const [resource, setResource] = useState<VideoResource>("guide");
+  const displayedGuide = linkedGuide?.content ?? item.content.guide;
+  const displayedKeyPoints = linkedGuide?.content.keyPoints ?? item.content.keyPoints;
+  const displayedQuiz = linkedGuide?.content.quiz.questions ?? item.content.quiz.questions;
   const tabs: { id: VideoResource; label: string }[] = [
     { id: "guide", label: "Guía" },
     { id: "key-points", label: "Puntos clave" },
@@ -188,28 +579,57 @@ function VideoBody({ item }: { item: VideoItem }) {
         role="tabpanel"
       >
         {resource === "guide" && (
-          <div className="video-guide-sections">
-            {item.content.guide.sections.map((section, index) => (
-              <article key={`${section.heading}-${index}`}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <h3>{section.heading}</h3>
-                  {section.body.split(/\n{2,}/).map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </div>
-              </article>
-            ))}
+          <div className="video-guide-resource">
+            {linkedGuide && (
+              <header className="video-linked-guide-heading">
+                <span>Guía vinculada</span>
+                <h3>{linkedGuide.title}</h3>
+                <p>{linkedGuide.summary}</p>
+                <Link href={`/guias/${linkedGuide.slug}`}>
+                  Abrir guía completa <ArrowRight aria-hidden="true" size={16} />
+                </Link>
+              </header>
+            )}
+            {displayedGuide.document ? (
+              <RichTextRenderer
+                className="video-rich-guide-document"
+                document={displayedGuide.document}
+              />
+            ) : (
+              <div className="video-guide-sections">
+                {displayedGuide.sections.map((section, index) => (
+                  <article key={`${section.heading}-${index}`}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <div>
+                      <h3>{section.heading}</h3>
+                      {section.body.split(/\n{2,}/).map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {resource === "key-points" && (
-          <ul className="video-key-points">
-            {item.content.keyPoints.map((point) => (
-              <li key={point}><CheckCircle size={19} />{point}</li>
-            ))}
-          </ul>
+          displayedKeyPoints.length > 0 ? (
+            <ul className="video-key-points">
+              {displayedKeyPoints.map((point) => (
+                <li key={point}><CheckCircle size={19} />{point}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="published-rich-guide-resource-empty">Esta guía no incluye puntos clave.</p>
+          )
         )}
-        {resource === "quiz" && <QuizPractice questions={item.content.quiz.questions} />}
+        {resource === "quiz" && (
+          displayedQuiz.length > 0 ? (
+            <QuizPractice questions={displayedQuiz} />
+          ) : (
+            <p className="published-rich-guide-resource-empty">Esta guía no incluye cuestionario.</p>
+          )
+        )}
       </section>
     </section>
   );

@@ -237,10 +237,357 @@ const HttpsUrlSchema = z
     message: "Only HTTPS URLs are accepted",
   });
 
+export const RichTextTextAlignSchema = z.enum(["left", "center", "right", "justify"]);
+
+export type RichTextTextAlign = z.infer<typeof RichTextTextAlignSchema>;
+
+const RichTextColorSchema = z
+  .string()
+  .regex(/^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i, {
+    message: "Colors must use hexadecimal notation",
+  });
+
+const RichTextLinkHrefSchema = z
+  .string()
+  .trim()
+  .max(2_048)
+  .url()
+  .refine((value) => new URL(value).protocol === "https:", {
+    message: "Rich text links must use HTTPS",
+  });
+
+export const RichTextMarkSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("bold") }).strict(),
+  z.object({ type: z.literal("italic") }).strict(),
+  z.object({ type: z.literal("underline") }).strict(),
+  z.object({ type: z.literal("strike") }).strict(),
+  z.object({ type: z.literal("code") }).strict(),
+  z.object({ type: z.literal("subscript") }).strict(),
+  z.object({ type: z.literal("superscript") }).strict(),
+  z
+    .object({
+      attrs: z
+        .object({
+          href: RichTextLinkHrefSchema,
+          class: z.string().trim().min(1).max(100).nullable().optional(),
+          rel: z.string().trim().min(1).max(100).nullable().optional(),
+          target: z.enum(["_blank", "_self"]).nullable().optional(),
+        })
+        .strict(),
+      type: z.literal("link"),
+    })
+    .strict(),
+  z
+    .object({
+      attrs: z.object({ color: RichTextColorSchema.nullable().optional() }).strict().optional(),
+      type: z.literal("highlight"),
+    })
+    .strict(),
+  z
+    .object({
+      attrs: z.object({ color: RichTextColorSchema.nullable().optional() }).strict(),
+      type: z.literal("textStyle"),
+    })
+    .strict(),
+]);
+
+export type RichTextMark = z.infer<typeof RichTextMarkSchema>;
+
+export type RichTextNode =
+  | {
+      attrs?: { textAlign?: RichTextTextAlign | null };
+      content?: RichTextNode[];
+      type: "paragraph";
+    }
+  | {
+      attrs: { level: number; textAlign?: RichTextTextAlign | null };
+      content?: RichTextNode[];
+      type: "heading";
+    }
+  | {
+      content?: RichTextNode[];
+      type: "bulletList";
+    }
+  | {
+      attrs?: { start?: number };
+      content?: RichTextNode[];
+      type: "orderedList";
+    }
+  | {
+      content?: RichTextNode[];
+      type: "listItem";
+    }
+  | {
+      content?: RichTextNode[];
+      type: "blockquote";
+    }
+  | {
+      attrs?: { language?: string | null };
+      content?: RichTextNode[];
+      type: "codeBlock";
+    }
+  | {
+      marks?: RichTextMark[];
+      text: string;
+      type: "text";
+    }
+  | {
+      type: "hardBreak" | "horizontalRule";
+    }
+  | {
+      attrs: {
+        alt?: string | null;
+        height?: number | null;
+        src: string;
+        title?: string | null;
+        width?: number | null;
+      };
+      type: "image";
+    };
+
+const RichTextChildrenSchema = z
+  .array(z.lazy((): z.ZodType<RichTextNode> => RichTextNodeSchema))
+  .max(500)
+  .optional();
+
+const RichTextAlignmentAttrsSchema = z
+  .object({
+    textAlign: RichTextTextAlignSchema.nullable().optional(),
+  })
+  .strict();
+
+export const RichTextNodeSchema: z.ZodType<RichTextNode> = z.lazy(() =>
+  z.discriminatedUnion("type", [
+    z
+      .object({
+        marks: z.array(RichTextMarkSchema).max(12).optional(),
+        text: z.string().min(1).max(20_000),
+        type: z.literal("text"),
+      })
+      .strict(),
+    z
+      .object({
+        attrs: RichTextAlignmentAttrsSchema.optional(),
+        content: RichTextChildrenSchema,
+        type: z.literal("paragraph"),
+      })
+      .strict(),
+    z
+      .object({
+        attrs: RichTextAlignmentAttrsSchema.extend({
+          level: z.number().int().min(1).max(6),
+        }).strict(),
+        content: RichTextChildrenSchema,
+        type: z.literal("heading"),
+      })
+      .strict(),
+    z
+      .object({
+        content: RichTextChildrenSchema,
+        type: z.literal("bulletList"),
+      })
+      .strict(),
+    z
+      .object({
+        attrs: z.object({ start: z.number().int().min(1).max(1_000_000).optional() }).strict().optional(),
+        content: RichTextChildrenSchema,
+        type: z.literal("orderedList"),
+      })
+      .strict(),
+    z
+      .object({
+        content: RichTextChildrenSchema,
+        type: z.literal("listItem"),
+      })
+      .strict(),
+    z
+      .object({
+        content: RichTextChildrenSchema,
+        type: z.literal("blockquote"),
+      })
+      .strict(),
+    z
+      .object({
+        attrs: z
+          .object({ language: z.string().trim().min(1).max(50).nullable().optional() })
+          .strict()
+          .optional(),
+        content: RichTextChildrenSchema,
+        type: z.literal("codeBlock"),
+      })
+      .strict(),
+    z.object({ type: z.literal("hardBreak") }).strict(),
+    z.object({ type: z.literal("horizontalRule") }).strict(),
+    z
+      .object({
+        attrs: z
+          .object({
+            alt: z.string().trim().max(500).nullable().optional(),
+            height: z.number().int().positive().max(10_000).nullable().optional(),
+            src: HttpsUrlSchema.max(2_048),
+            title: z.string().trim().max(500).nullable().optional(),
+            width: z.number().int().positive().max(10_000).nullable().optional(),
+          })
+          .strict(),
+        type: z.literal("image"),
+      })
+      .strict(),
+  ]),
+);
+
+const RichTextBlockNodeTypes = new Set([
+  "paragraph",
+  "heading",
+  "bulletList",
+  "orderedList",
+  "blockquote",
+  "codeBlock",
+  "horizontalRule",
+  "image",
+]);
+
+const RichTextInlineNodeTypes = new Set(["text", "hardBreak"]);
+const RichTextMaxDepth = 12;
+const RichTextMaxNodes = 2_000;
+const RichTextMaxTextCharacters = 200_000;
+const RichTextMaxInputValues = 20_000;
+const RichTextMaxInputCharacters = 500_000;
+
+function inspectRichTextInput(value: unknown, context: z.RefinementCtx): void {
+  const pending: Array<{ depth: number; value: unknown }> = [{ depth: 0, value }];
+  const seen = new WeakSet<object>();
+  let characterCount = 0;
+  let valueCount = 0;
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) break;
+    valueCount += 1;
+
+    if (valueCount > RichTextMaxInputValues) {
+      context.addIssue({ code: "custom", message: "Rich text document has too many values" });
+      return;
+    }
+
+    if (current.depth > RichTextMaxDepth * 3) {
+      context.addIssue({ code: "custom", message: "Rich text document is nested too deeply" });
+      return;
+    }
+
+    if (typeof current.value === "string") {
+      characterCount += current.value.length;
+    } else if (typeof current.value === "object" && current.value !== null) {
+      if (seen.has(current.value)) {
+        context.addIssue({ code: "custom", message: "Rich text document must be a JSON tree" });
+        return;
+      }
+      seen.add(current.value);
+
+      if (Array.isArray(current.value)) {
+        for (const entry of current.value) {
+          pending.push({ depth: current.depth + 1, value: entry });
+        }
+      } else {
+        for (const [key, entry] of Object.entries(current.value)) {
+          characterCount += key.length;
+          pending.push({ depth: current.depth + 1, value: entry });
+        }
+      }
+    }
+
+    if (characterCount > RichTextMaxInputCharacters) {
+      context.addIssue({ code: "custom", message: "Rich text document is too large" });
+      return;
+    }
+  }
+}
+
+function validateRichTextDocument(
+  document: { content: RichTextNode[]; type: "doc" },
+  context: z.RefinementCtx,
+): void {
+  const pending = document.content.map((node) => ({ depth: 1, node, parentType: "doc" }));
+  let nodeCount = 0;
+  let textCharacters = 0;
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) break;
+    nodeCount += 1;
+
+    if (nodeCount > RichTextMaxNodes) {
+      context.addIssue({ code: "custom", message: `Rich text documents support at most ${RichTextMaxNodes} nodes` });
+      return;
+    }
+    if (current.depth > RichTextMaxDepth) {
+      context.addIssue({ code: "custom", message: `Rich text documents support at most ${RichTextMaxDepth} nested nodes` });
+      return;
+    }
+
+    const allowed =
+      current.parentType === "paragraph" || current.parentType === "heading"
+        ? RichTextInlineNodeTypes.has(current.node.type)
+        : current.parentType === "codeBlock"
+          ? current.node.type === "text"
+          : current.parentType === "bulletList" || current.parentType === "orderedList"
+            ? current.node.type === "listItem"
+            : current.parentType === "doc" || current.parentType === "listItem" || current.parentType === "blockquote"
+              ? RichTextBlockNodeTypes.has(current.node.type)
+              : false;
+
+    if (!allowed) {
+      context.addIssue({
+        code: "custom",
+        message: `${current.node.type} is not valid inside ${current.parentType}`,
+      });
+      return;
+    }
+
+    if (current.node.type === "text") {
+      textCharacters += current.node.text.length;
+      if (textCharacters > RichTextMaxTextCharacters) {
+        context.addIssue({
+          code: "custom",
+          message: `Rich text documents support at most ${RichTextMaxTextCharacters} text characters`,
+        });
+        return;
+      }
+      continue;
+    }
+
+    if ("content" in current.node && current.node.content) {
+      for (const child of current.node.content) {
+        pending.push({ depth: current.depth + 1, node: child, parentType: current.node.type });
+      }
+    }
+  }
+}
+
+const RichTextDocumentShapeSchema = z
+  .object({
+    content: z.array(RichTextNodeSchema).max(500).default([]),
+    type: z.literal("doc"),
+  })
+  .strict()
+  .superRefine(validateRichTextDocument);
+
+export const RichTextDocumentSchema = z
+  .unknown()
+  .superRefine(inspectRichTextInput)
+  .pipe(RichTextDocumentShapeSchema);
+
+export type RichTextDocument = z.infer<typeof RichTextDocumentSchema>;
+
 const ContentDraftBaseSchema = z.object({
   estimatedMinutes: z.number().int().min(0).max(100_000).nullable().default(null),
   featured: z.boolean().default(false),
   slug: z.string().trim().min(1).max(200).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  summary: z.string().trim().max(2_000),
+  title: z.string().trim().max(200),
+  topic: z.string().trim().max(120),
+});
+
+const PublishableContentDraftBaseSchema = ContentDraftBaseSchema.extend({
   summary: z.string().trim().min(1).max(2_000),
   title: z.string().trim().min(1).max(200),
   topic: z.string().trim().min(1).max(120),
@@ -249,6 +596,13 @@ const ContentDraftBaseSchema = z.object({
 export const GuideSectionSchema = z.object({
   body: z.string().trim().min(1).max(30_000),
   heading: z.string().trim().min(1).max(200),
+});
+
+export type GuideSection = z.infer<typeof GuideSectionSchema>;
+
+const DraftGuideSectionSchema = z.object({
+  body: z.string().trim().max(30_000),
+  heading: z.string().trim().max(200),
 });
 
 export const QuizQuestionSchema = z
@@ -268,59 +622,171 @@ export const QuizQuestionSchema = z
     }
   });
 
+// Guide companions are authored incrementally. Empty fields are valid while a
+// publication is still a draft; the API readiness check prevents incomplete
+// questions from entering review or being published.
+export const GuideQuizQuestionSchema = z
+  .object({
+    correctOptionIndex: z.number().int().min(0),
+    explanation: z.string().trim().max(4_000).default(""),
+    options: z.array(z.string().trim().max(500)).min(2).max(8),
+    prompt: z.string().trim().max(2_000),
+  })
+  .superRefine((question, context) => {
+    if (question.correctOptionIndex >= question.options.length) {
+      context.addIssue({
+        code: "custom",
+        message: "correctOptionIndex must reference an existing option",
+        path: ["correctOptionIndex"],
+      });
+    }
+  });
+
 export const FlashcardSchema = z.object({
   back: z.string().trim().min(1).max(4_000),
   front: z.string().trim().min(1).max(2_000),
 });
 
+const DraftFlashcardSchema = z.object({
+  back: z.string().trim().max(4_000),
+  front: z.string().trim().max(2_000),
+});
+
+export const ContentRegionsSchema = z
+  .array(z.string().trim().min(1).max(120))
+  .max(12)
+  .default([]);
+
+export type ContentRegions = z.infer<typeof ContentRegionsSchema>;
+
+const DraftGuideDocumentSchema = z.object({
+  document: RichTextDocumentSchema.nullable().default(null),
+  sections: z.array(DraftGuideSectionSchema).max(100).default([]),
+});
+
+const PublishableGuideDocumentSchema = z.object({
+  document: RichTextDocumentSchema.nullable().default(null),
+  sections: z.array(GuideSectionSchema).max(100).default([]),
+});
+
 export const ContentDraftSchema = z.discriminatedUnion("kind", [
   ContentDraftBaseSchema.extend({
     content: z.object({
-      description: z.string().trim().min(1).max(10_000),
+      description: z.string().trim().max(10_000),
       durationSeconds: z.number().int().min(0).max(86_400).nullable().default(null),
       externalUrl: HttpsUrlSchema.nullable().default(null),
-      guide: z
-        .object({
-          sections: z.array(GuideSectionSchema).max(100).default([]),
-        })
-        .default({ sections: [] }),
-      keyPoints: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+      guide: DraftGuideDocumentSchema.default({ document: null, sections: [] }),
+      keyPoints: z.array(z.string().trim().max(500)).max(30).default([]),
       quiz: z
         .object({
-          questions: z.array(QuizQuestionSchema).max(100).default([]),
+          questions: z.array(GuideQuizQuestionSchema).max(100).default([]),
         })
         .default({ questions: [] }),
+      regions: ContentRegionsSchema,
     }),
     kind: z.literal("video"),
   }),
   ContentDraftBaseSchema.extend({
     content: z.object({
-      sections: z.array(GuideSectionSchema).max(100).default([]),
+      document: RichTextDocumentSchema.nullable().default(null),
+      keyPoints: z.array(z.string().trim().max(500)).max(30).default([]),
+      linkedVideoId: z.string().uuid().nullable().default(null),
+      quiz: z
+        .object({
+          questions: z.array(GuideQuizQuestionSchema).max(100).default([]),
+        })
+        .default({ questions: [] }),
+      regions: ContentRegionsSchema,
+      sections: z.array(DraftGuideSectionSchema).max(100).default([]),
     }),
     kind: z.literal("guide"),
   }),
   ContentDraftBaseSchema.extend({
     content: z.object({
-      questions: z.array(QuizQuestionSchema).min(1).max(100),
+      questions: z.array(GuideQuizQuestionSchema).max(100).default([]),
+      regions: ContentRegionsSchema,
     }),
     kind: z.literal("quiz"),
   }),
   ContentDraftBaseSchema.extend({
     content: z.object({
-      cards: z.array(FlashcardSchema).min(1).max(500),
+      cards: z.array(DraftFlashcardSchema).max(500).default([]),
+      regions: ContentRegionsSchema,
     }),
     kind: z.literal("flashcards"),
   }),
   ContentDraftBaseSchema.extend({
     content: z.object({
-      introduction: z.string().trim().min(1).max(20_000),
-      objectives: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+      introduction: z.string().trim().max(20_000),
+      objectives: z.array(z.string().trim().max(500)).max(30).default([]),
+      regions: ContentRegionsSchema,
     }),
     kind: z.literal("topic"),
   }),
 ]);
 
 export type ContentDraft = z.infer<typeof ContentDraftSchema>;
+
+/**
+ * Strict publication contract. Drafts may contain empty authoring fields so
+ * progress can be persisted, but review, approval and publication must satisfy
+ * this schema in addition to asset-specific readiness checks in the API.
+ */
+export const PublishableContentDraftSchema = z.discriminatedUnion("kind", [
+  PublishableContentDraftBaseSchema.extend({
+    content: z.object({
+      description: z.string().trim().min(1).max(10_000),
+      durationSeconds: z.number().int().min(0).max(86_400).nullable().default(null),
+      externalUrl: HttpsUrlSchema.nullable().default(null),
+      guide: PublishableGuideDocumentSchema.default({ document: null, sections: [] }),
+      keyPoints: z.array(z.string().trim().min(1).max(500)).min(1).max(30),
+      quiz: z.object({
+        questions: z.array(QuizQuestionSchema).min(1).max(100),
+      }),
+      regions: ContentRegionsSchema,
+    }),
+    kind: z.literal("video"),
+  }),
+  PublishableContentDraftBaseSchema.extend({
+    content: z.object({
+      document: RichTextDocumentSchema.nullable().default(null),
+      keyPoints: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+      linkedVideoId: z.string().uuid().nullable().default(null),
+      quiz: z
+        .object({
+          questions: z.array(QuizQuestionSchema).max(100).default([]),
+        })
+        .default({ questions: [] }),
+      regions: ContentRegionsSchema,
+      sections: z.array(GuideSectionSchema).max(100).default([]),
+    }),
+    kind: z.literal("guide"),
+  }),
+  PublishableContentDraftBaseSchema.extend({
+    content: z.object({
+      questions: z.array(QuizQuestionSchema).min(1).max(100),
+      regions: ContentRegionsSchema,
+    }),
+    kind: z.literal("quiz"),
+  }),
+  PublishableContentDraftBaseSchema.extend({
+    content: z.object({
+      cards: z.array(FlashcardSchema).min(1).max(500),
+      regions: ContentRegionsSchema,
+    }),
+    kind: z.literal("flashcards"),
+  }),
+  PublishableContentDraftBaseSchema.extend({
+    content: z.object({
+      introduction: z.string().trim().min(1).max(20_000),
+      objectives: z.array(z.string().trim().min(1).max(500)).max(30).default([]),
+      regions: ContentRegionsSchema,
+    }),
+    kind: z.literal("topic"),
+  }),
+]);
+
+export type PublishableContentDraft = z.infer<typeof PublishableContentDraftSchema>;
 
 export const ContentAssetKindSchema = z.enum(["video", "document", "image"]);
 export const ContentAssetMimeTypeSchema = z.enum([
@@ -518,6 +984,7 @@ export interface ContentProvider {
   }): Promise<ContentItem[]>;
   listPublished(input: {
     kind?: ContentKind;
+    linkedVideoId?: string;
     limit: number;
   }): Promise<ContentItem[]>;
   transitionContent(input: {

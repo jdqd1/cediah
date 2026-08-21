@@ -1,0 +1,1061 @@
+"use client";
+
+import type { ClipboardEvent as ReactClipboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowUDownLeft,
+  ArrowUUpLeft,
+  CaretDown,
+  CaretUp,
+  Check,
+  CheckCircle,
+  Eye,
+  HighlighterCircle,
+  ImageSquare,
+  LinkSimple,
+  ListBullets,
+  ListNumbers,
+  Minus,
+  NotePencil,
+  Paragraph,
+  Plus,
+  Question,
+  Quotes,
+  TextAlignCenter,
+  TextAlignLeft,
+  TextAlignRight,
+  TextB,
+  TextItalic,
+  TextStrikethrough,
+  TextUnderline,
+  Trash,
+  X,
+} from "@phosphor-icons/react";
+import Highlight from "@tiptap/extension-highlight";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
+import TextAlign from "@tiptap/extension-text-align";
+import Underline from "@tiptap/extension-underline";
+import { EditorContent, useEditor, type Editor, type JSONContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import {
+  RichTextDocumentSchema,
+  type ContentDraft,
+  type ContentStatus,
+  type RichTextDocument,
+} from "@cediah/contracts";
+import { useRouter } from "next/navigation";
+import {
+  extractGuideOutline,
+  richTextDocumentToPlainText,
+  richTextDocumentToSections,
+  sectionsToRichTextDocument,
+} from "@/lib/guide-document";
+import { RegionTagsInput } from "./region-tags-input";
+
+type GuideDraft = Extract<ContentDraft, { kind: "guide" }>;
+type VideoDraft = Extract<ContentDraft, { kind: "video" }>;
+type EditableGuideDraft = GuideDraft | VideoDraft;
+type QuizQuestion = Extract<ContentDraft, { kind: "quiz" }>[
+  "content"
+]["questions"][number];
+
+type PendingNavigationIntent =
+  | { href: string; kind: "href" }
+  | { kind: "fallback-back" }
+  | { kind: "panel" };
+
+type BrowserNavigateEvent = Event & {
+  destination: { url: string };
+  downloadRequest: string | null;
+  hashChange: boolean;
+  navigationType: "push" | "reload" | "replace" | "traverse";
+};
+
+type BrowserNavigation = EventTarget;
+
+const fallbackGuardStateKey = "__cediahGuideEditorGuard";
+const fallbackBaseStateKey = "__cediahGuideEditorBase";
+
+function getBrowserNavigation(): BrowserNavigation | null {
+  return (window as Window & { navigation?: BrowserNavigation }).navigation ?? null;
+}
+
+function historyStateRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+}
+
+const statusLabels: Record<ContentStatus, string> = {
+  approved: "Aprobado",
+  archived: "Archivado",
+  changes_requested: "Cambios solicitados",
+  draft: "Borrador",
+  in_review: "En revisión",
+  published: "Publicado",
+};
+
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function summaryFromText(value: string) {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return compact.length > 280 ? compact.slice(0, 277).trimEnd() + "…" : compact;
+}
+
+function guideDocument(draft: EditableGuideDraft) {
+  const guide = draft.kind === "video" ? draft.content.guide : draft.content;
+  return guide.document ?? sectionsToRichTextDocument(guide.sections);
+}
+
+function guideKeyPoints(draft: EditableGuideDraft) {
+  return draft.content.keyPoints;
+}
+
+function guideQuestions(draft: EditableGuideDraft) {
+  return draft.content.quiz.questions;
+}
+
+function draftRegions(draft: EditableGuideDraft) {
+  return draft.content.regions.length > 0 ? draft.content.regions : draft.topic ? [draft.topic] : [];
+}
+
+function withDocument(draft: EditableGuideDraft, document: RichTextDocument): EditableGuideDraft {
+  const sections = richTextDocumentToSections(document);
+  if (draft.kind === "video") {
+    return {
+      ...draft,
+      content: {
+        ...draft.content,
+        guide: { ...draft.content.guide, document, sections },
+      },
+    };
+  }
+  return { ...draft, content: { ...draft.content, document, sections } };
+}
+
+function withKeyPoints(draft: EditableGuideDraft, keyPoints: string[]): EditableGuideDraft {
+  return { ...draft, content: { ...draft.content, keyPoints } } as EditableGuideDraft;
+}
+
+function withQuestions(draft: EditableGuideDraft, questions: QuizQuestion[]): EditableGuideDraft {
+  return {
+    ...draft,
+    content: { ...draft.content, quiz: { questions } },
+  } as EditableGuideDraft;
+}
+
+function withRegions(draft: EditableGuideDraft, regions: string[]): EditableGuideDraft {
+  return {
+    ...draft,
+    topic: regions[0] ?? "",
+    content: { ...draft.content, regions },
+  } as EditableGuideDraft;
+}
+
+function sanitizeEditorJson(content: JSONContent): JSONContent {
+  const node: JSONContent = { type: content.type };
+  if (typeof content.text === "string") node.text = content.text;
+  if (content.content) node.content = content.content.map(sanitizeEditorJson);
+  if (content.marks) {
+    node.marks = content.marks.flatMap((mark) => {
+      if (mark.type === "link") {
+        try {
+          const href = typeof mark.attrs?.href === "string" ? mark.attrs.href : "";
+          const url = new URL(href);
+          return url.protocol === "https:"
+            ? [{ type: mark.type, attrs: { href: url.toString() } }]
+            : [];
+        } catch {
+          return [];
+        }
+      }
+      if (mark.type === "highlight") return [{ type: mark.type }];
+      return [{ type: mark.type }];
+    });
+  }
+  if (content.type === "heading") {
+    node.attrs = {
+      level: content.attrs?.level,
+      ...(content.attrs?.textAlign ? { textAlign: content.attrs.textAlign } : {}),
+    };
+  } else if (content.type === "paragraph" && content.attrs?.textAlign) {
+    node.attrs = { textAlign: content.attrs.textAlign };
+  } else if (content.type === "orderedList" && Number.isInteger(content.attrs?.start)) {
+    node.attrs = { start: content.attrs?.start };
+  } else if (content.type === "image") {
+    node.attrs = {
+      src: content.attrs?.src,
+      ...(content.attrs?.alt ? { alt: content.attrs.alt } : {}),
+      ...(content.attrs?.title ? { title: content.attrs.title } : {}),
+    };
+  }
+  return node;
+}
+
+function plainPasteContent(text: string): JSONContent[] {
+  return text
+    .replace(/\r/g, "")
+    .split(/\n{2,}/)
+    .map((block) => {
+      const lines = block.split("\n");
+      const content: JSONContent[] = [];
+      lines.forEach((line, index) => {
+        if (line) content.push({ type: "text", text: line });
+        if (index < lines.length - 1) content.push({ type: "hardBreak" });
+      });
+      return { type: "paragraph", ...(content.length > 0 ? { content } : {}) };
+    });
+}
+
+function ToolbarButton({
+  active = false,
+  disabled = false,
+  label,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      aria-label={label}
+      aria-pressed={active || undefined}
+      className={active ? "is-active" : ""}
+      disabled={disabled}
+      title={label}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function KeyPointsPanel({
+  disabled,
+  editor,
+  onChange,
+  values,
+}: {
+  disabled: boolean;
+  editor: Editor | null;
+  onChange: (values: string[]) => void;
+  values: string[];
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  function addSelection() {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const selected = editor.state.doc.textBetween(from, to, " ").trim();
+    onChange([...values, selected || ""]);
+  }
+
+  return (
+    <section className={`guide-companion-panel ${collapsed ? "is-collapsed" : ""}`}>
+      <header>
+        <button type="button" onClick={() => setCollapsed((value) => !value)}>
+          <span><HighlighterCircle size={19} /> Puntos clave <small>{values.length}</small></span>
+          {collapsed ? <CaretDown size={16} /> : <CaretUp size={16} />}
+        </button>
+      </header>
+      {!collapsed && (
+        <div className="guide-companion-body">
+          <p>Resume lo imprescindible mientras construyes la guía.</p>
+          {values.map((value, index) => (
+            <div className="guide-key-point-row" key={index}>
+              <span>{index + 1}</span>
+              <textarea
+                aria-label={`Punto clave ${index + 1}`}
+                disabled={disabled}
+                maxLength={500}
+                placeholder="Escribe una idea esencial…"
+                rows={2}
+                value={value}
+                onChange={(event) =>
+                  onChange(values.map((current, position) => position === index ? event.target.value : current))
+                }
+              />
+              <button
+                aria-label={`Eliminar punto clave ${index + 1}`}
+                disabled={disabled}
+                type="button"
+                onClick={() => onChange(values.filter((_, position) => position !== index))}
+              >
+                <Trash size={15} />
+              </button>
+            </div>
+          ))}
+          <button className="guide-panel-add" disabled={disabled || values.length >= 30} type="button" onClick={addSelection}>
+            <Plus size={15} /> {editor && !editor.state.selection.empty ? "Añadir selección" : "Añadir punto clave"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function QuizPanel({
+  disabled,
+  onChange,
+  questions,
+}: {
+  disabled: boolean;
+  onChange: (questions: QuizQuestion[]) => void;
+  questions: QuizQuestion[];
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [openQuestion, setOpenQuestion] = useState(0);
+  const emptyQuestion: QuizQuestion = {
+    correctOptionIndex: 0,
+    explanation: "",
+    options: ["", ""],
+    prompt: "",
+  };
+
+  function update(index: number, patch: Partial<QuizQuestion>) {
+    onChange(questions.map((question, position) => position === index ? { ...question, ...patch } : question));
+  }
+
+  return (
+    <section className={`guide-companion-panel ${collapsed ? "is-collapsed" : ""}`}>
+      <header>
+        <button type="button" onClick={() => setCollapsed((value) => !value)}>
+          <span><Question size={19} /> Cuestionario <small>{questions.length}</small></span>
+          {collapsed ? <CaretDown size={16} /> : <CaretUp size={16} />}
+        </button>
+      </header>
+      {!collapsed && (
+        <div className="guide-companion-body guide-quiz-builder">
+          <p>Añade preguntas sin perder de vista el contenido.</p>
+          {questions.map((question, questionIndex) => {
+            const complete = Boolean(
+              question.prompt.trim() &&
+              question.options.length >= 2 &&
+              question.options.every((option) => option.trim()),
+            );
+            const open = openQuestion === questionIndex;
+            return (
+              <article className={open ? "is-open" : ""} key={questionIndex}>
+                <header>
+                  <button type="button" onClick={() => setOpenQuestion(open ? -1 : questionIndex)}>
+                    {complete ? <CheckCircle size={16} weight="fill" /> : <span>{questionIndex + 1}</span>}
+                    <strong>{question.prompt || `Pregunta ${questionIndex + 1}`}</strong>
+                    {open ? <CaretUp size={14} /> : <CaretDown size={14} />}
+                  </button>
+                  <button
+                    aria-label={`Eliminar pregunta ${questionIndex + 1}`}
+                    disabled={disabled}
+                    type="button"
+                    onClick={() => onChange(questions.filter((_, index) => index !== questionIndex))}
+                  >
+                    <Trash size={14} />
+                  </button>
+                </header>
+                {open && (
+                  <div className="guide-quiz-fields">
+                    <label>
+                      <span>Pregunta</span>
+                      <textarea
+                        disabled={disabled}
+                        maxLength={2000}
+                        rows={2}
+                        value={question.prompt}
+                        onChange={(event) => update(questionIndex, { prompt: event.target.value })}
+                      />
+                    </label>
+                    <span className="guide-quiz-label">Respuestas · marca la correcta</span>
+                    {question.options.map((option, optionIndex) => (
+                      <div className="guide-quiz-option" key={optionIndex}>
+                        <input
+                          aria-label={`Respuesta correcta ${optionIndex + 1}`}
+                          checked={question.correctOptionIndex === optionIndex}
+                          disabled={disabled}
+                          name={`guide-correct-${questionIndex}`}
+                          type="radio"
+                          onChange={() => update(questionIndex, { correctOptionIndex: optionIndex })}
+                        />
+                        <input
+                          aria-label={`Respuesta ${optionIndex + 1}`}
+                          disabled={disabled}
+                          maxLength={500}
+                          placeholder={`Respuesta ${optionIndex + 1}`}
+                          value={option}
+                          onChange={(event) => update(questionIndex, {
+                            options: question.options.map((current, index) => index === optionIndex ? event.target.value : current),
+                          })}
+                        />
+                        <button
+                          aria-label={`Eliminar respuesta ${optionIndex + 1}`}
+                          disabled={disabled || question.options.length <= 2}
+                          type="button"
+                          onClick={() => {
+                            const options = question.options.filter((_, index) => index !== optionIndex);
+                            const correctOptionIndex =
+                              optionIndex < question.correctOptionIndex
+                                ? question.correctOptionIndex - 1
+                                : optionIndex === question.correctOptionIndex
+                                  ? Math.min(optionIndex, options.length - 1)
+                                  : question.correctOptionIndex;
+                            update(questionIndex, {
+                              correctOptionIndex,
+                              options,
+                            });
+                          }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      className="guide-quiz-inline-add"
+                      disabled={disabled || question.options.length >= 8}
+                      type="button"
+                      onClick={() => update(questionIndex, { options: [...question.options, ""] })}
+                    >
+                      <Plus size={13} /> Añadir respuesta
+                    </button>
+                    <label>
+                      <span>Explicación (opcional)</span>
+                      <textarea
+                        disabled={disabled}
+                        maxLength={4000}
+                        rows={2}
+                        value={question.explanation}
+                        onChange={(event) => update(questionIndex, { explanation: event.target.value })}
+                      />
+                    </label>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          <button
+            className="guide-panel-add"
+            disabled={disabled || questions.length >= 100}
+            type="button"
+            onClick={() => {
+              onChange([...questions, emptyQuestion]);
+              setOpenQuestion(questions.length);
+            }}
+          >
+            <Plus size={15} /> Añadir pregunta
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function GuideEditorScreen({
+  busy,
+  draft,
+  editable,
+  hasUnsavedChanges,
+  isNew,
+  notice,
+  onChange,
+  onLeave,
+  onSave,
+  regionSuggestions,
+  status = "draft",
+}: {
+  busy: boolean;
+  draft: EditableGuideDraft;
+  editable: boolean;
+  hasUnsavedChanges: boolean;
+  isNew: boolean;
+  notice: { text: string; tone: "error" | "success" } | null;
+  onChange: (draft: EditableGuideDraft) => void;
+  onLeave: (discard: boolean) => void;
+  onSave: () => Promise<boolean>;
+  regionSuggestions: string[];
+  status?: ContentStatus;
+}) {
+  const router = useRouter();
+  const [initialDocument] = useState(() => guideDocument(draft)); // Editor remounts for each selected publication.
+  const [documentState, setDocumentState] = useState<RichTextDocument>(initialDocument);
+  const [exitPrompt, setExitPrompt] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [savingToLeave, setSavingToLeave] = useState(false);
+  const [activeOutline, setActiveOutline] = useState(0);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const exitDialogRef = useRef<HTMLElement>(null);
+  const manualSummaryRef = useRef(false);
+  const draftRef = useRef(draft);
+  const allowNavigationRef = useRef(false);
+  const bypassNavigationEventRef = useRef(false);
+  const exitPromptOpenRef = useRef(false);
+  const fallbackGuardId = useId();
+  const fallbackRestoringRef = useRef(false);
+  const fallbackReleasingRef = useRef(false);
+  const pendingNavigationRef = useRef<PendingNavigationIntent | null>(null);
+  const outline = useMemo(() => extractGuideOutline(documentState), [documentState]);
+  const releaseFallbackSentinel = useCallback((continuation?: () => void) => {
+    const state = historyStateRecord(window.history.state);
+    if (state[fallbackGuardStateKey] !== fallbackGuardId || fallbackReleasingRef.current) {
+      continuation?.();
+      return;
+    }
+
+    fallbackReleasingRef.current = true;
+    const releasedGuardState = { ...state };
+    delete releasedGuardState[fallbackGuardStateKey];
+    window.history.replaceState(releasedGuardState, "", window.location.href);
+    window.addEventListener(
+      "popstate",
+      () => {
+        fallbackReleasingRef.current = false;
+        const releasedState = historyStateRecord(window.history.state);
+        if (releasedState[fallbackBaseStateKey] === fallbackGuardId) {
+          delete releasedState[fallbackBaseStateKey];
+          window.history.replaceState(releasedState, "", window.location.href);
+        }
+        continuation?.();
+      },
+      { once: true },
+    );
+    window.history.back();
+  }, [fallbackGuardId]);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: true,
+    extensions: [
+      StarterKit.configure({ link: false, underline: false }),
+      Underline,
+      Highlight.configure({ multicolor: false }),
+      Link.configure({ autolink: false, defaultProtocol: "https", openOnClick: false }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Image.configure({ allowBase64: false }),
+      Placeholder.configure({
+        placeholder: "Pega aquí el contenido de tu guía en texto plano o comienza a escribir…",
+      }),
+    ],
+    content: initialDocument as JSONContent,
+    editorProps: {
+      attributes: {
+        "aria-label": "Contenido de la guía",
+        class: "guide-editor-prosemirror",
+      },
+    },
+    onUpdate({ editor: currentEditor }) {
+      const parsed = RichTextDocumentSchema.safeParse(sanitizeEditorJson(currentEditor.getJSON()));
+      if (!parsed.success) return;
+      setDocumentState(parsed.data);
+      const currentDraft = draftRef.current;
+      let next = withDocument(currentDraft, parsed.data);
+      if (currentDraft.kind === "guide" && isNew && !manualSummaryRef.current) {
+        const summary = summaryFromText(richTextDocumentToPlainText(parsed.data));
+        next = { ...next, summary } as EditableGuideDraft;
+      }
+      onChange(next);
+    },
+  });
+
+  useEffect(() => {
+    editor?.setEditable(editable && !preview);
+  }, [editable, editor, preview]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      if (allowNavigationRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const interceptNavigation = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) return;
+
+      const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!target || target.download || target.target === "_blank") return;
+
+      const next = new URL(target.href, window.location.href);
+      const current = new URL(window.location.href);
+      if (next.protocol !== "http:" && next.protocol !== "https:") return;
+      if (
+        next.origin === current.origin &&
+        next.pathname === current.pathname &&
+        next.search === current.search
+      ) return;
+
+      event.preventDefault();
+      openExitPrompt({ href: next.href, kind: "href" });
+    };
+
+    document.addEventListener("click", interceptNavigation, true);
+    return () => document.removeEventListener("click", interceptNavigation, true);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const navigation = getBrowserNavigation();
+    if (!navigation) return;
+
+    const interceptHistoryNavigation = (rawEvent: Event) => {
+      const event = rawEvent as BrowserNavigateEvent;
+      if (event.navigationType === "traverse") return;
+      if (allowNavigationRef.current || bypassNavigationEventRef.current) {
+        bypassNavigationEventRef.current = false;
+        return;
+      }
+      if (
+        Boolean(event.downloadRequest) ||
+        event.hashChange ||
+        event.navigationType === "reload" ||
+        !event.destination.url ||
+        event.destination.url === window.location.href
+      ) return;
+
+      if (!event.cancelable) return;
+
+      event.preventDefault();
+      if (exitPromptOpenRef.current) return;
+      openExitPrompt({ href: event.destination.url, kind: "href" });
+    };
+
+    navigation.addEventListener("navigate", interceptHistoryNavigation);
+    return () => navigation.removeEventListener("navigate", interceptHistoryNavigation);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const currentState = historyStateRecord(window.history.state);
+    if (currentState[fallbackGuardStateKey] !== fallbackGuardId) {
+      if (window.history.length <= 1) return;
+      const baseState: Record<string, unknown> = { ...currentState, [fallbackBaseStateKey]: fallbackGuardId };
+      delete baseState[fallbackGuardStateKey];
+      const guardState: Record<string, unknown> = { ...currentState, [fallbackGuardStateKey]: fallbackGuardId };
+      delete guardState[fallbackBaseStateKey];
+      window.history.replaceState(baseState, "", window.location.href);
+      window.history.pushState(guardState, "", window.location.href);
+    }
+
+    const interceptFallbackBack = (event: PopStateEvent) => {
+      if (fallbackReleasingRef.current || allowNavigationRef.current) return;
+      if (fallbackRestoringRef.current) {
+        fallbackRestoringRef.current = false;
+        openExitPrompt({ kind: "fallback-back" });
+        return;
+      }
+
+      const state = historyStateRecord(event.state);
+      if (state[fallbackBaseStateKey] !== fallbackGuardId) return;
+
+      fallbackRestoringRef.current = true;
+      window.history.forward();
+    };
+
+    window.addEventListener("popstate", interceptFallbackBack);
+    return () => window.removeEventListener("popstate", interceptFallbackBack);
+  }, [fallbackGuardId, hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (hasUnsavedChanges || exitPromptOpenRef.current) return;
+    releaseFallbackSentinel();
+  }, [hasUnsavedChanges, releaseFallbackSentinel]);
+
+  useEffect(() => {
+    if (!exitPrompt) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = exitDialogRef.current;
+    const focusable = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable?.[0];
+    const last = focusable?.[focusable.length - 1];
+    first?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !savingToLeave && !busy) {
+        event.preventDefault();
+        closeExitPrompt();
+        return;
+      }
+      if (event.key !== "Tab" || !first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [busy, exitPrompt, savingToLeave]);
+
+  function openExitPrompt(intent: PendingNavigationIntent) {
+    if (exitPromptOpenRef.current) return;
+    pendingNavigationRef.current = intent;
+    exitPromptOpenRef.current = true;
+    setExitPrompt(true);
+  }
+
+  function closeExitPrompt() {
+    pendingNavigationRef.current = null;
+    exitPromptOpenRef.current = false;
+    setExitPrompt(false);
+  }
+
+  function finishLeaving(discard: boolean) {
+    const intent = pendingNavigationRef.current ?? { kind: "panel" };
+    pendingNavigationRef.current = null;
+    exitPromptOpenRef.current = false;
+    setExitPrompt(false);
+
+    if (intent.kind === "fallback-back") {
+      releaseFallbackSentinel(() => {
+        allowNavigationRef.current = true;
+        window.history.back();
+      });
+      return;
+    }
+
+    releaseFallbackSentinel(() => {
+      if (intent.kind === "panel") {
+        onLeave(discard);
+        return;
+      }
+
+      const target = new URL(intent.href, window.location.href);
+      const targetsCurrentRoute =
+        target.origin === window.location.origin &&
+        target.pathname === window.location.pathname &&
+        target.search === window.location.search;
+
+      if (targetsCurrentRoute) {
+        onLeave(discard);
+      } else if (target.origin === window.location.origin) {
+        allowNavigationRef.current = true;
+        bypassNavigationEventRef.current = true;
+        router.push(`${target.pathname}${target.search}${target.hash}`);
+      } else {
+        allowNavigationRef.current = true;
+        window.location.assign(target.href);
+      }
+    });
+  }
+
+  function requestLeave() {
+    if (hasUnsavedChanges) {
+      openExitPrompt({ kind: "panel" });
+    }
+    else onLeave(isNew && draft.kind === "guide");
+  }
+
+  async function saveAndLeave() {
+    setSavingToLeave(true);
+    const saved = await onSave();
+    setSavingToLeave(false);
+    if (saved) finishLeaving(false);
+    else closeExitPrompt();
+  }
+
+  function setLink() {
+    if (!editor) return;
+    const previous = editor.getAttributes("link").href as string | undefined;
+    const requested = window.prompt("Dirección HTTPS del enlace", previous ?? "https://");
+    if (requested === null) return;
+    if (!requested.trim()) {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      return;
+    }
+    try {
+      const value = new URL(requested.startsWith("http") ? requested : `https://${requested}`);
+      if (value.protocol !== "https:") throw new Error("invalid");
+      editor.chain().focus().extendMarkRange("link").setLink({ href: value.toString() }).run();
+    } catch {
+      window.alert("Usa una dirección web segura que comience por https://");
+    }
+  }
+
+  function addImage() {
+    if (!editor) return;
+    const requested = window.prompt("Dirección HTTPS de la imagen", "https://");
+    if (!requested) return;
+    try {
+      const value = new URL(requested);
+      if (value.protocol !== "https:") throw new Error("invalid");
+      const alt = window.prompt("Descripción breve de la imagen para accesibilidad", "") ?? "";
+      editor.chain().focus().setImage({ src: value.toString(), alt }).run();
+    } catch {
+      window.alert("Usa una dirección de imagen segura que comience por https://");
+    }
+  }
+
+  function addCallout(kind: "key" | "clinical") {
+    if (!editor) return;
+    const label = kind === "key" ? "PUNTO CLAVE — " : "RELACIÓN CLÍNICA — ";
+    const selected = editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, " ").trim();
+    editor.chain().focus().insertContent({
+      type: "blockquote",
+      content: [{ type: "paragraph", content: [{ type: "text", text: label + selected }] }],
+    }).run();
+  }
+
+  function handlePlainPaste(event: ReactClipboardEvent<HTMLDivElement>) {
+    if (!editor || !editable || preview) return;
+    const text = event.clipboardData.getData("text/plain");
+    if (!text) return;
+    event.preventDefault();
+    event.stopPropagation();
+    editor.chain().focus().insertContent(plainPasteContent(text)).run();
+  }
+
+  const disabled = !editable || busy || preview || !editor;
+  const regions = draftRegions(draft);
+
+  return (
+    <div className="guide-editor-page">
+      <header className="guide-editor-heading">
+        <button className="guide-editor-back" type="button" onClick={requestLeave}>
+          <ArrowLeft size={18} /> Volver a publicaciones
+        </button>
+        <div className="guide-editor-title-block">
+          <span>Editor de guía</span>
+          {draft.kind === "guide" ? (
+            <input
+              aria-label="Título de la guía"
+              disabled={!editable || busy}
+              maxLength={200}
+              placeholder="Título de la guía"
+              value={draft.title}
+              onChange={(event) => {
+                const title = event.target.value;
+                onChange({ ...draft, slug: isNew ? slugify(title) : draft.slug, title });
+              }}
+            />
+          ) : (
+            <h2>Guía de {draft.title || "nuevo video"}</h2>
+          )}
+          <small>
+            <span className={`guide-editor-status guide-editor-status-${status}`}>{statusLabels[status]}</span>
+            {hasUnsavedChanges ? "Cambios sin guardar" : "Todo guardado"}
+          </small>
+        </div>
+        <div className="guide-editor-heading-actions">
+          <button className={preview ? "is-active" : ""} type="button" onClick={() => setPreview((value) => !value)}>
+            <Eye size={17} /> {preview ? "Seguir editando" : "Vista previa"}
+          </button>
+          {editable && (
+            <button className="guide-editor-save" disabled={busy || !hasUnsavedChanges} type="button" onClick={() => void onSave()}>
+              {busy ? <span className="guide-editor-saving" /> : <Check size={17} weight="bold" />}
+              {busy ? "Guardando…" : "Guardar"}
+            </button>
+          )}
+        </div>
+      </header>
+
+      <section className="guide-editor-details">
+        <div>
+          <RegionTagsInput
+            disabled={!editable || busy}
+            suggestions={regionSuggestions}
+            values={regions}
+            onChange={(values) => onChange(withRegions(draft, values))}
+          />
+        </div>
+        <button aria-expanded={detailsOpen} type="button" onClick={() => setDetailsOpen((value) => !value)}>
+          <NotePencil size={17} /> Detalles de publicación {detailsOpen ? <CaretUp size={14} /> : <CaretDown size={14} />}
+        </button>
+        {detailsOpen && (
+          <div className="guide-editor-summary">
+            <label>
+              <span>Resumen</span>
+              <textarea
+                disabled={!editable || busy}
+                maxLength={2000}
+                placeholder="Este texto aparecerá en el catálogo de guías."
+                rows={2}
+                value={draft.summary}
+                onChange={(event) => {
+                  manualSummaryRef.current = true;
+                  onChange({ ...draft, summary: event.target.value } as EditableGuideDraft);
+                }}
+              />
+            </label>
+            {draft.kind === "guide" && draft.content.linkedVideoId && (
+              <span className="guide-linked-video"><CheckCircle size={16} /> Esta guía se publicará como anexo de un video.</span>
+            )}
+          </div>
+        )}
+      </section>
+
+      <div className="guide-format-toolbar" aria-label="Formato del texto" role="toolbar">
+        <div className="guide-toolbar-group">
+          <ToolbarButton disabled={disabled || !editor?.can().undo()} label="Deshacer" onClick={() => editor?.chain().focus().undo().run()}><ArrowUUpLeft size={18} /></ToolbarButton>
+          <ToolbarButton disabled={disabled || !editor?.can().redo()} label="Rehacer" onClick={() => editor?.chain().focus().redo().run()}><ArrowUDownLeft size={18} /></ToolbarButton>
+        </div>
+        <label className="guide-style-select">
+          <Paragraph size={17} />
+          <select
+            aria-label="Estilo de párrafo"
+            disabled={disabled}
+            value={editor?.isActive("heading", { level: 1 }) ? "h1" : editor?.isActive("heading", { level: 2 }) ? "h2" : editor?.isActive("heading", { level: 3 }) ? "h3" : "p"}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === "p") editor?.chain().focus().setParagraph().run();
+              else editor?.chain().focus().toggleHeading({ level: Number(value.slice(1)) as 1 | 2 | 3 }).run();
+            }}
+          >
+            <option value="p">Párrafo</option>
+            <option value="h1">Título 1</option>
+            <option value="h2">Título 2</option>
+            <option value="h3">Título 3</option>
+          </select>
+        </label>
+        <div className="guide-toolbar-group">
+          <ToolbarButton active={Boolean(editor?.isActive("bold"))} disabled={disabled} label="Negrita" onClick={() => editor?.chain().focus().toggleBold().run()}><TextB size={18} weight="bold" /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive("italic"))} disabled={disabled} label="Cursiva" onClick={() => editor?.chain().focus().toggleItalic().run()}><TextItalic size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive("underline"))} disabled={disabled} label="Subrayado" onClick={() => editor?.chain().focus().toggleUnderline().run()}><TextUnderline size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive("strike"))} disabled={disabled} label="Tachado" onClick={() => editor?.chain().focus().toggleStrike().run()}><TextStrikethrough size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive("highlight"))} disabled={disabled} label="Resaltar" onClick={() => editor?.chain().focus().toggleHighlight().run()}><HighlighterCircle size={18} /></ToolbarButton>
+        </div>
+        <div className="guide-toolbar-group">
+          <ToolbarButton active={Boolean(editor?.isActive("bulletList"))} disabled={disabled} label="Lista con viñetas" onClick={() => editor?.chain().focus().toggleBulletList().run()}><ListBullets size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive("orderedList"))} disabled={disabled} label="Lista numerada" onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListNumbers size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive({ textAlign: "left" }))} disabled={disabled} label="Alinear a la izquierda" onClick={() => editor?.chain().focus().setTextAlign("left").run()}><TextAlignLeft size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive({ textAlign: "center" }))} disabled={disabled} label="Centrar" onClick={() => editor?.chain().focus().setTextAlign("center").run()}><TextAlignCenter size={18} /></ToolbarButton>
+          <ToolbarButton active={Boolean(editor?.isActive({ textAlign: "right" }))} disabled={disabled} label="Alinear a la derecha" onClick={() => editor?.chain().focus().setTextAlign("right").run()}><TextAlignRight size={18} /></ToolbarButton>
+        </div>
+        <div className="guide-toolbar-group">
+          <ToolbarButton active={Boolean(editor?.isActive("link"))} disabled={disabled} label="Añadir enlace" onClick={setLink}><LinkSimple size={18} /></ToolbarButton>
+          <ToolbarButton disabled={disabled} label="Insertar imagen mediante URL" onClick={addImage}><ImageSquare size={18} /></ToolbarButton>
+          <ToolbarButton disabled={disabled} label="Añadir separador" onClick={() => editor?.chain().focus().setHorizontalRule().run()}><Minus size={18} /></ToolbarButton>
+          <ToolbarButton disabled={disabled} label="Insertar punto clave" onClick={() => addCallout("key")}><HighlighterCircle size={18} /></ToolbarButton>
+          <ToolbarButton disabled={disabled} label="Insertar relación clínica" onClick={() => addCallout("clinical")}><Quotes size={18} /></ToolbarButton>
+        </div>
+      </div>
+
+      {notice && (
+        <p className={`guide-editor-notice guide-editor-notice-${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>
+          {notice.text}
+        </p>
+      )}
+
+      <div className="guide-editor-workspace">
+        <aside className="guide-editor-outline" aria-label="Índice de la guía">
+          <header><strong>Índice de la guía</strong><small>{outline.length}</small></header>
+          <ol>
+            {outline.map((entry, index) => (
+              <li className={`level-${entry.level} ${activeOutline === index ? "is-active" : ""}`} key={`${entry.id}-${index}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveOutline(index);
+                    const headings = canvasRef.current?.querySelectorAll(".ProseMirror h2, .ProseMirror h3");
+                    headings?.[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
+                >
+                  {entry.label}
+                </button>
+              </li>
+            ))}
+          </ol>
+          {outline.length === 0 && <p>Los títulos que añadas aparecerán aquí automáticamente.</p>}
+          <button
+            className="guide-outline-add"
+            disabled={disabled}
+            type="button"
+            onClick={() => editor?.chain().focus().insertContent([
+              { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Nueva sección" }] },
+              { type: "paragraph" },
+            ]).run()}
+          >
+            <Plus size={16} /> Nueva sección
+          </button>
+        </aside>
+
+        <main className={`guide-editor-canvas ${preview ? "is-preview" : ""}`} ref={canvasRef}>
+          <div className="guide-editor-canvas-label">
+            <span>{preview ? "Vista del lector" : "Documento editable"}</span>
+            <span>{richTextDocumentToPlainText(documentState).trim().split(/\s+/).filter(Boolean).length} palabras</span>
+          </div>
+          <div onPasteCapture={handlePlainPaste}>
+            <EditorContent editor={editor} />
+          </div>
+          {!preview && <p className="guide-editor-paste-hint">Al pegar contenido externo se conservará únicamente el texto, para que tú decidas el formato final.</p>}
+        </main>
+
+        <aside className="guide-editor-companions" aria-label="Complementos de la guía">
+          <KeyPointsPanel
+            disabled={!editable || busy}
+            editor={editor}
+            values={guideKeyPoints(draft)}
+            onChange={(values) => onChange(withKeyPoints(draft, values))}
+          />
+          <QuizPanel
+            disabled={!editable || busy}
+            questions={guideQuestions(draft)}
+            onChange={(questions) => onChange(withQuestions(draft, questions))}
+          />
+        </aside>
+      </div>
+
+      {exitPrompt && (
+        <div className="guide-exit-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !savingToLeave && !busy) closeExitPrompt();
+        }}>
+          <section
+            aria-describedby="guide-exit-description"
+            aria-labelledby="guide-exit-title"
+            aria-modal="true"
+            className="guide-exit-dialog"
+            ref={exitDialogRef}
+            role="dialog"
+          >
+            <span className="guide-exit-icon"><NotePencil size={24} /></span>
+            <h3 id="guide-exit-title">¿Quieres guardar tu progreso?</h3>
+            <p id="guide-exit-description">Hay cambios en la guía que todavía no se han guardado.</p>
+            <div>
+              <button disabled={savingToLeave || busy} type="button" onClick={closeExitPrompt}>Seguir editando</button>
+              <button disabled={savingToLeave || busy} type="button" onClick={() => finishLeaving(true)}>Volver sin guardar</button>
+              <button className="is-primary" disabled={savingToLeave || busy} type="button" onClick={() => void saveAndLeave()}>
+                {savingToLeave ? "Guardando…" : "Guardar y volver"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
