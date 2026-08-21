@@ -1,12 +1,17 @@
 "use client";
 
-import type { ClipboardEvent as ReactClipboardEvent } from "react";
+import type {
+  ClipboardEvent as ReactClipboardEvent,
+  MouseEvent as ReactMouseEvent,
+} from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUDownLeft,
   ArrowUUpLeft,
   CaretDown,
+  CaretLeft,
+  CaretRight,
   CaretUp,
   Check,
   CheckCircle,
@@ -31,7 +36,6 @@ import {
   TextUnderline,
   Table as TableIcon,
   Trash,
-  X,
 } from "@phosphor-icons/react";
 import Highlight from "@tiptap/extension-highlight";
 import Image from "@tiptap/extension-image";
@@ -41,6 +45,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import { TableKit } from "@tiptap/extension-table";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, type Editor, type JSONContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import {
   RichTextDocumentSchema,
@@ -57,6 +62,7 @@ import {
   sectionsToRichTextDocument,
   type NumberedGuideOutlineItem,
 } from "@/lib/guide-document";
+import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 type GuideDraft = Extract<ContentDraft, { kind: "guide" }>;
@@ -79,6 +85,15 @@ type BrowserNavigateEvent = Event & {
 };
 
 type BrowserNavigation = EventTarget;
+
+type TableControlsPosition = {
+  bottom: number;
+  left: number;
+  right: number;
+  showColumn: boolean;
+  showRow: boolean;
+  top: number;
+};
 
 const fallbackGuardStateKey = "__cediahGuideEditorGuard";
 const fallbackBaseStateKey = "__cediahGuideEditorBase";
@@ -579,26 +594,28 @@ function QuizPanel({
     <section className={`guide-companion-panel ${collapsed ? "is-collapsed" : ""}`}>
       <header>
         <button type="button" onClick={() => setCollapsed((value) => !value)}>
-          <span><Question size={19} /> Cuestionario <small className="guide-count guide-count-quiz">{questions.length}</small></span>
+          <span><Question size={19} /> Preguntas y respuestas <small className="guide-count guide-count-quiz">{questions.length}</small></span>
           {collapsed ? <CaretDown size={16} /> : <CaretUp size={16} />}
         </button>
       </header>
       {!collapsed && (
         <div className="guide-companion-body guide-quiz-builder">
-          <p>Añade preguntas sin perder de vista el contenido.</p>
+          <p>Crea tarjetas de repaso con una pregunta y su respuesta directa.</p>
           {questions.map((question, questionIndex) => {
             const complete = Boolean(
               question.prompt.trim() &&
-              question.options.length >= 2 &&
-              question.options.every((option) => option.trim()),
+              questionAnswer(question).trim(),
             );
             const open = openQuestion === questionIndex;
             return (
-              <article className={open ? "is-open" : ""} key={questionIndex}>
+              <article className={`guide-question-answer-card${open ? " is-open" : ""}`} key={questionIndex}>
                 <header>
                   <button type="button" onClick={() => setOpenQuestion(open ? -1 : questionIndex)}>
                     {complete ? <CheckCircle size={16} weight="fill" /> : <span>{questionIndex + 1}</span>}
-                    <strong>{question.prompt || `Pregunta ${questionIndex + 1}`}</strong>
+                    <span className="guide-question-answer-title">
+                      <small>Pregunta</small>
+                      <strong>{question.prompt || `Pregunta ${questionIndex + 1}`}</strong>
+                    </span>
                     {open ? <CaretUp size={14} /> : <CaretDown size={14} />}
                   </button>
                   <button
@@ -611,8 +628,8 @@ function QuizPanel({
                   </button>
                 </header>
                 {open && (
-                  <div className="guide-quiz-fields">
-                    <label>
+                  <div className="guide-quiz-fields guide-question-answer-fields">
+                    <label className="guide-question-field">
                       <span>Pregunta</span>
                       <textarea
                         disabled={disabled}
@@ -622,59 +639,22 @@ function QuizPanel({
                         onChange={(event) => update(questionIndex, { prompt: event.target.value })}
                       />
                     </label>
-                    <span className="guide-quiz-label">Respuestas · marca la correcta</span>
-                    {question.options.map((option, optionIndex) => (
-                      <div className="guide-quiz-option" key={optionIndex}>
-                        <input
-                          aria-label={`Respuesta correcta ${optionIndex + 1}`}
-                          checked={question.correctOptionIndex === optionIndex}
-                          disabled={disabled}
-                          name={`guide-correct-${questionIndex}`}
-                          type="radio"
-                          onChange={() => update(questionIndex, { correctOptionIndex: optionIndex })}
-                        />
-                        <input
-                          aria-label={`Respuesta ${optionIndex + 1}`}
-                          disabled={disabled}
-                          maxLength={500}
-                          placeholder={`Respuesta ${optionIndex + 1}`}
-                          value={option}
-                          onChange={(event) => update(questionIndex, {
-                            options: question.options.map((current, index) => index === optionIndex ? event.target.value : current),
-                          })}
-                        />
-                        <button
-                          aria-label={`Eliminar respuesta ${optionIndex + 1}`}
-                          disabled={disabled || question.options.length <= 2}
-                          type="button"
-                          onClick={() => {
-                            const options = question.options.filter((_, index) => index !== optionIndex);
-                            const correctOptionIndex =
-                              optionIndex < question.correctOptionIndex
-                                ? question.correctOptionIndex - 1
-                                : optionIndex === question.correctOptionIndex
-                                  ? Math.min(optionIndex, options.length - 1)
-                                  : question.correctOptionIndex;
-                            update(questionIndex, {
-                              correctOptionIndex,
-                              options,
-                            });
-                          }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      className="guide-quiz-inline-add"
-                      disabled={disabled || question.options.length >= 8}
-                      type="button"
-                      onClick={() => update(questionIndex, { options: [...question.options, ""] })}
-                    >
-                      <Plus size={13} /> Añadir respuesta
-                    </button>
-                    <label>
-                      <span>Explicación (opcional)</span>
+                    <label className="guide-answer-field">
+                      <span>Respuesta</span>
+                      <textarea
+                        aria-label={`Respuesta ${questionIndex + 1}`}
+                        disabled={disabled}
+                        maxLength={500}
+                        placeholder="Escribe una respuesta clara y directa…"
+                        rows={2}
+                        value={questionAnswer(question)}
+                        onChange={(event) =>
+                          update(questionIndex, withQuestionAnswer(question, event.target.value))
+                        }
+                      />
+                    </label>
+                    <label className="guide-answer-context-field">
+                      <span>Contexto adicional <small>(opcional)</small></span>
                       <textarea
                         disabled={disabled}
                         maxLength={4000}
@@ -778,16 +758,18 @@ function GuideReaderPreview({
             ) : <p>No hay puntos clave.</p>}
           </section>
           <section className="guide-reader-preview-resource">
-            <header><Question size={19} /><strong>Cuestionario</strong><small>{questions.length}</small></header>
+            <header><Question size={19} /><strong>Preguntas y respuestas</strong><small>{questions.length}</small></header>
             {questions.length > 0 ? (
-              <ol>
+              <div className="guide-reader-preview-question-list">
                 {questions.slice(0, 3).map((question, index) => (
-                  <li key={`${question.prompt}-${index}`}>
+                  <article key={`${question.prompt}-${index}`}>
+                    <small>Pregunta {String(index + 1).padStart(2, "0")}</small>
                     <strong>{question.prompt || `Pregunta ${index + 1}`}</strong>
-                    <ul>{question.options.map((option) => <li key={option}>{option || "Respuesta sin completar"}</li>)}</ul>
-                  </li>
+                    <span>Respuesta</span>
+                    <p>{questionAnswer(question) || "Respuesta sin completar"}</p>
+                  </article>
                 ))}
-              </ol>
+              </div>
             ) : <p>No hay preguntas.</p>}
           </section>
         </aside>
@@ -832,9 +814,10 @@ export function GuideEditorScreen({
   const [companionsCollapsed, setCompanionsCollapsed] = useState(false);
   const [savingToLeave, setSavingToLeave] = useState(false);
   const [activeOutline, setActiveOutline] = useState(0);
+  const [tableControlsPosition, setTableControlsPosition] = useState<TableControlsPosition | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const hoveredTableRef = useRef<HTMLTableElement | null>(null);
   const exitDialogRef = useRef<HTMLElement>(null);
-  const manualSummaryRef = useRef(false);
   const draftRef = useRef(draft);
   const allowNavigationRef = useRef(false);
   const bypassNavigationEventRef = useRef(false);
@@ -905,7 +888,7 @@ export function GuideEditorScreen({
       setDocumentState(parsed.data);
       const currentDraft = draftRef.current;
       let next = withDocument(currentDraft, parsed.data);
-      if (currentDraft.kind === "guide" && isNew && !manualSummaryRef.current) {
+      if (currentDraft.kind === "guide") {
         const summary = summaryFromText(richTextDocumentToPlainText(parsed.data));
         next = { ...next, summary } as EditableGuideDraft;
       }
@@ -1183,6 +1166,67 @@ export function GuideEditorScreen({
     editor.chain().focus().insertContent(pastedContent(text, html)).run();
   }
 
+  function handleTablePointerMove(event: ReactMouseEvent<HTMLDivElement>) {
+    if (!isEditing || preview || !canvasRef.current) return;
+    const pointerTarget = event.target;
+    if (!(pointerTarget instanceof Element)) return;
+    if (pointerTarget.closest(".guide-table-edge-controls")) return;
+
+    const table = pointerTarget.closest("table");
+    if (!(table instanceof HTMLTableElement)) {
+      hoveredTableRef.current = null;
+      setTableControlsPosition(null);
+      return;
+    }
+
+    hoveredTableRef.current = table;
+    const tableRect = table.getBoundingClientRect();
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const showColumn = tableRect.right - event.clientX <= 52;
+    const showRow = tableRect.bottom - event.clientY <= 44;
+    if (!showColumn && !showRow) {
+      setTableControlsPosition(null);
+      return;
+    }
+    const next = {
+      bottom: Math.round(tableRect.bottom - canvasRect.top),
+      left: Math.round(tableRect.left - canvasRect.left + tableRect.width / 2),
+      right: Math.round(tableRect.right - canvasRect.left),
+      showColumn,
+      showRow,
+      top: Math.round(tableRect.top - canvasRect.top + tableRect.height / 2),
+    };
+    setTableControlsPosition((current) =>
+      current &&
+      current.bottom === next.bottom &&
+      current.left === next.left &&
+      current.right === next.right &&
+      current.showColumn === next.showColumn &&
+      current.showRow === next.showRow &&
+      current.top === next.top
+        ? current
+        : next,
+    );
+  }
+
+  function addTablePart(kind: "column" | "row") {
+    if (!editor || !hoveredTableRef.current) return;
+    const rows = Array.from(hoveredTableRef.current.rows);
+    const cell = kind === "column"
+      ? rows[0]?.cells[rows[0].cells.length - 1]
+      : rows[rows.length - 1]?.cells[0];
+    if (!cell) return;
+
+    try {
+      const position = editor.view.posAtDOM(cell, 0) + 1;
+      const chain = editor.chain().focus().setTextSelection(position);
+      if (kind === "column") chain.addColumnAfter().run();
+      else chain.addRowAfter().run();
+    } catch {
+      // The table may have been removed between pointer movement and click.
+    }
+  }
+
   const disabled = !isEditing || busy || preview || !editor;
 
   return (
@@ -1259,28 +1303,6 @@ export function GuideEditorScreen({
         </div>
       </header>
 
-      {!preview && isEditing && (
-        <section className="guide-editor-summary guide-editor-summary-strip">
-            <label>
-              <span>Resumen</span>
-              <textarea
-                disabled={!isEditing || busy}
-                maxLength={2000}
-                placeholder="Este texto aparecerá en el catálogo de guías."
-                rows={2}
-                value={draft.summary}
-                onChange={(event) => {
-                  manualSummaryRef.current = true;
-                  onChange({ ...draft, summary: event.target.value } as EditableGuideDraft);
-                }}
-              />
-            </label>
-            {draft.kind === "guide" && draft.content.linkedVideoId && (
-              <span className="guide-linked-video"><CheckCircle size={16} /> Esta guía se publicará como anexo de un video.</span>
-            )}
-        </section>
-      )}
-
       {!preview && isEditing && <div className="guide-format-toolbar" aria-label="Formato del texto" role="toolbar">
         <div className="guide-toolbar-group">
           <ToolbarButton disabled={disabled || !editor?.can().undo()} label="Deshacer" onClick={() => editor?.chain().focus().undo().run()}><ArrowUUpLeft size={18} /></ToolbarButton>
@@ -1328,6 +1350,24 @@ export function GuideEditorScreen({
         </div>
       </div>}
 
+      {editor && isEditing && !preview && (
+        <BubbleMenu
+          className="guide-selection-toolbar"
+          editor={editor}
+          shouldShow={({ from, to }) => from !== to}
+        >
+          <ToolbarButton active={editor.isActive("bold")} label="Negrita" onClick={() => editor.chain().focus().toggleBold().run()}><TextB size={17} weight="bold" /></ToolbarButton>
+          <ToolbarButton active={editor.isActive("italic")} label="Cursiva" onClick={() => editor.chain().focus().toggleItalic().run()}><TextItalic size={17} /></ToolbarButton>
+          <span aria-hidden="true" />
+          <ToolbarButton active={editor.isActive("bulletList")} label="Lista con viñetas" onClick={() => editor.chain().focus().toggleBulletList().run()}><ListBullets size={17} /></ToolbarButton>
+          <ToolbarButton active={editor.isActive("orderedList")} label="Lista numerada" onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListNumbers size={17} /></ToolbarButton>
+          <span aria-hidden="true" />
+          <ToolbarButton active={editor.isActive({ textAlign: "left" })} label="Alinear a la izquierda" onClick={() => editor.chain().focus().setTextAlign("left").run()}><TextAlignLeft size={17} /></ToolbarButton>
+          <ToolbarButton active={editor.isActive({ textAlign: "center" })} label="Centrar" onClick={() => editor.chain().focus().setTextAlign("center").run()}><TextAlignCenter size={17} /></ToolbarButton>
+          <ToolbarButton active={editor.isActive({ textAlign: "right" })} label="Alinear a la derecha" onClick={() => editor.chain().focus().setTextAlign("right").run()}><TextAlignRight size={17} /></ToolbarButton>
+        </BubbleMenu>
+      )}
+
       {notice && (
         <p className={`guide-editor-notice guide-editor-notice-${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>
           {notice.text}
@@ -1344,13 +1384,16 @@ export function GuideEditorScreen({
           keyPoints={guideKeyPoints(draft)}
         />
       ) : (
-        <div className="guide-editor-workspace">
+        <div
+          className={`guide-editor-workspace${outlineCollapsed ? " is-outline-collapsed" : ""}${companionsCollapsed ? " is-companions-collapsed" : ""}${isEditing ? "" : " is-view-mode"}`}
+        >
           <aside className={`guide-editor-outline ${outlineCollapsed ? "is-collapsed" : ""}`} aria-label="Índice de la guía">
             <header>
               <button aria-controls="guide-editor-outline-content" aria-expanded={!outlineCollapsed} type="button" onClick={() => setOutlineCollapsed((value) => !value)}>
+                <ListBullets aria-hidden="true" size={17} />
                 <strong>Índice de la guía</strong>
                 <small>{outline.length}</small>
-                {outlineCollapsed ? <CaretDown size={15} /> : <CaretUp size={15} />}
+                {outlineCollapsed ? <CaretRight size={15} /> : <CaretLeft size={15} />}
               </button>
             </header>
             {!outlineCollapsed && (
@@ -1388,7 +1431,15 @@ export function GuideEditorScreen({
             )}
           </aside>
 
-          <main className="guide-editor-canvas" ref={canvasRef}>
+          <main
+            className="guide-editor-canvas"
+            ref={canvasRef}
+            onMouseLeave={() => {
+              hoveredTableRef.current = null;
+              setTableControlsPosition(null);
+            }}
+            onMouseMove={handleTablePointerMove}
+          >
             <div className="guide-editor-canvas-label">
               <span>{isEditing ? "Documento editable" : "Documento de la guía"}</span>
               <span>{richTextDocumentToPlainText(documentState).trim().split(/\s+/).filter(Boolean).length} palabras</span>
@@ -1396,15 +1447,46 @@ export function GuideEditorScreen({
             <div onPasteCapture={handlePlainPaste}>
               <EditorContent editor={editor} />
             </div>
+            {tableControlsPosition && isEditing && (
+              <div className="guide-table-edge-controls" aria-label="Controles rápidos de tabla" role="toolbar">
+                {tableControlsPosition.showColumn && (
+                  <button
+                    aria-label="Añadir columna a la derecha"
+                    className="is-column"
+                    style={{ left: tableControlsPosition.right, top: tableControlsPosition.top }}
+                    title="Añadir columna"
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => addTablePart("column")}
+                  >
+                    <Plus aria-hidden="true" size={14} /> <span>Columna</span>
+                  </button>
+                )}
+                {tableControlsPosition.showRow && (
+                  <button
+                    aria-label="Añadir fila debajo"
+                    className="is-row"
+                    style={{ left: tableControlsPosition.left, top: tableControlsPosition.bottom }}
+                    title="Añadir fila"
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => addTablePart("row")}
+                  >
+                    <Plus aria-hidden="true" size={14} /> <span>Fila</span>
+                  </button>
+                )}
+              </div>
+            )}
             <p className="guide-editor-paste-hint">Al pegar tablas o Markdown se conservará su estructura y formato para que puedas seguir editándolos.</p>
           </main>
 
-          <aside className="guide-editor-companions" aria-label="Complementos de la guía">
+          <aside className={`guide-editor-companions${companionsCollapsed ? " is-collapsed" : ""}`} aria-label="Complementos de la guía">
             <section className={`guide-companions-container ${companionsCollapsed ? "is-collapsed" : ""}`}>
               <header>
                 <button aria-controls="guide-editor-companions-content" aria-expanded={!companionsCollapsed} type="button" onClick={() => setCompanionsCollapsed((value) => !value)}>
+                  <HighlighterCircle aria-hidden="true" size={17} />
                   <span>Complementos de la guía</span>
-                  {companionsCollapsed ? <CaretDown size={16} /> : <CaretUp size={16} />}
+                  {companionsCollapsed ? <CaretLeft size={16} /> : <CaretRight size={16} />}
                 </button>
               </header>
               {!companionsCollapsed && (

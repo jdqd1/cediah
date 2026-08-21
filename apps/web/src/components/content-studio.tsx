@@ -11,7 +11,6 @@ import {
   CheckCircle,
   CloudArrowUp,
   Compass,
-  FilePdf,
   FileVideo,
   MagnifyingGlass,
   NotePencil,
@@ -36,6 +35,7 @@ import {
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
 import { uniqueRegions } from "@/lib/content-regions";
+import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { RegionTagsInput } from "./region-tags-input";
 
 const GuideEditorScreen = dynamic(
@@ -384,18 +384,19 @@ function QuizQuestionsEditor({
     );
 
   return (
-    <section className="studio-builder" aria-label={title}>
+    <section className="studio-builder studio-question-answer-builder" aria-label={title}>
       <header className="studio-builder-heading">
         <div>
-          <Question size={19} />
+          <CardsThree size={19} />
           <h4>{title}</h4>
         </div>
-        <span>{questions.length} {questions.length === 1 ? "pregunta" : "preguntas"}</span>
+        <span>{questions.length} {questions.length === 1 ? "tarjeta" : "tarjetas"}</span>
       </header>
       {questions.map((question, questionIndex) => (
-        <article className="studio-repeater" key={questionIndex}>
+        <article className="studio-repeater studio-question-answer-card" key={questionIndex}>
           <header>
-            <strong>Pregunta {questionIndex + 1}</strong>
+            <span className="studio-question-number">{String(questionIndex + 1).padStart(2, "0")}</span>
+            <strong>Pregunta y respuesta</strong>
             <button
               aria-label={`Eliminar pregunta ${questionIndex + 1}`}
               disabled={!allowEmpty && questions.length <= 1}
@@ -415,65 +416,22 @@ function QuizQuestionsEditor({
               onChange={(event) => updateQuestion(questionIndex, { prompt: event.target.value })}
             />
           </label>
-          <div className="studio-options">
-            <strong>Respuestas</strong>
-            {question.options.map((option, optionIndex) => (
-              <div className="studio-option" key={optionIndex}>
-                <input
-                  aria-label={`Marcar respuesta ${optionIndex + 1} como correcta`}
-                  checked={question.correctOptionIndex === optionIndex}
-                  name={`correct-${questionIndex}`}
-                  type="radio"
-                  onChange={() => updateQuestion(questionIndex, { correctOptionIndex: optionIndex })}
-                />
-                <input
-                  required
-                  aria-label={`Respuesta ${optionIndex + 1}`}
-                  maxLength={500}
-                  placeholder={`Respuesta ${optionIndex + 1}`}
-                  value={option}
-                  onChange={(event) =>
-                    updateQuestion(questionIndex, {
-                      options: question.options.map((current, index) =>
-                        index === optionIndex ? event.target.value : current,
-                      ),
-                    })
-                  }
-                />
-                <button
-                  aria-label={`Eliminar respuesta ${optionIndex + 1}`}
-                  disabled={question.options.length <= 2}
-                  type="button"
-                  onClick={() => {
-                    const options = question.options.filter((_, index) => index !== optionIndex);
-                    const currentCorrectOptionIndex = question.correctOptionIndex;
-                    const correctOptionIndex =
-                      optionIndex < currentCorrectOptionIndex
-                        ? currentCorrectOptionIndex - 1
-                        : optionIndex === currentCorrectOptionIndex
-                          ? Math.min(optionIndex, options.length - 1)
-                          : currentCorrectOptionIndex;
-                    updateQuestion(questionIndex, {
-                      correctOptionIndex,
-                      options,
-                    });
-                  }}
-                >
-                  <Trash size={16} />
-                </button>
-              </div>
-            ))}
-            <button
-              className="studio-add"
-              disabled={question.options.length >= 8}
-              type="button"
-              onClick={() => updateQuestion(questionIndex, { options: [...question.options, ""] })}
-            >
-              <Plus size={16} /> Añadir respuesta
-            </button>
-          </div>
+          <label className="studio-field studio-answer-field">
+            <span>Respuesta</span>
+            <textarea
+              required
+              aria-label={`Respuesta ${questionIndex + 1}`}
+              maxLength={500}
+              placeholder="Escribe la respuesta directa…"
+              rows={2}
+              value={questionAnswer(question)}
+              onChange={(event) =>
+                updateQuestion(questionIndex, withQuestionAnswer(question, event.target.value))
+              }
+            />
+          </label>
           <label className="studio-field">
-            <span>Explicación de la respuesta</span>
+            <span>Contexto adicional <small>(opcional)</small></span>
             <textarea
               maxLength={4000}
               rows={2}
@@ -586,7 +544,7 @@ function TypeEditor({
     return (
       <div className="studio-type-editor">
         <QuizQuestionsEditor
-          title="Preguntas del cuestionario"
+          title="Preguntas y respuestas"
           questions={draft.content.questions}
           onChange={(questions) => onChange({ ...draft, content: { ...draft.content, questions } })}
         />
@@ -804,8 +762,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
     resetFeedback();
     if (current.kind === "guide") {
       guideEntryDraftRef.current = itemDraft(current);
-      setGuideEditing(true);
     }
+    setGuideEditing(false);
   }
 
   function create(kind: ContentKind = "video") {
@@ -1131,12 +1089,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
   }
 
   const actions = item ? workflow(item, capabilities) : [];
-  const accepts =
-    draft?.kind === "video"
-      ? "video/mp4,video/quicktime,video/webm"
-      : draft?.kind === "guide"
-        ? "application/pdf"
-        : undefined;
+  const accepts = draft?.kind === "video"
+    ? "video/mp4,video/quicktime,video/webm"
+    : undefined;
   const videoChecklist = draft?.kind === "video"
     ? [
         {
@@ -1165,16 +1120,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
         {
           icon: Question,
-          label: "Cuestionario",
+          label: "Preguntas y respuestas",
           ready:
             draft.content.quiz.questions.length > 0 &&
             draft.content.quiz.questions.every(
               (question) =>
                 question.prompt.trim().length > 0 &&
-                question.options.length >= 2 &&
-                question.options.every((option) => option.trim().length > 0) &&
-                question.correctOptionIndex >= 0 &&
-                question.correctOptionIndex < question.options.length,
+                questionAnswer(question).trim().length > 0,
             ),
         },
       ]
@@ -1386,7 +1338,7 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                       key={action.status}
                       title={
                         draft.kind === "video" && !videoComplete
-                          ? "Completa video, puntos clave, guía y cuestionario"
+                          ? "Completa el video, los puntos clave, la guía y las preguntas y respuestas"
                           : undefined
                       }
                       type="button"
@@ -1455,10 +1407,10 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                 <section className="studio-assets" aria-labelledby="studio-upload-title">
                   <div className="studio-assets-heading">
                     <span className="studio-assets-icon">
-                      {draft.kind === "video" ? <FileVideo size={22} /> : <FilePdf size={22} />}
+                      <FileVideo size={22} />
                     </span>
                     <div>
-                      <h4 id="studio-upload-title">{draft.kind === "video" ? "Video" : "Archivo PDF"}</h4>
+                      <h4 id="studio-upload-title">Video</h4>
                       {item?.asset && (
                         <p className="studio-current-file">
                           <CheckCircle size={15} weight="fill" /> {item.asset.fileName}
@@ -1468,8 +1420,8 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                   </div>
                   <label className={`studio-upload-zone ${file ? "has-file" : ""}`}>
                     <CloudArrowUp size={24} />
-                    <span>{file ? file.name : draft.kind === "video" ? "Seleccionar video" : "Seleccionar PDF"}</span>
-                    <small>{draft.kind === "video" ? "MP4, MOV o WebM" : "PDF"}</small>
+                    <span>{file ? file.name : "Seleccionar video"}</span>
+                    <small>MP4, MOV o WebM</small>
                     <input
                       ref={fileRef}
                       accept={accepts}
@@ -1499,11 +1451,7 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                     onClick={upload}
                   >
                     <CloudArrowUp size={17} />
-                    {busy === "upload"
-                      ? "Subiendo..."
-                      : draft.kind === "video"
-                        ? "Subir video"
-                        : "Subir PDF"}
+                    {busy === "upload" ? "Subiendo..." : "Subir video"}
                   </button>
                 </section>
               )}

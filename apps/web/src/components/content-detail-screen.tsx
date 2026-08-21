@@ -4,6 +4,8 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowsInSimple,
+  ArrowsOutSimple,
   BookOpen,
   CaretDown,
   CaretLeft,
@@ -20,7 +22,6 @@ import {
   PlayCircle,
   Plus,
   Printer,
-  SealCheck,
   ShareNetwork,
   Star,
   TextAa,
@@ -36,6 +37,7 @@ import {
   useState,
 } from "react";
 import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
+import { questionAnswer } from "@/lib/question-answer";
 import { AppShell } from "./app-shell";
 import { RichTextRenderer } from "./rich-text-renderer";
 
@@ -127,10 +129,13 @@ function GuideBody({ item }: { item: GuideItem }) {
   const [highlightImportant, setHighlightImportant] = useState(false);
   const [outlineExpanded, setOutlineExpanded] = useState(true);
   const [supportExpanded, setSupportExpanded] = useState(true);
+  const [supportWide, setSupportWide] = useState(false);
   const [favorite, setFavorite] = useState(false);
   const [shareFeedback, setShareFeedback] = useState("");
   const manualNavigationRef = useRef(false);
-  const manualNavigationTimerRef = useRef<number | null>(null);
+  const navigationFrameRef = useRef<number | null>(null);
+  const headingHighlightTimerRef = useRef<number | null>(null);
+  const highlightedHeadingRef = useRef<HTMLElement | null>(null);
   const visibleActiveHeadingId = outline.some(({ id }) => id === activeHeadingId)
     ? activeHeadingId
     : outline[0]?.id;
@@ -165,24 +170,65 @@ function GuideBody({ item }: { item: GuideItem }) {
 
   useEffect(
     () => () => {
-      if (manualNavigationTimerRef.current !== null) {
-        window.clearTimeout(manualNavigationTimerRef.current);
-      }
+      if (navigationFrameRef.current !== null) window.cancelAnimationFrame(navigationFrameRef.current);
+      if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
+      highlightedHeadingRef.current?.classList.remove("is-navigation-target");
     },
     [],
   );
 
   function goToHeading(id: string) {
+    const target = document.getElementById(id);
+    if (!target) return;
     manualNavigationRef.current = true;
-    if (manualNavigationTimerRef.current !== null) {
-      window.clearTimeout(manualNavigationTimerRef.current);
-    }
-    manualNavigationTimerRef.current = window.setTimeout(() => {
-      manualNavigationRef.current = false;
-      manualNavigationTimerRef.current = null;
-    }, 1_000);
+    if (navigationFrameRef.current !== null) window.cancelAnimationFrame(navigationFrameRef.current);
+    if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
+    highlightedHeadingRef.current?.classList.remove("is-navigation-target");
     setActiveHeadingId(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    let previousScrollY = window.scrollY;
+    let stableFrames = 0;
+    let frameCount = 0;
+    let observedMovement = false;
+
+    const monitorArrival = () => {
+      frameCount += 1;
+      const currentScrollY = window.scrollY;
+      if (Math.abs(currentScrollY - previousScrollY) > 0.5) {
+        observedMovement = true;
+        stableFrames = 0;
+      } else {
+        stableFrames += 1;
+      }
+      previousScrollY = currentScrollY;
+
+      const scrollMarginTop = Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
+      const targetTop = target.getBoundingClientRect().top;
+      const reachedRequestedOffset = Math.abs(targetTop - scrollMarginTop) <= 24;
+      const targetIsVisible = targetTop >= scrollMarginTop - 24 && targetTop <= window.innerHeight * 0.82;
+      const scrollingFinished = observedMovement && stableFrames >= 4 && targetIsVisible;
+      const alreadyAtSection = !observedMovement && frameCount > 6 && stableFrames >= 4 && targetIsVisible;
+
+      if ((reachedRequestedOffset && stableFrames >= 2) || scrollingFinished || alreadyAtSection || frameCount > 160) {
+        navigationFrameRef.current = null;
+        manualNavigationRef.current = false;
+        target.classList.remove("is-navigation-target");
+        void target.offsetWidth;
+        target.classList.add("is-navigation-target");
+        highlightedHeadingRef.current = target;
+        headingHighlightTimerRef.current = window.setTimeout(() => {
+          target.classList.remove("is-navigation-target");
+          if (highlightedHeadingRef.current === target) highlightedHeadingRef.current = null;
+          headingHighlightTimerRef.current = null;
+        }, 1_500);
+        return;
+      }
+
+      navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
+    };
+
+    navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
   }
 
   async function shareGuide() {
@@ -291,31 +337,33 @@ function GuideBody({ item }: { item: GuideItem }) {
       </section>
 
       <div
-        className={`published-rich-guide-layout${outlineExpanded ? "" : " is-outline-collapsed"}${supportExpanded ? "" : " is-support-collapsed"}`}
+        className={`published-rich-guide-layout${outlineExpanded ? "" : " is-outline-collapsed"}${supportExpanded ? "" : " is-support-collapsed"}${supportWide ? " is-support-wide" : ""}`}
       >
         <nav
           className={`published-rich-guide-outline${outlineExpanded ? "" : " is-collapsed"}`}
           aria-label="Índice de la guía"
         >
-          <button
-            aria-controls="published-guide-outline-links"
-            aria-expanded={outlineExpanded}
-            aria-label={outlineExpanded ? "Contraer índice de la guía" : "Expandir índice de la guía"}
-            className="published-rich-guide-outline-heading"
-            title={outlineExpanded ? "Contraer índice" : "Expandir índice"}
-            type="button"
-            onClick={() => setOutlineExpanded((current) => !current)}
-          >
+          <div className="published-rich-guide-outline-heading">
             <span>
               <ListBullets aria-hidden="true" size={19} />
               <strong>Índice de la guía</strong>
             </span>
+            <button
+              aria-controls="published-guide-outline-links"
+              aria-expanded={outlineExpanded}
+              aria-label={outlineExpanded ? "Contraer índice de la guía" : "Expandir índice de la guía"}
+              className="published-rich-guide-outline-toggle"
+              title={outlineExpanded ? "Contraer índice" : "Expandir índice"}
+              type="button"
+              onClick={() => setOutlineExpanded((current) => !current)}
+            >
             {outlineExpanded ? (
               <CaretLeft aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
             ) : (
               <CaretRight aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
             )}
-          </button>
+            </button>
+          </div>
           <div
             className="published-rich-guide-outline-content"
             hidden={!outlineExpanded}
@@ -375,25 +423,37 @@ function GuideBody({ item }: { item: GuideItem }) {
           className={`published-rich-guide-support${supportExpanded ? "" : " is-collapsed"}`}
           aria-label="Recursos de estudio"
         >
-          <button
-            aria-controls="published-guide-support-content"
-            aria-expanded={supportExpanded}
-            aria-label={supportExpanded ? "Contraer recursos de estudio" : "Expandir recursos de estudio"}
-            className="published-rich-guide-support-heading"
-            title={supportExpanded ? "Contraer recursos" : "Expandir recursos"}
-            type="button"
-            onClick={() => setSupportExpanded((current) => !current)}
-          >
+          <div className="published-rich-guide-support-heading">
             <span>
               <BookOpen aria-hidden="true" size={18} />
               <strong>Recursos de estudio</strong>
             </span>
+            <button
+              aria-label={supportWide ? "Restaurar tamaño de recursos" : "Ampliar recursos de estudio"}
+              aria-pressed={supportWide}
+              className="published-rich-guide-support-expand"
+              title={supportWide ? "Restaurar tamaño" : "Ampliar recursos"}
+              type="button"
+              onClick={() => setSupportWide((current) => !current)}
+            >
+              {supportWide ? <ArrowsInSimple aria-hidden="true" size={16} /> : <ArrowsOutSimple aria-hidden="true" size={16} />}
+            </button>
+            <button
+              aria-controls="published-guide-support-content"
+              aria-expanded={supportExpanded}
+              aria-label={supportExpanded ? "Contraer recursos de estudio" : "Expandir recursos de estudio"}
+              className="published-rich-guide-support-toggle"
+              title={supportExpanded ? "Contraer recursos" : "Expandir recursos"}
+              type="button"
+              onClick={() => setSupportExpanded((current) => !current)}
+            >
             {supportExpanded ? (
               <CaretRight aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
             ) : (
               <CaretLeft aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
             )}
-          </button>
+            </button>
+          </div>
           <div
             className="published-rich-guide-support-content"
             hidden={!supportExpanded}
@@ -427,13 +487,13 @@ function GuideBody({ item }: { item: GuideItem }) {
                 defaultExpanded
                 icon={<ClipboardText aria-hidden="true" size={20} />}
                 id="published-guide-quiz"
-                title="Cuestionario"
+                title="Preguntas y respuestas"
                 tone="quiz"
               >
                 {item.content.quiz.questions.length > 0 ? (
-                  <QuizPractice questions={item.content.quiz.questions} />
+                  <QuestionAnswerCards questions={item.content.quiz.questions} />
                 ) : (
-                  <p className="published-rich-guide-resource-empty">Esta guía no incluye cuestionario.</p>
+                  <p className="published-rich-guide-resource-empty">Esta guía no incluye preguntas y respuestas.</p>
                 )}
               </ReaderSupportPanel>
             </div>
@@ -497,7 +557,7 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
   const tabs: { id: VideoResource; label: string }[] = [
     { id: "guide", label: "Guía" },
     { id: "key-points", label: "Puntos clave" },
-    { id: "quiz", label: "Cuestionario" },
+    { id: "quiz", label: "Preguntas y respuestas" },
   ];
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -608,9 +668,9 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
         )}
         {resource === "quiz" && (
           displayedQuiz.length > 0 ? (
-            <QuizPractice questions={displayedQuiz} />
+            <QuestionAnswerCards questions={displayedQuiz} />
           ) : (
-            <p className="published-rich-guide-resource-empty">Esta guía no incluye cuestionario.</p>
+            <p className="published-rich-guide-resource-empty">Esta guía no incluye preguntas y respuestas.</p>
           )
         )}
       </section>
@@ -623,85 +683,41 @@ function QuizBody({
 }: {
   item: ContentItem & { kind: "quiz" };
 }) {
-  return <QuizPractice questions={item.content.questions} />;
+  return <QuestionAnswerCards questions={item.content.questions} />;
 }
 
 type QuizQuestion = Extract<ContentItem, { kind: "quiz" }>["content"]["questions"][number];
 
-function QuizPractice({ questions }: { questions: QuizQuestion[] }) {
-  const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [submitted, setSubmitted] = useState(false);
-  const score = useMemo(
-    () =>
-      questions.reduce(
-        (total, question, index) =>
-          total + (answers[index] === question.correctOptionIndex ? 1 : 0),
-        0,
-      ),
-    [answers, questions],
-  );
-
+function QuestionAnswerCards({ questions }: { questions: QuizQuestion[] }) {
   return (
-    <section className="published-quiz">
+    <section className="published-question-answer">
       <div className="published-tool-heading">
-          <ClipboardText size={34} />
+        <ClipboardText size={34} />
         <div>
-          <h3>Comprueba lo aprendido</h3>
-          <p>{questions.length} preguntas</p>
+          <h3>Preguntas y respuestas</h3>
+          <p>{questions.length} {questions.length === 1 ? "tarjeta" : "tarjetas"} de repaso</p>
         </div>
       </div>
-      {questions.map((question, questionIndex) => (
-        <fieldset key={question.prompt}>
-          <legend><span>{questionIndex + 1}</span>{question.prompt}</legend>
-          {question.options.map((option, optionIndex) => {
-            const selected = answers[questionIndex] === optionIndex;
-            const correct = submitted && optionIndex === question.correctOptionIndex;
-            const incorrect = submitted && selected && !correct;
-            return (
-              <label
-                className={correct ? "is-correct" : incorrect ? "is-incorrect" : ""}
-                key={option}
-              >
-                <input
-                  checked={selected}
-                  disabled={submitted}
-                  name={"question-" + questionIndex}
-                  onChange={() =>
-                    setAnswers((current) => ({ ...current, [questionIndex]: optionIndex }))
-                  }
-                  type="radio"
-                />
-                <span>{option}</span>
-              </label>
-            );
-          })}
-          {submitted && question.explanation && <p>{question.explanation}</p>}
-        </fieldset>
-      ))}
-      {submitted ? (
-        <div className="quiz-result" role="status">
-          <SealCheck size={28} />
-          <strong>{score} de {questions.length} respuestas correctas</strong>
-          <button
-            type="button"
-            onClick={() => {
-              setAnswers({});
-              setSubmitted(false);
-            }}
-          >
-            Intentar de nuevo
-          </button>
-        </div>
-      ) : (
-        <button
-          className="published-primary-action"
-          disabled={Object.keys(answers).length !== questions.length}
-          onClick={() => setSubmitted(true)}
-          type="button"
-        >
-          Calificar cuestionario
-        </button>
-      )}
+      <div className="published-question-answer-list">
+        {questions.map((question, questionIndex) => (
+          <article className="published-question-answer-card" key={`${question.prompt}-${questionIndex}`}>
+            <header>
+              <span>{String(questionIndex + 1).padStart(2, "0")}</span>
+              <div>
+                <small>Pregunta</small>
+                <h4>{question.prompt}</h4>
+              </div>
+            </header>
+            <div className="published-question-answer-response">
+              <span><CheckCircle aria-hidden="true" size={16} weight="fill" /> Respuesta</span>
+              <p>{questionAnswer(question)}</p>
+            </div>
+            {question.explanation && (
+              <p className="published-question-answer-context">{question.explanation}</p>
+            )}
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

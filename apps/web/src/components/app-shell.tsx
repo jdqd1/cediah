@@ -147,6 +147,14 @@ export function AppShell({
       : "Contraer menú principal"
     : "Abrir menú principal";
 
+  function togglePrimaryMenu() {
+    if (window.matchMedia("(min-width: 961px)").matches) {
+      setSidebarCollapsedPreference(!sidebarCollapsed);
+    } else {
+      setSidebarOpen(true);
+    }
+  }
+
   useEffect(() => {
     const desktopMedia = window.matchMedia("(min-width: 961px)");
     const synchronizeViewport = () => {
@@ -224,6 +232,17 @@ export function AppShell({
     >
       <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
         <div className="sidebar-topline">
+          <button
+            aria-controls="app-sidebar"
+            aria-expanded={!sidebarCollapsed}
+            aria-label={menuButtonLabel}
+            className="sidebar-menu-trigger"
+            title={menuButtonLabel}
+            type="button"
+            onClick={togglePrimaryMenu}
+          >
+            <List aria-hidden="true" size={25} />
+          </button>
           <Link
             className="sidebar-brand"
             href="/dashboard"
@@ -312,13 +331,7 @@ export function AppShell({
             aria-controls="app-sidebar"
             aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
             title={menuButtonLabel}
-            onClick={() => {
-              if (window.matchMedia("(min-width: 961px)").matches) {
-                setSidebarCollapsedPreference(!sidebarCollapsed);
-              } else {
-                setSidebarOpen(true);
-              }
-            }}
+            onClick={togglePrimaryMenu}
           >
             <List size={28} />
           </button>
