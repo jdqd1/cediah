@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ContentItem } from "@cediah/contracts";
 import { useMemo, useState } from "react";
+import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 
 type GuideItem = ContentItem & { kind: "guide" };
@@ -43,6 +44,10 @@ function normalize(value: string) {
     .toLocaleLowerCase("es");
 }
 
+function guideRegions(guide: GuideItem) {
+  return guide.content.regions.length > 0 ? guide.content.regions : [guide.topic];
+}
+
 function sectionCount(guide: GuideItem) {
   const count = guide.content.sections.length;
   if (count === 0) return null;
@@ -62,19 +67,22 @@ export function GuideDashboardScreen({
   const [topic, setTopic] = useState("");
   const topics = useMemo(
     () =>
-      Array.from(new Set(guides.map((guide) => guide.topic))).sort((left, right) =>
+      uniqueRegions(guides.flatMap(guideRegions)).sort((left, right) =>
         left.localeCompare(right, "es"),
       ),
     [guides],
   );
   const visibleGuides = useMemo(() => {
     const search = normalize(query.trim());
+    const selectedRegion = normalize(topic);
 
     return guides.filter((guide) => {
-      const matchesTopic = !topic || guide.topic === topic;
+      const regions = guideRegions(guide);
+      const matchesTopic =
+        !selectedRegion || regions.some((region) => normalize(region) === selectedRegion);
       const matchesSearch =
         !search ||
-        normalize(`${guide.title} ${guide.summary} ${guide.topic}`).includes(search);
+        normalize(`${guide.title} ${guide.summary} ${guide.topic} ${regions.join(" ")}`).includes(search);
       return matchesTopic && matchesSearch;
     });
   }, [guides, query, topic]);

@@ -23,6 +23,10 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/panel/actions";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CediahLogo } from "./cediah-logo";
+import {
+  setSidebarCollapsedPreference,
+  useSidebarCollapsedPreference,
+} from "./sidebar-preference";
 
 type AppShellProps = {
   activeKey: string;
@@ -100,9 +104,10 @@ function NavigationItem({
       href={item.href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
+      title={item.label}
     >
       <Icon size={21} weight={active ? "fill" : "regular"} />
-      <span>{item.label}</span>
+      <span className="sidebar-link-label">{item.label}</span>
       <NavigationItemStatus label={item.label} />
     </Link>
   );
@@ -123,7 +128,9 @@ export function AppShell({
   welcome = false,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const sidebarCollapsed = useSidebarCollapsedPreference();
   const [viewer, setViewer] = useState<{ email: string } | null>(initialViewer ?? null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -134,6 +141,23 @@ export function AppShell({
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
   const showContentManagement = canManageContent || isAdministrator;
   const showRoleManagement = canManageRoles || isAdministrator;
+  const menuButtonLabel = isDesktopSidebar
+    ? sidebarCollapsed
+      ? "Expandir menú principal"
+      : "Contraer menú principal"
+    : "Abrir menú principal";
+
+  useEffect(() => {
+    const desktopMedia = window.matchMedia("(min-width: 961px)");
+    const synchronizeViewport = () => {
+      setIsDesktopSidebar(desktopMedia.matches);
+      if (desktopMedia.matches) setSidebarOpen(false);
+    };
+
+    synchronizeViewport();
+    desktopMedia.addEventListener("change", synchronizeViewport);
+    return () => desktopMedia.removeEventListener("change", synchronizeViewport);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -195,10 +219,18 @@ export function AppShell({
   const showHeaderHeading = showBreadcrumbs || Boolean(headerTitle || headerSubtitle);
 
   return (
-    <div className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""}`.trim()}>
+    <div
+      className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`.trim()}
+    >
       <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
         <div className="sidebar-topline">
-          <Link className="sidebar-brand" href="/dashboard" aria-label="CEDIAH, inicio" onClick={closeSidebar}>
+          <Link
+            className="sidebar-brand"
+            href="/dashboard"
+            aria-label="CEDIAH, inicio"
+            onClick={closeSidebar}
+            title="Ir al inicio"
+          >
             <CediahLogo variant="light" priority={activeKey === "dashboard"} />
           </Link>
           <button
@@ -276,10 +308,17 @@ export function AppShell({
             className="menu-trigger"
             ref={menuTriggerRef}
             type="button"
-            aria-label="Abrir menú"
+            aria-label={menuButtonLabel}
             aria-controls="app-sidebar"
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen(true)}
+            aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
+            title={menuButtonLabel}
+            onClick={() => {
+              if (window.matchMedia("(min-width: 961px)").matches) {
+                setSidebarCollapsedPreference(!sidebarCollapsed);
+              } else {
+                setSidebarOpen(true);
+              }
+            }}
           >
             <List size={28} />
           </button>

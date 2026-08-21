@@ -80,6 +80,7 @@ const ContentSlugParamsSchema = z.object({
 });
 const ContentListQuerySchema = z.object({
   kind: ContentKindSchema.optional(),
+  linkedVideoId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(40),
 });
 

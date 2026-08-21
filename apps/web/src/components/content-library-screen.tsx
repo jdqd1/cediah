@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ContentItem, ContentKind } from "@cediah/contracts";
 import { type MouseEvent, useMemo, useState } from "react";
+import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 
 type CatalogKind = ContentKind | "all";
@@ -81,6 +82,17 @@ function catalogSearchPlaceholder(kind: CatalogKind) {
   if (kind === "video") return "Buscar videos";
   if (kind === "topic") return "Buscar temas anatómicos";
   return "Buscar en la biblioteca";
+}
+
+function normalize(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es");
+}
+
+function itemRegions(item: ContentItem) {
+  return item.content.regions.length > 0 ? item.content.regions : [item.topic];
 }
 
 function CatalogCard({ item, video = false }: { item: ContentItem; video?: boolean }) {
@@ -150,7 +162,7 @@ export function ContentLibraryScreen({
   const title = catalogTitle(kind);
 
   const topics = useMemo(
-    () => Array.from(new Set(items.map((item) => item.topic))).sort((left, right) => left.localeCompare(right, "es")),
+    () => uniqueRegions(items.flatMap(itemRegions)).sort((left, right) => left.localeCompare(right, "es")),
     [items],
   );
   const kindCounts = useMemo(() => {
@@ -159,14 +171,16 @@ export function ContentLibraryScreen({
     return counts;
   }, [items]);
   const visibleItems = useMemo(() => {
-    const normalized = search.trim().toLocaleLowerCase("es");
+    const normalized = normalize(search.trim());
+    const selectedRegion = normalize(topic);
     return items.filter((item) => {
+      const regions = itemRegions(item);
       const matchesKind = kind === "all" || item.kind === kind;
-      const matchesTopic = !topic || item.topic === topic;
+      const matchesTopic =
+        !selectedRegion || regions.some((region) => normalize(region) === selectedRegion);
       const matchesSearch =
         !normalized ||
-        (item.title + " " + item.summary + " " + item.topic)
-          .toLocaleLowerCase("es")
+        normalize(`${item.title} ${item.summary} ${item.topic} ${regions.join(" ")}`)
           .includes(normalized);
       return matchesKind && matchesTopic && matchesSearch;
     });
@@ -261,12 +275,12 @@ export function ContentLibraryScreen({
         </div>
 
         {topics.length > 0 && (
-          <nav className="content-catalog-topic-nav" aria-label="Temas">
-            <span className="content-catalog-topic-label">Tema</span>
+          <nav className="content-catalog-topic-nav" aria-label="Regiones anatómicas">
+            <span className="content-catalog-topic-label">Región</span>
             <div className="content-catalog-topic-chips">
               {["", ...topics].map((value) => {
                 const href = catalogHref(kind, value);
-                const label = value || "Todos los temas";
+                const label = value || "Todas las regiones";
                 return (
                   <Link
                     aria-current={topic === value ? "page" : undefined}

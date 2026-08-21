@@ -84,10 +84,12 @@ export async function requestContentApi(
 
 export async function getPublishedContent(input: {
   kind?: ContentKind;
+  linkedVideoId?: string;
   limit?: number;
 } = {}): Promise<PublishedContentResult> {
   const query = new URLSearchParams();
   if (input.kind) query.set("kind", input.kind);
+  if (input.linkedVideoId) query.set("linkedVideoId", input.linkedVideoId);
   query.set("limit", String(input.limit ?? 40));
   const response = await requestContentApi({
     method: "GET",

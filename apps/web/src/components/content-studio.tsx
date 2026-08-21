@@ -1,8 +1,12 @@
 "use client";
 
-import type { ChangeEvent, FormEvent } from "react";
-import { useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
+  CaretLeft,
+  CaretRight,
+  CardsThree,
   Check,
   CheckCircle,
   CloudArrowUp,
@@ -17,16 +21,34 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react";
+import dynamic from "next/dynamic";
 import {
   ContentItemSchema,
   type ContentAssetUploadResponse,
   type ContentDraft,
   type ContentItem,
   type ContentKind,
+  type RichTextDocument,
+  type RichTextNode,
   type ContentStatus,
   type ContentWorkspaceResponse,
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
+import { uniqueRegions } from "@/lib/content-regions";
+import { RegionTagsInput } from "./region-tags-input";
+
+const GuideEditorScreen = dynamic(
+  () => import("./guide-editor-screen").then((module) => module.GuideEditorScreen),
+  {
+    loading: () => (
+      <div className="guide-editor-module-loading" role="status">
+        <span className="route-loading-indicator" aria-hidden="true" />
+        Preparando el editor de guía…
+      </div>
+    ),
+    ssr: false,
+  },
+);
 
 type Props = { initialWorkspace: ContentWorkspaceResponse };
 type Asset = NonNullable<ContentItem["asset"]>;
@@ -46,10 +68,18 @@ const kinds: { label: string; value: ContentKind }[] = [
 ];
 
 const primaryKinds = [
-  { icon: PlayCircle, label: "Nuevo video", value: "video" },
-  { icon: Notebook, label: "Nueva guía", value: "guide" },
-  { icon: Compass, label: "Nuevo tema", value: "topic" },
-] satisfies { icon: typeof PlayCircle; label: string; value: ContentKind }[];
+  { label: "Video", value: "video" },
+  { label: "Guía", value: "guide" },
+  { label: "Tema", value: "topic" },
+] satisfies { label: string; value: ContentKind }[];
+
+const kindIcons: Record<ContentKind, typeof PlayCircle> = {
+  flashcards: CardsThree,
+  guide: Notebook,
+  quiz: Question,
+  topic: Compass,
+  video: PlayCircle,
+};
 
 const statuses: { label: string; value: ContentStatus }[] = [
   { label: "Borrador", value: "draft" },
@@ -86,25 +116,56 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es");
+}
+
 function summaryFromText(value: string) {
   const compact = value.replace(/\s+/g, " ").trim();
   return compact.length > 280 ? compact.slice(0, 277).trimEnd() + "…" : compact;
 }
 
+function richTextNodeHasBody(node: RichTextNode, insideHeading = false): boolean {
+  const nextInsideHeading = insideHeading || node.type === "heading";
+  if (node.type === "text") return !nextInsideHeading && node.text.trim().length > 0;
+  if ("content" in node && node.content) {
+    return node.content.some((child) => richTextNodeHasBody(child, nextInsideHeading));
+  }
+  return false;
+}
+
+function richTextDocumentHasBody(document: RichTextDocument | null): boolean {
+  return Boolean(document?.content.some((node) => richTextNodeHasBody(node)));
+}
+
 function prepareDraft(draft: ContentDraft): ContentDraft {
   const slug = draft.slug || slugify(draft.title) || `contenido-${Date.now().toString(36)}`;
+  const regions = uniqueRegions(
+    draft.content.regions.length > 0 ? draft.content.regions : [draft.topic],
+  );
+  const topic = regions[0] ?? draft.topic;
 
   if (draft.kind === "video") {
     return {
       ...draft,
       slug,
+      topic,
       content: {
         ...draft.content,
         description: draft.content.description.trim() || draft.summary.trim(),
+        regions,
       },
     };
   }
-  return { ...draft, slug };
+  return {
+    ...draft,
+    slug,
+    topic,
+    content: { ...draft.content, regions },
+  } as ContentDraft;
 }
 
 function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
@@ -126,14 +187,26 @@ function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
         description: "",
         durationSeconds: null,
         externalUrl: null,
-        guide: { sections: [] },
+        guide: { document: null, sections: [] },
         keyPoints: [],
         quiz: { questions: [] },
+        regions: [],
       },
     };
   }
   if (kind === "guide") {
-    return { ...base, kind, content: { sections: [] } };
+    return {
+      ...base,
+      kind,
+      content: {
+        document: null,
+        keyPoints: [],
+        linkedVideoId: null,
+        quiz: { questions: [] },
+        regions: [],
+        sections: [],
+      },
+    };
   }
   if (kind === "quiz") {
     return {
@@ -141,13 +214,14 @@ function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
       kind,
       content: {
         questions: [{ correctOptionIndex: 0, explanation: "", options: ["", ""], prompt: "" }],
+        regions: [],
       },
     };
   }
   if (kind === "flashcards") {
-    return { ...base, kind, content: { cards: [{ back: "", front: "" }] } };
+    return { ...base, kind, content: { cards: [{ back: "", front: "" }], regions: [] } };
   }
-  return { ...base, kind: "topic", content: { introduction: "", objectives: [] } };
+  return { ...base, kind: "topic", content: { introduction: "", objectives: [], regions: [] } };
 }
 
 function itemDraft(item: ContentItem): ContentDraft {
@@ -282,95 +356,7 @@ function StringList({
   );
 }
 
-type GuideSection = Extract<ContentDraft, { kind: "guide" }>["content"]["sections"][number];
 type QuizQuestion = Extract<ContentDraft, { kind: "quiz" }>["content"]["questions"][number];
-
-function GuideSectionsEditor({
-  sections,
-  onChange,
-  title,
-}: {
-  sections: GuideSection[];
-  onChange: (sections: GuideSection[]) => void;
-  title: string;
-}) {
-  return (
-    <section className="studio-builder" aria-label={title}>
-      <header className="studio-builder-heading">
-        <div>
-          <Notebook size={19} />
-          <h4>{title}</h4>
-        </div>
-        <span>{sections.length} {sections.length === 1 ? "sección" : "secciones"}</span>
-      </header>
-      {sections.map((section, index) => (
-        <article className="studio-repeater" key={index}>
-          <header>
-            <strong>Sección {index + 1}</strong>
-            <button
-              aria-label={`Eliminar sección ${index + 1}`}
-              type="button"
-              onClick={() => onChange(sections.filter((_, position) => position !== index))}
-            >
-              <Trash size={16} />
-            </button>
-          </header>
-          <label className="studio-field">
-            <span>Título de la sección</span>
-            <input
-              required
-              maxLength={200}
-              value={section.heading}
-              onChange={(event) =>
-                onChange(
-                  sections.map((current, position) =>
-                    position === index ? { ...current, heading: event.target.value } : current,
-                  ),
-                )
-              }
-            />
-          </label>
-          <label className="studio-field">
-            <span>Contenido</span>
-            <textarea
-              required
-              maxLength={30000}
-              rows={6}
-              value={section.body}
-              onChange={(event) =>
-                onChange(
-                  sections.map((current, position) =>
-                    position === index ? { ...current, body: event.target.value } : current,
-                  ),
-                )
-              }
-            />
-          </label>
-        </article>
-      ))}
-      {sections.length === 0 && (
-        <button
-          className="studio-builder-empty"
-          type="button"
-          onClick={() => onChange([{ body: "", heading: "" }])}
-        >
-          <Plus size={19} />
-          <span>Añadir la primera sección</span>
-        </button>
-      )}
-      {sections.length > 0 && (
-        <button
-          className="studio-add"
-          disabled={sections.length >= 100}
-          type="button"
-          onClick={() => onChange([...sections, { body: "", heading: "" }])}
-        >
-          <Plus size={16} /> Añadir sección
-        </button>
-      )}
-    </section>
-  );
-}
 
 function QuizQuestionsEditor({
   allowEmpty = false,
@@ -522,66 +508,48 @@ function QuizQuestionsEditor({
 
 function TypeEditor({
   draft,
+  onOpenGuide,
   onChange,
 }: {
   draft: ContentDraft;
+  onOpenGuide: () => void;
   onChange: (draft: ContentDraft) => void;
 }) {
   if (draft.kind === "video") {
     return (
-      <div className="studio-type-editor studio-video-resources">
-        <section className="studio-builder" aria-label="Puntos clave">
-          <header className="studio-builder-heading">
-            <div>
-              <CheckCircle size={19} />
-              <h4>Puntos clave</h4>
-            </div>
-            <span>{draft.content.keyPoints.length}</span>
-          </header>
-          <StringList
-            label="Puntos clave"
-            max={30}
-            showLabel={false}
-            values={draft.content.keyPoints}
-            onChange={(keyPoints) =>
-              onChange({ ...draft, content: { ...draft.content, keyPoints } })
-            }
-          />
-        </section>
-        <GuideSectionsEditor
-          title="Guía del video"
-          sections={draft.content.guide.sections}
-          onChange={(sections) =>
-            onChange({
-              ...draft,
-              content: { ...draft.content, guide: { sections } },
-            })
-          }
-        />
-        <QuizQuestionsEditor
-          allowEmpty
-          title="Cuestionario del video"
-          questions={draft.content.quiz.questions}
-          onChange={(questions) =>
-            onChange({
-              ...draft,
-              content: { ...draft.content, quiz: { questions } },
-            })
-          }
-        />
-      </div>
+      <button
+        aria-label="Abrir editor de guía y recursos"
+        className="studio-type-editor studio-guide-launch studio-guide-cta"
+        type="button"
+        onClick={onOpenGuide}
+      >
+        <span className="studio-guide-launch-icon"><Notebook size={24} /></span>
+        <span className="studio-guide-cta-copy">
+          <strong>Editar guía y recursos</strong>
+          <small>
+            {draft.content.guide.sections.length} secciones · {draft.content.keyPoints.length} puntos clave · {draft.content.quiz.questions.length} preguntas
+          </small>
+        </span>
+        <CaretRight aria-hidden="true" size={20} />
+      </button>
     );
   }
 
   if (draft.kind === "guide") {
     return (
-      <div className="studio-type-editor">
-        <GuideSectionsEditor
-          title="Contenido de la guía"
-          sections={draft.content.sections}
-          onChange={(sections) => onChange({ ...draft, content: { sections } })}
-        />
-      </div>
+      <button
+        aria-label="Abrir editor de guía"
+        className="studio-type-editor studio-guide-launch studio-guide-cta"
+        type="button"
+        onClick={onOpenGuide}
+      >
+        <span className="studio-guide-launch-icon"><Notebook size={24} /></span>
+        <span className="studio-guide-cta-copy">
+          <strong>Editar contenido de la guía</strong>
+          <small>Abre el editor visual para organizar secciones y contenido.</small>
+        </span>
+        <CaretRight aria-hidden="true" size={20} />
+      </button>
     );
   }
   if (draft.kind === "quiz") {
@@ -590,7 +558,7 @@ function TypeEditor({
         <QuizQuestionsEditor
           title="Preguntas del cuestionario"
           questions={draft.content.questions}
-          onChange={(questions) => onChange({ ...draft, content: { questions } })}
+          onChange={(questions) => onChange({ ...draft, content: { ...draft.content, questions } })}
         />
       </div>
     );
@@ -612,7 +580,7 @@ function TypeEditor({
                   onClick={() =>
                     onChange({
                       ...draft,
-                      content: { cards: draft.content.cards.filter((_, position) => position !== index) },
+                      content: { ...draft.content, cards: draft.content.cards.filter((_, position) => position !== index) },
                     })
                   }
                 >
@@ -631,6 +599,7 @@ function TypeEditor({
                       onChange({
                         ...draft,
                         content: {
+                          ...draft.content,
                           cards: draft.content.cards.map((current, position) =>
                             position === index ? { ...current, [side]: event.target.value } : current,
                           ),
@@ -650,7 +619,7 @@ function TypeEditor({
           onClick={() =>
             onChange({
               ...draft,
-              content: { cards: [...draft.content.cards, { back: "", front: "" }] },
+              content: { ...draft.content, cards: [...draft.content.cards, { back: "", front: "" }] },
             })
           }
         >
@@ -702,16 +671,45 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [notice, setNotice] = useState<{ text: string; tone: "error" | "success" } | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
+  const [guideEditing, setGuideEditing] = useState(false);
+  const [guideCreateOpen, setGuideCreateOpen] = useState(false);
+  const [linkedVideoId, setLinkedVideoId] = useState("");
+  const [publicationsCollapsed, setPublicationsCollapsed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const guideEntryDraftRef = useRef<ContentDraft | null>(null);
+  const guideChoiceDialogRef = useRef<HTMLElement>(null);
+  const guideChoiceTriggerRef = useRef<HTMLElement | null>(null);
   const capabilities = initialWorkspace.capabilities;
   const item = editingId ? items.find((current) => current.id === editingId) : undefined;
 
+  const regionSuggestions = useMemo(
+    () => Array.from(new Set(items.flatMap((current) =>
+      current.content.regions.length > 0 ? current.content.regions : [current.topic],
+    ))).sort((left, right) => left.localeCompare(right, "es")),
+    [items],
+  );
+  const linkableVideos = useMemo(
+    () =>
+      items.filter(
+        (current): current is ContentItem & { kind: "video" } =>
+          current.kind === "video" &&
+          current.status !== "archived" &&
+          ((current.asset?.kind === "video" && current.asset.status === "ready") ||
+            Boolean(current.content.externalUrl)),
+      ),
+    [items],
+  );
+
   const visibleItems = useMemo(() => {
-    const text = query.trim().toLocaleLowerCase("es");
+    const text = normalizeSearch(query.trim());
     return [...items]
       .filter((current) => {
-        const haystack = `${current.title} ${current.summary} ${current.topic} ${current.slug}`
-          .toLocaleLowerCase("es");
+        const regions = current.content.regions.length > 0
+          ? current.content.regions
+          : [current.topic];
+        const haystack = normalizeSearch(
+          `${current.title} ${current.summary} ${current.topic} ${regions.join(" ")} ${current.slug}`,
+        );
         return (
           (!text || haystack.includes(text)) &&
           (kindFilter === "all" || current.kind === kindFilter) &&
@@ -723,13 +721,15 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   const editable =
     Boolean(draft) &&
-    (isNew ||
-      Boolean(
-        item &&
-          item.status !== "published" &&
-          item.status !== "archived" &&
-          (capabilities.canCreate || capabilities.canEditAll),
-      ));
+    (isNew
+      ? capabilities.canCreate
+      : Boolean(
+          item &&
+            (capabilities.canEditAll
+              ? item.status !== "published" && item.status !== "archived"
+              : capabilities.canCreate &&
+                (item.status === "draft" || item.status === "changes_requested")),
+        ));
   const draftBaseline = draft
     ? isNew
       ? emptyDraft(draft.kind)
@@ -743,6 +743,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
         file !== null ||
         JSON.stringify(draft) !== JSON.stringify(draftBaseline)),
   );
+
+  useEffect(() => {
+    if (!guideCreateOpen) return;
+    guideChoiceDialogRef.current
+      ?.querySelector<HTMLElement>("[data-guide-choice-initial]")
+      ?.focus();
+  }, [guideCreateOpen]);
 
   function confirmDiscard() {
     return (
@@ -766,15 +773,118 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setEditingId(current.id);
     setIsNew(false);
     resetFeedback();
+    if (current.kind === "guide") {
+      guideEntryDraftRef.current = itemDraft(current);
+      setGuideEditing(true);
+    }
   }
 
   function create(kind: ContentKind = "video") {
     if (busy) return;
     if (!confirmDiscard()) return;
+    if (kind === "guide") {
+      guideChoiceTriggerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setLinkedVideoId("");
+      setGuideCreateOpen(true);
+      return;
+    }
     setDraft(emptyDraft(kind));
     setEditingId(null);
     setIsNew(true);
     resetFeedback();
+  }
+
+  function closeGuideCreationChoice() {
+    const trigger = guideChoiceTriggerRef.current;
+    setGuideCreateOpen(false);
+    window.requestAnimationFrame(() => {
+      if (trigger?.isConnected) trigger.focus();
+    });
+  }
+
+  function handleGuideChoiceKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeGuideCreationChoice();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((element) => !element.hasAttribute("hidden"));
+    if (focusable.length === 0) {
+      event.preventDefault();
+      event.currentTarget.focus();
+      return;
+    }
+
+    const first = focusable[0]!;
+    const last = focusable.at(-1)!;
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function beginGuideCreation(videoId: string | null) {
+    const linkedVideo = videoId
+      ? linkableVideos.find((current) => current.id === videoId)
+      : undefined;
+    const created = emptyDraft("guide") as Extract<ContentDraft, { kind: "guide" }>;
+    const regions = linkedVideo
+      ? linkedVideo.content.regions.length > 0
+        ? linkedVideo.content.regions
+        : [linkedVideo.topic]
+      : [];
+    const next: Extract<ContentDraft, { kind: "guide" }> = {
+      ...created,
+      topic: regions[0] ?? "",
+      content: {
+        ...created.content,
+        linkedVideoId: linkedVideo?.id ?? null,
+        regions,
+      },
+    };
+    setDraft(next);
+    setEditingId(null);
+    setIsNew(true);
+    setGuideCreateOpen(false);
+    guideEntryDraftRef.current = structuredClone(next);
+    setGuideEditing(true);
+    resetFeedback();
+  }
+
+  function openGuideEditor() {
+    if (!draft || (draft.kind !== "guide" && draft.kind !== "video")) return;
+    guideEntryDraftRef.current = structuredClone(draft);
+    setGuideEditing(true);
+    setNotice(null);
+  }
+
+  function leaveGuideEditor(discard: boolean) {
+    if (discard && isNew && draft?.kind === "guide") {
+      setDraft(null);
+      setEditingId(null);
+      setIsNew(false);
+      setGuideEditing(false);
+      guideEntryDraftRef.current = null;
+      resetFeedback();
+      return;
+    }
+    if (discard && guideEntryDraftRef.current) {
+      setDraft(structuredClone(guideEntryDraftRef.current));
+    }
+    setGuideEditing(false);
+    guideEntryDraftRef.current = null;
   }
 
   function close() {
@@ -782,6 +892,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setDraft(null);
     setEditingId(null);
     setIsNew(false);
+    setGuideEditing(false);
     resetFeedback();
   }
 
@@ -789,9 +900,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setItems((existing) => [current, ...existing.filter((value) => value.id !== current.id)]);
   }
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    if (!draft || !editable || busy) return;
+  async function save(event?: FormEvent): Promise<boolean> {
+    event?.preventDefault();
+    if (!draft || !editable || busy) return false;
     setBusy("save");
     setNotice(null);
 
@@ -805,12 +916,15 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setDraft(itemDraft(current));
       setEditingId(current.id);
       setIsNew(false);
+      guideEntryDraftRef.current = itemDraft(current);
       setNotice({ text: "Contenido guardado.", tone: "success" });
+      return true;
     } catch (error) {
       setNotice({
         text: error instanceof Error ? error.message : "No fue posible guardar.",
         tone: "error",
       });
+      return false;
     } finally {
       setBusy(null);
     }
@@ -976,10 +1090,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
           icon: Notebook,
           label: "Guía",
           ready:
-            draft.content.guide.sections.length > 0 &&
-            draft.content.guide.sections.every(
-              (section) => section.heading.trim().length > 0 && section.body.trim().length > 0,
-            ),
+            (draft.content.guide.sections.length > 0 &&
+              draft.content.guide.sections.every(
+                (section) => section.heading.trim().length > 0 && section.body.trim().length > 0,
+              )) || richTextDocumentHasBody(draft.content.guide.document),
         },
         {
           icon: Question,
@@ -997,12 +1111,42 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
       ]
     : [];
-  const videoComplete = videoChecklist.length > 0 && videoChecklist.every((requirement) => requirement.ready);
+const videoComplete = videoChecklist.length > 0 && videoChecklist.every((requirement) => requirement.ready);
   const basicsComplete = Boolean(
     draft?.title.trim() &&
       draft.topic.trim() &&
       (draft.kind === "topic" ? draft.content.introduction.trim() : draft.summary.trim()),
   );
+
+  if (guideEditing && draft && (draft.kind === "guide" || draft.kind === "video")) {
+    return (
+      <AppShell
+        activeKey="editor"
+        canManageContent
+        canManageRoles={initialWorkspace.roles.includes("administrator")}
+        isAdministrator={initialWorkspace.roles.includes("administrator")}
+        headerTitle="Editor de guía"
+        mainClassName="guide-editor-main"
+      >
+        <GuideEditorScreen
+          key={`${editingId ?? "new"}-${draft.kind}`}
+          busy={busy !== null}
+          draft={draft}
+          editable={editable}
+          hasUnsavedChanges={hasUnsavedChanges}
+          isNew={isNew}
+          notice={notice}
+          status={item?.status}
+          onChange={(next) => {
+            setDraft(next);
+            setNotice(null);
+          }}
+          onLeave={leaveGuideEditor}
+          onSave={() => save()}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
@@ -1016,12 +1160,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
       <header className="studio-heading">
         <div>
           <h2>Gestionar contenido</h2>
-          <p>{items.length} {items.length === 1 ? "publicación" : "publicaciones"}</p>
         </div>
         {capabilities.canCreate && (
           <div className="studio-create-actions" aria-label="Crear contenido">
             {primaryKinds.map((option) => {
-              const Icon = option.icon;
               return (
                 <button
                   className="studio-create-button"
@@ -1030,7 +1172,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
                   type="button"
                   onClick={() => create(option.value)}
                 >
-                  <Icon size={18} /> {option.label}
+                  <Plus aria-hidden="true" size={16} weight="bold" />
+                  <span>{option.label}</span>
                 </button>
               );
             })}
@@ -1082,28 +1225,49 @@ export function ContentStudio({ initialWorkspace }: Props) {
         </label>
       </div>
 
-      <div className="studio-workspace">
-        <aside className="studio-items" aria-label="Contenido disponible">
-          <strong>{visibleItems.length} {visibleItems.length === 1 ? "resultado" : "resultados"}</strong>
-          {visibleItems.map((current) => (
+      <div className={`studio-workspace ${publicationsCollapsed ? "publications-collapsed" : ""}`}>
+        <aside className="studio-items" aria-label="Publicaciones" id="studio-publications">
+          <header className="studio-publications-heading">
+            <div>
+              <strong>Publicaciones</strong>
+              <small>{visibleItems.length}</small>
+            </div>
             <button
-              aria-pressed={item?.id === current.id}
-              className={`studio-item ${item?.id === current.id ? "studio-item-active" : ""}`}
-              disabled={busy !== null}
-              key={current.id}
+              aria-controls="studio-publications"
+              aria-expanded={!publicationsCollapsed}
+              aria-label={publicationsCollapsed ? "Expandir publicaciones" : "Contraer publicaciones"}
+              title={publicationsCollapsed ? "Expandir publicaciones" : "Contraer publicaciones"}
               type="button"
-              onClick={() => open(current)}
+              onClick={() => setPublicationsCollapsed((value) => !value)}
             >
-              <span className={`studio-kind studio-kind-${current.kind}`}>
-                {labelOf(kinds, current.kind)}
-              </span>
-              <strong>{current.title}</strong>
-              <small>{current.topic}</small>
-              <span className={`studio-badge studio-badge-${current.status}`}>
-                {labelOf(statuses, current.status)}
-              </span>
+              {publicationsCollapsed ? <CaretRight size={17} /> : <CaretLeft size={17} />}
             </button>
-          ))}
+          </header>
+          {visibleItems.map((current) => {
+            const ItemIcon = kindIcons[current.kind];
+            return (
+              <button
+                aria-label={`${labelOf(kinds, current.kind)}: ${current.title}. ${labelOf(statuses, current.status)}`}
+                aria-pressed={item?.id === current.id}
+                className={`studio-item ${item?.id === current.id ? "studio-item-active" : ""}`}
+                disabled={busy !== null}
+                key={current.id}
+                title={publicationsCollapsed ? current.title : undefined}
+                type="button"
+                onClick={() => open(current)}
+              >
+                <span className={`studio-kind studio-kind-${current.kind}`}>
+                  <ItemIcon aria-hidden="true" size={15} />
+                  <span>{labelOf(kinds, current.kind)}</span>
+                </span>
+                <strong>{current.title}</strong>
+                <small>{current.topic}</small>
+                <span className={`studio-badge studio-badge-${current.status}`}>
+                  {labelOf(statuses, current.status)}
+                </span>
+              </button>
+            );
+          })}
           {visibleItems.length === 0 && (
             <p className="studio-empty">No hay contenido con estos filtros.</p>
           )}
@@ -1122,24 +1286,71 @@ export function ContentStudio({ initialWorkspace }: Props) {
           ) : (
             <>
               <header className="studio-editor-heading">
-                <div>
+                <div className="studio-editor-title-block">
                   <small>{labelOf(kinds, draft.kind)}</small>
-                  <h3>{isNew ? `Nuevo ${labelOf(kinds, draft.kind).toLocaleLowerCase("es")}` : draft.title}</h3>
+                  {editable ? (
+                    <label className="studio-editor-title-field">
+                      <span className="sr-only">Título</span>
+                      <input
+                        aria-label="Título"
+                        autoFocus={isNew}
+                        className="studio-editor-title-input"
+                        disabled={busy !== null}
+                        form="studio-content-form"
+                        maxLength={200}
+                        required
+                        value={draft.title}
+                        onChange={(event) => {
+                          const title = event.target.value;
+                          setDraft({
+                            ...draft,
+                            slug: isNew ? slugify(title) : draft.slug,
+                            title,
+                          } as ContentDraft);
+                        }}
+                      />
+                    </label>
+                  ) : (
+                    <h3>{draft.title}</h3>
+                  )}
                 </div>
-                {item && (
-                  <span className={`studio-badge studio-editor-status studio-badge-${item.status}`}>
-                    {labelOf(statuses, item.status)}
-                  </span>
-                )}
-                <button
-                  className="studio-editor-close"
-                  aria-label="Cerrar editor"
-                  disabled={busy !== null}
-                  type="button"
-                  onClick={close}
-                >
-                  <X size={19} />
-                </button>
+                <div className="studio-editor-heading-actions">
+                  {item && (
+                    <span className={`studio-badge studio-editor-status studio-badge-${item.status}`}>
+                      {labelOf(statuses, item.status)}
+                    </span>
+                  )}
+                  {actions.map((action) => (
+                    <button
+                      className={`studio-button studio-editor-action studio-button-${action.tone}`}
+                      disabled={
+                        busy !== null ||
+                        (draft.kind === "video" &&
+                          (action.status === "in_review" || action.status === "published") &&
+                          !videoComplete)
+                      }
+                      key={action.status}
+                      title={
+                        draft.kind === "video" && !videoComplete
+                          ? "Completa video, puntos clave, guía y cuestionario"
+                          : undefined
+                      }
+                      type="button"
+                      onClick={() => transition(action.status)}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                  <button
+                    className="studio-editor-close"
+                    aria-label="Cerrar editor"
+                    disabled={busy !== null}
+                    type="button"
+                    onClick={close}
+                  >
+                    <X size={19} />
+                  </button>
+                </div>
               </header>
 
               {draft.kind === "video" && (
@@ -1230,40 +1441,24 @@ export function ContentStudio({ initialWorkspace }: Props) {
                 </section>
               )}
 
-              <form onSubmit={save}>
+              <form id="studio-content-form" onSubmit={save}>
                 <fieldset disabled={!editable || busy !== null}>
                   <section className="studio-form-section">
                     <h4>Información básica</h4>
                     <div className="studio-form-grid">
-                      <label className="studio-field">
-                        <span>Título</span>
-                        <input
-                          required
-                          autoFocus={isNew}
-                          maxLength={200}
-                          value={draft.title}
-                          onChange={(event) => {
-                            const title = event.target.value;
-                            setDraft({
-                              ...draft,
-                              slug: isNew ? slugify(title) : draft.slug,
-                              title,
-                            } as ContentDraft);
-                          }}
-                        />
-                      </label>
-                      <label className="studio-field">
-                        <span>Región anatómica</span>
-                        <input
-                          required
-                          maxLength={120}
-                          value={draft.topic}
-                          onChange={(event) =>
-                            setDraft({ ...draft, topic: event.target.value } as ContentDraft)
-                          }
-                        />
-                      </label>
-                      {draft.kind !== "topic" && (
+                      <RegionTagsInput
+                        disabled={!editable || busy !== null}
+                        suggestions={regionSuggestions}
+                        values={draft.content.regions.length > 0 ? draft.content.regions : draft.topic ? [draft.topic] : []}
+                        onChange={(regions) =>
+                          setDraft({
+                            ...draft,
+                            topic: regions[0] ?? "",
+                            content: { ...draft.content, regions },
+                          } as ContentDraft)
+                        }
+                      />
+                      {draft.kind !== "topic" && draft.kind !== "guide" && (
                         <label className="studio-field studio-field-wide">
                           <span>Resumen</span>
                           <textarea
@@ -1289,7 +1484,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                     </div>
                   </section>
 
-                  <TypeEditor draft={draft} onChange={setDraft} />
+                  <TypeEditor draft={draft} onChange={setDraft} onOpenGuide={openGuideEditor} />
                 </fieldset>
 
                 {editable && (
@@ -1304,39 +1499,80 @@ export function ContentStudio({ initialWorkspace }: Props) {
                   </footer>
                 )}
               </form>
-
-              {item && (
-                <footer className="studio-workflow">
-                  <strong>Estado: {labelOf(statuses, item.status)}</strong>
-                  <div>
-                    {actions.map((action) => (
-                      <button
-                        className={`studio-button studio-button-${action.tone}`}
-                        disabled={
-                          busy !== null ||
-                          (draft.kind === "video" &&
-                            (action.status === "in_review" || action.status === "published") &&
-                            !videoComplete)
-                        }
-                        key={action.status}
-                        type="button"
-                        title={
-                          draft.kind === "video" && !videoComplete
-                            ? "Completa video, puntos clave, guía y cuestionario"
-                            : undefined
-                        }
-                        onClick={() => transition(action.status)}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </footer>
-              )}
             </>
           )}
         </section>
       </div>
+
+      {guideCreateOpen && (
+        <div
+          className="studio-guide-choice-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeGuideCreationChoice();
+          }}
+        >
+          <section
+            aria-describedby="guide-choice-description"
+            aria-labelledby="guide-choice-title"
+            aria-modal="true"
+            className="studio-guide-choice"
+            ref={guideChoiceDialogRef}
+            role="dialog"
+            tabIndex={-1}
+            onKeyDown={handleGuideChoiceKeyDown}
+          >
+            <header>
+              <span><Notebook size={23} /></span>
+              <div>
+                <small>Nueva guía</small>
+                <h3 id="guide-choice-title">¿Dónde se publicará?</h3>
+                <p id="guide-choice-description">Puedes crear una guía independiente o enlazarla como material anexo de un video.</p>
+              </div>
+              <button aria-label="Cerrar" type="button" onClick={closeGuideCreationChoice}><X size={18} /></button>
+            </header>
+            <div className="studio-guide-choice-options">
+              <button
+                className="studio-guide-choice-card"
+                data-guide-choice-initial
+                type="button"
+                onClick={() => beginGuideCreation(null)}
+              >
+                <span><Notebook size={22} /></span>
+                <strong>Guía independiente</strong>
+                <small>Se mostrará en el catálogo de guías sin depender de un video.</small>
+                <CaretRight size={18} />
+              </button>
+              <div className="studio-guide-choice-card studio-guide-choice-linked">
+                <span><PlayCircle size={22} /></span>
+                <strong>Anexo de un video</strong>
+                <small>La guía aparecerá también dentro del material complementario del video elegido.</small>
+                <label>
+                  <span className="sr-only">Video relacionado</span>
+                  <select value={linkedVideoId} onChange={(event) => setLinkedVideoId(event.target.value)}>
+                    <option value="">
+                      {linkableVideos.length > 0
+                        ? "Selecciona un video…"
+                        : "No hay videos disponibles"}
+                    </option>
+                    {linkableVideos.map((video) => (
+                      <option key={video.id} value={video.id}>
+                        {video.title} · {labelOf(statuses, video.status)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button disabled={!linkedVideoId} type="button" onClick={() => beginGuideCreation(linkedVideoId)}>
+                  Continuar <CaretRight size={16} />
+                </button>
+              </div>
+            </div>
+            <button className="studio-guide-choice-cancel" type="button" onClick={closeGuideCreationChoice}>
+              <ArrowLeft size={16} /> Cancelar
+            </button>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }
