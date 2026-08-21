@@ -21,8 +21,6 @@ import {
   Minus,
   PlayCircle,
   Plus,
-  Printer,
-  ShareNetwork,
   Star,
   TextAa,
 } from "@phosphor-icons/react";
@@ -131,7 +129,8 @@ function GuideBody({ item }: { item: GuideItem }) {
   const [supportExpanded, setSupportExpanded] = useState(true);
   const [supportWide, setSupportWide] = useState(false);
   const [favorite, setFavorite] = useState(false);
-  const [shareFeedback, setShareFeedback] = useState("");
+  const [fontMenuOpen, setFontMenuOpen] = useState(false);
+  const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
   const manualNavigationRef = useRef(false);
   const navigationFrameRef = useRef<number | null>(null);
   const headingHighlightTimerRef = useRef<number | null>(null);
@@ -231,31 +230,24 @@ function GuideBody({ item }: { item: GuideItem }) {
     navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
   }
 
-  async function shareGuide() {
-    const url = window.location.href;
-    const shareData = { text: item.summary, title: item.title, url };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        setShareFeedback("Guía compartida.");
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      }
-    }
-
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard_unavailable");
-      await navigator.clipboard.writeText(url);
-      setShareFeedback("Enlace copiado.");
-    } catch {
-      window.prompt("Copia este enlace para compartir la guía:", url);
-    }
-  }
-
   function toggleFavorite() {
     setFavorite((current) => !current);
+  }
+
+  function toggleOutlinePanel() {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setMobileDrawer((current) => (current === "outline" ? null : "outline"));
+      return;
+    }
+    setOutlineExpanded((current) => !current);
+  }
+
+  function toggleSupportPanel() {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setMobileDrawer((current) => (current === "support" ? null : "support"));
+      return;
+    }
+    setSupportExpanded((current) => !current);
   }
 
   return (
@@ -304,16 +296,6 @@ function GuideBody({ item }: { item: GuideItem }) {
         </div>
 
         <div className="published-reader-actionbar-group published-reader-actions">
-          {item.asset?.downloadUrl && (
-            <a aria-label="Descargar guía" href={item.asset.downloadUrl}>
-              <DownloadSimple aria-hidden="true" size={18} />
-              <span>Descargar</span>
-            </a>
-          )}
-          <button aria-label="Imprimir guía" type="button" onClick={() => window.print()}>
-            <Printer aria-hidden="true" size={18} />
-            <span>Imprimir</span>
-          </button>
           <button
             aria-pressed={favorite}
             aria-label="Favorito"
@@ -324,23 +306,108 @@ function GuideBody({ item }: { item: GuideItem }) {
             <Star aria-hidden="true" size={18} weight={favorite ? "fill" : "regular"} />
             <span>Favorito</span>
           </button>
-          <button aria-label="Compartir guía" type="button" onClick={() => void shareGuide()}>
-            <ShareNetwork aria-hidden="true" size={18} />
-            <span>Compartir</span>
+        </div>
+      </section>
+
+      <section className="published-reader-mobile-toolbar" aria-label="Herramientas de lectura móvil">
+        <div
+          aria-hidden={!fontMenuOpen}
+          className={"published-reader-mobile-font-menu" + (fontMenuOpen ? " is-open" : "")}
+          id="published-reader-font-menu"
+        >
+          <button
+            aria-label="Reducir tamaño de texto"
+            disabled={!fontMenuOpen || fontScale <= 90}
+            tabIndex={fontMenuOpen ? 0 : -1}
+            type="button"
+            onClick={() => setFontScale((current) => Math.max(90, current - 10))}
+          >
+            <Minus aria-hidden="true" size={15} />
+          </button>
+          <output aria-live="polite">{fontScale}%</output>
+          <button
+            aria-label="Aumentar tamaño de texto"
+            disabled={!fontMenuOpen || fontScale >= 130}
+            tabIndex={fontMenuOpen ? 0 : -1}
+            type="button"
+            onClick={() => setFontScale((current) => Math.min(130, current + 10))}
+          >
+            <Plus aria-hidden="true" size={15} />
           </button>
         </div>
-        {shareFeedback && (
-          <span className="published-reader-share-feedback" role="status">
-            {shareFeedback}
-          </span>
-        )}
+        <div className="published-reader-mobile-toolbar-row">
+          <button
+            aria-controls="published-guide-outline-links"
+            aria-expanded={mobileDrawer === "outline"}
+            aria-label="Abrir índice"
+            className="published-reader-mobile-side-button"
+            type="button"
+            onClick={() => setMobileDrawer((current) => (current === "outline" ? null : "outline"))}
+          >
+            <ListBullets aria-hidden="true" size={19} />
+            <span className="sr-only">Índice</span>
+          </button>
+          <div className="published-reader-mobile-main-tools">
+            <button
+              aria-label="Resaltar"
+              aria-pressed={highlightImportant}
+              className={"published-reader-mobile-tool" + (highlightImportant ? " is-active" : "")}
+              type="button"
+              onClick={() => setHighlightImportant((current) => !current)}
+            >
+              <Highlighter aria-hidden="true" size={17} />
+              <span>Resaltar</span>
+            </button>
+            <button
+              aria-controls="published-reader-font-menu"
+              aria-expanded={fontMenuOpen}
+              aria-label="Fuente"
+              className={"published-reader-mobile-tool" + (fontMenuOpen ? " is-active" : "")}
+              type="button"
+              onClick={() => setFontMenuOpen((current) => !current)}
+            >
+              <TextAa aria-hidden="true" size={17} />
+              <span>Fuente</span>
+            </button>
+            <button
+              aria-label="Favorito"
+              aria-pressed={favorite}
+              className={"published-reader-mobile-tool" + (favorite ? " is-active" : "")}
+              type="button"
+              onClick={toggleFavorite}
+            >
+              <Star aria-hidden="true" size={17} weight={favorite ? "fill" : "regular"} />
+              <span>Favorito</span>
+            </button>
+          </div>
+          <button
+            aria-controls="published-guide-support-content"
+            aria-expanded={mobileDrawer === "support"}
+            aria-label="Abrir recursos de estudio"
+            className="published-reader-mobile-side-button"
+            type="button"
+            onClick={() => setMobileDrawer((current) => (current === "support" ? null : "support"))}
+          >
+            <BookOpen aria-hidden="true" size={19} />
+            <span className="sr-only">Recursos de estudio</span>
+          </button>
+        </div>
       </section>
+
+      {mobileDrawer && (
+        <button
+          aria-label="Cerrar panel lateral"
+          className="published-reader-drawer-backdrop"
+          type="button"
+          onClick={() => setMobileDrawer(null)}
+        />
+      )}
 
       <div
         className={`published-rich-guide-layout${outlineExpanded ? "" : " is-outline-collapsed"}${supportExpanded ? "" : " is-support-collapsed"}${supportWide ? " is-support-wide" : ""}`}
       >
         <nav
-          className={`published-rich-guide-outline${outlineExpanded ? "" : " is-collapsed"}`}
+          className={"published-rich-guide-outline" + (outlineExpanded ? "" : " is-collapsed") + (mobileDrawer === "outline" ? " is-mobile-open" : "")}
           aria-label="Índice de la guía"
         >
           <div className="published-rich-guide-outline-heading">
@@ -355,7 +422,7 @@ function GuideBody({ item }: { item: GuideItem }) {
               className="published-rich-guide-outline-toggle"
               title={outlineExpanded ? "Contraer índice" : "Expandir índice"}
               type="button"
-              onClick={() => setOutlineExpanded((current) => !current)}
+              onClick={toggleOutlinePanel}
             >
             {outlineExpanded ? (
               <CaretLeft aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
@@ -420,7 +487,7 @@ function GuideBody({ item }: { item: GuideItem }) {
         </section>
 
         <aside
-          className={`published-rich-guide-support${supportExpanded ? "" : " is-collapsed"}`}
+          className={"published-rich-guide-support" + (supportExpanded ? "" : " is-collapsed") + (mobileDrawer === "support" ? " is-mobile-open" : "")}
           aria-label="Recursos de estudio"
         >
           <div className="published-rich-guide-support-heading">
@@ -445,7 +512,7 @@ function GuideBody({ item }: { item: GuideItem }) {
               className="published-rich-guide-support-toggle"
               title={supportExpanded ? "Contraer recursos" : "Expandir recursos"}
               type="button"
-              onClick={() => setSupportExpanded((current) => !current)}
+              onClick={toggleSupportPanel}
             >
             {supportExpanded ? (
               <CaretRight aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
@@ -487,7 +554,7 @@ function GuideBody({ item }: { item: GuideItem }) {
                 defaultExpanded
                 icon={<ClipboardText aria-hidden="true" size={20} />}
                 id="published-guide-quiz"
-                title="Preguntas y respuestas"
+                title="Cuestinoario"
                 tone="quiz"
               >
                 {item.content.quiz.questions.length > 0 ? (
@@ -539,8 +606,14 @@ function ReaderSupportPanel({
         </span>
         <CaretDown aria-hidden="true" className="published-rich-guide-resource-caret" size={17} />
       </button>
-      <div className="published-rich-guide-resource-content" hidden={!expanded} id={id}>
-        {children}
+      <div
+        aria-hidden={!expanded}
+        className={"published-rich-guide-resource-content" + (expanded ? " is-expanded" : "")}
+        id={id}
+      >
+        <div className="published-rich-guide-resource-content-inner">
+          {children}
+        </div>
       </div>
     </section>
   );

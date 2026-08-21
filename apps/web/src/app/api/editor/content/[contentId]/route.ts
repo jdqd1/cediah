@@ -25,11 +25,3 @@ export async function PATCH(request: Request, { params }: ContentRouteProps) {
     responseSchema: ContentItemSchema,
   });
 }
-
-export async function DELETE(_request: Request, { params }: ContentRouteProps) {
-  const { contentId } = await params;
-  return forwardEditorContentRequest({
-    method: "DELETE",
-    path: "/v1/editor/content/" + encodeURIComponent(contentId),
-  });
-}

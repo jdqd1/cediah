@@ -57,10 +57,15 @@ type NavItem = {
 const mainNavigation: NavItem[] = [
   { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
   { key: "video", label: "Videos", href: "/biblioteca?tipo=video", icon: PlayCircle },
-  { key: "study", label: "Material de estudio", href: "/biblioteca", icon: BookOpen },
+];
+
+const studyNavigation: NavItem[] = [
   { key: "guides", label: "Guías", href: "/guias", icon: Notebook },
   { key: "flashcards", label: "Flashcards", href: "/biblioteca?tipo=flashcards", icon: CardsThree },
   { key: "quiz", label: "Cuestionarios", href: "/biblioteca?tipo=quiz", icon: ClipboardText },
+];
+
+const topicalNavigation: NavItem[] = [
   { key: "topic", label: "Temas anatómicos", href: "/biblioteca?tipo=topic", icon: UserCircle },
 ];
 
@@ -113,6 +118,83 @@ function NavigationItem({
   );
 }
 
+function NavigationGroup({
+  activeKey,
+  childItems,
+  href,
+  icon: Icon,
+  label,
+  onNavigate,
+  onToggle,
+  open,
+  groupKey,
+}: {
+  activeKey: string;
+  childItems: NavItem[];
+  href?: string;
+  icon: NavIcon;
+  label: string;
+  onNavigate: () => void;
+  onToggle: () => void;
+  open: boolean;
+  groupKey: string;
+}) {
+  const active = activeKey === groupKey || childItems.some((item) => item.key === activeKey);
+  const groupClassName = "sidebar-nav-group-item" + (active ? " is-active" : "");
+  const labelClassName = "sidebar-group-link" + (active ? " is-active" : "");
+
+  return (
+    <section className={groupClassName}>
+      <div className="sidebar-group-heading">
+        {href ? (
+          <Link
+            aria-current={active ? "page" : undefined}
+            className={labelClassName}
+            href={href}
+            onClick={() => {
+              if (!open) onToggle();
+              onNavigate();
+            }}
+            title={label}
+          >
+            <Icon size={21} weight={active ? "fill" : "regular"} />
+            <span className="sidebar-link-label">{label}</span>
+          </Link>
+        ) : (
+          <button
+            aria-controls={"sidebar-submenu-" + groupKey}
+            aria-expanded={open}
+            className={labelClassName}
+            type="button"
+            onClick={onToggle}
+          >
+            <Icon size={21} weight={active ? "fill" : "regular"} />
+            <span className="sidebar-link-label">{label}</span>
+          </button>
+        )}
+        <button
+          aria-controls={"sidebar-submenu-" + groupKey}
+          aria-expanded={open}
+          aria-label={(open ? "Contraer " : "Expandir ") + label}
+          className="sidebar-group-toggle"
+          type="button"
+          onClick={onToggle}
+        >
+          <CaretDown aria-hidden="true" size={16} />
+        </button>
+      </div>
+      <div
+        className={"sidebar-submenu" + (open ? " is-open" : "")}
+        id={"sidebar-submenu-" + groupKey}
+      >
+        {childItems.map((item) => (
+          <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={onNavigate} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function AppShell({
   activeKey,
   breadcrumbs,
@@ -128,6 +210,12 @@ export function AppShell({
   welcome = false,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [studyMenuOpen, setStudyMenuOpen] = useState(
+    activeKey === "study" || studyNavigation.some((item) => item.key === activeKey),
+  );
+  const [adminMenuOpen, setAdminMenuOpen] = useState(
+    activeKey === "editor" || activeKey === "roles",
+  );
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const sidebarCollapsed = useSidebarCollapsedPreference();
@@ -141,6 +229,15 @@ export function AppShell({
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
   const showContentManagement = canManageContent || isAdministrator;
   const showRoleManagement = canManageRoles || isAdministrator;
+  const administrationItems: NavItem[] = [
+    ...(showContentManagement
+      ? [{ key: "editor", label: "Publicar contenido", href: "/panel/contenido", icon: PencilSimpleLine }]
+      : []),
+    ...(showRoleManagement
+      ? [{ key: "roles", label: "Roles", href: "/panel/administracion/roles", icon: ShieldCheck }]
+      : []),
+  ];
+
   const menuButtonLabel = isDesktopSidebar
     ? sidebarCollapsed
       ? "Expandir menú principal"
@@ -269,6 +366,20 @@ export function AppShell({
             {mainNavigation.map((item) => (
               <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
             ))}
+            <NavigationGroup
+              activeKey={activeKey}
+              childItems={studyNavigation}
+              groupKey="study"
+              href="/biblioteca"
+              icon={BookOpen}
+              label="Material de estudio"
+              onNavigate={closeSidebar}
+              onToggle={() => setStudyMenuOpen((open) => !open)}
+              open={studyMenuOpen}
+            />
+            {topicalNavigation.map((item) => (
+              <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
+            ))}
             {includeCourses && (
               <NavigationItem
                 item={{ key: "courses", label: "Mis cursos", href: "/cursos", icon: CheckSquareOffset }}
@@ -276,28 +387,16 @@ export function AppShell({
                 onNavigate={closeSidebar}
               />
             )}
-            {showContentManagement && (
-              <NavigationItem
-                item={{
-                  key: "editor",
-                  label: "Gestión de contenido",
-                  href: "/panel/contenido",
-                  icon: PencilSimpleLine,
-                }}
+            {administrationItems.length > 0 && (
+              <NavigationGroup
                 activeKey={activeKey}
+                childItems={administrationItems}
+                groupKey="admin"
+                icon={ShieldCheck}
+                label="Administrar"
                 onNavigate={closeSidebar}
-              />
-            )}
-            {showRoleManagement && (
-              <NavigationItem
-                item={{
-                  key: "roles",
-                  label: "Administrar roles",
-                  href: "/panel/administracion/roles",
-                  icon: ShieldCheck,
-                }}
-                activeKey={activeKey}
-                onNavigate={closeSidebar}
+                onToggle={() => setAdminMenuOpen((open) => !open)}
+                open={adminMenuOpen}
               />
             )}
           </div>
