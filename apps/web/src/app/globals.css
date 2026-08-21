@@ -6671,6 +6671,16 @@ textarea:focus-visible {
   --reader-font-size: 0.91rem;
   min-width: 0;
 }
+/* The reader owns viewport-fixed controls. A transformed ancestor would make
+ * those controls relative to the full document instead of the viewport. */
+.app-shell:has(.published-rich-guide-reader) .published-content {
+  animation: published-guide-content-enter 320ms ease both;
+}
+
+@keyframes published-guide-content-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .app-shell:has(.published-rich-guide-reader) .app-topbar.app-topbar-simplified {
   position: sticky;
