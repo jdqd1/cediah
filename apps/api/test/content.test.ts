@@ -776,7 +776,7 @@ describe("content API", () => {
     await app.close();
   });
 
-  it("allows editorial roles to edit published and archived content", () => {
+  it("locks published and archived content for every editorial role", () => {
     for (const status of ["published", "archived"] as const) {
       expect(
         canEditContent({
@@ -785,8 +785,17 @@ describe("content API", () => {
           roles: ["academic_editor"],
           status,
         }),
-      ).toBe(true);
+      ).toBe(false);
     }
+
+    expect(
+      canEditContent({
+        actorUserId: users.editor.id,
+        authorUserId: users.contributor.id,
+        roles: ["academic_editor"],
+        status: "in_review",
+      }),
+    ).toBe(true);
 
     expect(
       canEditContent({
