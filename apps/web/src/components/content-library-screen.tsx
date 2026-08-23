@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
   BookOpen,
   CardsThree,
   ClipboardText,
@@ -13,12 +12,12 @@ import {
   PlayCircle,
   X,
 } from "@phosphor-icons/react";
-import type { ContentItem, ContentKind } from "@cediah/contracts";
+import type { ContentItem, ContentKind, Subject } from "@cediah/contracts";
 import { type MouseEvent, useMemo, useState } from "react";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 
-type CatalogKind = ContentKind | "all";
+type CatalogKind = Exclude<ContentKind, "topic"> | "all";
 
 type ContentLibraryScreenProps = {
   available: boolean;
@@ -26,13 +25,14 @@ type ContentLibraryScreenProps = {
   initialTopic?: string;
   isAdministrator?: boolean;
   items: ContentItem[];
+  subjects?: Subject[];
 };
 
 const kindLabels: Record<ContentKind, string> = {
   flashcards: "Flashcards",
   guide: "Guías",
   quiz: "Cuestionarios",
-  topic: "Temas anatómicos",
+  topic: "Tema",
   video: "Videos",
 };
 
@@ -53,10 +53,10 @@ const kindImages: Record<ContentKind, string> = {
 };
 
 const contentKinds = Object.keys(kindLabels) as ContentKind[];
+const filterableKinds = ["video", "guide", "quiz", "flashcards"] as Exclude<ContentKind, "topic">[];
 const kindOptions: { icon: typeof BookOpen; label: string; value: CatalogKind }[] = [
   { icon: BookOpen, label: "Todo", value: "all" },
   { icon: PlayCircle, label: "Videos", value: "video" },
-  { icon: Compass, label: "Temas anatómicos", value: "topic" },
   { icon: BookOpen, label: "Guías", value: "guide" },
   { icon: ClipboardText, label: "Cuestionarios", value: "quiz" },
   { icon: CardsThree, label: "Flashcards", value: "flashcards" },
@@ -68,19 +68,17 @@ function itemHref(item: ContentItem) {
     : "/biblioteca/" + item.slug;
 }
 
-function isContentKind(value: string | null): value is ContentKind {
-  return value !== null && contentKinds.includes(value as ContentKind);
+function isContentKind(value: string | null): value is Exclude<ContentKind, "topic"> {
+  return value !== null && filterableKinds.includes(value as Exclude<ContentKind, "topic">);
 }
 
 function catalogTitle(kind: CatalogKind) {
   if (kind === "video") return "Videos";
-  if (kind === "topic") return "Temas anatómicos";
   return "Biblioteca";
 }
 
 function catalogSearchPlaceholder(kind: CatalogKind) {
   if (kind === "video") return "Buscar videos";
-  if (kind === "topic") return "Buscar temas anatómicos";
   return "Buscar en la biblioteca";
 }
 
@@ -127,31 +125,11 @@ function CatalogCard({ item, video = false }: { item: ContentItem; video?: boole
   );
 }
 
-function TopicDirectoryItem({ item }: { item: ContentItem }) {
-  return (
-    <Link className="content-catalog-topic-link" href={itemHref(item)}>
-      <span className="content-catalog-topic-icon" aria-hidden="true">
-        <Compass size={24} />
-      </span>
-      <div className="content-catalog-topic-copy">
-        <span className="content-catalog-topic-meta">
-          <span>{item.topic}</span>
-          {item.featured && <span>Destacado</span>}
-        </span>
-        <strong>{item.title}</strong>
-        <p>{item.summary}</p>
-      </div>
-      <span className="content-catalog-topic-action" aria-hidden="true">
-        Ver tema <ArrowRight size={18} />
-      </span>
-    </Link>
-  );
-}
-
 export function ContentLibraryScreen({
   available,
   isAdministrator = false,
   items,
+  subjects = [],
 }: ContentLibraryScreenProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -159,6 +137,8 @@ export function ContentLibraryScreen({
   const requestedKind = searchParams.get("tipo");
   const kind: CatalogKind = isContentKind(requestedKind) ? requestedKind : "all";
   const topic = searchParams.get("tema")?.trim() ?? "";
+  const subjectSlug = searchParams.get("asignatura")?.trim() ?? "";
+  const selectedSubject = subjects.find((subject) => subject.slug === subjectSlug);
   const title = catalogTitle(kind);
 
   const topics = useMemo(
@@ -176,22 +156,26 @@ export function ContentLibraryScreen({
     return items.filter((item) => {
       const regions = itemRegions(item);
       const matchesKind = kind === "all" || item.kind === kind;
+      const matchesSubject =
+        !subjectSlug || Boolean(selectedSubject && item.subjectIds.includes(selectedSubject.id));
       const matchesTopic =
         !selectedRegion || regions.some((region) => normalize(region) === selectedRegion);
       const matchesSearch =
         !normalized ||
         normalize(`${item.title} ${item.summary} ${item.topic} ${regions.join(" ")}`)
           .includes(normalized);
-      return matchesKind && matchesTopic && matchesSearch;
+      return matchesKind && matchesSubject && matchesTopic && matchesSearch;
     });
-  }, [items, kind, search, topic]);
+  }, [items, kind, search, selectedSubject, subjectSlug, topic]);
 
-  function catalogHref(nextKind: CatalogKind, nextTopic: string) {
+  function catalogHref(nextKind: CatalogKind, nextTopic: string, nextSubject = subjectSlug) {
     const params = new URLSearchParams(searchParams.toString());
     if (nextKind === "all") params.delete("tipo");
     else params.set("tipo", nextKind);
     if (nextTopic) params.set("tema", nextTopic);
     else params.delete("tema");
+    if (nextSubject) params.set("asignatura", nextSubject);
+    else params.delete("asignatura");
     const query = params.toString();
     return query ? `${pathname}?${query}` : pathname;
   }
@@ -214,14 +198,15 @@ export function ContentLibraryScreen({
   }
 
   const activeKey = kind === "all" ? "study" : kind === "guide" ? "guides" : kind;
-  const clearHref = catalogHref("all", "");
-  const hasFilters = kind !== "all" || Boolean(topic) || Boolean(search);
+  const clearHref = catalogHref("all", "", "");
+  const hasFilters = kind !== "all" || Boolean(subjectSlug) || Boolean(topic) || Boolean(search);
 
   return (
     <AppShell
       activeKey={activeKey}
       isAdministrator={isAdministrator}
       headerTitle={title}
+      headerSubtitle={selectedSubject?.name}
       mainClassName="content-catalog-main"
     >
       <section className="content-catalog-page" aria-label={title}>
@@ -229,7 +214,7 @@ export function ContentLibraryScreen({
           <div className="content-catalog-kind-chips">
             {kindOptions.map((option) => {
               const Icon = option.icon;
-              const href = catalogHref(option.value, topic);
+              const href = catalogHref(option.value, topic, subjectSlug);
               const count = option.value === "all" ? items.length : kindCounts[option.value];
 
               return (
@@ -274,13 +259,35 @@ export function ContentLibraryScreen({
           </span>
         </div>
 
+        {subjects.length > 0 && (
+          <nav className="content-catalog-subject-nav" aria-label="Asignatura">
+            <span className="content-catalog-topic-label">Asignatura</span>
+            <div className="content-catalog-topic-chips">
+              {[{ slug: "", name: "Todas las asignaturas" }, ...subjects].map((subject) => {
+                const href = catalogHref(kind, topic, subject.slug);
+                return (
+                  <Link
+                    aria-current={subjectSlug === subject.slug ? "page" : undefined}
+                    className={`content-catalog-topic-chip ${subjectSlug === subject.slug ? "is-active" : ""}`.trim()}
+                    href={href}
+                    key={subject.slug || "all-subjects"}
+                    onClick={(event) => navigateCatalog(event, href)}
+                    prefetch={false}
+                  >
+                    {subject.name}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
         {topics.length > 0 && (
-          <nav className="content-catalog-topic-nav" aria-label="Regiones anatómicas">
-            <span className="content-catalog-topic-label">Región</span>
+          <nav className="content-catalog-topic-nav" aria-label="Etiquetas del tema">
+            <span className="content-catalog-topic-label">Etiqueta</span>
             <div className="content-catalog-topic-chips">
               {["", ...topics].map((value) => {
-                const href = catalogHref(kind, value);
-                const label = value || "Todas las regiones";
+                const href = catalogHref(kind, value, subjectSlug);
+                const label = value || "Todas las etiquetas";
                 return (
                   <Link
                     aria-current={topic === value ? "page" : undefined}
@@ -299,15 +306,6 @@ export function ContentLibraryScreen({
         )}
 
         {visibleItems.length > 0 ? (
-          kind === "topic" ? (
-            <ul className="content-catalog-topic-directory" id="content-catalog-results">
-              {visibleItems.map((item) => (
-                <li key={item.id}>
-                  <TopicDirectoryItem item={item} />
-                </li>
-              ))}
-            </ul>
-          ) : (
             <ul
               className={kind === "video" ? "content-catalog-video-grid" : "content-catalog-resource-grid"}
               id="content-catalog-results"
@@ -318,7 +316,6 @@ export function ContentLibraryScreen({
                 </li>
               ))}
             </ul>
-          )
         ) : (
           <div className="content-catalog-empty" id="content-catalog-results" role="status">
             <Compass aria-hidden="true" size={38} />

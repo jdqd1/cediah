@@ -7,6 +7,7 @@ import {
   CircleNotch,
   ClipboardText,
   House,
+  GraduationCap,
   List,
   Notebook,
   PlayCircle,
@@ -56,6 +57,7 @@ type NavItem = {
 
 const mainNavigation: NavItem[] = [
   { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
+  { key: "subjects", label: "Asignaturas", href: "/asignaturas", icon: GraduationCap },
   { key: "video", label: "Videos", href: "/biblioteca?tipo=video", icon: PlayCircle },
 ];
 
@@ -65,9 +67,8 @@ const studyNavigation: NavItem[] = [
   { key: "quiz", label: "Cuestionarios", href: "/biblioteca?tipo=quiz", icon: ClipboardText },
 ];
 
-const topicalNavigation: NavItem[] = [
-  { key: "topic", label: "Temas anatómicos", href: "/biblioteca?tipo=topic", icon: UserCircle },
-];
+
+
 
 function getProfileInitials(email: string) {
   const localPart = email.split("@", 1)[0]?.replace(/[^a-z0-9]/gi, "") ?? "";
@@ -377,9 +378,8 @@ export function AppShell({
               onToggle={() => setStudyMenuOpen((open) => !open)}
               open={studyMenuOpen}
             />
-            {topicalNavigation.map((item) => (
-              <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
-            ))}
+
+
             {includeCourses && (
               <NavigationItem
                 item={{ key: "courses", label: "Mis cursos", href: "/cursos", icon: CheckSquareOffset }}

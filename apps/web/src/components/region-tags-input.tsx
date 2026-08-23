@@ -8,7 +8,7 @@ const MAX_REGIONS = 12;
 
 export function RegionTagsInput({
   disabled = false,
-  label = "Regiones anatómicas",
+  label = "Etiquetas del tema",
   onChange,
   suggestions = [],
   values,
@@ -96,7 +96,7 @@ export function RegionTagsInput({
           <span className="region-tag" key={normalizeRegion(value)}>
             {value}
             <button
-              aria-label={`Quitar región ${value}`}
+              aria-label={`Quitar etiqueta ${value}`}
               disabled={disabled}
               type="button"
               onClick={() => remove(index)}
@@ -115,10 +115,10 @@ export function RegionTagsInput({
           aria-controls={listId}
           aria-describedby={helpId}
           aria-expanded={suggestionsVisible}
-          aria-label="Añadir región anatómica"
+          aria-label="Añadir etiqueta"
           autoComplete="off"
           disabled={disabled || cleanValues.length >= MAX_REGIONS}
-          placeholder={cleanValues.length === 0 ? "Escribe una región y pulsa Enter" : "Añadir región…"}
+          placeholder={cleanValues.length === 0 ? "Escribe una región y pulsa Enter" : "Añadir etiqueta…"}
           ref={inputRef}
           role="combobox"
           value={input}
@@ -157,7 +157,7 @@ export function RegionTagsInput({
           aria-controls={listId}
           aria-expanded={hasInput ? undefined : suggestionsVisible}
           aria-haspopup={hasInput ? undefined : "listbox"}
-          aria-label={hasInput ? "Añadir región" : "Mostrar regiones disponibles"}
+          aria-label={hasInput ? "Añadir etiqueta" : "Mostrar etiquetas disponibles"}
           className={`region-tags-add${hasInput ? "" : " is-menu"}`}
           disabled={
             disabled ||
@@ -209,7 +209,7 @@ export function RegionTagsInput({
         </div>
       )}
       <span className="sr-only" id={helpId}>
-        La primera etiqueta será la región principal. Puedes añadir hasta {MAX_REGIONS}.
+        La primera etiqueta será la principal. Puedes añadir hasta {MAX_REGIONS}.
       </span>
     </div>
   );

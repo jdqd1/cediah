@@ -3,6 +3,10 @@ import {
   ContentCatalogResponseSchema,
   ContentItemSchema,
   ContentWorkspaceResponseSchema,
+  SubjectCatalogResponseSchema,
+  SubjectDetailResponseSchema,
+  type Subject,
+  type SubjectDetailResponse,
   type ContentCatalogResponse,
   type ContentItem,
   type ContentKind,
@@ -34,6 +38,14 @@ export type ContentWorkspaceResult =
   | { status: "forbidden" }
   | { status: "unavailable" }
   | { status: "ready"; workspace: ContentWorkspaceResponse };
+
+export type SubjectsResult =
+  | { status: "ready"; subjects: Subject[] }
+  | { status: "unavailable" };
+
+export type SubjectDetailResult =
+  | { status: "not_found" | "unavailable" }
+  | { status: "ready"; detail: SubjectDetailResponse };
 
 export function getContentApiError(value: unknown) {
   if (
@@ -85,9 +97,11 @@ export async function requestContentApi(
 export async function getPublishedContent(input: {
   kind?: ContentKind;
   limit?: number;
+  subjectId?: string;
 } = {}): Promise<PublishedContentResult> {
   const query = new URLSearchParams();
   if (input.kind) query.set("kind", input.kind);
+  if (input.subjectId) query.set("subjectId", input.subjectId);
   query.set("limit", String(input.limit ?? 40));
   const response = await requestContentApi({
     method: "GET",
@@ -100,7 +114,23 @@ export async function getPublishedContent(input: {
     ? { catalog: catalog.data, status: "ready" }
     : { status: "unavailable" };
 }
+export async function getSubjects(): Promise<SubjectsResult> {
+  const response = await requestContentApi({ method: "GET", path: "/v1/subjects" });
+  if (response.status !== 200) return { status: "unavailable" };
+  const parsed = SubjectCatalogResponseSchema.safeParse(response.body);
+  return parsed.success ? { status: "ready", subjects: parsed.data.subjects } : { status: "unavailable" };
+}
 
+export async function getSubjectContent(slug: string): Promise<SubjectDetailResult> {
+  const response = await requestContentApi({
+    method: "GET",
+    path: "/v1/subjects/" + encodeURIComponent(slug),
+  });
+  if (response.status === 404) return { status: "not_found" };
+  if (response.status !== 200) return { status: "unavailable" };
+  const detail = SubjectDetailResponseSchema.safeParse(response.body);
+  return detail.success ? { status: "ready", detail: detail.data } : { status: "unavailable" };
+}
 export async function getPublishedContentItem(
   slug: string,
 ): Promise<PublishedContentItemResult> {

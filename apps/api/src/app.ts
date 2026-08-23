@@ -15,8 +15,15 @@ import {
   ContentKindSchema,
   ContentTransitionRequestSchema,
   ContentWorkspaceResponseSchema,
+  ContentSubjectAssignmentRequestSchema,
+  SubjectCatalogResponseSchema,
+  SubjectCreateRequestSchema,
+  SubjectDetailResponseSchema,
+  SubjectResponseSchema,
   CurrentUserResponseSchema,
   type ContentMutationFailure,
+  type SubjectMutationFailure,
+  type SubjectProvider,
   type ContentProvider,
   type IdentityProvider,
   type RoleManagementProvider,
@@ -39,9 +46,11 @@ import { createSupabaseRoleManagementProvider } from "./providers/supabase-role-
 import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
 import { createSupabaseLearningProvider } from "./providers/supabase-learning.js";
 import { createSupabaseStorageVideoProvider } from "./providers/supabase-storage.js";
+import { createSupabaseSubjectProvider } from "./providers/supabase-subjects.js";
 
 type AppDependencies = {
   contentProvider?: ContentProvider;
+  subjectProvider?: SubjectProvider;
   roleManagementProvider?: RoleManagementProvider;
   identityProvider?: IdentityProvider;
   learningProvider?: LearningProvider;
@@ -79,10 +88,12 @@ const ContentAssetIdParamsSchema = z.object({ assetId: z.string().uuid() });
 const ContentSlugParamsSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
 });
+const SubjectSlugParamsSchema = ContentSlugParamsSchema;
 const ContentListQuerySchema = z.object({
   kind: ContentKindSchema.optional(),
   linkedVideoId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(40),
+  subjectId: z.string().uuid().optional(),
 });
 
 const directUploadLifetimeMilliseconds = 15 * 60 * 1_000;
@@ -225,6 +236,16 @@ function sendContentMutationError(error: ContentMutationFailure, reply: FastifyR
     .send({ error: error === "not_publishable" ? "content_not_publishable" : "content_conflict" });
 }
 
+function sendSubjectMutationError(error: SubjectMutationFailure, reply: FastifyReply) {
+  if (error === "not_found") {
+    return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+  }
+  if (error === "forbidden") {
+    return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+  }
+  return reply.status(409).header("Cache-Control", "no-store").send({ error: "subject_conflict" });
+}
+
 export async function buildApp(
   environment: ApiEnvironment = readEnvironment(),
   dependencies: AppDependencies = {},
@@ -233,6 +254,11 @@ export async function buildApp(
     dependencies.contentProvider ??
     (environment.contentStorage
       ? createSupabaseContentProvider(environment.contentStorage)
+      : undefined);
+  const subjectProvider =
+    dependencies.subjectProvider ??
+    (environment.contentStorage
+      ? createSupabaseSubjectProvider(environment.contentStorage)
       : undefined);
   const roleManagementProvider =
     dependencies.roleManagementProvider ??
@@ -365,6 +391,44 @@ export async function buildApp(
     },
   );
 
+  app.get("/v1/subjects", async (request, reply) => {
+    if (!subjectProvider) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    try {
+      const subjects = await subjectProvider.listSubjects({ publishedOnly: true });
+      return reply
+        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .send(SubjectCatalogResponseSchema.parse({ subjects }));
+    } catch {
+      request.log.error("Published-subject request failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
+  app.get<{ Params: { slug: string } }>("/v1/subjects/:slug", async (request, reply) => {
+    if (!subjectProvider || !contentProvider) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    const params = SubjectSlugParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    }
+
+    try {
+      const subject = await subjectProvider.getSubjectBySlug(params.data.slug);
+      if (!subject) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      const items = await contentProvider.listPublished({ limit: 100, subjectId: subject.id });
+      return reply
+        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .send(SubjectDetailResponseSchema.parse({ items, subject }));
+    } catch {
+      request.log.error("Published-subject detail request failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
   app.get<{ Querystring: unknown }>("/v1/content", async (request, reply) => {
     if (!contentProvider) {
       return reply
@@ -443,11 +507,15 @@ export async function buildApp(
         actorUserId: editor.user.id,
         roles: editor.roles,
       });
+      const subjects = subjectProvider
+        ? await subjectProvider.listSubjects({ publishedOnly: false })
+        : [];
       return reply.header("Cache-Control", "no-store").send(
         ContentWorkspaceResponseSchema.parse({
           capabilities: editor.capabilities,
           items,
           roles: editor.roles,
+          subjects,
         }),
       );
     } catch {
@@ -459,6 +527,40 @@ export async function buildApp(
     }
   });
 
+  app.post<{ Body: unknown }>("/v1/editor/subjects", async (request, reply) => {
+    const editor = await resolveEditorUser(
+      request.headers.authorization,
+      identityProvider,
+      contentProvider,
+    );
+    if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+    if (!editor.capabilities.canCreate && !editor.capabilities.canEditAll) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
+    if (!subjectProvider) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    const input = SubjectCreateRequestSchema.safeParse(request.body);
+    if (!input.success) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_subject" });
+    }
+
+    try {
+      const result = await subjectProvider.createSubject({
+        actorUserId: editor.user.id,
+        name: input.data.name,
+      });
+      if (result.status !== "success") return sendSubjectMutationError(result.status, reply);
+      return reply
+        .status(201)
+        .header("Cache-Control", "no-store")
+        .send(SubjectResponseSchema.parse({ subject: result.value }));
+    } catch {
+      request.log.error("Subject creation failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
   app.post<{ Body: unknown }>("/v1/editor/content", async (request, reply) => {
     const editor = await resolveEditorUser(
       request.headers.authorization,
@@ -498,6 +600,48 @@ export async function buildApp(
     }
   });
 
+  app.patch<{ Body: unknown; Params: { contentId: string } }>(
+    "/v1/editor/content/:contentId/subjects",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canEditAll) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+      if (!contentProvider?.assignSubjects) {
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+      }
+
+      const params = ContentIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      const assignment = ContentSubjectAssignmentRequestSchema.safeParse(request.body);
+      if (!assignment.success) {
+        return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_subject" });
+      }
+
+      try {
+        const result = await contentProvider.assignSubjects({
+          actorUserId: editor.user.id,
+          contentId: params.data.contentId,
+          roles: editor.roles,
+          subjectIds: assignment.data.subjectIds,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(ContentItemSchema.parse(result.value));
+      } catch {
+        request.log.error("Content subject assignment failed");
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+      }
+    },
+  );
   app.patch<{ Body: unknown; Params: { contentId: string } }>(
     "/v1/editor/content/:contentId",
     async (request, reply) => {

@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CEDIAH | Aprende anatomía",
+  title: "CEDIAH | Aprende por asignaturas",
   description:
-    "Plataforma educativa de anatomía para conectar estudio teórico, práctica presencial y seguimiento del aprendizaje.",
+    "Plataforma educativa para organizar videos, guías y recursos por asignatura.",
 };
 
 export const viewport: Viewport = {

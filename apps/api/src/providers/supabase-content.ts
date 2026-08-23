@@ -27,7 +27,7 @@ const assetSelection =
 const contentSelection =
   "id, kind, slug, title, summary, topic, status, content, estimated_minutes, is_featured, author_user_id, published_at, created_at, updated_at, content_assets (" +
   assetSelection +
-  ")";
+  "), content_subjects (subject_id)";
 
 const signedDownloadLifetimeSeconds = 60 * 60;
 const maximumFileSizeBytes = 500_000_000;
@@ -239,12 +239,17 @@ export function createSupabaseContentProvider(
     const asset = selectedAsset
       ? await parseAsset(selectedAsset, includeDownloadUrl)
       : null;
+    const subjectIds = asArray(row.content_subjects)
+      .map(asRecord)
+      .map((subject) => readString(subject?.subject_id))
+      .filter((id): id is string => Boolean(id));
     const draft = ContentDraftSchema.parse({
       content: row.content,
       estimatedMinutes: row.estimated_minutes ?? null,
       featured: readBoolean(row.is_featured) ?? false,
       kind: row.kind,
       slug: row.slug,
+      subjectIds,
       summary: row.summary,
       title: row.title,
       topic: row.topic,
@@ -315,6 +320,34 @@ export function createSupabaseContentProvider(
       target_type: "content_item",
     });
     if (error) throw error;
+  }
+
+  async function subjectIdsExist(subjectIds: string[]) {
+    const ids = Array.from(new Set(subjectIds));
+    if (ids.length === 0) return true;
+    const { data, error } = await client.from("subjects").select("id").in("id", ids);
+    if (error) throw error;
+    return asArray(data).length === ids.length;
+  }
+
+  async function replaceSubjectLinks(contentId: string, subjectIds: string[]) {
+    const ids = Array.from(new Set(subjectIds));
+    if (!(await subjectIdsExist(ids))) return false;
+
+    const { error: deleteError } = await client
+      .from("content_subjects")
+      .delete()
+      .eq("content_item_id", contentId);
+    if (deleteError) throw deleteError;
+
+    if (ids.length > 0) {
+      const { error: insertError } = await client.from("content_subjects").insert(
+        ids.map((subjectId) => ({ content_item_id: contentId, subject_id: subjectId })),
+      );
+      if (insertError) throw insertError;
+    }
+
+    return true;
   }
 
   return {
@@ -404,6 +437,8 @@ export function createSupabaseContentProvider(
     },
 
     async createContent(input) {
+      if (!(await subjectIdsExist(input.draft.subjectIds))) return { status: "conflict" };
+
       const { data, error } = await client
         .from("content_items")
         .insert({
@@ -425,12 +460,19 @@ export function createSupabaseContentProvider(
         throw error;
       }
 
-      const item = await parseContentItem(data, true);
+      const contentId = readString(asRecord(data)?.id);
+      if (!contentId || !(await replaceSubjectLinks(contentId, input.draft.subjectIds))) {
+        if (contentId) await client.from("content_items").delete().eq("id", contentId);
+        return { status: "conflict" };
+      }
+
+      const item = await getItemById(contentId);
+      if (!item) return { status: "not_found" };
       await writeAudit({
         action: "content_created",
         actorUserId: input.actorUserId,
         contentId: item.id,
-        metadata: { kind: item.kind },
+        metadata: { kind: item.kind, subjectIds: item.subjectIds },
       });
       return { status: "success", value: item };
     },
@@ -626,6 +668,19 @@ export function createSupabaseContentProvider(
       if (input.linkedVideoId) {
         query = query.eq("content->>linkedVideoId", input.linkedVideoId);
       }
+      if (input.subjectId) {
+        const { data: relationData, error: relationError } = await client
+          .from("content_subjects")
+          .select("content_item_id")
+          .eq("subject_id", input.subjectId);
+        if (relationError) throw relationError;
+        const contentIds = asArray(relationData)
+          .map(asRecord)
+          .map((relation) => readString(relation?.content_item_id))
+          .filter((id): id is string => Boolean(id));
+        if (contentIds.length === 0) return [];
+        query = query.in("id", contentIds);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -698,6 +753,25 @@ export function createSupabaseContentProvider(
       return { status: "success", value: item };
     },
 
+    async assignSubjects(input) {
+      if (!getContentCapabilities(input.roles).canEditAll) return { status: "forbidden" };
+      const access = await getStoredAccess(input.contentId);
+      if (!access) return { status: "not_found" };
+
+      const subjectIds = Array.from(new Set(input.subjectIds));
+      if (!(await subjectIdsExist(subjectIds))) return { status: "conflict" };
+      if (!(await replaceSubjectLinks(input.contentId, subjectIds))) return { status: "conflict" };
+
+      const item = await getItemById(input.contentId);
+      if (!item) return { status: "not_found" };
+      await writeAudit({
+        action: "content_subjects_updated",
+        actorUserId: input.actorUserId,
+        contentId: input.contentId,
+        metadata: { subjectIds: item.subjectIds },
+      });
+      return { status: "success", value: item };
+    },
     async updateContent(input) {
       const access = await getStoredAccess(input.contentId);
       if (!access) return { status: "not_found" };
@@ -717,6 +791,8 @@ export function createSupabaseContentProvider(
       ) {
         return { status: "not_publishable" };
       }
+
+      if (!(await subjectIdsExist(input.draft.subjectIds))) return { status: "conflict" };
 
       const nextStatus =
         access.status === "in_review" || access.status === "approved" ? "draft" : access.status;
@@ -749,13 +825,17 @@ export function createSupabaseContentProvider(
         throw error;
       }
       if (!data) return { status: "conflict" };
+      if (!(await replaceSubjectLinks(input.contentId, input.draft.subjectIds))) {
+        return { status: "conflict" };
+      }
 
-      const item = await parseContentItem(data, true);
+      const item = await getItemById(input.contentId);
+      if (!item) return { status: "not_found" };
       await writeAudit({
         action: "content_updated",
         actorUserId: input.actorUserId,
         contentId: input.contentId,
-        metadata: { kind: item.kind },
+        metadata: { kind: item.kind, subjectIds: item.subjectIds },
       });
       return { status: "success", value: item };
     },

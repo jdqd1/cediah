@@ -24,6 +24,7 @@ import {
 import dynamic from "next/dynamic";
 import {
   ContentItemSchema,
+  SubjectSchema,
   type ContentAssetUploadResponse,
   type ContentDraft,
   type ContentItem,
@@ -57,7 +58,7 @@ type Mime = ContentAssetUploadResponse["asset"]["mimeType"];
 type TargetStatus = Exclude<ContentStatus, "draft">;
 type Base = Pick<
   ContentDraft,
-  "estimatedMinutes" | "featured" | "slug" | "summary" | "title" | "topic"
+  "estimatedMinutes" | "featured" | "slug" | "subjectIds" | "summary" | "title" | "topic"
 >;
 
 const kinds: { label: string; value: ContentKind }[] = [
@@ -65,7 +66,7 @@ const kinds: { label: string; value: ContentKind }[] = [
   { label: "Guía", value: "guide" },
   { label: "Cuestionario", value: "quiz" },
   { label: "Flashcards", value: "flashcards" },
-  { label: "Tema anatómico", value: "topic" },
+  { label: "Tema", value: "topic" },
 ];
 
 const primaryKinds = [
@@ -102,6 +103,8 @@ const errors: Record<string, string> = {
   invalid_content_transition: "La transición de estado no es válida.",
   not_found: "El contenido no existe o no tienes acceso.",
   unauthorized: "Tu sesión terminó. Vuelve a iniciar sesión.",
+  invalid_subject: "Escribe un nombre válido para la asignatura.",
+  subject_conflict: "Ya existe una asignatura con ese nombre.",
 };
 
 function labelOf<T extends string>(options: { label: string; value: T }[], value: T) {
@@ -153,6 +156,7 @@ function prepareDraft(draft: ContentDraft): ContentDraft {
     return {
       ...draft,
       slug,
+      subjectIds: Array.from(new Set(draft.subjectIds)),
       topic,
       content: {
         ...draft.content,
@@ -164,6 +168,7 @@ function prepareDraft(draft: ContentDraft): ContentDraft {
   return {
     ...draft,
     slug,
+    subjectIds: Array.from(new Set(draft.subjectIds)),
     topic,
     content: { ...draft.content, regions },
   } as ContentDraft;
@@ -175,6 +180,7 @@ function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
     featured: false,
     slug: "",
     summary: "",
+    subjectIds: [],
     title: "",
     topic: "",
     ...seed,
@@ -265,6 +271,12 @@ async function contentItemJson(url: string, init: RequestInit = {}) {
   return parsed.data;
 }
 
+function onlySubjectAssignmentChanged(current: ContentDraft, baseline: ContentDraft) {
+  if (JSON.stringify(current.subjectIds) === JSON.stringify(baseline.subjectIds)) return false;
+  const currentWithoutSubjects = { ...current, subjectIds: [] };
+  const baselineWithoutSubjects = { ...baseline, subjectIds: [] };
+  return JSON.stringify(currentWithoutSubjects) === JSON.stringify(baselineWithoutSubjects);
+}
 function signedPut(url: string, file: File, onProgress: (value: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -619,7 +631,7 @@ function TypeEditor({
 
   return (
     <section className="studio-type-editor">
-      <h4>Contenido del tema anatómico</h4>
+      <h4>Contenido del tema</h4>
       <label className="studio-field">
         <span>Contenido</span>
         <textarea
@@ -649,7 +661,9 @@ function TypeEditor({
 }
 export function ContentStudio({ initialWorkspace }: Props) {
   const [items, setItems] = useState(initialWorkspace.items);
+  const [subjects, setSubjects] = useState(initialWorkspace.subjects);
   const [draft, setDraft] = useState<ContentDraft | null>(null);
+  const [newSubjectName, setNewSubjectName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [query, setQuery] = useState("");
@@ -731,6 +745,14 @@ export function ContentStudio({ initialWorkspace }: Props) {
         JSON.stringify(draft) !== JSON.stringify(draftBaseline)),
   );
 
+  const subjectOnlyAssignment = Boolean(
+    !isNew &&
+    item &&
+    draft &&
+    draftBaseline &&
+    (item.status === "published" || item.status === "archived") &&
+    onlySubjectAssignmentChanged(draft, draftBaseline),
+  );
   useEffect(() => {
     if (!guideCreateOpen) return;
     guideChoiceDialogRef.current
@@ -747,6 +769,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   function resetFeedback() {
     setNotice(null);
+    setNewSubjectName("");
     setFile(null);
     setProgress(0);
     if (fileRef.current) fileRef.current.value = "";
@@ -834,6 +857,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       : [];
     const next: Extract<ContentDraft, { kind: "guide" }> = {
       ...created,
+      subjectIds: linkedVideo?.subjectIds ?? [],
       topic: regions[0] ?? "",
       content: {
         ...created.content,
@@ -887,18 +911,70 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setItems((existing) => [current, ...existing.filter((value) => value.id !== current.id)]);
   }
 
+  async function createSubject() {
+    const name = newSubjectName.trim();
+    if (!name || !editable || busy) return;
+    setBusy("subject");
+    setNotice(null);
+    try {
+      const response = await json<{ subject: unknown }>("/api/editor/subjects", {
+        body: JSON.stringify({ name }),
+        method: "POST",
+      });
+      const parsed = SubjectSchema.safeParse(response.subject);
+      if (!parsed.success) throw new Error(errors.content_unavailable);
+      setSubjects((current) =>
+        [...current.filter((subject) => subject.id !== parsed.data.id), parsed.data]
+          .sort((left, right) => left.name.localeCompare(right.name, "es")),
+      );
+      setDraft((current) =>
+        current
+          ? { ...current, subjectIds: Array.from(new Set([...current.subjectIds, parsed.data.id])) }
+          : current,
+      );
+      setNewSubjectName("");
+      setNotice({ text: `Asignatura “${parsed.data.name}” creada y seleccionada.`, tone: "success" });
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error ? error.message : "No fue posible crear la asignatura.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
   async function save(event?: FormEvent): Promise<boolean> {
     event?.preventDefault();
     if (!draft || !editable || busy) return false;
     if (!hasUnsavedChanges) return true;
+    if (
+      item &&
+      !isNew &&
+      (item.status === "published" || item.status === "archived") &&
+      !subjectOnlyAssignment
+    ) {
+      setNotice({
+        text: "El contenido publicado sólo permite actualizar sus asignaturas desde este editor.",
+        tone: "error",
+      });
+      return false;
+    }
+
     setBusy("save");
     setNotice(null);
 
     try {
       const payload = prepareDraft(draft);
       const current = await contentItemJson(
-        isNew ? "/api/editor/content" : `/api/editor/content/${encodeURIComponent(editingId!)}`,
-        { body: JSON.stringify(payload), method: isNew ? "POST" : "PATCH" },
+        subjectOnlyAssignment
+          ? `/api/editor/content/${encodeURIComponent(editingId!)}/subjects`
+          : isNew
+            ? "/api/editor/content"
+            : `/api/editor/content/${encodeURIComponent(editingId!)}`,
+        {
+          body: JSON.stringify(subjectOnlyAssignment ? { subjectIds: payload.subjectIds } : payload),
+          method: subjectOnlyAssignment || !isNew ? "PATCH" : "POST",
+        },
       );
       upsert(current);
       setDraft(itemDraft(current));
@@ -1480,8 +1556,60 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                           }}
                         />
                       </label>
+                      <section className="studio-subject-assignment studio-field-wide" aria-labelledby="studio-subject-title">
+                        <div className="studio-subject-heading">
+                          <div>
+                            <h5 id="studio-subject-title">Asignaturas</h5>
+                            <p>Selecciona una o varias materias para organizar este contenido.</p>
+                          </div>
+                          <span>{draft.subjectIds.length} seleccionada{draft.subjectIds.length === 1 ? "" : "s"}</span>
+                        </div>
+                        <div className="studio-subject-options" role="group" aria-label="Asignaturas del contenido">
+                          {subjects.map((subject) => (
+                            <label className={`studio-subject-option ${draft.subjectIds.includes(subject.id) ? "is-selected" : ""}`.trim()} key={subject.id}>
+                              <input
+                                checked={draft.subjectIds.includes(subject.id)}
+                                type="checkbox"
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...draft,
+                                    subjectIds: event.target.checked
+                                      ? Array.from(new Set([...draft.subjectIds, subject.id]))
+                                      : draft.subjectIds.filter((id) => id !== subject.id),
+                                  } as ContentDraft)
+                                }
+                              />
+                              <span>
+                                <strong>{subject.name}</strong>
+                                <small>{subject.contentCount} recursos</small>
+                              </span>
+                            </label>
+                          ))}
+                          {subjects.length === 0 && <p className="studio-subject-empty">Crea la primera asignatura para organizar el contenido.</p>}
+                        </div>
+                        <div className="studio-new-subject">
+                          <input
+                            aria-label="Nombre de la nueva asignatura"
+                            maxLength={120}
+                            placeholder="Nueva asignatura"
+                            type="text"
+                            value={newSubjectName}
+                            onChange={(event) => setNewSubjectName(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                void createSubject();
+                              }
+                            }}
+                          />
+                          <button disabled={!newSubjectName.trim() || busy !== null} type="button" onClick={() => void createSubject()}>
+                            <Plus size={16} /> Crear asignatura
+                          </button>
+                        </div>
+                      </section>
                       <RegionTagsInput
                         disabled={!editable || busy !== null}
+                        label="Etiquetas del tema"
                         suggestions={regionSuggestions}
                         values={draft.content.regions.length > 0 ? draft.content.regions : draft.topic ? [draft.topic] : []}
                         onChange={(regions) =>

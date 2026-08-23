@@ -230,6 +230,29 @@ export const ContentStatusSchema = z.enum([
 export type ContentKind = z.infer<typeof ContentKindSchema>;
 export type ContentStatus = z.infer<typeof ContentStatusSchema>;
 
+export const SubjectSchema = z.object({
+  contentCount: z.number().int().min(0).default(0),
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  slug: z.string().trim().min(1).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+});
+
+export type Subject = z.infer<typeof SubjectSchema>;
+
+export const SubjectCatalogResponseSchema = z.object({
+  subjects: z.array(SubjectSchema),
+});
+
+export const SubjectCreateRequestSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+
+export const SubjectResponseSchema = z.object({
+  subject: SubjectSchema,
+});
+
+export type SubjectCreateRequest = z.infer<typeof SubjectCreateRequestSchema>;
+
 const HttpsUrlSchema = z
   .string()
   .url()
@@ -634,6 +657,7 @@ const ContentDraftBaseSchema = z.object({
   featured: z.boolean().default(false),
   slug: z.string().trim().min(1).max(200).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   summary: z.string().trim().max(2_000),
+  subjectIds: z.array(z.string().uuid()).max(20).default([]),
   title: z.string().trim().max(200),
   topic: z.string().trim().max(120),
 });
@@ -900,9 +924,15 @@ export const ContentWorkspaceResponseSchema = z.object({
   capabilities: ContentCapabilitiesSchema,
   items: z.array(ContentItemSchema),
   roles: z.array(PlatformRoleSchema),
+  subjects: z.array(SubjectSchema).default([]),
 });
 
 export type ContentWorkspaceResponse = z.infer<typeof ContentWorkspaceResponseSchema>;
+export const ContentSubjectAssignmentRequestSchema = z.object({
+  subjectIds: z.array(z.string().uuid()).max(20).default([]),
+});
+export type ContentSubjectAssignmentRequest = z.infer<typeof ContentSubjectAssignmentRequestSchema>;
+
 
 export const CreateContentRequestSchema = ContentDraftSchema;
 export const UpdateContentRequestSchema = ContentDraftSchema;
@@ -913,6 +943,13 @@ export const ContentTransitionRequestSchema = z.object({
 export type CreateContentRequest = z.infer<typeof CreateContentRequestSchema>;
 export type UpdateContentRequest = z.infer<typeof UpdateContentRequestSchema>;
 export type ContentTransitionRequest = z.infer<typeof ContentTransitionRequestSchema>;
+
+export const SubjectDetailResponseSchema = z.object({
+  items: z.array(ContentItemSchema),
+  subject: SubjectSchema,
+});
+
+export type SubjectDetailResponse = z.infer<typeof SubjectDetailResponseSchema>;
 
 export const ContentAssetUploadRequestSchema = z
   .object({
@@ -967,6 +1004,22 @@ export type ContentMutationFailure =
 export type ContentMutationResult<T> =
   | { status: "success"; value: T }
   | { status: ContentMutationFailure };
+
+export type SubjectMutationFailure = "conflict" | "forbidden" | "not_found";
+
+export type SubjectMutationResult<T> =
+  | { status: "success"; value: T }
+  | { status: SubjectMutationFailure };
+
+export interface SubjectProvider {
+  createSubject(input: {
+    actorUserId: string;
+    name: string;
+  }): Promise<SubjectMutationResult<Subject>>;
+  getSubjectBySlug(slug: string): Promise<Subject | null>;
+  listSubjects(input?: { publishedOnly?: boolean }): Promise<Subject[]>;
+}
+
 export const AdminRoleActionSchema = z.enum(["assign", "revoke"]);
 export const AdminRoleUserSchema = z.object({
   email: z.string().email(),
@@ -1018,6 +1071,12 @@ export interface ContentProvider {
     file: ContentAssetUploadRequest;
     roles: PlatformRole[];
   }): Promise<ContentMutationResult<ContentAssetUploadResponse>>;
+  assignSubjects?(input: {
+    actorUserId: string;
+    contentId: string;
+    roles: PlatformRole[];
+    subjectIds: string[];
+  }): Promise<ContentMutationResult<ContentItem>>;
   createContent(input: {
     actorUserId: string;
     draft: ContentDraft;
@@ -1042,6 +1101,7 @@ export interface ContentProvider {
     kind?: ContentKind;
     linkedVideoId?: string;
     limit: number;
+    subjectId?: string;
   }): Promise<ContentItem[]>;
   transitionContent(input: {
     actorUserId: string;
