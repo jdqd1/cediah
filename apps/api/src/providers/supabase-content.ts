@@ -112,7 +112,7 @@ function canAttachAsset(contentKind: string, assetKind: ContentAssetKind) {
   return false;
 }
 
-function validTransition(input: {
+export function isContentTransitionAllowed(input: {
   actorUserId: string;
   authorUserId: string;
   currentStatus: ContentStatus;
@@ -133,7 +133,10 @@ function validTransition(input: {
   }
 
   if (input.targetStatus === "published") {
-    return capabilities.canPublish && input.currentStatus === "approved";
+    return (
+      capabilities.canPublish &&
+      (input.currentStatus === "approved" || input.currentStatus === "archived")
+    );
   }
 
   return capabilities.canPublish && input.currentStatus === "published";
@@ -691,7 +694,7 @@ export function createSupabaseContentProvider(
       const access = await getStoredAccess(input.contentId);
       if (!access) return { status: "not_found" };
       if (
-        !validTransition({
+        !isContentTransitionAllowed({
           actorUserId: input.actorUserId,
           authorUserId: access.authorUserId,
           currentStatus: access.status,

@@ -101,6 +101,24 @@ type TableControlsPosition = {
   top: number;
 };
 
+type TableContextMenuState = {
+  left: number;
+  position: number;
+  top: number;
+};
+
+type TableContextAction =
+  | "add-column-after"
+  | "add-column-before"
+  | "add-row-after"
+  | "add-row-before"
+  | "delete-column"
+  | "delete-row"
+  | "delete-table"
+  | "toggle-header-row";
+
+type MobileEditorDrawer = "companions" | "outline" | null;
+
 const fallbackGuardStateKey = "__cediahGuideEditorGuard";
 const fallbackBaseStateKey = "__cediahGuideEditorBase";
 
@@ -829,8 +847,11 @@ export function GuideEditorScreen({
   const [savingToLeave, setSavingToLeave] = useState(false);
   const [activeOutline, setActiveOutline] = useState(0);
   const [tableControlsPosition, setTableControlsPosition] = useState<TableControlsPosition | null>(null);
+  const [tableContextMenu, setTableContextMenu] = useState<TableContextMenuState | null>(null);
+  const [mobileDrawer, setMobileDrawer] = useState<MobileEditorDrawer>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const hoveredTableRef = useRef<HTMLTableElement | null>(null);
+  const tableContextMenuRef = useRef<HTMLDivElement>(null);
   const exitDialogRef = useRef<HTMLElement>(null);
   const draftRef = useRef(draft);
   const allowNavigationRef = useRef(false);
@@ -929,6 +950,46 @@ export function GuideEditorScreen({
   useEffect(() => {
     editor?.setEditable(isEditing && !preview);
   }, [editor, isEditing, preview]);
+
+  useEffect(() => {
+    if (!tableContextMenu) return;
+    const frame = window.requestAnimationFrame(() => {
+      tableContextMenuRef.current
+        ?.querySelector<HTMLButtonElement>("button:not([disabled])")
+        ?.focus({ preventScroll: true });
+    });
+    const closeOnPointerDown = (event: MouseEvent) => {
+      if (
+        event.target instanceof Node &&
+        !tableContextMenuRef.current?.contains(event.target)
+      ) setTableContextMenu(null);
+    };
+    const closeOnKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTableContextMenu(null);
+    };
+    const close = () => setTableContextMenu(null);
+
+    document.addEventListener("mousedown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnKeyDown);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnKeyDown);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [tableContextMenu]);
+
+  useEffect(() => {
+    if (!mobileDrawer) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileDrawer(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [mobileDrawer]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -1196,6 +1257,46 @@ export function GuideEditorScreen({
     editor.chain().focus().insertContent(pastedContent(text, html)).run();
   }
 
+  function handleTableContextMenu(event: ReactMouseEvent<HTMLDivElement>) {
+    if (!editor || !isEditing || preview) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const cell = target.closest("td, th");
+    const table = cell?.closest("table");
+    if (!(cell instanceof HTMLTableCellElement) || !(table instanceof HTMLTableElement)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const position = editor.view.posAtDOM(cell, 0) + 1;
+      editor.chain().focus().setTextSelection(position).run();
+      hoveredTableRef.current = table;
+      setTableControlsPosition(null);
+      setTableContextMenu({
+        left: Math.max(12, Math.min(event.clientX, window.innerWidth - 252)),
+        position,
+        top: Math.max(12, Math.min(event.clientY, window.innerHeight - 390)),
+      });
+    } catch {
+      setTableContextMenu(null);
+    }
+  }
+
+  function runTableContextAction(action: TableContextAction) {
+    if (!editor || !tableContextMenu) return;
+    const chain = editor.chain().focus().setTextSelection(tableContextMenu.position);
+    if (action === "add-column-after") chain.addColumnAfter().run();
+    else if (action === "add-column-before") chain.addColumnBefore().run();
+    else if (action === "add-row-after") chain.addRowAfter().run();
+    else if (action === "add-row-before") chain.addRowBefore().run();
+    else if (action === "delete-column") chain.deleteColumn().run();
+    else if (action === "delete-row") chain.deleteRow().run();
+    else if (action === "toggle-header-row") chain.toggleHeaderRow().run();
+    else chain.deleteTable().run();
+    setTableContextMenu(null);
+    setTableControlsPosition(null);
+  }
+
   function handleTablePointerMove(event: ReactMouseEvent<HTMLDivElement>) {
     if (!isEditing || preview || !canvasRef.current) return;
     const pointerTarget = event.target;
@@ -1323,7 +1424,16 @@ export function GuideEditorScreen({
               <NotePencil size={17} /> <span>{isEditing ? "Editando" : "Editar"}</span>
             </button>
           )}
-          <button aria-label={preview ? "Volver al editor" : "Vista previa de lector"} className={preview ? "is-active" : ""} type="button" onClick={() => setPreview((value) => !value)}>
+          <button
+            aria-label={preview ? "Volver al editor" : "Vista previa de lector"}
+            className={preview ? "is-active" : ""}
+            type="button"
+            onClick={() => {
+              setMobileDrawer(null);
+              setTableContextMenu(null);
+              setPreview((value) => !value);
+            }}
+          >
             <Eye size={17} /> {preview ? "Seguir editando" : "Vista previa"}
           </button>
           {isEditing && (
@@ -1425,19 +1535,58 @@ export function GuideEditorScreen({
           keyPoints={guideKeyPoints(draft)}
         />
       ) : (
-        <div
-          className={`guide-editor-workspace${outlineCollapsed ? " is-outline-collapsed" : ""}${companionsCollapsed ? " is-companions-collapsed" : ""}${isEditing ? "" : " is-view-mode"}`}
-        >
-          <aside className={`guide-editor-outline ${outlineCollapsed ? "is-collapsed" : ""}`} aria-label="Índice de la guía">
+        <>
+          <div className="guide-editor-mobile-sidebar-controls" aria-label="Paneles laterales del editor">
+            <button
+              aria-controls="guide-editor-outline-content"
+              aria-expanded={mobileDrawer === "outline"}
+              type="button"
+              onClick={() => setMobileDrawer((current) => current === "outline" ? null : "outline")}
+            >
+              <ListBullets aria-hidden="true" size={18} />
+              <span>Índice</span>
+              <small>{outline.length}</small>
+            </button>
+            <button
+              aria-controls="guide-editor-companions-content"
+              aria-expanded={mobileDrawer === "companions"}
+              type="button"
+              onClick={() => setMobileDrawer((current) => current === "companions" ? null : "companions")}
+            >
+              <HighlighterCircle aria-hidden="true" size={18} />
+              <span>Complementos</span>
+              <small>{guideKeyPoints(draft).length + guideQuestions(draft).length}</small>
+            </button>
+          </div>
+          {mobileDrawer && (
+            <button
+              aria-label="Cerrar panel lateral"
+              className="guide-editor-mobile-drawer-backdrop"
+              type="button"
+              onClick={() => setMobileDrawer(null)}
+            />
+          )}
+          <div
+            className={`guide-editor-workspace${outlineCollapsed ? " is-outline-collapsed" : ""}${companionsCollapsed ? " is-companions-collapsed" : ""}${isEditing ? "" : " is-view-mode"}`}
+          >
+          <aside className={`guide-editor-outline${outlineCollapsed && mobileDrawer !== "outline" ? " is-collapsed" : ""}${mobileDrawer === "outline" ? " is-mobile-open" : ""}`} aria-label="Índice de la guía">
             <header>
-              <button aria-controls="guide-editor-outline-content" aria-expanded={!outlineCollapsed} type="button" onClick={() => setOutlineCollapsed((value) => !value)}>
+              <button
+                aria-controls="guide-editor-outline-content"
+                aria-expanded={mobileDrawer === "outline" || !outlineCollapsed}
+                type="button"
+                onClick={() => {
+                  if (mobileDrawer === "outline") setMobileDrawer(null);
+                  else setOutlineCollapsed((value) => !value);
+                }}
+              >
                 <ListBullets aria-hidden="true" size={17} />
                 <strong>Índice de la guía</strong>
                 <small>{outline.length}</small>
-                {outlineCollapsed ? <CaretRight size={15} /> : <CaretLeft size={15} />}
+                {mobileDrawer === "outline" || !outlineCollapsed ? <CaretLeft size={15} /> : <CaretRight size={15} />}
               </button>
             </header>
-            {!outlineCollapsed && (
+            {(!outlineCollapsed || mobileDrawer === "outline") && (
               <div className="guide-editor-outline-content" id="guide-editor-outline-content">
                 <ol>
                   {numberedOutline.map((entry, index) => (
@@ -1447,6 +1596,7 @@ export function GuideEditorScreen({
                         onClick={() => {
                           setActiveOutline(index);
                           setOutlineCollapsed(true);
+                          setMobileDrawer(null);
                           const headings = canvasRef.current?.querySelectorAll(".ProseMirror h1, .ProseMirror h2, .ProseMirror h3");
                           headings?.[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
                         }}
@@ -1480,6 +1630,7 @@ export function GuideEditorScreen({
               hoveredTableRef.current = null;
               setTableControlsPosition(null);
             }}
+            onContextMenu={handleTableContextMenu}
             onMouseMove={handleTablePointerMove}
           >
             <div className="guide-editor-canvas-label">
@@ -1545,19 +1696,74 @@ export function GuideEditorScreen({
                 )}
               </div>
             )}
+            {tableContextMenu && isEditing && (
+              <div
+                aria-label="Opciones de tabla"
+                className="guide-table-context-menu"
+                ref={tableContextMenuRef}
+                role="menu"
+                style={{ left: tableContextMenu.left, top: tableContextMenu.top }}
+              >
+                <header>
+                  <TableIcon aria-hidden="true" size={17} />
+                  <span>
+                    <strong>Opciones de tabla</strong>
+                    <small>Aplica cambios desde la celda seleccionada</small>
+                  </span>
+                </header>
+                <div role="group" aria-label="Filas">
+                  <button disabled={disabled || !editor?.can().addRowBefore()} role="menuitem" type="button" onClick={() => runTableContextAction("add-row-before")}>
+                    <Plus aria-hidden="true" size={15} /> Añadir fila arriba
+                  </button>
+                  <button disabled={disabled || !editor?.can().addRowAfter()} role="menuitem" type="button" onClick={() => runTableContextAction("add-row-after")}>
+                    <Plus aria-hidden="true" size={15} /> Añadir fila debajo
+                  </button>
+                  <button disabled={disabled || !editor?.can().deleteRow()} role="menuitem" type="button" onClick={() => runTableContextAction("delete-row")}>
+                    <Trash aria-hidden="true" size={15} /> Eliminar fila
+                  </button>
+                </div>
+                <div role="group" aria-label="Columnas">
+                  <button disabled={disabled || !editor?.can().addColumnBefore()} role="menuitem" type="button" onClick={() => runTableContextAction("add-column-before")}>
+                    <Plus aria-hidden="true" size={15} /> Añadir columna a la izquierda
+                  </button>
+                  <button disabled={disabled || !editor?.can().addColumnAfter()} role="menuitem" type="button" onClick={() => runTableContextAction("add-column-after")}>
+                    <Plus aria-hidden="true" size={15} /> Añadir columna a la derecha
+                  </button>
+                  <button disabled={disabled || !editor?.can().deleteColumn()} role="menuitem" type="button" onClick={() => runTableContextAction("delete-column")}>
+                    <Trash aria-hidden="true" size={15} /> Eliminar columna
+                  </button>
+                </div>
+                <div role="group" aria-label="Tabla">
+                  <button disabled={disabled || !editor?.can().toggleHeaderRow()} role="menuitem" type="button" onClick={() => runTableContextAction("toggle-header-row")}>
+                    <Check aria-hidden="true" size={15} /> Alternar fila de encabezado
+                  </button>
+                  <button className="is-danger" disabled={disabled || !editor?.can().deleteTable()} role="menuitem" type="button" onClick={() => runTableContextAction("delete-table")}>
+                    <Trash aria-hidden="true" size={15} /> Eliminar tabla
+                  </button>
+                </div>
+              </div>
+            )}
             <p className="guide-editor-paste-hint">Al pegar tablas o Markdown se conservará su estructura y formato para que puedas seguir editándolos.</p>
           </main>
 
-          <aside className={`guide-editor-companions${companionsCollapsed ? " is-collapsed" : ""}`} aria-label="Complementos de la guía">
-            <section className={`guide-companions-container ${companionsCollapsed ? "is-collapsed" : ""}`}>
+          <aside className={`guide-editor-companions${companionsCollapsed && mobileDrawer !== "companions" ? " is-collapsed" : ""}${mobileDrawer === "companions" ? " is-mobile-open" : ""}`} aria-label="Complementos de la guía">
+            <section className={`guide-companions-container${companionsCollapsed && mobileDrawer !== "companions" ? " is-collapsed" : ""}`}>
               <header>
-                <button aria-controls="guide-editor-companions-content" aria-expanded={!companionsCollapsed} type="button" onClick={() => setCompanionsCollapsed((value) => !value)}>
+                <button
+                  aria-controls="guide-editor-companions-content"
+                  aria-expanded={mobileDrawer === "companions" || !companionsCollapsed}
+                  type="button"
+                  onClick={() => {
+                    if (mobileDrawer === "companions") setMobileDrawer(null);
+                    else setCompanionsCollapsed((value) => !value);
+                  }}
+                >
                   <HighlighterCircle aria-hidden="true" size={17} />
                   <span>Complementos de la guía</span>
-                  {companionsCollapsed ? <CaretLeft size={16} /> : <CaretRight size={16} />}
+                  {mobileDrawer === "companions" || !companionsCollapsed ? <CaretRight size={16} /> : <CaretLeft size={16} />}
                 </button>
               </header>
-              {!companionsCollapsed && (
+              {(!companionsCollapsed || mobileDrawer === "companions") && (
                 <div className="guide-editor-companions-content" id="guide-editor-companions-content">
                   <KeyPointsPanel
                     disabled={!isEditing || busy}
@@ -1575,6 +1781,7 @@ export function GuideEditorScreen({
             </section>
           </aside>
         </div>
+        </>
       )}
 
       {exitPrompt && (

@@ -20,7 +20,10 @@ import type {
 import { buildApp } from "../src/app.js";
 import { canEditContent } from "../src/content-authorization.js";
 import type { ApiEnvironment } from "../src/config.js";
-import { isContentReadyForTransition } from "../src/providers/supabase-content.js";
+import {
+  isContentReadyForTransition,
+  isContentTransitionAllowed,
+} from "../src/providers/supabase-content.js";
 
 const contentId = "7a8a6513-9384-4b5d-a825-439f42355714";
 const subjectId = "19d4f11b-9ff1-45c2-b2b5-50686038fe42";
@@ -815,6 +818,27 @@ describe("content API", () => {
         authorUserId: users.contributor.id,
         roles: ["community_contributor"],
         status: "published",
+      }),
+    ).toBe(false);
+  });
+
+  it("allows coordination to restore archived content without broadening editorial permissions", () => {
+    expect(
+      isContentTransitionAllowed({
+        actorUserId: users.coordinator.id,
+        authorUserId: users.contributor.id,
+        currentStatus: "archived",
+        roles: ["coordination"],
+        targetStatus: "published",
+      }),
+    ).toBe(true);
+    expect(
+      isContentTransitionAllowed({
+        actorUserId: users.editor.id,
+        authorUserId: users.contributor.id,
+        currentStatus: "archived",
+        roles: ["academic_editor"],
+        targetStatus: "published",
       }),
     ).toBe(false);
   });

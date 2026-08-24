@@ -12,6 +12,8 @@ import {
   CloudArrowUp,
   Compass,
   FileVideo,
+  FunnelSimple,
+  GraduationCap,
   MagnifyingGlass,
   NotePencil,
   Notebook,
@@ -39,6 +41,7 @@ import { AppShell } from "./app-shell";
 import { uniqueRegions } from "@/lib/content-regions";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { RegionTagsInput } from "./region-tags-input";
+import { StudioNameDialog } from "./studio-name-dialog";
 
 const GuideEditorScreen = dynamic(
   () => import("./guide-editor-screen").then((module) => module.GuideEditorScreen),
@@ -318,6 +321,9 @@ function workflow(
   }
   if (item.status === "published" && capabilities.canPublish) {
     return [{ label: "Archivar", status: "archived", tone: "danger" }];
+  }
+  if (item.status === "archived" && capabilities.canPublish) {
+    return [{ label: "Desarchivar", status: "published", tone: "primary" }];
   }
   return [];
 }
@@ -665,6 +671,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [subjects, setSubjects] = useState(initialWorkspace.subjects);
   const [draft, setDraft] = useState<ContentDraft | null>(null);
   const [newSubjectName, setNewSubjectName] = useState("");
+  const [subjectCreateOpen, setSubjectCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [query, setQuery] = useState("");
@@ -677,7 +684,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [guideEditing, setGuideEditing] = useState(false);
   const [guideCreateOpen, setGuideCreateOpen] = useState(false);
   const [linkedVideoId, setLinkedVideoId] = useState("");
-  const [publicationsCollapsed, setPublicationsCollapsed] = useState(false);
+  const [publicationsCollapsed, setPublicationsCollapsed] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const guideEntryDraftRef = useRef<ContentDraft | null>(null);
   const guideChoiceDialogRef = useRef<HTMLElement>(null);
@@ -771,6 +778,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   function resetFeedback() {
     setNotice(null);
     setNewSubjectName("");
+    setSubjectCreateOpen(false);
     setFile(null);
     setProgress(0);
     if (fileRef.current) fileRef.current.value = "";
@@ -934,6 +942,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
           : current,
       );
       setNewSubjectName("");
+      setSubjectCreateOpen(false);
       setNotice({ text: `Asignatura “${parsed.data.name}” creada y seleccionada.`, tone: "success" });
     } catch (error) {
       setNotice({
@@ -1040,6 +1049,11 @@ export function ContentStudio({ initialWorkspace }: Props) {
       return;
     }
     if (status === "archived" && !window.confirm("¿Archivar este contenido?")) return;
+    if (
+      item.status === "archived" &&
+      status === "published" &&
+      !window.confirm("¿Desarchivar y volver a publicar este contenido?")
+    ) return;
     setBusy("transition");
     setNotice(null);
 
@@ -1316,37 +1330,41 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
         )}
       </header>
 
-      <div className="studio-toolbar">
+      <div className="studio-toolbar" role="search">
         <label className="studio-search">
-          <MagnifyingGlass size={18} />
+          <MagnifyingGlass aria-hidden="true" size={18} />
           <input
             aria-label="Buscar contenido"
-            placeholder="Buscar por título o región"
+            placeholder="Buscar por título, región o slug…"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <div className="studio-kind-filters" role="group" aria-label="Filtrar por tipo">
-          {([
-            { label: "Todo", value: "all" },
-            { label: "Videos", value: "video" },
-            { label: "Guías", value: "guide" },
-            { label: "Temas", value: "topic" },
-          ] as const).map((option) => (
-            <button
-              aria-pressed={kindFilter === option.value}
-              className={kindFilter === option.value ? "is-active" : ""}
-              key={option.value}
-              type="button"
-              onClick={() => setKindFilter(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="studio-filter-section">
+          <span className="studio-filter-label">Tipo</span>
+          <div className="studio-kind-filters" role="group" aria-label="Filtrar por tipo">
+            {([
+              { label: "Todo", value: "all" },
+              { label: "Videos", value: "video" },
+              { label: "Guías", value: "guide" },
+              { label: "Temas", value: "topic" },
+            ] as const).map((option) => (
+              <button
+                aria-pressed={kindFilter === option.value}
+                className={kindFilter === option.value ? "is-active" : ""}
+                key={option.value}
+                type="button"
+                onClick={() => setKindFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
         <label className="studio-status-filter">
-          <span className="sr-only">Estado</span>
+          <FunnelSimple aria-hidden="true" size={17} />
+          <span>Estado</span>
           <select
             aria-label="Filtrar por estado"
             value={statusFilter}
@@ -1601,7 +1619,6 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                             <h5 id="studio-subject-title">Asignaturas</h5>
                             <p>Selecciona una o varias materias para organizar este contenido.</p>
                           </div>
-                          <span>{draft.subjectIds.length} seleccionada{draft.subjectIds.length === 1 ? "" : "s"}</span>
                         </div>
                         <div className="studio-subject-options" role="group" aria-label="Asignaturas del contenido">
                           {subjects.map((subject) => (
@@ -1641,22 +1658,13 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                           {subjects.length === 0 && <p className="studio-subject-empty">Crea la primera asignatura para organizar el contenido.</p>}
                         </div>
                         <div className="studio-new-subject">
-                          <input
-                            aria-label="Nombre de la nueva asignatura"
-                            maxLength={120}
-                            placeholder="Nueva asignatura"
-                            type="text"
-                            value={newSubjectName}
-                            onChange={(event) => setNewSubjectName(event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                void createSubject();
-                              }
-                            }}
-                          />
-                          <button disabled={!newSubjectName.trim() || busy !== null} type="button" onClick={() => void createSubject()}>
-                            <Plus size={16} /> Crear asignatura
+                          <button
+                            className="studio-entity-create-button"
+                            disabled={!editable || busy !== null}
+                            type="button"
+                            onClick={() => setSubjectCreateOpen(true)}
+                          >
+                            <Plus aria-hidden="true" size={16} /> Nueva asignatura
                           </button>
                         </div>
                       </section>
@@ -1718,6 +1726,25 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
           )}
         </section>
       </div>
+
+      <StudioNameDialog
+        busy={busy === "subject"}
+        description="La nueva asignatura quedará seleccionada automáticamente en este contenido."
+        icon={<GraduationCap size={22} />}
+        inputLabel="Nombre de la asignatura"
+        maxLength={120}
+        open={subjectCreateOpen}
+        placeholder="Ej. Anatomía"
+        submitLabel="Crear asignatura"
+        title="Nueva asignatura"
+        value={newSubjectName}
+        onChange={setNewSubjectName}
+        onClose={() => {
+          setSubjectCreateOpen(false);
+          setNewSubjectName("");
+        }}
+        onSubmit={createSubject}
+      />
 
       {guideCreateOpen && (
         <div
