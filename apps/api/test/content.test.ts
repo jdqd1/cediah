@@ -31,6 +31,7 @@ import {
 const contentId = "7a8a6513-9384-4b5d-a825-439f42355714";
 const subjectId = "19d4f11b-9ff1-45c2-b2b5-50686038fe42";
 const assetId = "86bc79c0-c73b-4aa6-9257-f22f0d89b080";
+const linkedVideoId = "16a730c2-f283-45bc-80fd-8a8fbfe11345";
 const createdAt = "2026-08-10T12:00:00.000Z";
 const publishedAt = "2026-08-10T13:00:00.000Z";
 
@@ -842,13 +843,17 @@ describe("content API", () => {
     ).toBe(false);
   });
 
-  it("limits published updates to assignments and topic labels", () => {
+  it("limits published updates to organization and guide video links", () => {
     const published = guideItem({ status: "published" });
     const organizationUpdate = ContentDraftSchema.parse({
       ...published,
       subjectIds: [subjectId],
       topic: "Cuello",
-      content: { ...published.content, regions: ["Cuello", "Cabeza"] },
+      content: {
+        ...published.content,
+        linkedVideoId,
+        regions: ["Cuello", "Cabeza"],
+      },
     });
     const contentUpdate = ContentDraftSchema.parse({
       ...organizationUpdate,

@@ -3,6 +3,7 @@
 import type { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Archive,
   ArrowLeft,
   CaretLeft,
   CaretRight,
@@ -40,7 +41,8 @@ import {
 import { AppShell } from "./app-shell";
 import { uniqueRegions } from "@/lib/content-regions";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
-import { RegionTagsInput } from "./region-tags-input";
+import { TopicSelector } from "./topic-selector";
+import { StudioConfirmDialog } from "./studio-confirm-dialog";
 import { StudioNameDialog } from "./studio-name-dialog";
 import { PlatformToast, type PlatformNotice } from "./platform-toast";
 
@@ -130,6 +132,17 @@ function normalizeSearch(value: string) {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase("es");
+}
+
+function topicsForSubjects(items: ContentItem[], subjectIds: readonly string[]) {
+  if (subjectIds.length === 0) return [];
+  const selected = new Set(subjectIds);
+  return uniqueRegions(items
+    .filter((current) => current.subjectIds.some((id) => selected.has(id)))
+    .flatMap((current) => current.content.regions.length > 0
+      ? current.content.regions
+      : [current.topic]))
+    .sort((left, right) => left.localeCompare(right, "es"));
 }
 
 function summaryFromText(value: string) {
@@ -284,23 +297,34 @@ function onlySubjectAssignmentChanged(current: ContentDraft, baseline: ContentDr
 }
 
 function onlyOrganizationChanged(current: ContentDraft, baseline: ContentDraft) {
+  const currentLinkedVideoId = current.kind === "guide" ? current.content.linkedVideoId : null;
+  const baselineLinkedVideoId = baseline.kind === "guide" ? baseline.content.linkedVideoId : null;
   const organizationChanged =
     JSON.stringify(current.subjectIds) !== JSON.stringify(baseline.subjectIds) ||
     current.topic !== baseline.topic ||
-    JSON.stringify(current.content.regions) !== JSON.stringify(baseline.content.regions);
+    JSON.stringify(current.content.regions) !== JSON.stringify(baseline.content.regions) ||
+    currentLinkedVideoId !== baselineLinkedVideoId;
   if (!organizationChanged) return false;
 
   const currentWithoutOrganization = {
     ...current,
     subjectIds: [],
     topic: "",
-    content: { ...current.content, regions: [] },
+    content: {
+      ...current.content,
+      regions: [],
+      ...(current.kind === "guide" ? { linkedVideoId: null } : {}),
+    },
   };
   const baselineWithoutOrganization = {
     ...baseline,
     subjectIds: [],
     topic: "",
-    content: { ...baseline.content, regions: [] },
+    content: {
+      ...baseline.content,
+      regions: [],
+      ...(baseline.kind === "guide" ? { linkedVideoId: null } : {}),
+    },
   };
   return JSON.stringify(currentWithoutOrganization) === JSON.stringify(baselineWithoutOrganization);
 }
@@ -532,7 +556,7 @@ function GuideEditorLaunch({
   label,
   onOpen,
 }: {
-  description: string;
+  description?: string;
   label: string;
   onOpen: () => void;
 }) {
@@ -564,7 +588,7 @@ function GuideEditorLaunch({
         <span className="studio-guide-launch-icon"><NotePencil size={22} /></span>
         <span className="studio-guide-cta-copy">
           <strong>{label}</strong>
-          <small>{description}</small>
+          {description && <small>{description}</small>}
         </span>
         <span className="studio-guide-preview-action">
           Ir al editor <CaretRight aria-hidden="true" size={16} />
@@ -596,8 +620,7 @@ function TypeEditor({
   if (draft.kind === "guide") {
     return (
       <GuideEditorLaunch
-        description="Organiza el documento, el índice y los recursos de estudio."
-        label="Editar contenido de la guía"
+        label="Editar contenido"
         onOpen={onOpenGuide}
       />
     );
@@ -727,6 +750,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [guideEditing, setGuideEditing] = useState(false);
   const [guideCreateOpen, setGuideCreateOpen] = useState(false);
   const [linkedVideoId, setLinkedVideoId] = useState("");
+  const [archiveConfirmationOpen, setArchiveConfirmationOpen] = useState(false);
   const [publicationsCollapsed, setPublicationsCollapsed] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const guideEntryDraftRef = useRef<ContentDraft | null>(null);
@@ -735,11 +759,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const capabilities = initialWorkspace.capabilities;
   const item = editingId ? items.find((current) => current.id === editingId) : undefined;
 
-  const regionSuggestions = useMemo(
-    () => Array.from(new Set(items.flatMap((current) =>
-      current.content.regions.length > 0 ? current.content.regions : [current.topic],
-    ))).sort((left, right) => left.localeCompare(right, "es")),
-    [items],
+  const topicSuggestions = useMemo(
+    () => topicsForSubjects(items, draft?.subjectIds ?? []),
+    [draft?.subjectIds, items],
   );
   const linkableVideos = useMemo(
     () =>
@@ -752,6 +774,19 @@ export function ContentStudio({ initialWorkspace }: Props) {
       ),
     [items],
   );
+  const guideVideoOptions = useMemo(() => {
+    if (draft?.kind !== "guide") return linkableVideos;
+    const selectedSubjects = new Set(draft.subjectIds);
+    const candidates = linkableVideos.filter((video) =>
+      selectedSubjects.size === 0 || video.subjectIds.some((id) => selectedSubjects.has(id)),
+    );
+    const current = draft.content.linkedVideoId
+      ? items.find((value): value is ContentItem & { kind: "video" } =>
+          value.kind === "video" && value.id === draft.content.linkedVideoId)
+      : undefined;
+    if (current && !candidates.some((video) => video.id === current.id)) candidates.push(current);
+    return candidates.sort((left, right) => left.title.localeCompare(right.title, "es"));
+  }, [draft, items, linkableVideos]);
 
   const visibleItems = useMemo(() => {
     const text = normalizeSearch(query.trim());
@@ -827,6 +862,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   function resetFeedback() {
     setNotice(null);
+    setArchiveConfirmationOpen(false);
     setNewSubjectName("");
     setSubjectCreateOpen(false);
     setFile(null);
@@ -1059,7 +1095,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setNotice({
         text: item.status === "published"
           ? capabilities.canEditAll
-            ? "El contenido publicado sólo permite actualizar sus asignaturas y etiquetas desde este editor."
+            ? "El contenido publicado sólo permite actualizar sus asignaturas, tema y video relacionado desde este editor."
             : "No tienes permisos para reorganizar contenido publicado."
           : "Sólo coordinación o administración pueden editar contenido archivado.",
         tone: "error",
@@ -1113,7 +1149,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setNotice({ text: "Guarda los cambios antes de cambiar el estado.", tone: "error" });
       return;
     }
-    if (status === "archived" && !window.confirm("¿Archivar este contenido?")) return;
     if (
       item.status === "archived" &&
       status === "published" &&
@@ -1131,6 +1166,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setDraft(itemDraft(current));
       setEditingId(current.id);
       setIsNew(false);
+      if (status === "archived") setArchiveConfirmationOpen(false);
       setNotice({
         text: `Estado actualizado a ${labelOf(statuses, current.status)}.`,
         tone: "success",
@@ -1555,7 +1591,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
             <>
               <div className="studio-empty">
                 <Notebook size={30} />
-                <h3>Elige una publicación</h3>
+                <h3>Elige o crea una publicación</h3>
               </div>
             </>
           ) : (
@@ -1573,7 +1609,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
                   )}
                   {actions.map((action) => (
                     <button
-                      className={`studio-button studio-editor-action studio-button-${action.tone}`}
+                      aria-label={action.label}
+                      className={`studio-button studio-editor-action studio-button-${action.tone}${action.status === "archived" ? " is-icon-only" : ""}`}
                       disabled={
                         busy !== null ||
                         (draft.kind === "video" &&
@@ -1584,12 +1621,16 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       title={
                         draft.kind === "video" && !videoComplete
                           ? "Completa el video, los puntos clave, la guía y el cuestionario"
-                          : undefined
+                          : action.label
                       }
                       type="button"
-                      onClick={() => transition(action.status)}
+                      onClick={() => action.status === "archived"
+                        ? setArchiveConfirmationOpen(true)
+                        : void transition(action.status)}
                     >
-                      {action.label}
+                      {action.status === "archived"
+                        ? <Archive aria-hidden="true" size={17} />
+                        : action.label}
                     </button>
                   ))}
                   {item?.kind === "guide" && capabilities.canPublish && (
@@ -1602,7 +1643,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       onClick={() => void removeGuide()}
                     >
                       <Trash aria-hidden="true" size={16} />
-                      <span>{busy === "delete" ? "Eliminando…" : "Eliminar"}</span>
                     </button>
                   )}
                   <button
@@ -1717,7 +1757,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
                         <div className="studio-subject-heading">
                           <div>
                             <h5 id="studio-subject-title">Asignaturas</h5>
-                            <p>Selecciona una o varias materias para organizar este contenido.</p>
                           </div>
                         </div>
                         <div className="studio-subject-options" role="group" aria-label="Asignaturas del contenido">
@@ -1727,14 +1766,33 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                 <input
                                   checked={draft.subjectIds.includes(subject.id)}
                                   type="checkbox"
-                                  onChange={(event) =>
-                                    setDraft({
-                                      ...draft,
-                                      subjectIds: event.target.checked
-                                        ? Array.from(new Set([...draft.subjectIds, subject.id]))
-                                        : draft.subjectIds.filter((id) => id !== subject.id),
-                                    } as ContentDraft)
-                                  }
+                                  onChange={(event) => setDraft((current) => {
+                                    if (!current) return current;
+                                    const nextSubjectIds = event.target.checked
+                                      ? Array.from(new Set([...current.subjectIds, subject.id]))
+                                      : current.subjectIds.filter((id) => id !== subject.id);
+                                    const currentTopic = current.content.regions[0] ?? current.topic;
+                                    const previousTopics = topicsForSubjects(items, current.subjectIds);
+                                    const nextTopics = topicsForSubjects(items, nextSubjectIds);
+                                    const topicWasExisting = previousTopics.some(
+                                      (value) => normalizeSearch(value) === normalizeSearch(currentTopic),
+                                    );
+                                    const topicStillAvailable = nextTopics.some(
+                                      (value) => normalizeSearch(value) === normalizeSearch(currentTopic),
+                                    );
+                                    const keepTopic = Boolean(
+                                      currentTopic &&
+                                      nextSubjectIds.length > 0 &&
+                                      (topicStillAvailable || !topicWasExisting),
+                                    );
+                                    const nextTopic = keepTopic ? currentTopic : "";
+                                    return {
+                                      ...current,
+                                      subjectIds: nextSubjectIds,
+                                      topic: nextTopic,
+                                      content: { ...current.content, regions: nextTopic ? [nextTopic] : [] },
+                                    } as ContentDraft;
+                                  })}
                                 />
                                 <span>
                                   <strong>{subject.name}</strong>
@@ -1768,19 +1826,41 @@ export function ContentStudio({ initialWorkspace }: Props) {
                           </button>
                         </div>
                       </section>
-                      <RegionTagsInput
+                      <TopicSelector
                         disabled={!editable || busy !== null}
-                        label="Etiquetas del tema"
-                        suggestions={regionSuggestions}
-                        values={draft.content.regions.length > 0 ? draft.content.regions : draft.topic ? [draft.topic] : []}
-                        onChange={(regions) =>
+                        subjectSelected={draft.subjectIds.length > 0}
+                        suggestions={topicSuggestions}
+                        value={draft.content.regions[0] ?? draft.topic}
+                        onChange={(topic) =>
                           setDraft({
                             ...draft,
-                            topic: regions[0] ?? "",
-                            content: { ...draft.content, regions },
+                            topic,
+                            content: { ...draft.content, regions: topic ? [topic] : [] },
                           } as ContentDraft)
                         }
                       />
+                      {draft.kind === "guide" && (
+                        <label className="studio-field studio-field-wide studio-linked-video-field">
+                          <span>Video relacionado</span>
+                          <select
+                            value={draft.content.linkedVideoId ?? ""}
+                            onChange={(event) => setDraft({
+                              ...draft,
+                              content: {
+                                ...draft.content,
+                                linkedVideoId: event.target.value || null,
+                              },
+                            })}
+                          >
+                            <option value="">Sin video relacionado</option>
+                            {guideVideoOptions.map((video) => (
+                              <option key={video.id} value={video.id}>
+                                {video.title} · {labelOf(statuses, video.status)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                       {draft.kind !== "topic" && draft.kind !== "guide" && (
                         <label className="studio-field studio-field-wide">
                           <span>Resumen</span>
@@ -1844,6 +1924,17 @@ export function ContentStudio({ initialWorkspace }: Props) {
           setNewSubjectName("");
         }}
         onSubmit={createSubject}
+      />
+
+      <StudioConfirmDialog
+        busy={busy === "transition"}
+        confirmLabel="Archivar"
+        description={`“${item?.title ?? "Esta publicación"}” dejará de estar visible para los estudiantes. Podrás volver a publicarla más adelante.`}
+        icon={<Archive size={24} />}
+        open={archiveConfirmationOpen && Boolean(item)}
+        title="¿Archivar esta publicación?"
+        onClose={() => setArchiveConfirmationOpen(false)}
+        onConfirm={() => transition("archived")}
       />
 
       {guideCreateOpen && (

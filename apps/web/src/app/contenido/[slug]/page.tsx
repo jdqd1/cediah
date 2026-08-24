@@ -1,12 +1,16 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
-import { subjectContentHref } from "@/lib/content-navigation";
-import { getPublishedContentItem, getSubjects } from "@/lib/server/content-api";
+import { isStudyContentKind, subjectContentHref } from "@/lib/content-navigation";
+import {
+  getPublishedContent,
+  getPublishedContentItem,
+  getSubjects,
+} from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
-type GuidePageProps = {
+type ContentPageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -15,7 +19,7 @@ function firstSearchValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function GuidePage({ params, searchParams }: GuidePageProps) {
+export default async function ContentPage({ params, searchParams }: ContentPageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
   const [result, subjectsResult, isAdministrator] = await Promise.all([
     getPublishedContentItem(slug),
@@ -24,32 +28,42 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
   ]);
 
   if (result.status === "ready") {
-    if (result.item.kind !== "guide" && result.item.kind !== "video") notFound();
     const requestedSubject = firstSearchValue(query.asignatura)?.trim();
     const subjects = subjectsResult.status === "ready" ? subjectsResult.subjects : [];
     const subject = subjects.find((current) => current.slug === requestedSubject) ??
       subjects.find((current) => result.item.subjectIds.includes(current.id));
+    const requestedKind = firstSearchValue(query.tipo)?.trim();
+    const kind = isStudyContentKind(requestedKind)
+      ? requestedKind
+      : isStudyContentKind(result.item.kind)
+        ? result.item.kind
+        : undefined;
     const topic = firstSearchValue(query.tema)?.trim() ||
       result.item.content.regions[0] ||
       result.item.topic;
-    const origin = firstSearchValue(query.origen)?.trim();
-    const guideMode = result.item.kind === "video";
-    const guideParams = new URLSearchParams();
-    if (subject) guideParams.set("asignatura", subject.slug);
-    if (topic) guideParams.set("tema", topic);
-    const returnHref = guideMode
-      ? `/contenido/${result.item.slug}`
-      : origin === "asignatura" && subject
-        ? subjectContentHref(subject.slug, "guide", topic || undefined)
-        : `/guias${guideParams.size > 0 ? `?${guideParams.toString()}` : ""}`;
+    const returnHref = subject
+      ? subjectContentHref(subject.slug, kind, topic || undefined)
+      : "/asignaturas";
+    const returnLabel = topic
+      ? `Volver a ${topic}`
+      : subject
+        ? `Volver a ${subject.name}`
+        : "Volver a asignaturas";
+    const linkedGuideResult = result.item.kind === "video"
+      ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 1 })
+      : null;
+    const linkedGuide = linkedGuideResult?.status === "ready"
+      ? linkedGuideResult.catalog.items.find((item) => item.kind === "guide")
+      : undefined;
+
     return (
       <ContentDetailScreen
         contextLabel={subject?.name}
-        guideMode={guideMode}
         item={result.item}
         isAdministrator={isAdministrator}
+        linkedGuide={linkedGuide}
         returnHref={returnHref}
-        returnLabel={guideMode ? "Volver al video" : topic ? `Volver a ${topic}` : "Volver a guías"}
+        returnLabel={returnLabel}
       />
     );
   }
@@ -57,7 +71,7 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
 
   return (
     <main className="content-unavailable-page">
-      <h1>No pudimos cargar esta guía.</h1>
+      <h1>No pudimos cargar este contenido.</h1>
       <p>Intenta actualizar la página en unos minutos.</p>
     </main>
   );

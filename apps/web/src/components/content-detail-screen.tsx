@@ -37,34 +37,40 @@ import {
 import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
 import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { contentKindLabel } from "@/lib/content-navigation";
 import { AppShell } from "./app-shell";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 export function ContentDetailScreen({
+  contextLabel,
   guideMode = false,
   item,
   isAdministrator = false,
   linkedGuide,
   returnHref,
+  returnLabel,
 }: {
+  contextLabel?: string;
   guideMode?: boolean;
   item: ContentItem;
   isAdministrator?: boolean;
   linkedGuide?: Extract<ContentItem, { kind: "guide" }>;
   returnHref?: string;
+  returnLabel?: string;
 }) {
   const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
-  const libraryLabel = isGuideView ? "Guías" : "Biblioteca";
+  const sectionLabel = isGuideView ? "Guías" : contentKindLabel(item.kind);
   const defaultBackHref = guideMode && item.kind === "video"
-    ? `/biblioteca/${item.slug}`
+    ? `/contenido/${item.slug}`
     : item.kind === "guide"
       ? "/guias"
-      : "/biblioteca";
+      : "/asignaturas";
   const backHref = returnHref ?? defaultBackHref;
+  const backLabel = returnLabel ?? (isGuideView ? "Volver a guías" : "Volver a asignaturas");
   return (
     <AppShell
-      activeKey={isGuideView ? "guides" : item.kind}
-      headerTitle={isGuideView ? libraryLabel : item.kind === "video" ? "Video" : "Material de estudio"}
+      activeKey={isGuideView ? "guides" : item.kind === "topic" ? "subjects" : item.kind}
+      headerTitle={sectionLabel}
       isAdministrator={isAdministrator}
       mainClassName="content-detail-main"
     >
@@ -73,10 +79,10 @@ export function ContentDetailScreen({
           {isGuideView ? (
             <div className="published-content-context">
               <Link href={backHref}>
-                <ArrowLeft size={17} /> Volver
+                <ArrowLeft size={17} /> {backLabel}
               </Link>
               <nav className="published-content-breadcrumbs" aria-label="Ruta actual">
-                <span>{libraryLabel}</span>
+                <span>{contextLabel ?? sectionLabel}</span>
                 <span aria-hidden="true">›</span>
                 <span>{item.topic}</span>
                 <span aria-hidden="true">›</span>
@@ -84,10 +90,10 @@ export function ContentDetailScreen({
               </nav>
             </div>
           ) : (
-            <nav className="published-content-flow-navigation" aria-label="Volver al temario">
+            <nav className="published-content-flow-navigation" aria-label={backLabel}>
               <Link href={backHref}>
                 <ArrowLeft aria-hidden="true" size={16} />
-                Volver al temario
+                {backLabel}
               </Link>
             </nav>
           )}

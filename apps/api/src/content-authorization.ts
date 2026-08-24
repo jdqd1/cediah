@@ -71,7 +71,15 @@ export function isPublishedOrganizationUpdate(
     return false;
   }
 
-  const currentContent = { ...current.content, regions: [] };
-  const nextContent = { ...next.content, regions: [] };
+  const currentContent = {
+    ...current.content,
+    regions: [],
+    ...(current.kind === "guide" ? { linkedVideoId: null } : {}),
+  };
+  const nextContent = {
+    ...next.content,
+    regions: [],
+    ...(next.kind === "guide" ? { linkedVideoId: null } : {}),
+  };
   return JSON.stringify(currentContent) === JSON.stringify(nextContent);
 }

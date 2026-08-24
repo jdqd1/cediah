@@ -61,10 +61,10 @@ const mainNavigation: NavItem[] = [
 ];
 
 const studyNavigation: NavItem[] = [
-  { key: "video", label: "Videos", href: "/biblioteca?tipo=video", icon: PlayCircle },
+  { key: "video", label: "Videos", href: "/asignaturas?tipo=video", icon: PlayCircle },
   { key: "guides", label: "Guías", href: "/guias", icon: Notebook },
-  { key: "flashcards", label: "Flashcards", href: "/biblioteca?tipo=flashcards", icon: CardsThree },
-  { key: "quiz", label: "Cuestionarios", href: "/biblioteca?tipo=quiz", icon: ClipboardText },
+  { key: "flashcards", label: "Flashcards", href: "/asignaturas?tipo=flashcards", icon: CardsThree },
+  { key: "quiz", label: "Cuestionarios", href: "/asignaturas?tipo=quiz", icon: ClipboardText },
 ];
 
 

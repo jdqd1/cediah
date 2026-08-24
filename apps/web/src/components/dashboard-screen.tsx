@@ -5,10 +5,10 @@ import {
   BookOpen,
   CardsThree,
   CheckSquareOffset,
-  Compass,
   PlayCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import type { ContentItem, ContentKind } from "@cediah/contracts";
+import { publishedContentHref, subjectDirectoryHref } from "@/lib/content-navigation";
 import { AppShell } from "./app-shell";
 import { BrandFooter } from "./brand-footer";
 
@@ -30,6 +30,13 @@ const kindImages: Record<ContentKind, string> = {
 
 const materialDefinitions = [
   {
+    description: "Clases y explicaciones",
+    href: "/asignaturas?tipo=video",
+    icon: PlayCircle,
+    kind: "video" as const,
+    title: "Videos",
+  },
+  {
     description: "Documentos y lecturas",
     href: "/guias",
     icon: BookOpen,
@@ -38,31 +45,22 @@ const materialDefinitions = [
   },
   {
     description: "Repasos rápidos",
-    href: "/biblioteca?tipo=flashcards",
+    href: "/asignaturas?tipo=flashcards",
     icon: CardsThree,
     kind: "flashcards" as const,
     title: "Flashcards",
   },
   {
     description: "Evalúa tu conocimiento",
-    href: "/biblioteca?tipo=quiz",
+    href: "/asignaturas?tipo=quiz",
     icon: CheckSquareOffset,
     kind: "quiz" as const,
     title: "Cuestionarios",
   },
-  {
-    description: "Recorridos por tema",
-    href: "/biblioteca?tipo=topic",
-    icon: Compass,
-    kind: "topic" as const,
-    title: "Temas",
-  },
 ] as const;
 
 function contentHref(item: ContentItem) {
-  return item.kind === "guide"
-    ? "/guias/" + item.slug
-    : "/biblioteca/" + item.slug;
+  return publishedContentHref(item);
 }
 
 function formatDuration(item: ContentItem) {
@@ -135,7 +133,7 @@ export function DashboardScreen({
           <section className="dashboard-section dashboard-recent" aria-labelledby="recent-title">
             <div className="section-heading-row">
               <h2 id="recent-title">Videos recientes</h2>
-              <Link href="/biblioteca?tipo=video">
+              <Link href={subjectDirectoryHref("video")}>
                 Ver todo <ArrowRight size={17} />
               </Link>
             </div>
@@ -163,8 +161,8 @@ export function DashboardScreen({
           <section className="dashboard-section dashboard-materials" aria-labelledby="materials-title">
             <div className="section-heading-row">
               <h2 id="materials-title">Material de estudio</h2>
-              <Link href="/biblioteca">
-                Abrir biblioteca <ArrowRight size={17} />
+              <Link href="/asignaturas">
+                Explorar asignaturas <ArrowRight size={17} />
               </Link>
             </div>
             <div className="study-material-grid">
@@ -192,7 +190,7 @@ export function DashboardScreen({
         <aside className="dashboard-most-viewed" aria-labelledby="featured-content-title">
           <div className="section-heading-row">
             <h2 id="featured-content-title">Destacados</h2>
-            <Link href="/biblioteca">
+            <Link href="/asignaturas">
               Ver todo <ArrowRight size={17} />
             </Link>
           </div>

@@ -1,12 +1,13 @@
 import { GuideDashboardScreen } from "@/components/guide-dashboard-screen";
-import { getPublishedContent } from "@/lib/server/content-api";
+import { getPublishedContent, getSubjects } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function GuidesPage() {
-  const [result, isAdministrator] = await Promise.all([
+  const [result, subjectsResult, isAdministrator] = await Promise.all([
     getPublishedContent({ kind: "guide", limit: 100 }),
+    getSubjects(),
     currentUserIsAdministrator(),
   ]);
   const guides =
@@ -19,6 +20,7 @@ export default async function GuidesPage() {
       available={result.status === "ready"}
       guides={guides}
       isAdministrator={isAdministrator}
+      subjects={subjectsResult.status === "ready" ? subjectsResult.subjects : []}
     />
   );
 }

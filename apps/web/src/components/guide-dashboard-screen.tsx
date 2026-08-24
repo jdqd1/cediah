@@ -2,21 +2,24 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ArrowLeft,
   ArrowRight,
   BookOpen,
-  FilePdf,
+  Books,
   MagnifyingGlass,
-  Star,
   X,
 } from "@phosphor-icons/react";
-import type { ContentItem } from "@cediah/contracts";
-import { useMemo, useState } from "react";
+import type { ContentItem, Subject } from "@cediah/contracts";
+import { type MouseEvent, useMemo, useState } from "react";
+import { publishedContentHref } from "@/lib/content-navigation";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 
 type GuideItem = ContentItem & { kind: "guide" };
 
+const UNASSIGNED = "sin-asignatura";
 const guideImages = [
   "/anatomy/skull-light.png",
   "/anatomy/heart-light.png",
@@ -24,10 +27,6 @@ const guideImages = [
   "/anatomy/intestines.png",
   "/anatomy/thigh-light.png",
 ] as const;
-
-function guideHref(guide: GuideItem) {
-  return "/guias/" + guide.slug;
-}
 
 function guideImage(guide: GuideItem) {
   const position = Array.from(guide.slug).reduce(
@@ -44,186 +43,242 @@ function normalize(value: string) {
     .toLocaleLowerCase("es");
 }
 
-function guideRegions(guide: GuideItem) {
-  return guide.content.regions.length > 0 ? guide.content.regions : [guide.topic];
+function guideTopics(guide: GuideItem) {
+  return uniqueRegions(guide.content.regions.length > 0 ? guide.content.regions : [guide.topic]);
 }
 
-function sectionCount(guide: GuideItem) {
-  const count = guide.content.sections.length;
-  if (count === 0) return null;
-  return `${count} ${count === 1 ? "sección" : "secciones"}`;
+function queryHref(pathname: string, subjectSlug = "", topic = "") {
+  const params = new URLSearchParams();
+  if (subjectSlug) params.set("asignatura", subjectSlug);
+  if (topic) params.set("tema", topic);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+function GuideList({ guides, subjectSlug, topic }: {
+  guides: GuideItem[];
+  subjectSlug: string;
+  topic: string;
+}) {
+  return (
+    <ul className="guide-directory-list">
+      {guides.map((guide) => (
+        <li key={guide.id}>
+          <Link
+            className="guide-directory-item"
+            href={publishedContentHref(guide, {
+              origin: "guias",
+              subjectSlug: subjectSlug === UNASSIGNED ? undefined : subjectSlug,
+              topic,
+            })}
+          >
+            <span className="guide-directory-cover">
+              <Image alt="" fill sizes="(max-width: 620px) 64px, 78px" src={guideImage(guide)} />
+            </span>
+            <span className="guide-directory-copy">
+              <strong>{guide.title}</strong>
+              <span>{guide.summary}</span>
+            </span>
+            <ArrowRight aria-hidden="true" size={18} />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export function GuideDashboardScreen({
   available,
   guides,
   isAdministrator = false,
+  subjects,
 }: {
   available: boolean;
   guides: GuideItem[];
   isAdministrator?: boolean;
+  subjects: Subject[];
 }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
-  const [topic, setTopic] = useState("");
+  const selectedSlug = searchParams.get("asignatura")?.trim() ?? "";
+  const selectedTopic = searchParams.get("tema")?.trim() ?? "";
+  const selectedSubject = subjects.find((subject) => subject.slug === selectedSlug);
+  const isUnassigned = selectedSlug === UNASSIGNED;
+  const hasSelection = Boolean(selectedSubject || isUnassigned);
+  const buckets = useMemo(() => {
+    const assigned = subjects.map((subject) => ({
+      count: guides.filter((guide) => guide.subjectIds.includes(subject.id)).length,
+      id: subject.id,
+      name: subject.name,
+      slug: subject.slug,
+    })).filter((subject) => subject.count > 0);
+    const unassignedCount = guides.filter((guide) => guide.subjectIds.length === 0).length;
+    if (unassignedCount > 0) {
+      assigned.push({ count: unassignedCount, id: UNASSIGNED, name: "Sin asignatura", slug: UNASSIGNED });
+    }
+    return assigned;
+  }, [guides, subjects]);
+  const selectedGuides = useMemo(() => {
+    if (isUnassigned) return guides.filter((guide) => guide.subjectIds.length === 0);
+    if (selectedSubject) return guides.filter((guide) => guide.subjectIds.includes(selectedSubject.id));
+    return [];
+  }, [guides, isUnassigned, selectedSubject]);
   const topics = useMemo(
-    () =>
-      uniqueRegions(guides.flatMap(guideRegions)).sort((left, right) =>
-        left.localeCompare(right, "es"),
-      ),
-    [guides],
+    () => uniqueRegions(selectedGuides.flatMap(guideTopics)).sort((left, right) => left.localeCompare(right, "es")),
+    [selectedGuides],
   );
   const visibleGuides = useMemo(() => {
     const search = normalize(query.trim());
-    const selectedRegion = normalize(topic);
-
-    return guides.filter((guide) => {
-      const regions = guideRegions(guide);
-      const matchesTopic =
-        !selectedRegion || regions.some((region) => normalize(region) === selectedRegion);
-      const matchesSearch =
-        !search ||
-        normalize(`${guide.title} ${guide.summary} ${guide.topic} ${regions.join(" ")}`).includes(search);
+    const topic = normalize(selectedTopic);
+    return selectedGuides.filter((guide) => {
+      const matchesTopic = !topic || guideTopics(guide).some((value) => normalize(value) === topic);
+      const matchesSearch = !search || normalize(`${guide.title} ${guide.summary} ${guide.topic}`).includes(search);
       return matchesTopic && matchesSearch;
     });
-  }, [guides, query, topic]);
-  const hasFilters = Boolean(query.trim() || topic);
+  }, [query, selectedGuides, selectedTopic]);
+  const visibleBuckets = useMemo(() => {
+    const search = normalize(query.trim());
+    return buckets.filter((bucket) => !search || normalize(bucket.name).includes(search));
+  }, [buckets, query]);
+  const topicGroups = useMemo(() => {
+    const groups = new Map<string, GuideItem[]>();
+    for (const guide of visibleGuides) {
+      for (const name of guideTopics(guide)) {
+        if (selectedTopic && normalize(name) !== normalize(selectedTopic)) continue;
+        const current = groups.get(name);
+        if (current) current.push(guide);
+        else groups.set(name, [guide]);
+      }
+    }
+    return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right, "es"));
+  }, [selectedTopic, visibleGuides]);
 
-  function clearFilters() {
+  function push(nextSubject = "", nextTopic = "") {
     setQuery("");
-    setTopic("");
+    const href = queryHref(pathname, nextSubject, nextTopic);
+    const currentHref = window.location.pathname + window.location.search;
+    if (currentHref !== href) window.history.pushState(null, "", href);
   }
+
+  function navigate(event: MouseEvent<HTMLAnchorElement>, nextSubject = "", nextTopic = "") {
+    if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    event.preventDefault();
+    push(nextSubject, nextTopic);
+  }
+
+  const selectionName = selectedSubject?.name ?? (isUnassigned ? "Sin asignatura" : "");
 
   return (
     <AppShell
       activeKey="guides"
       isAdministrator={isAdministrator}
-      headerTitle="Guías de estudio"
+      headerTitle="Guías"
       mainClassName="guide-catalog-main"
     >
-      <section className="guide-catalog" aria-labelledby="guide-catalog-title">
-        <header className="guide-catalog-header">
-          <div className="guide-catalog-heading">
-            <span className="guide-catalog-heading-icon" aria-hidden="true">
-              <BookOpen size={24} weight="duotone" />
-            </span>
+      <section className="guide-directory" aria-label="Guías de estudio">
+        <h2 className="sr-only">Guías de estudio</h2>
+
+        {hasSelection && (
+          <header className="guide-directory-context">
+            <Link href="/guias" onClick={(event) => navigate(event)}>
+              <ArrowLeft aria-hidden="true" size={16} /> Todas las asignaturas
+            </Link>
             <div>
-              <h2 id="guide-catalog-title">Guías de estudio</h2>
-              <span className="guide-catalog-total">
-                {guides.length} {guides.length === 1 ? "guía publicada" : "guías publicadas"}
-              </span>
+              <span>Guías</span>
+              <h3>{selectionName}</h3>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
-        <div className="guide-catalog-filters" role="search" aria-label="Buscar y filtrar guías">
-          <label className="guide-catalog-search" htmlFor="guide-catalog-search">
-            <span>Buscar</span>
-            <span className="guide-catalog-search-control">
-              <MagnifyingGlass size={19} aria-hidden="true" />
-              <input
-                id="guide-catalog-search"
-                type="search"
-                placeholder="Título, región o palabra clave"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </span>
+        <div className="guide-directory-filters" role="search" aria-label="Buscar y filtrar guías">
+          <label className="guide-directory-search">
+            <MagnifyingGlass aria-hidden="true" size={18} />
+            <input
+              aria-label={hasSelection ? "Buscar guías" : "Buscar asignatura"}
+              autoComplete="off"
+              placeholder={hasSelection ? "Buscar por título o descripción" : "Buscar asignatura"}
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {query && (
+              <button aria-label="Limpiar búsqueda" type="button" onClick={() => setQuery("")}>
+                <X aria-hidden="true" size={16} />
+              </button>
+            )}
           </label>
-
-          <label className="guide-catalog-topic" htmlFor="guide-catalog-topic">
-            <span>Región o tema</span>
-            <select
-              id="guide-catalog-topic"
-              value={topic}
-              onChange={(event) => setTopic(event.target.value)}
-            >
-              <option value="">Todos</option>
-              {topics.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
+          <label className="guide-directory-select">
+            <span className="sr-only">Asignatura</span>
+            <select value={hasSelection ? selectedSlug : ""} onChange={(event) => push(event.target.value)}>
+              <option value="">Asignatura</option>
+              {buckets.map((bucket) => (
+                <option key={bucket.id} value={bucket.slug}>{bucket.name}</option>
               ))}
             </select>
           </label>
-
-          {hasFilters && (
-            <button className="guide-catalog-clear" type="button" onClick={clearFilters}>
-              <X size={17} aria-hidden="true" />
-              Limpiar
-            </button>
-          )}
+          <label className="guide-directory-select">
+            <span className="sr-only">Tema</span>
+            <select
+              disabled={!hasSelection}
+              value={selectedTopic}
+              onChange={(event) => push(selectedSlug, event.target.value)}
+            >
+              <option value="">Todos los temas</option>
+              {topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
+            </select>
+          </label>
         </div>
 
-        <div className="guide-catalog-results-heading">
-          <h3>{topic || "Todas las guías"}</h3>
-          <span aria-live="polite">
-            {visibleGuides.length} {visibleGuides.length === 1 ? "resultado" : "resultados"}
-          </span>
-        </div>
-
-        {visibleGuides.length > 0 ? (
-          <ul className="guide-catalog-grid">
-            {visibleGuides.map((guide) => {
-              const sections = sectionCount(guide);
-              const isPdf = guide.asset?.mimeType === "application/pdf";
-
-              return (
-                <li className="guide-catalog-item" key={guide.id}>
-                  <Link className="guide-catalog-card" href={guideHref(guide)}>
-                    <span className="guide-catalog-card-media">
-                      <Image
-                        src={guideImage(guide)}
-                        alt=""
-                        fill
-                        sizes="(max-width: 720px) 100vw, (max-width: 1180px) 50vw, 33vw"
-                      />
-                      {guide.featured && (
-                        <span className="guide-catalog-featured">
-                          <Star size={14} weight="fill" aria-hidden="true" />
-                          Destacada
-                        </span>
-                      )}
-                    </span>
-
-                    <span className="guide-catalog-card-body">
-                      <span className="guide-catalog-card-meta">
-                        <span>{guide.topic}</span>
-                        <span>
-                          {isPdf ? (
-                            <FilePdf size={16} aria-hidden="true" />
-                          ) : (
-                            <BookOpen size={16} aria-hidden="true" />
-                          )}
-                          {isPdf ? "PDF" : "Lectura web"}
-                        </span>
+        {!hasSelection && visibleBuckets.length > 0 && (
+          <nav className="guide-subject-browser" aria-label="Guías por asignatura">
+            <h3>Asignaturas</h3>
+            <ul>
+              {visibleBuckets.map((bucket) => {
+                const href = queryHref(pathname, bucket.slug);
+                return (
+                  <li key={bucket.id}>
+                    <Link href={href} onClick={(event) => navigate(event, bucket.slug)}>
+                      <span className="guide-subject-icon" aria-hidden="true"><Books size={21} /></span>
+                      <span>
+                        <strong>{bucket.name}</strong>
+                        <small>{bucket.count === 1 ? "1 guía" : `${bucket.count} guías`}</small>
                       </span>
-                      <strong>{guide.title}</strong>
-                      <span className="guide-catalog-card-summary">{guide.summary}</span>
-                      <span className="guide-catalog-card-footer">
-                        <span>{sections ?? (isPdf ? "Documento" : "Guía")}</span>
-                        <span className="guide-catalog-card-action">
-                          Abrir guía
-                          <ArrowRight size={17} aria-hidden="true" />
-                        </span>
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
+                      <ArrowRight aria-hidden="true" size={18} />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        )}
+
+        {hasSelection && visibleGuides.length > 0 && (
+          <div className="guide-topic-groups" aria-live="polite">
+            {topicGroups.map(([topic, topicGuides]) => (
+              <section key={topic} aria-labelledby={`guide-topic-${normalize(topic).replace(/[^a-z0-9]+/g, "-")}`}>
+                <header>
+                  <h3 id={`guide-topic-${normalize(topic).replace(/[^a-z0-9]+/g, "-")}`}>{topic}</h3>
+                  <span>{topicGuides.length}</span>
+                </header>
+                <GuideList guides={topicGuides} subjectSlug={selectedSlug} topic={topic} />
+              </section>
+            ))}
+          </div>
+        )}
+
+        {((!hasSelection && visibleBuckets.length === 0) || (hasSelection && visibleGuides.length === 0)) && (
           <div className="guide-catalog-empty" role="status">
-            <BookOpen size={36} aria-hidden="true" />
+            <BookOpen size={34} aria-hidden="true" />
             <h3>
-              {hasFilters
+              {query || selectedTopic
                 ? "No encontramos guías con esos filtros."
                 : available
-                  ? "Aún no hay guías publicadas."
+                  ? "Aún no hay guías en esta selección."
                   : "No pudimos cargar las guías."}
             </h3>
-            {hasFilters && (
-              <button type="button" onClick={clearFilters}>
+            {(query || selectedTopic) && (
+              <button type="button" onClick={() => selectedTopic ? push(selectedSlug) : setQuery("")}>
                 Limpiar filtros
               </button>
             )}
