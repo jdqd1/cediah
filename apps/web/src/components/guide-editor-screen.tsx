@@ -46,6 +46,12 @@ import { TableKit } from "@tiptap/extension-table";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, type Editor, type JSONContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import {
+  CellSelection,
+  deleteColumn as deleteSelectedColumns,
+  deleteRow as deleteSelectedRows,
+  deleteTable as deleteSelectedTable,
+} from "@tiptap/pm/tables";
 import StarterKit from "@tiptap/starter-kit";
 import {
   RichTextDocumentSchema,
@@ -710,6 +716,7 @@ function GuideReaderPreview({
   const [outlineExpanded, setOutlineExpanded] = useState(true);
 
   function scrollToHeading(id: string) {
+    setOutlineExpanded(false);
     window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
@@ -737,7 +744,7 @@ function GuideReaderPreview({
               <div className="published-rich-guide-outline-links">
                 {outline.map((entry) => (
                   <button
-                    className={entry.displayLevel === 2 ? "is-subsection" : "is-section"}
+                    className={`is-level-${entry.displayLevel}`}
                     key={entry.id}
                     type="button"
                     onClick={() => scrollToHeading(entry.id)}
@@ -887,6 +894,22 @@ export function GuideEditorScreen({
       attributes: {
         "aria-label": "Contenido de la guía",
         class: "guide-editor-prosemirror",
+      },
+      handleKeyDown(view, event) {
+        if (event.key !== "Backspace" && event.key !== "Delete") return false;
+        const selection = view.state.selection;
+        if (!(selection instanceof CellSelection)) return false;
+
+        if (selection.isRowSelection() && selection.isColSelection()) {
+          return deleteSelectedTable(view.state, view.dispatch);
+        }
+        if (selection.isRowSelection()) {
+          return deleteSelectedRows(view.state, view.dispatch);
+        }
+        if (selection.isColSelection()) {
+          return deleteSelectedColumns(view.state, view.dispatch);
+        }
+        return false;
       },
     },
     onUpdate({ editor: currentEditor }) {
@@ -1216,7 +1239,7 @@ export function GuideEditorScreen({
     );
   }
 
-  function addTablePart(kind: "column" | "row") {
+  function changeTablePart(kind: "column" | "row", action: "add" | "delete") {
     if (!editor || !hoveredTableRef.current) return;
     const rows = Array.from(hoveredTableRef.current.rows);
     const cell = kind === "column"
@@ -1227,8 +1250,10 @@ export function GuideEditorScreen({
     try {
       const position = editor.view.posAtDOM(cell, 0) + 1;
       const chain = editor.chain().focus().setTextSelection(position);
-      if (kind === "column") chain.addColumnAfter().run();
-      else chain.addRowAfter().run();
+      if (kind === "column" && action === "add") chain.addColumnAfter().run();
+      else if (kind === "column") chain.deleteColumn().run();
+      else if (action === "add") chain.addRowAfter().run();
+      else chain.deleteRow().run();
     } catch {
       // The table may have been removed between pointer movement and click.
     }
@@ -1348,6 +1373,15 @@ export function GuideEditorScreen({
           <ToolbarButton active={Boolean(editor?.isActive({ textAlign: "center" }))} disabled={disabled} label="Centrar" onClick={() => editor?.chain().focus().setTextAlign("center").run()}><TextAlignCenter size={18} /></ToolbarButton>
           <ToolbarButton active={Boolean(editor?.isActive({ textAlign: "right" }))} disabled={disabled} label="Alinear a la derecha" onClick={() => editor?.chain().focus().setTextAlign("right").run()}><TextAlignRight size={18} /></ToolbarButton>
         </div>
+        {editor?.isActive("table") && (
+          <div className="guide-toolbar-group guide-table-toolbar-group" aria-label="Editar tabla">
+            <ToolbarButton disabled={disabled || !editor.can().addRowAfter()} label="Añadir fila" onClick={() => editor.chain().focus().addRowAfter().run()}><Plus size={17} /><span>Fila</span></ToolbarButton>
+            <ToolbarButton disabled={disabled || !editor.can().deleteRow()} label="Eliminar fila" onClick={() => editor.chain().focus().deleteRow().run()}><Trash size={16} /><span>Fila</span></ToolbarButton>
+            <ToolbarButton disabled={disabled || !editor.can().addColumnAfter()} label="Añadir columna" onClick={() => editor.chain().focus().addColumnAfter().run()}><Plus size={17} /><span>Col.</span></ToolbarButton>
+            <ToolbarButton disabled={disabled || !editor.can().deleteColumn()} label="Eliminar columna" onClick={() => editor.chain().focus().deleteColumn().run()}><Trash size={16} /><span>Col.</span></ToolbarButton>
+            <ToolbarButton disabled={disabled || !editor.can().deleteTable()} label="Eliminar tabla" onClick={() => editor.chain().focus().deleteTable().run()}><Trash size={17} /><span>Tabla</span></ToolbarButton>
+          </div>
+        )}
         <div className="guide-toolbar-group">
           <ToolbarButton active={Boolean(editor?.isActive("link"))} disabled={disabled} label="Añadir enlace" onClick={setLink}><LinkSimple size={18} /></ToolbarButton>
           <ToolbarButton disabled={disabled} label="Insertar imagen mediante URL" onClick={addImage}><ImageSquare size={18} /></ToolbarButton>
@@ -1412,7 +1446,8 @@ export function GuideEditorScreen({
                         type="button"
                         onClick={() => {
                           setActiveOutline(index);
-                          const headings = canvasRef.current?.querySelectorAll(".ProseMirror h1, .ProseMirror h2");
+                          setOutlineCollapsed(true);
+                          const headings = canvasRef.current?.querySelectorAll(".ProseMirror h1, .ProseMirror h2, .ProseMirror h3");
                           headings?.[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
                         }}
                       >
@@ -1457,30 +1492,56 @@ export function GuideEditorScreen({
             {tableControlsPosition && isEditing && (
               <div className="guide-table-edge-controls" aria-label="Controles rápidos de tabla" role="toolbar">
                 {tableControlsPosition.showColumn && (
-                  <button
-                    aria-label="Añadir columna a la derecha"
-                    className="is-column"
-                    style={{ left: tableControlsPosition.right, top: tableControlsPosition.top }}
-                    title="Añadir columna"
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => addTablePart("column")}
-                  >
-                    <Plus aria-hidden="true" size={14} /> <span>Columna</span>
-                  </button>
+                  <>
+                    <button
+                      aria-label="Añadir columna a la derecha"
+                      className="is-column"
+                      style={{ left: tableControlsPosition.right, top: tableControlsPosition.top - 17 }}
+                      title="Añadir columna"
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => changeTablePart("column", "add")}
+                    >
+                      <Plus aria-hidden="true" size={14} /> <span>Columna</span>
+                    </button>
+                    <button
+                      aria-label="Eliminar última columna"
+                      className="is-column is-delete"
+                      style={{ left: tableControlsPosition.right, top: tableControlsPosition.top + 17 }}
+                      title="Eliminar última columna"
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => changeTablePart("column", "delete")}
+                    >
+                      <Trash aria-hidden="true" size={13} /> <span>Columna</span>
+                    </button>
+                  </>
                 )}
                 {tableControlsPosition.showRow && (
-                  <button
-                    aria-label="Añadir fila debajo"
-                    className="is-row"
-                    style={{ left: tableControlsPosition.left, top: tableControlsPosition.bottom }}
-                    title="Añadir fila"
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => addTablePart("row")}
-                  >
-                    <Plus aria-hidden="true" size={14} /> <span>Fila</span>
-                  </button>
+                  <>
+                    <button
+                      aria-label="Añadir fila debajo"
+                      className="is-row"
+                      style={{ left: tableControlsPosition.left - 42, top: tableControlsPosition.bottom }}
+                      title="Añadir fila"
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => changeTablePart("row", "add")}
+                    >
+                      <Plus aria-hidden="true" size={14} /> <span>Fila</span>
+                    </button>
+                    <button
+                      aria-label="Eliminar última fila"
+                      className="is-row is-delete"
+                      style={{ left: tableControlsPosition.left + 42, top: tableControlsPosition.bottom }}
+                      title="Eliminar última fila"
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => changeTablePart("row", "delete")}
+                    >
+                      <Trash aria-hidden="true" size={13} /> <span>Fila</span>
+                    </button>
+                  </>
                 )}
               </div>
             )}

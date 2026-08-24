@@ -24,7 +24,7 @@ export async function readContentJson(request: Request) {
 
 export async function forwardEditorContentRequest(input: {
   body?: unknown;
-  method: "GET" | "PATCH" | "POST";
+  method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
   responseSchema?: {
     safeParse: (body: unknown) =>

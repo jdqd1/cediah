@@ -6,11 +6,11 @@ export type GuideOutlineItem = {
   id: string;
   index: number;
   label: string;
-  level: 1 | 2;
+  level: 1 | 2 | 3;
 };
 
 export type NumberedGuideOutlineItem = GuideOutlineItem & {
-  displayLevel: 1 | 2;
+  displayLevel: 1 | 2 | 3;
   number: string;
 };
 
@@ -297,7 +297,7 @@ export function createStableHeadingIdGenerator(): (label: string) => string {
   };
 }
 
-/** Builds the reader/editor outline from level-two and level-three headings. */
+/** Builds the reader/editor outline from the three authoring heading levels. */
 export function extractGuideOutline(document: RichTextDocument): GuideOutlineItem[] {
   const outline: GuideOutlineItem[] = [];
   const nextId = createStableHeadingIdGenerator();
@@ -307,7 +307,7 @@ export function extractGuideOutline(document: RichTextDocument): GuideOutlineIte
 
     if (nodeType(node) === "heading") {
       const level = headingLevel(node);
-      if (level === 1 || level === 2) {
+      if (level === 1 || level === 2 || level === 3) {
         const label = normalizeExtractedText(inlineNodeText(node));
         const id = nextId(label);
         if (label) {
@@ -327,19 +327,36 @@ export function extractGuideOutline(document: RichTextDocument): GuideOutlineIte
 export function numberGuideOutline(
   outline: readonly GuideOutlineItem[],
 ): NumberedGuideOutlineItem[] {
-  const hasLevelOne = outline.some((item) => item.level === 1);
+  const rootLevel: 1 | 2 | 3 = outline.some((item) => item.level === 1)
+    ? 1
+    : outline.some((item) => item.level === 2)
+      ? 2
+      : 3;
   let section = 0;
   let subsection = 0;
+  let detail = 0;
 
   return outline.map((item) => {
-    if (item.level === 1 || !hasLevelOne) {
+    if (item.level <= rootLevel) {
       section += 1;
       subsection = 0;
+      detail = 0;
       return { ...item, displayLevel: 1 as const, number: `${section}.` };
     }
 
     if (section === 0) section = 1;
-    subsection += 1;
-    return { ...item, displayLevel: 2 as const, number: `${section}.${subsection}` };
+    if (item.level === rootLevel + 1) {
+      subsection += 1;
+      detail = 0;
+      return { ...item, displayLevel: 2 as const, number: `${section}.${subsection}` };
+    }
+
+    if (subsection === 0) subsection = 1;
+    detail += 1;
+    return {
+      ...item,
+      displayLevel: 3 as const,
+      number: `${section}.${subsection}.${detail}`,
+    };
   });
 }

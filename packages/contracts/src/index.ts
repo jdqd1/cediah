@@ -251,6 +251,10 @@ export const SubjectResponseSchema = z.object({
   subject: SubjectSchema,
 });
 
+export const DeletedSubjectSchema = z.object({
+  id: z.string().uuid(),
+});
+
 export type SubjectCreateRequest = z.infer<typeof SubjectCreateRequestSchema>;
 
 const HttpsUrlSchema = z
@@ -1016,6 +1020,10 @@ export interface SubjectProvider {
     actorUserId: string;
     name: string;
   }): Promise<SubjectMutationResult<Subject>>;
+  deleteSubject(input: {
+    actorUserId: string;
+    subjectId: string;
+  }): Promise<SubjectMutationResult<{ id: string }>>;
   getSubjectBySlug(slug: string): Promise<Subject | null>;
   listSubjects(input?: { publishedOnly?: boolean }): Promise<Subject[]>;
 }

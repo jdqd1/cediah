@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
-import { getPublishedContentItem } from "@/lib/server/content-api";
+import { getPublishedContent, getPublishedContentItem } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,19 @@ export default async function ContentPage({ params }: ContentPageProps) {
   ]);
 
   if (result.status === "ready") {
-    return <ContentDetailScreen item={result.item} isAdministrator={isAdministrator} />;
+    const linkedGuideResult = result.item.kind === "video"
+      ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 1 })
+      : null;
+    const linkedGuide = linkedGuideResult?.status === "ready"
+      ? linkedGuideResult.catalog.items.find((item) => item.kind === "guide")
+      : undefined;
+    return (
+      <ContentDetailScreen
+        item={result.item}
+        isAdministrator={isAdministrator}
+        linkedGuide={linkedGuide}
+      />
+    );
   }
   if (result.status === "not_found") notFound();
 

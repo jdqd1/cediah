@@ -4,6 +4,7 @@ import {
   BookOpen,
   CardsThree,
   ClipboardText,
+  GraduationCap,
   House,
   List,
   Notebook,
@@ -17,6 +18,7 @@ import { useSidebarCollapsedPreference } from "./sidebar-preference";
 
 const APPLICATION_PATH_PREFIXES = [
   "/biblioteca",
+  "/asignaturas",
   "/clases",
   "/cursos",
   "/dashboard",
@@ -27,11 +29,12 @@ const APPLICATION_PATH_PREFIXES = [
 
 const LOADING_NAVIGATION = [
   { label: "Inicio", icon: House, path: "/dashboard" },
-  { label: "Videos", icon: PlayCircle, path: "/clases" },
+  { label: "Asignaturas", icon: GraduationCap, path: "/asignaturas" },
   { label: "Material de estudio", icon: BookOpen, path: "/biblioteca" },
-  { label: "Guías", icon: Notebook, path: "/guias" },
-  { label: "Flashcards", icon: CardsThree, path: "/flashcards" },
-  { label: "Cuestionarios", icon: ClipboardText, path: "/cuestionarios" },
+  { child: true, label: "Videos", icon: PlayCircle, path: "/clases" },
+  { child: true, label: "Guías", icon: Notebook, path: "/guias" },
+  { child: true, label: "Flashcards", icon: CardsThree, path: "/flashcards" },
+  { child: true, label: "Cuestionarios", icon: ClipboardText, path: "/cuestionarios" },
   { label: "Gestión de contenido", icon: PencilSimpleLine, path: "/panel" },
 ];
 
@@ -78,7 +81,7 @@ export function RouteLoadingShell() {
               const active = pathname === item.path || pathname.startsWith(`${item.path}/`);
               return (
                 <div
-                  className={`sidebar-link route-loading-sidebar-link ${active ? "is-active" : ""}`.trim()}
+                  className={`sidebar-link route-loading-sidebar-link ${item.child ? "is-child" : ""} ${active ? "is-active" : ""}`.trim()}
                   key={item.label}
                 >
                   <Icon size={21} weight={active ? "fill" : "regular"} />

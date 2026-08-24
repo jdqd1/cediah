@@ -40,26 +40,34 @@ import { AppShell } from "./app-shell";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 export function ContentDetailScreen({
+  guideMode = false,
   item,
   isAdministrator = false,
   linkedGuide,
 }: {
+  guideMode?: boolean;
   item: ContentItem;
   isAdministrator?: boolean;
   linkedGuide?: Extract<ContentItem, { kind: "guide" }>;
 }) {
-  const libraryLabel = item.kind === "guide" ? "Guías" : "Biblioteca";
+  const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
+  const libraryLabel = isGuideView ? "Guías" : "Biblioteca";
+  const backHref = guideMode && item.kind === "video"
+    ? `/biblioteca/${item.slug}`
+    : item.kind === "guide"
+      ? "/guias"
+      : "/biblioteca";
   return (
     <AppShell
-      activeKey={item.kind === "guide" ? "guides" : item.kind}
+      activeKey={isGuideView ? "guides" : item.kind}
       headerTitle={libraryLabel}
       isAdministrator={isAdministrator}
       mainClassName="content-detail-main"
     >
       <article className="published-content">
-        <header className={`published-content-header${item.kind === "guide" ? " published-rich-guide-header" : ""}`}>
+        <header className={`published-content-header${isGuideView ? " published-rich-guide-header" : ""}`}>
           <div className="published-content-context">
-            <Link href={item.kind === "guide" ? "/guias" : "/biblioteca"}>
+            <Link href={backHref}>
               <ArrowLeft size={17} /> Volver
             </Link>
             <nav className="published-content-breadcrumbs" aria-label="Ruta actual">
@@ -73,20 +81,29 @@ export function ContentDetailScreen({
           <div className="published-guide-title-row">
             <h2>{item.title}</h2>
           </div>
-          {item.kind !== "guide" && <p>{item.summary}</p>}
+          {!isGuideView && <p>{item.summary}</p>}
         </header>
-        <ContentBody item={item} linkedGuide={linkedGuide} />
+        <ContentBody guideMode={guideMode} item={item} linkedGuide={linkedGuide} />
       </article>
     </AppShell>
   );
 }
 
-function ContentBody({ item, linkedGuide }: { item: ContentItem; linkedGuide?: GuideItem }) {
+function ContentBody({
+  guideMode,
+  item,
+  linkedGuide,
+}: {
+  guideMode: boolean;
+  item: ContentItem;
+  linkedGuide?: GuideItem;
+}) {
   if (item.kind === "guide") {
     return <GuideBody item={item} />;
   }
 
   if (item.kind === "video") {
+    if (guideMode) return <GuideBody item={guideItemFromVideo(item)} />;
     return <VideoBody item={item} linkedGuide={linkedGuide} />;
   }
 
@@ -114,6 +131,70 @@ function ContentBody({ item, linkedGuide }: { item: ContentItem; linkedGuide?: G
 }
 
 type GuideItem = Extract<ContentItem, { kind: "guide" }>;
+type VideoItem = Extract<ContentItem, { kind: "video" }>;
+type VideoResource = "guide" | "key-points" | "quiz";
+
+function guideItemFromVideo(item: VideoItem): GuideItem {
+  return {
+    ...item,
+    asset: null,
+    content: {
+      ...item.content.guide,
+      keyPoints: item.content.keyPoints,
+      linkedVideoId: item.id,
+      quiz: item.content.quiz,
+      regions: item.content.regions,
+    },
+    kind: "guide",
+  };
+}
+
+function normalizePassageText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const passageStopWords = new Set([
+  "como", "con", "del", "desde", "el", "en", "es", "esta", "este", "la", "las",
+  "los", "para", "por", "que", "se", "son", "una", "uno", "y",
+]);
+
+function passageTokens(value: string) {
+  return new Set(
+    normalizePassageText(value)
+      .split(" ")
+      .filter((word) => word.length >= 3 && !passageStopWords.has(word)),
+  );
+}
+
+function findGuidePassage(point: string): HTMLElement | null {
+  const article = document.querySelector<HTMLElement>(".published-rich-guide-article");
+  if (!article) return null;
+  const candidates = Array.from(
+    article.querySelectorAll<HTMLElement>("h1, h2, h3, p, blockquote, li, td, th"),
+  ).filter((candidate) => Boolean(candidate.textContent?.trim()));
+  const normalizedPoint = normalizePassageText(point);
+  const exact = candidates.find((candidate) => {
+    const candidateText = normalizePassageText(candidate.textContent ?? "");
+    return candidateText.includes(normalizedPoint) ||
+      (candidateText.length >= 24 && normalizedPoint.includes(candidateText));
+  });
+  if (exact) return exact;
+
+  const pointWords = passageTokens(point);
+  let best: { element: HTMLElement; score: number } | null = null;
+  for (const candidate of candidates) {
+    const candidateWords = passageTokens(candidate.textContent ?? "");
+    const shared = Array.from(pointWords).filter((word) => candidateWords.has(word)).length;
+    const score = pointWords.size > 0 ? shared / pointWords.size : 0;
+    if (!best || score > best.score) best = { element: candidate, score };
+  }
+  return best && best.score > 0 ? best.element : article;
+}
 
 function GuideBody({ item }: { item: GuideItem }) {
   const guideDocument = useMemo(
@@ -135,6 +216,8 @@ function GuideBody({ item }: { item: GuideItem }) {
   const navigationFrameRef = useRef<number | null>(null);
   const headingHighlightTimerRef = useRef<number | null>(null);
   const highlightedHeadingRef = useRef<HTMLElement | null>(null);
+  const passageHighlightTimerRef = useRef<number | null>(null);
+  const highlightedPassageRef = useRef<HTMLElement | null>(null);
   const visibleActiveHeadingId = outline.some(({ id }) => id === activeHeadingId)
     ? activeHeadingId
     : outline[0]?.id;
@@ -171,7 +254,9 @@ function GuideBody({ item }: { item: GuideItem }) {
     () => () => {
       if (navigationFrameRef.current !== null) window.cancelAnimationFrame(navigationFrameRef.current);
       if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
+      if (passageHighlightTimerRef.current !== null) window.clearTimeout(passageHighlightTimerRef.current);
       highlightedHeadingRef.current?.classList.remove("is-navigation-target");
+      highlightedPassageRef.current?.classList.remove("is-key-point-target");
     },
     [],
   );
@@ -184,6 +269,11 @@ function GuideBody({ item }: { item: GuideItem }) {
     if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
     highlightedHeadingRef.current?.classList.remove("is-navigation-target");
     setActiveHeadingId(id);
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setMobileDrawer(null);
+    } else {
+      setOutlineExpanded(false);
+    }
     target.scrollIntoView({ behavior: "smooth", block: "start" });
 
     let previousScrollY = window.scrollY;
@@ -230,12 +320,31 @@ function GuideBody({ item }: { item: GuideItem }) {
     navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
   }
 
+  function goToKeyPoint(point: string) {
+    const target = findGuidePassage(point);
+    if (!target) return;
+    if (passageHighlightTimerRef.current !== null) window.clearTimeout(passageHighlightTimerRef.current);
+    highlightedPassageRef.current?.classList.remove("is-key-point-target");
+    setMobileDrawer(null);
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.remove("is-key-point-target");
+    void target.offsetWidth;
+    target.classList.add("is-key-point-target");
+    highlightedPassageRef.current = target;
+    passageHighlightTimerRef.current = window.setTimeout(() => {
+      target.classList.remove("is-key-point-target");
+      if (highlightedPassageRef.current === target) highlightedPassageRef.current = null;
+      passageHighlightTimerRef.current = null;
+    }, 1_800);
+  }
+
   function toggleFavorite() {
     setFavorite((current) => !current);
   }
 
   function toggleOutlinePanel() {
     if (window.matchMedia("(max-width: 760px)").matches) {
+      if (mobileDrawer !== "outline") setOutlineExpanded(true);
       setMobileDrawer((current) => (current === "outline" ? null : "outline"));
       return;
     }
@@ -342,7 +451,10 @@ function GuideBody({ item }: { item: GuideItem }) {
             aria-label="Abrir índice"
             className="published-reader-mobile-side-button"
             type="button"
-            onClick={() => setMobileDrawer((current) => (current === "outline" ? null : "outline"))}
+            onClick={() => {
+              setOutlineExpanded(true);
+              setMobileDrawer((current) => (current === "outline" ? null : "outline"));
+            }}
           >
             <ListBullets aria-hidden="true" size={19} />
             <span className="sr-only">Índice</span>
@@ -386,7 +498,10 @@ function GuideBody({ item }: { item: GuideItem }) {
             aria-label="Abrir recursos de estudio"
             className="published-reader-mobile-side-button"
             type="button"
-            onClick={() => setMobileDrawer((current) => (current === "support" ? null : "support"))}
+            onClick={() => {
+              setSupportExpanded(true);
+              setMobileDrawer((current) => (current === "support" ? null : "support"));
+            }}
           >
             <BookOpen aria-hidden="true" size={19} />
             <span className="sr-only">Recursos de estudio</span>
@@ -440,7 +555,7 @@ function GuideBody({ item }: { item: GuideItem }) {
               {numberedOutline.map((outlineItem) => (
                 <a
                   aria-current={visibleActiveHeadingId === outlineItem.id ? "location" : undefined}
-                  className={`${outlineItem.displayLevel === 2 ? "is-subsection" : "is-section"}${visibleActiveHeadingId === outlineItem.id ? " is-active" : ""}`}
+                  className={`is-level-${outlineItem.displayLevel}${visibleActiveHeadingId === outlineItem.id ? " is-active" : ""}`}
                   href={`#${outlineItem.id}`}
                   key={outlineItem.id}
                   onClick={(event) => {
@@ -537,10 +652,19 @@ function GuideBody({ item }: { item: GuideItem }) {
               >
                 {item.content.keyPoints.length > 0 ? (
                   <ul className="published-rich-guide-key-points">
-                    {item.content.keyPoints.map((point) => (
-                      <li key={point}>
+                    {item.content.keyPoints.map((point, index) => (
+                      <li key={`${point}-${index}`}>
                         <Lightbulb aria-hidden="true" size={17} />
                         <span>{point}</span>
+                        <button
+                          aria-label={`Ir al fragmento relacionado con el punto clave ${index + 1}`}
+                          title="Ver en el texto de la guía"
+                          type="button"
+                          onClick={() => goToKeyPoint(point)}
+                        >
+                          <span>Ver en texto</span>
+                          <ArrowRight aria-hidden="true" size={14} />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -554,7 +678,7 @@ function GuideBody({ item }: { item: GuideItem }) {
                 defaultExpanded
                 icon={<ClipboardText aria-hidden="true" size={20} />}
                 id="published-guide-quiz"
-                title="Cuestinoario"
+                title="Preguntas y respuestas"
                 tone="quiz"
               >
                 {item.content.quiz.questions.length > 0 ? (
@@ -619,14 +743,12 @@ function ReaderSupportPanel({
   );
 }
 
-type VideoItem = ContentItem & { kind: "video" };
-type VideoResource = "guide" | "key-points" | "quiz";
-
 function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: GuideItem }) {
   const [resource, setResource] = useState<VideoResource>("guide");
   const displayedGuide = linkedGuide?.content ?? item.content.guide;
   const displayedKeyPoints = linkedGuide?.content.keyPoints ?? item.content.keyPoints;
   const displayedQuiz = linkedGuide?.content.quiz.questions ?? item.content.quiz.questions;
+  const guideHref = `/guias/${linkedGuide?.slug ?? item.slug}`;
   const tabs: { id: VideoResource; label: string }[] = [
     { id: "guide", label: "Guía" },
     { id: "key-points", label: "Puntos clave" },
@@ -696,16 +818,19 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
       >
         {resource === "guide" && (
           <div className="video-guide-resource">
-            {linkedGuide && (
-              <header className="video-linked-guide-heading">
-                <span>Guía vinculada</span>
-                <h3>{linkedGuide.title}</h3>
-                <p>{linkedGuide.summary}</p>
-                <Link href={`/guias/${linkedGuide.slug}`}>
-                  Abrir guía completa <ArrowRight aria-hidden="true" size={16} />
-                </Link>
-              </header>
-            )}
+            <header className="video-linked-guide-heading">
+              <span className="video-linked-guide-icon" aria-hidden="true"><BookOpen size={19} /></span>
+              <div>
+                <span>Modo de estudio</span>
+                <h3>{linkedGuide?.title ?? "Continúa en la guía interactiva"}</h3>
+                <p>
+                  {linkedGuide?.summary ?? "Abre el lector para usar el índice, los puntos clave y las herramientas de lectura."}
+                </p>
+              </div>
+              <Link href={guideHref}>
+                Abrir guía <ArrowRight aria-hidden="true" size={16} />
+              </Link>
+            </header>
             {displayedGuide.document ? (
               <RichTextRenderer
                 className="video-rich-guide-document"
@@ -741,7 +866,7 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
         )}
         {resource === "quiz" && (
           displayedQuiz.length > 0 ? (
-            <QuestionAnswerCards questions={displayedQuiz} />
+            <QuestionAnswerCards mode="flashcards" questions={displayedQuiz} />
           ) : (
             <p className="published-rich-guide-resource-empty">Esta guía no incluye preguntas y respuestas.</p>
           )
@@ -761,7 +886,15 @@ function QuizBody({
 
 type QuizQuestion = Extract<ContentItem, { kind: "quiz" }>["content"]["questions"][number];
 
-function QuestionAnswerCards({ questions }: { questions: QuizQuestion[] }) {
+function QuestionAnswerCards({
+  mode = "expanded",
+  questions,
+}: {
+  mode?: "expanded" | "flashcards";
+  questions: QuizQuestion[];
+}) {
+  if (mode === "flashcards") return <QuestionAnswerFlashcards questions={questions} />;
+
   return (
     <section className="published-question-answer">
       <div className="published-tool-heading">
@@ -790,6 +923,52 @@ function QuestionAnswerCards({ questions }: { questions: QuizQuestion[] }) {
             )}
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function QuestionAnswerFlashcards({ questions }: { questions: QuizQuestion[] }) {
+  const [revealed, setRevealed] = useState<number | null>(null);
+
+  return (
+    <section className="video-question-flashcards" aria-label="Tarjetas de preguntas y respuestas">
+      <header className="video-question-flashcards-heading">
+        <div>
+          <span>Repaso activo</span>
+          <h3>Comprueba lo que aprendiste</h3>
+        </div>
+        <small>{questions.length} {questions.length === 1 ? "tarjeta" : "tarjetas"}</small>
+      </header>
+      <div className="video-question-flashcards-list">
+        {questions.map((question, index) => {
+          const isRevealed = revealed === index;
+          return (
+            <article className={`video-question-flashcard${isRevealed ? " is-revealed" : ""}`} key={`${question.prompt}-${index}`}>
+              <button
+                aria-controls={`video-question-answer-${index}`}
+                aria-expanded={isRevealed}
+                type="button"
+                onClick={() => setRevealed((current) => current === index ? null : index)}
+              >
+                <span className="video-question-flashcard-number">{String(index + 1).padStart(2, "0")}</span>
+                <span className="video-question-flashcard-prompt">
+                  <small>Pregunta</small>
+                  <strong>{question.prompt}</strong>
+                </span>
+                <span className="video-question-flashcard-action">
+                  {isRevealed ? "Ocultar" : "Ver respuesta"}
+                  <CaretDown aria-hidden="true" size={15} />
+                </span>
+              </button>
+              <div className="video-question-flashcard-answer" hidden={!isRevealed} id={`video-question-answer-${index}`}>
+                <span><CheckCircle aria-hidden="true" size={16} weight="fill" /> Respuesta</span>
+                <p>{questionAnswer(question)}</p>
+                {question.explanation && <small>{question.explanation}</small>}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

@@ -17,8 +17,14 @@ export default async function GuidePage({ params }: GuidePageProps) {
   ]);
 
   if (result.status === "ready") {
-    if (result.item.kind !== "guide") notFound();
-    return <ContentDetailScreen item={result.item} isAdministrator={isAdministrator} />;
+    if (result.item.kind !== "guide" && result.item.kind !== "video") notFound();
+    return (
+      <ContentDetailScreen
+        guideMode={result.item.kind === "video"}
+        item={result.item}
+        isAdministrator={isAdministrator}
+      />
+    );
   }
   if (result.status === "not_found") notFound();
 

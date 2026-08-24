@@ -58,10 +58,10 @@ type NavItem = {
 const mainNavigation: NavItem[] = [
   { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
   { key: "subjects", label: "Asignaturas", href: "/asignaturas", icon: GraduationCap },
-  { key: "video", label: "Videos", href: "/biblioteca?tipo=video", icon: PlayCircle },
 ];
 
 const studyNavigation: NavItem[] = [
+  { key: "video", label: "Videos", href: "/biblioteca?tipo=video", icon: PlayCircle },
   { key: "guides", label: "Guías", href: "/guias", icon: Notebook },
   { key: "flashcards", label: "Flashcards", href: "/biblioteca?tipo=flashcards", icon: CardsThree },
   { key: "quiz", label: "Cuestionarios", href: "/biblioteca?tipo=quiz", icon: ClipboardText },
@@ -122,7 +122,6 @@ function NavigationItem({
 function NavigationGroup({
   activeKey,
   childItems,
-  href,
   icon: Icon,
   label,
   onNavigate,
@@ -132,7 +131,6 @@ function NavigationGroup({
 }: {
   activeKey: string;
   childItems: NavItem[];
-  href?: string;
   icon: NavIcon;
   label: string;
   onNavigate: () => void;
@@ -147,46 +145,24 @@ function NavigationGroup({
   return (
     <section className={groupClassName}>
       <div className="sidebar-group-heading">
-        {href ? (
-          <Link
-            aria-current={active ? "page" : undefined}
-            className={labelClassName}
-            href={href}
-            onClick={() => {
-              if (!open) onToggle();
-              onNavigate();
-            }}
-            title={label}
-          >
-            <Icon size={21} weight={active ? "fill" : "regular"} />
-            <span className="sidebar-link-label">{label}</span>
-          </Link>
-        ) : (
-          <button
-            aria-controls={"sidebar-submenu-" + groupKey}
-            aria-expanded={open}
-            className={labelClassName}
-            type="button"
-            onClick={onToggle}
-          >
-            <Icon size={21} weight={active ? "fill" : "regular"} />
-            <span className="sidebar-link-label">{label}</span>
-          </button>
-        )}
         <button
           aria-controls={"sidebar-submenu-" + groupKey}
           aria-expanded={open}
-          aria-label={(open ? "Contraer " : "Expandir ") + label}
-          className="sidebar-group-toggle"
+          className={labelClassName}
+          title={label}
           type="button"
           onClick={onToggle}
         >
-          <CaretDown aria-hidden="true" size={16} />
+          <Icon size={21} weight={active ? "fill" : "regular"} />
+          <span className="sidebar-link-label">{label}</span>
+          <CaretDown aria-hidden="true" className="sidebar-group-caret" size={16} />
         </button>
       </div>
       <div
+        aria-hidden={!open}
         className={"sidebar-submenu" + (open ? " is-open" : "")}
         id={"sidebar-submenu-" + groupKey}
+        inert={!open}
       >
         {childItems.map((item) => (
           <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={onNavigate} />
@@ -294,11 +270,13 @@ export function AppShell({
   useEffect(() => {
     if (!sidebarOpen || !window.matchMedia("(max-width: 960px)").matches) return;
 
-    const focusable = sidebarRef.current?.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    );
-    const first = focusable?.[0];
-    const last = focusable?.[focusable.length - 1];
+    const focusable = Array.from(
+      sidebarRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((element) => !element.closest("[inert]") && element.getClientRects().length > 0);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
     first?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -371,7 +349,6 @@ export function AppShell({
               activeKey={activeKey}
               childItems={studyNavigation}
               groupKey="study"
-              href="/biblioteca"
               icon={BookOpen}
               label="Material de estudio"
               onNavigate={closeSidebar}

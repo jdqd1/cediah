@@ -17,7 +17,7 @@ import { getServerEnvironment } from "./env";
 type ContentApiRequest = {
   accessToken?: string;
   body?: unknown;
-  method: "GET" | "PATCH" | "POST";
+  method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
 };
 
@@ -96,11 +96,13 @@ export async function requestContentApi(
 
 export async function getPublishedContent(input: {
   kind?: ContentKind;
+  linkedVideoId?: string;
   limit?: number;
   subjectId?: string;
 } = {}): Promise<PublishedContentResult> {
   const query = new URLSearchParams();
   if (input.kind) query.set("kind", input.kind);
+  if (input.linkedVideoId) query.set("linkedVideoId", input.linkedVideoId);
   if (input.subjectId) query.set("subjectId", input.subjectId);
   query.set("limit", String(input.limit ?? 40));
   const response = await requestContentApi({

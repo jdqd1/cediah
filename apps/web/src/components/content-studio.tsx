@@ -31,6 +31,7 @@ import {
   type ContentKind,
   type RichTextDocument,
   type RichTextNode,
+  type Subject,
   type ContentStatus,
   type ContentWorkspaceResponse,
 } from "@cediah/contracts";
@@ -943,6 +944,44 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setBusy(null);
     }
   }
+
+  async function removeSubject(subject: Subject) {
+    if (!capabilities.canEditAll || busy) return;
+    const resourceLabel = subject.contentCount === 1
+      ? "1 publicación dejará de estar clasificada en ella"
+      : `${subject.contentCount} publicaciones dejarán de estar clasificadas en ella`;
+    const confirmed = window.confirm(
+      `¿Eliminar la asignatura “${subject.name}”?\n\n${resourceLabel}. Las publicaciones no se eliminarán. Esta acción no se puede deshacer.`,
+    );
+    if (!confirmed) return;
+
+    setBusy(`subject-delete-${subject.id}`);
+    setNotice(null);
+    try {
+      const deleted = await json<{ id: string }>(
+        `/api/editor/subjects/${encodeURIComponent(subject.id)}`,
+        { method: "DELETE" },
+      );
+      if (deleted.id !== subject.id) throw new Error(errors.content_unavailable);
+
+      setSubjects((current) => current.filter((value) => value.id !== subject.id));
+      setItems((current) => current.map((value) => ({
+        ...value,
+        subjectIds: value.subjectIds.filter((id) => id !== subject.id),
+      })) as ContentItem[]);
+      setDraft((current) => current
+        ? { ...current, subjectIds: current.subjectIds.filter((id) => id !== subject.id) } as ContentDraft
+        : current);
+      setNotice({ text: `Asignatura “${subject.name}” eliminada. El contenido se conservó.`, tone: "success" });
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error ? error.message : "No fue posible eliminar la asignatura.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
   async function save(event?: FormEvent): Promise<boolean> {
     event?.preventDefault();
     if (!draft || !editable || busy) return false;
@@ -1566,24 +1605,38 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                         </div>
                         <div className="studio-subject-options" role="group" aria-label="Asignaturas del contenido">
                           {subjects.map((subject) => (
-                            <label className={`studio-subject-option ${draft.subjectIds.includes(subject.id) ? "is-selected" : ""}`.trim()} key={subject.id}>
-                              <input
-                                checked={draft.subjectIds.includes(subject.id)}
-                                type="checkbox"
-                                onChange={(event) =>
-                                  setDraft({
-                                    ...draft,
-                                    subjectIds: event.target.checked
-                                      ? Array.from(new Set([...draft.subjectIds, subject.id]))
-                                      : draft.subjectIds.filter((id) => id !== subject.id),
-                                  } as ContentDraft)
-                                }
-                              />
-                              <span>
-                                <strong>{subject.name}</strong>
-                                <small>{subject.contentCount} recursos</small>
-                              </span>
-                            </label>
+                            <div className="studio-subject-option-row" key={subject.id}>
+                              <label className={`studio-subject-option ${draft.subjectIds.includes(subject.id) ? "is-selected" : ""}`.trim()}>
+                                <input
+                                  checked={draft.subjectIds.includes(subject.id)}
+                                  type="checkbox"
+                                  onChange={(event) =>
+                                    setDraft({
+                                      ...draft,
+                                      subjectIds: event.target.checked
+                                        ? Array.from(new Set([...draft.subjectIds, subject.id]))
+                                        : draft.subjectIds.filter((id) => id !== subject.id),
+                                    } as ContentDraft)
+                                  }
+                                />
+                                <span>
+                                  <strong>{subject.name}</strong>
+                                  <small>{subject.contentCount} recursos</small>
+                                </span>
+                              </label>
+                              {capabilities.canEditAll && (
+                                <button
+                                  aria-label={`Eliminar asignatura ${subject.name}`}
+                                  className="studio-subject-delete"
+                                  disabled={busy !== null}
+                                  title={`Eliminar ${subject.name}`}
+                                  type="button"
+                                  onClick={() => void removeSubject(subject)}
+                                >
+                                  <Trash aria-hidden="true" size={15} />
+                                </button>
+                              )}
+                            </div>
                           ))}
                           {subjects.length === 0 && <p className="studio-subject-empty">Crea la primera asignatura para organizar el contenido.</p>}
                         </div>

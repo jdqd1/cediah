@@ -15,6 +15,7 @@ import type {
   IdentityProvider,
   PlatformRole,
   ProviderUser,
+  SubjectProvider,
 } from "@cediah/contracts";
 import { buildApp } from "../src/app.js";
 import { canEditContent } from "../src/content-authorization.js";
@@ -22,6 +23,7 @@ import type { ApiEnvironment } from "../src/config.js";
 import { isContentReadyForTransition } from "../src/providers/supabase-content.js";
 
 const contentId = "7a8a6513-9384-4b5d-a825-439f42355714";
+const subjectId = "19d4f11b-9ff1-45c2-b2b5-50686038fe42";
 const assetId = "86bc79c0-c73b-4aa6-9257-f22f0d89b080";
 const createdAt = "2026-08-10T12:00:00.000Z";
 const publishedAt = "2026-08-10T13:00:00.000Z";
@@ -194,6 +196,16 @@ function contentProvider(
     listPublished: async () => [],
     transitionContent: async () => ({ status: "not_found" }),
     updateContent: async () => ({ status: "not_found" }),
+    ...overrides,
+  };
+}
+
+function subjectProvider(overrides: Partial<SubjectProvider> = {}): SubjectProvider {
+  return {
+    createSubject: async () => ({ status: "conflict" }),
+    deleteSubject: async () => ({ status: "not_found" }),
+    getSubjectBySlug: async () => null,
+    listSubjects: async () => [],
     ...overrides,
   };
 }
@@ -993,6 +1005,56 @@ describe("content API", () => {
     expect(provisioned.json()).toEqual(upload);
     expect(finalized.statusCode).toBe(200);
     expect(finalized.json()).toMatchObject({ id: assetId, status: "ready" });
+    await app.close();
+  });
+
+  it("allows an academic editor to delete a subject", async () => {
+    const deletions: Parameters<SubjectProvider["deleteSubject"]>[0][] = [];
+    const app = await buildApp(testEnvironment, {
+      contentProvider: contentProvider(["academic_editor"]),
+      identityProvider: identityProvider(),
+      subjectProvider: subjectProvider({
+        deleteSubject: async (input) => {
+          deletions.push(input);
+          return { status: "success", value: { id: input.subjectId } };
+        },
+      }),
+    });
+
+    const response = await app.inject({
+      headers: auth("editor-token"),
+      method: "DELETE",
+      url: `/v1/editor/subjects/${subjectId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ id: subjectId });
+    expect(deletions).toEqual([{ actorUserId: users.editor.id, subjectId }]);
+    await app.close();
+  });
+
+  it("prevents contributors from deleting shared subjects", async () => {
+    let deletions = 0;
+    const app = await buildApp(testEnvironment, {
+      contentProvider: contentProvider(["community_contributor"]),
+      identityProvider: identityProvider(),
+      subjectProvider: subjectProvider({
+        deleteSubject: async () => {
+          deletions += 1;
+          return { status: "success", value: { id: subjectId } };
+        },
+      }),
+    });
+
+    const response = await app.inject({
+      headers: auth("contributor-token"),
+      method: "DELETE",
+      url: `/v1/editor/subjects/${subjectId}`,
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "forbidden" });
+    expect(deletions).toBe(0);
     await app.close();
   });
 });

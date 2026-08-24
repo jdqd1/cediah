@@ -157,6 +157,39 @@ export function createSupabaseSubjectProvider(
       return { status: "success", value: subject };
     },
 
+    async deleteSubject(input) {
+      const { data, error } = await client
+        .from("subjects")
+        .delete()
+        .eq("id", input.subjectId)
+        .select(subjectSelection)
+        .maybeSingle();
+      if (error) throw error;
+
+      const row = asRecord(data);
+      const deletedId = readString(row?.id);
+      if (!deletedId) return { status: "not_found" };
+
+      try {
+        const { error: auditError } = await client.from("audit_log").insert({
+          action: "subject_deleted",
+          actor_user_id: input.actorUserId,
+          metadata: {
+            name: readString(row?.name),
+            slug: readString(row?.slug),
+          },
+          target_id: deletedId,
+          target_type: "subject",
+        });
+        if (auditError) throw auditError;
+      } catch {
+        // The subject is already deleted; audit availability must not turn a
+        // completed destructive action into a misleading error response.
+      }
+
+      return { status: "success", value: { id: deletedId } };
+    },
+
     async getSubjectBySlug(slug) {
       const subjects = await listSubjects({ publishedOnly: true });
       return subjects.find((subject) => subject.slug === slug) ?? null;

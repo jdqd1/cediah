@@ -15,6 +15,7 @@ import {
   ContentKindSchema,
   ContentTransitionRequestSchema,
   ContentWorkspaceResponseSchema,
+  DeletedSubjectSchema,
   ContentSubjectAssignmentRequestSchema,
   SubjectCatalogResponseSchema,
   SubjectCreateRequestSchema,
@@ -89,6 +90,7 @@ const ContentSlugParamsSchema = z.object({
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
 });
 const SubjectSlugParamsSchema = ContentSlugParamsSchema;
+const SubjectIdParamsSchema = z.object({ subjectId: z.string().uuid() });
 const ContentListQuerySchema = z.object({
   kind: ContentKindSchema.optional(),
   linkedVideoId: z.string().uuid().optional(),
@@ -561,6 +563,42 @@ export async function buildApp(
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
     }
   });
+  app.delete<{ Params: { subjectId: string } }>(
+    "/v1/editor/subjects/:subjectId",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canEditAll) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+      if (!subjectProvider) {
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+      }
+
+      const params = SubjectIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      try {
+        const result = await subjectProvider.deleteSubject({
+          actorUserId: editor.user.id,
+          subjectId: params.data.subjectId,
+        });
+        if (result.status !== "success") return sendSubjectMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(DeletedSubjectSchema.parse(result.value));
+      } catch {
+        request.log.error("Subject deletion failed");
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+      }
+    },
+  );
   app.post<{ Body: unknown }>("/v1/editor/content", async (request, reply) => {
     const editor = await resolveEditorUser(
       request.headers.authorization,

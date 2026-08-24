@@ -168,7 +168,7 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
             ? rawLevel
             : 2;
         const label = textContent(node);
-        const id = level === 1 || level === 2 ? nextHeadingId(label) : undefined;
+        const id = level >= 1 && level <= 3 ? nextHeadingId(label) : undefined;
         const headingClass = `rich-guide-heading rich-guide-heading-${level}${alignmentClass(node)}`;
         const content = renderChildren();
 

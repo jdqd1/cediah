@@ -1,4 +1,5 @@
 import { ContentItemSchema } from "@cediah/contracts";
+import { z } from "zod";
 import {
   forwardEditorContentRequest,
   noStoreContentJson,
@@ -23,5 +24,14 @@ export async function PATCH(request: Request, { params }: ContentRouteProps) {
     method: "PATCH",
     path: "/v1/editor/content/" + encodeURIComponent(contentId),
     responseSchema: ContentItemSchema,
+  });
+}
+
+export async function DELETE(_request: Request, { params }: ContentRouteProps) {
+  const { contentId } = await params;
+  return forwardEditorContentRequest({
+    method: "DELETE",
+    path: "/v1/editor/content/" + encodeURIComponent(contentId),
+    responseSchema: z.object({ id: z.string().uuid() }),
   });
 }
