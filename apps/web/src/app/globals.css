@@ -6239,6 +6239,25 @@ textarea:focus-visible {
   padding: clamp(1rem, 2.6vw, 2.2rem) clamp(1rem, 2.8vw, 2.4rem) 4rem;
 }
 
+.content-catalog-context-navigation {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.content-catalog-context-navigation a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--wine);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.content-catalog-context-navigation a:hover { color: var(--wine-dark); }
+
 .content-catalog-kind-nav {
   overflow-x: auto;
   margin-inline: -0.15rem;
@@ -6300,6 +6319,8 @@ textarea:focus-visible {
   gap: 1rem;
   margin-top: 1.35rem;
 }
+
+.content-catalog-page.is-contextual .content-catalog-toolbar { margin-top: 0.85rem; }
 
 .content-catalog-search {
   display: flex;
@@ -6507,6 +6528,40 @@ textarea:focus-visible {
   border-top: 1px solid var(--line-strong);
 }
 
+.content-catalog-topic-browser { margin-top: 1.35rem; }
+
+.content-catalog-topic-browser-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.content-catalog-topic-browser-heading > div > span,
+.content-catalog-topic-section-heading > div > span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 780;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.content-catalog-topic-browser-heading h2 {
+  margin-top: 0.22rem;
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
+.content-catalog-topic-browser-heading p {
+  max-width: 25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.content-catalog-topic-browser .content-catalog-topic-directory { margin-top: 0.8rem; }
+
 .content-catalog-topic-link {
   display: grid;
   min-height: 112px;
@@ -6569,6 +6624,56 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.content-catalog-topic-groups {
+  display: grid;
+  gap: 2.15rem;
+  margin-top: 1.4rem;
+}
+
+.content-catalog-topic-browser + .content-catalog-topic-groups { margin-top: 2.15rem; }
+
+.content-catalog-topic-section {
+  min-width: 0;
+  scroll-margin-top: 5.5rem;
+}
+
+.content-catalog-topic-section-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 0.75rem;
+}
+
+.content-catalog-topic-section-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--wine-pale);
+  color: var(--wine);
+}
+
+.content-catalog-topic-section-heading h2 {
+  margin-top: 0.13rem;
+  color: var(--ink);
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.content-catalog-topic-section-heading > small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.content-catalog-topic-section > .content-catalog-video-grid,
+.content-catalog-topic-section > .content-catalog-resource-grid { margin-top: 0; }
+
 .content-catalog-empty {
   display: grid;
   min-height: 340px;
@@ -6605,16 +6710,20 @@ textarea:focus-visible {
 
 @media (max-width: 620px) {
   .content-catalog-page { padding-inline: 0.9rem; }
+  .content-catalog-context-navigation { align-items: flex-start; flex-direction: column; }
   .content-catalog-toolbar { grid-template-columns: 1fr; gap: 0.55rem; }
   .content-catalog-result-count { justify-self: end; }
   .content-catalog-topic-label { display: none; }
+  .content-catalog-topic-browser-heading { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
+  .content-catalog-topic-browser-heading p { text-align: left; }
   .content-catalog-video-grid,
   .content-catalog-resource-grid { grid-template-columns: 1fr; }
   .content-catalog-video-card { grid-template-rows: 165px minmax(0, 1fr); }
   .content-catalog-resource-card { grid-template-columns: 7rem minmax(0, 1fr); grid-template-rows: minmax(125px, auto); }
-  .content-catalog-topic-link { grid-template-columns: auto minmax(0, 1fr); }
+  .content-catalog-topic-link { min-height: 96px; grid-template-columns: auto minmax(0, 1fr); }
   .content-catalog-topic-action { display: none; }
   .content-catalog-topic-copy p { white-space: normal; }
+  .content-catalog-topic-groups { gap: 1.75rem; }
 }
 
 @media (max-width: 400px) {

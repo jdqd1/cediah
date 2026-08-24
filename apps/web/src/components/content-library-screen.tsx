@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ArrowDown,
+  ArrowLeft,
   BookOpen,
   CardsThree,
   ClipboardText,
@@ -73,13 +75,13 @@ function isContentKind(value: string | null): value is Exclude<ContentKind, "top
 }
 
 function catalogTitle(kind: CatalogKind) {
-  if (kind === "video") return "Videos";
-  return "Biblioteca";
+  return kind === "all" ? "Biblioteca" : kindLabels[kind];
 }
 
 function catalogSearchPlaceholder(kind: CatalogKind) {
-  if (kind === "video") return "Buscar videos";
-  return "Buscar en la biblioteca";
+  return kind === "all"
+    ? "Buscar en la biblioteca"
+    : `Buscar ${kindLabels[kind].toLocaleLowerCase("es")}`;
 }
 
 function normalize(value: string) {
@@ -91,6 +93,13 @@ function normalize(value: string) {
 
 function itemRegions(item: ContentItem) {
   return item.content.regions.length > 0 ? item.content.regions : [item.topic];
+}
+
+function topicAnchor(topic: string) {
+  const slug = normalize(topic)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `tema-${slug || "otros"}`;
 }
 
 function CatalogCard({ item, video = false }: { item: ContentItem; video?: boolean }) {
@@ -125,6 +134,32 @@ function CatalogCard({ item, video = false }: { item: ContentItem; video?: boole
   );
 }
 
+function CatalogGrid({
+  id,
+  items,
+  labelledBy,
+  video = false,
+}: {
+  id?: string;
+  items: ContentItem[];
+  labelledBy?: string;
+  video?: boolean;
+}) {
+  return (
+    <ul
+      aria-labelledby={labelledBy}
+      className={video ? "content-catalog-video-grid" : "content-catalog-resource-grid"}
+      id={id}
+    >
+      {items.map((item) => (
+        <li key={item.id}>
+          <CatalogCard item={item} video={video} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ContentLibraryScreen({
   available,
   isAdministrator = false,
@@ -140,6 +175,8 @@ export function ContentLibraryScreen({
   const subjectSlug = searchParams.get("asignatura")?.trim() ?? "";
   const selectedSubject = subjects.find((subject) => subject.slug === subjectSlug);
   const title = catalogTitle(kind);
+  const isContextualCatalog = kind !== "all" && Boolean(selectedSubject);
+  const ContextKindIcon = kind === "all" ? Compass : kindIcons[kind];
 
   const topics = useMemo(
     () => uniqueRegions(items.flatMap(itemRegions)).sort((left, right) => left.localeCompare(right, "es")),
@@ -167,6 +204,27 @@ export function ContentLibraryScreen({
       return matchesKind && matchesSubject && matchesTopic && matchesSearch;
     });
   }, [items, kind, search, selectedSubject, subjectSlug, topic]);
+  const contextualTopicGroups = useMemo(() => {
+    if (!isContextualCatalog) return [];
+
+    const selectedRegion = normalize(topic);
+    const groups = new Map<string, { items: ContentItem[]; name: string }>();
+
+    for (const item of visibleItems) {
+      const regions = uniqueRegions(itemRegions(item));
+      const groupRegions = regions.length > 0 ? regions : ["Otros"];
+
+      for (const region of groupRegions) {
+        if (selectedRegion && normalize(region) !== selectedRegion) continue;
+        const key = normalize(region);
+        const current = groups.get(key);
+        if (current) current.items.push(item);
+        else groups.set(key, { items: [item], name: region });
+      }
+    }
+
+    return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "es"));
+  }, [isContextualCatalog, topic, visibleItems]);
 
   function catalogHref(nextKind: CatalogKind, nextTopic: string, nextSubject = subjectSlug) {
     const params = new URLSearchParams(searchParams.toString());
@@ -198,8 +256,17 @@ export function ContentLibraryScreen({
   }
 
   const activeKey = kind === "all" ? "study" : kind === "guide" ? "guides" : kind;
-  const clearHref = catalogHref("all", "", "");
+  const clearHref = isContextualCatalog
+    ? catalogHref(kind, "", subjectSlug)
+    : catalogHref("all", "", "");
   const hasFilters = kind !== "all" || Boolean(subjectSlug) || Boolean(topic) || Boolean(search);
+  const shouldClearEmptyFilters = !isContextualCatalog || Boolean(search || topic);
+  const emptyActionHref = shouldClearEmptyFilters
+    ? clearHref
+    : selectedSubject
+      ? `/asignaturas/${selectedSubject.slug}`
+      : clearHref;
+  const contextualKindLabel = kind === "all" ? "material" : kindLabels[kind].toLocaleLowerCase("es");
 
   return (
     <AppShell
@@ -209,31 +276,54 @@ export function ContentLibraryScreen({
       headerSubtitle={selectedSubject?.name}
       mainClassName="content-catalog-main"
     >
-      <section className="content-catalog-page" aria-label={title}>
-        <nav className="content-catalog-kind-nav" aria-label="Tipo de contenido">
-          <div className="content-catalog-kind-chips">
-            {kindOptions.map((option) => {
-              const Icon = option.icon;
-              const href = catalogHref(option.value, topic, subjectSlug);
-              const count = option.value === "all" ? items.length : kindCounts[option.value];
+      <section
+        className={`content-catalog-page${isContextualCatalog ? " is-contextual" : ""}`}
+        aria-label={title}
+      >
+        {kind === "all" && (
+          <nav className="content-catalog-kind-nav" aria-label="Tipo de contenido">
+            <div className="content-catalog-kind-chips">
+              {kindOptions.map((option) => {
+                const Icon = option.icon;
+                const href = catalogHref(option.value, topic, subjectSlug);
+                const count = option.value === "all" ? items.length : kindCounts[option.value];
 
-              return (
-                <Link
-                  aria-current={kind === option.value ? "page" : undefined}
-                  className={`content-catalog-kind-chip ${kind === option.value ? "is-active" : ""}`.trim()}
-                  href={href}
-                  key={option.value}
-                  onClick={(event) => navigateCatalog(event, href)}
-                  prefetch={false}
-                >
-                  <Icon aria-hidden="true" size={18} />
-                  <span>{option.label}</span>
-                  <small aria-label={`${count} publicaciones`}>{count}</small>
-                </Link>
-              );
-            })}
+                return (
+                  <Link
+                    aria-current={kind === option.value ? "page" : undefined}
+                    className={`content-catalog-kind-chip ${kind === option.value ? "is-active" : ""}`.trim()}
+                    href={href}
+                    key={option.value}
+                    onClick={(event) => navigateCatalog(event, href)}
+                    prefetch={false}
+                  >
+                    <Icon aria-hidden="true" size={18} />
+                    <span>{option.label}</span>
+                    <small aria-label={`${count} publicaciones`}>{count}</small>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+
+        {isContextualCatalog && selectedSubject && (
+          <div className="content-catalog-context-navigation">
+            <Link href={`/asignaturas/${selectedSubject.slug}`}>
+              <ArrowLeft aria-hidden="true" size={16} />
+              Volver a {selectedSubject.name}
+            </Link>
+            {topic && (
+              <Link
+                href={catalogHref(kind, "", subjectSlug)}
+                onClick={(event) => navigateCatalog(event, catalogHref(kind, "", subjectSlug))}
+                prefetch={false}
+              >
+                Ver todos los temas
+              </Link>
+            )}
           </div>
-        </nav>
+        )}
 
         <div className="content-catalog-toolbar">
           <label className="content-catalog-search" htmlFor="content-catalog-search-input">
@@ -259,7 +349,7 @@ export function ContentLibraryScreen({
           </span>
         </div>
 
-        {subjects.length > 0 && (
+        {!selectedSubject && subjects.length > 0 && (
           <nav className="content-catalog-subject-nav" aria-label="Asignatura">
             <span className="content-catalog-topic-label">Asignatura</span>
             <div className="content-catalog-topic-chips">
@@ -281,7 +371,7 @@ export function ContentLibraryScreen({
             </div>
           </nav>
         )}
-        {topics.length > 0 && (
+        {!isContextualCatalog && topics.length > 0 && (
           <nav className="content-catalog-topic-nav" aria-label="Etiquetas del tema">
             <span className="content-catalog-topic-label">Etiqueta</span>
             <div className="content-catalog-topic-chips">
@@ -305,32 +395,108 @@ export function ContentLibraryScreen({
           </nav>
         )}
 
-        {visibleItems.length > 0 ? (
-            <ul
-              className={kind === "video" ? "content-catalog-video-grid" : "content-catalog-resource-grid"}
-              id="content-catalog-results"
-            >
-              {visibleItems.map((item) => (
-                <li key={item.id}>
-                  <CatalogCard item={item} video={kind === "video"} />
-                </li>
-              ))}
-            </ul>
+        {visibleItems.length > 0 && isContextualCatalog && selectedSubject ? (
+          <>
+            {contextualTopicGroups.length > 1 && (
+              <nav className="content-catalog-topic-browser" aria-labelledby="content-topic-browser-title">
+                <div className="content-catalog-topic-browser-heading">
+                  <div>
+                    <span>Temas disponibles</span>
+                    <h2 id="content-topic-browser-title">Explora por tema</h2>
+                  </div>
+                  <p>Ve directamente a la sección que quieres estudiar.</p>
+                </div>
+                <ul className="content-catalog-topic-directory">
+                  {contextualTopicGroups.map((group) => (
+                    <li key={group.name}>
+                      <a className="content-catalog-topic-link" href={`#${topicAnchor(group.name)}`}>
+                        <span className="content-catalog-topic-icon" aria-hidden="true">
+                          <ContextKindIcon size={23} />
+                        </span>
+                        <span className="content-catalog-topic-copy">
+                          <span className="content-catalog-topic-meta">
+                            {group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}
+                          </span>
+                          <strong>{group.name}</strong>
+                          <p>Material de {selectedSubject.name} reunido en esta sección</p>
+                        </span>
+                        <span className="content-catalog-topic-action">
+                          Ir a la sección <ArrowDown aria-hidden="true" size={15} />
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
+
+            <div className="content-catalog-topic-groups" id="content-catalog-results">
+              {contextualTopicGroups.map((group) => {
+                const headingId = `${topicAnchor(group.name)}-title`;
+                return (
+                  <section
+                    className="content-catalog-topic-section"
+                    id={topicAnchor(group.name)}
+                    key={group.name}
+                    aria-labelledby={headingId}
+                  >
+                    <header className="content-catalog-topic-section-heading">
+                      <span className="content-catalog-topic-section-icon" aria-hidden="true">
+                        <ContextKindIcon size={21} />
+                      </span>
+                      <div>
+                        <span>{title} · {selectedSubject.name}</span>
+                        <h2 id={headingId}>{group.name}</h2>
+                      </div>
+                      <small>{group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}</small>
+                    </header>
+                    <CatalogGrid
+                      items={group.items}
+                      labelledBy={headingId}
+                      video={kind === "video"}
+                    />
+                  </section>
+                );
+              })}
+            </div>
+          </>
+        ) : visibleItems.length > 0 ? (
+          <CatalogGrid id="content-catalog-results" items={visibleItems} video={kind === "video"} />
         ) : (
           <div className="content-catalog-empty" id="content-catalog-results" role="status">
             <Compass aria-hidden="true" size={38} />
-            <h2>{available ? "No encontramos contenido" : "La biblioteca no está disponible"}</h2>
-            <p>{available ? "Prueba con otros filtros." : "Intenta de nuevo en unos minutos."}</p>
+            <h2>
+              {available
+                ? isContextualCatalog
+                  ? `No encontramos ${contextualKindLabel}`
+                  : "No encontramos contenido"
+                : "La biblioteca no está disponible"}
+            </h2>
+            <p>
+              {available
+                ? isContextualCatalog
+                  ? search || topic
+                    ? "Prueba con otra búsqueda o revisa todos los temas."
+                    : `Aún no hay ${contextualKindLabel} disponibles en esta asignatura.`
+                  : "Prueba con otros filtros."
+                : "Intenta de nuevo en unos minutos."}
+            </p>
             {hasFilters && (
               <Link
                 className="content-catalog-clear-filters"
-                href={clearHref}
-                onClick={(event) => {
-                  if (navigateCatalog(event, clearHref)) setSearch("");
-                }}
+                href={emptyActionHref}
+                onClick={shouldClearEmptyFilters
+                  ? (event) => {
+                      if (navigateCatalog(event, clearHref)) setSearch("");
+                    }
+                  : undefined}
                 prefetch={false}
               >
-                Limpiar filtros
+                {isContextualCatalog
+                  ? search || topic
+                    ? "Ver todos los temas"
+                    : `Volver a ${selectedSubject?.name ?? "la asignatura"}`
+                  : "Limpiar filtros"}
               </Link>
             )}
           </div>
