@@ -4,7 +4,6 @@ import type { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent } from
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
-  CaretDown,
   CaretLeft,
   CaretRight,
   CardsThree,
@@ -43,6 +42,7 @@ import { uniqueRegions } from "@/lib/content-regions";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { RegionTagsInput } from "./region-tags-input";
 import { StudioNameDialog } from "./studio-name-dialog";
+import { PlatformToast, type PlatformNotice } from "./platform-toast";
 
 const GuideEditorScreen = dynamic(
   () => import("./guide-editor-screen").then((module) => module.GuideEditorScreen),
@@ -281,6 +281,48 @@ function onlySubjectAssignmentChanged(current: ContentDraft, baseline: ContentDr
   const currentWithoutSubjects = { ...current, subjectIds: [] };
   const baselineWithoutSubjects = { ...baseline, subjectIds: [] };
   return JSON.stringify(currentWithoutSubjects) === JSON.stringify(baselineWithoutSubjects);
+}
+
+function onlyOrganizationChanged(current: ContentDraft, baseline: ContentDraft) {
+  const organizationChanged =
+    JSON.stringify(current.subjectIds) !== JSON.stringify(baseline.subjectIds) ||
+    current.topic !== baseline.topic ||
+    JSON.stringify(current.content.regions) !== JSON.stringify(baseline.content.regions);
+  if (!organizationChanged) return false;
+
+  const currentWithoutOrganization = {
+    ...current,
+    subjectIds: [],
+    topic: "",
+    content: { ...current.content, regions: [] },
+  };
+  const baselineWithoutOrganization = {
+    ...baseline,
+    subjectIds: [],
+    topic: "",
+    content: { ...baseline.content, regions: [] },
+  };
+  return JSON.stringify(currentWithoutOrganization) === JSON.stringify(baselineWithoutOrganization);
+}
+
+function missingGuideContent(draft: ContentDraft) {
+  if (draft.kind !== "guide") return [];
+  const missing: string[] = [];
+  const hasDocument = richTextDocumentHasBody(draft.content.document) ||
+    (draft.content.sections.length > 0 && draft.content.sections.every(
+      (section) => section.heading.trim() && section.body.trim(),
+    ));
+  const hasKeyPoints = draft.content.keyPoints.length > 0 &&
+    draft.content.keyPoints.every((point) => point.trim());
+  const hasQuestionnaire = draft.content.quiz.questions.length > 0 &&
+    draft.content.quiz.questions.every(
+      (question) => question.prompt.trim() && questionAnswer(question).trim(),
+    );
+
+  if (!hasDocument) missing.push("contenido de la guía");
+  if (!hasKeyPoints) missing.push("puntos clave");
+  if (!hasQuestionnaire) missing.push("cuestionario");
+  return missing;
 }
 function signedPut(url: string, file: File, onProgress: (value: number) => void) {
   return new Promise<void>((resolve, reject) => {
@@ -564,7 +606,7 @@ function TypeEditor({
     return (
       <div className="studio-type-editor">
         <QuizQuestionsEditor
-          title="Preguntas y respuestas"
+          title="Cuestionario"
           questions={draft.content.questions}
           onChange={(questions) => onChange({ ...draft, content: { ...draft.content, questions } })}
         />
@@ -679,7 +721,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [kindFilter, setKindFilter] = useState<"all" | ContentKind>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | ContentStatus>("all");
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ text: string; tone: "error" | "success" } | null>(null);
+  const [notice, setNotice] = useState<PlatformNotice | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [guideEditing, setGuideEditing] = useState(false);
@@ -761,6 +803,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
     draftBaseline &&
     (item.status === "published" || item.status === "archived") &&
     onlySubjectAssignmentChanged(draft, draftBaseline),
+  );
+  const publishedOrganizationOnly = Boolean(
+    !isNew &&
+    item?.status === "published" &&
+    draft &&
+    draftBaseline &&
+    onlyOrganizationChanged(draft, draftBaseline),
   );
   useEffect(() => {
     if (!guideCreateOpen) return;
@@ -1002,13 +1051,16 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (
       item &&
       !isNew &&
-      (item.status === "published" ||
+      ((item.status === "published" &&
+        (!capabilities.canEditAll || !publishedOrganizationOnly)) ||
         (item.status === "archived" && !capabilities.canPublish)) &&
       !subjectOnlyAssignment
     ) {
       setNotice({
         text: item.status === "published"
-          ? "El contenido publicado sólo permite actualizar sus asignaturas desde este editor."
+          ? capabilities.canEditAll
+            ? "El contenido publicado sólo permite actualizar sus asignaturas y etiquetas desde este editor."
+            : "No tienes permisos para reorganizar contenido publicado."
           : "Sólo coordinación o administración pueden editar contenido archivado.",
         tone: "error",
       });
@@ -1036,7 +1088,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setEditingId(current.id);
       setIsNew(false);
       guideEntryDraftRef.current = itemDraft(current);
-      setNotice({ text: "Contenido guardado.", tone: "success" });
+      const missing = missingGuideContent(payload);
+      setNotice(missing.length > 0
+        ? {
+            text: `Contenido guardado. Para completar la guía faltan: ${missing.join(", ")}.`,
+            tone: "warning",
+          }
+        : { text: "Contenido guardado.", tone: "success" });
       return true;
     } catch (error) {
       setNotice({
@@ -1151,17 +1209,21 @@ export function ContentStudio({ initialWorkspace }: Props) {
       media.onerror = () => URL.revokeObjectURL(objectUrl);
       media.src = objectUrl;
     }
+
+    if (selected) void upload(selected);
   }
 
-  async function upload() {
-    if (!draft || !file || !editable || !capabilities.canUpload || busy) return;
+  async function upload(selectedFile: File) {
+    if (!draft || !editable || !capabilities.canUpload || busy) return;
     const isVideo = draft.kind === "video";
     const isGuide = draft.kind === "guide";
     const valid =
-      (isVideo && ["video/mp4", "video/quicktime", "video/webm"].includes(file.type)) ||
-      (isGuide && file.type === "application/pdf");
+      (isVideo && ["video/mp4", "video/quicktime", "video/webm"].includes(selectedFile.type)) ||
+      (isGuide && selectedFile.type === "application/pdf");
 
     if (!valid) {
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
       setNotice({ text: "El tipo de archivo no corresponde al contenido.", tone: "error" });
       return;
     }
@@ -1189,18 +1251,18 @@ export function ContentStudio({ initialWorkspace }: Props) {
         `/api/editor/content/${encodeURIComponent(target.id)}/assets`,
         {
           body: JSON.stringify({
-            fileName: file.name,
-            fileSizeBytes: file.size,
+            fileName: selectedFile.name,
+            fileSizeBytes: selectedFile.size,
             kind: isVideo ? "video" : "document",
-            mimeType: file.type as Mime,
+            mimeType: selectedFile.type as Mime,
           }),
           method: "POST",
         },
       );
-      if (file.size > reservation.constraints.maxFileSizeBytes) {
+      if (selectedFile.size > reservation.constraints.maxFileSizeBytes) {
         throw new Error("El archivo supera el límite permitido.");
       }
-      await signedPut(reservation.upload.url, file, setProgress);
+      await signedPut(reservation.upload.url, selectedFile, setProgress);
       const asset = await json<Asset>(
         `/api/editor/assets/${encodeURIComponent(reservation.asset.id)}/finalize`,
         { method: "POST" },
@@ -1215,6 +1277,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
       if (fileRef.current) fileRef.current.value = "";
       setNotice({ text: "Archivo cargado y verificado.", tone: "success" });
     } catch (error) {
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
       setNotice({
         text: error instanceof Error ? error.message : "No fue posible cargar el archivo.",
         tone: "error",
@@ -1256,7 +1320,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
         {
           icon: Question,
-          label: "Preguntas y respuestas",
+          label: "Cuestionario",
           ready:
             draft.content.quiz.questions.length > 0 &&
             draft.content.quiz.questions.every(
@@ -1269,11 +1333,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     : [];
   const videoComplete = videoChecklist.length > 0 && videoChecklist.every((requirement) => requirement.ready);
   const videoReadyCount = videoChecklist.filter((requirement) => requirement.ready).length;
-  const basicsComplete = Boolean(
-    draft?.title.trim() &&
-      draft.topic.trim() &&
-      (draft.kind === "topic" ? draft.content.introduction.trim() : draft.summary.trim()),
-  );
+  const videoNextStepIndex = videoChecklist.findIndex((requirement) => !requirement.ready);
 
   if (guideEditing && draft && (draft.kind === "guide" || draft.kind === "video")) {
     return (
@@ -1293,6 +1353,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
           hasUnsavedChanges={hasUnsavedChanges}
           isNew={isNew}
           notice={notice}
+          onDismissNotice={() => setNotice(null)}
           status={item?.status}
           onChange={(next) => {
             setDraft(next);
@@ -1314,9 +1375,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
       headerTitle="Contenido"
       mainClassName="studio-main"
     >
+      <PlatformToast notice={notice} onDismiss={() => setNotice(null)} />
       <header className="studio-heading">
         <div>
-          <h2>Gestionar contenido</h2>
+          <h2>Publicar contenido</h2>
         </div>
         {capabilities.canCreate && (
           <div className="studio-create-actions" aria-label="Crear contenido">
@@ -1457,14 +1519,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
         >
           {!draft ? (
             <>
-              {notice && (
-                <p
-                  className={`studio-notice studio-notice-${notice.tone}`}
-                  role={notice.tone === "error" ? "alert" : "status"}
-                >
-                  {notice.text}
-                </p>
-              )}
               <div className="studio-empty">
                 <Notebook size={30} />
                 <h3>Elige una publicación</h3>
@@ -1495,7 +1549,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       key={action.status}
                       title={
                         draft.kind === "video" && !videoComplete
-                          ? "Completa el video, los puntos clave, la guía y las preguntas y respuestas"
+                          ? "Completa el video, los puntos clave, la guía y el cuestionario"
                           : undefined
                       }
                       type="button"
@@ -1530,50 +1584,26 @@ export function ContentStudio({ initialWorkspace }: Props) {
               </header>
 
               {draft.kind === "video" && (
-                <details className="studio-package-checklist">
-                  <summary>
-                    <span className={videoComplete ? "is-ready" : ""}>
-                      {videoComplete ? (
-                        <CheckCircle aria-hidden="true" size={19} weight="fill" />
-                      ) : (
-                        <FileVideo aria-hidden="true" size={19} />
-                      )}
-                      <span>
-                        <strong>Preparación del video</strong>
-                        <small>{videoReadyCount} de {videoChecklist.length} requisitos completos</small>
-                      </span>
-                    </span>
-                    <CaretDown aria-hidden="true" size={17} />
-                  </summary>
-                  <div className="studio-package-requirements" aria-label="Requisitos del video">
-                    {videoChecklist.map((requirement) => {
-                      const Icon = requirement.icon;
+                <section className="studio-package-roadmap" aria-label="Preparación del video">
+                  <header>
+                    <strong>Preparación del video</strong>
+                    <span>{videoReadyCount}/{videoChecklist.length} completado</span>
+                  </header>
+                  <ol>
+                    {videoChecklist.map((requirement, index) => {
                       return (
-                        <span
+                        <li
                           aria-label={`${requirement.label}: ${requirement.ready ? "completo" : "pendiente"}`}
-                          className={requirement.ready ? "is-ready" : ""}
+                          className={`${requirement.ready ? "is-ready" : ""}${index === videoNextStepIndex ? " is-current" : ""}`.trim()}
                           key={requirement.label}
                         >
-                          {requirement.ready ? (
-                            <Check aria-hidden="true" size={15} weight="bold" />
-                          ) : (
-                            <Icon aria-hidden="true" size={15} />
-                          )}
-                          {requirement.label}
-                        </span>
+                          <span>{requirement.ready ? <Check aria-hidden="true" size={13} weight="bold" /> : index + 1}</span>
+                          <small>{requirement.label}</small>
+                        </li>
                       );
                     })}
-                  </div>
-                </details>
-              )}
-
-              {notice && (
-                <p
-                  className={`studio-notice studio-notice-${notice.tone}`}
-                  role={notice.tone === "error" ? "alert" : "status"}
-                >
-                  {notice.text}
-                </p>
+                  </ol>
+                </section>
               )}
 
               {accepts && capabilities.canUpload && editable && (
@@ -1593,8 +1623,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
                   </div>
                   <label className={`studio-upload-zone ${file ? "has-file" : ""}`}>
                     <CloudArrowUp size={24} />
-                    <span>{file ? file.name : item?.asset ? "Reemplazar video" : "Seleccionar video"}</span>
-                    <small>MP4, MOV o WebM</small>
+                    <span>{file ? file.name : item?.asset ? "Reemplazar video" : "Adjuntar video"}</span>
+                    <small>{busy === "upload" ? `Subiendo automáticamente · ${progress}%` : "MP4, MOV o WebM · carga automática"}</small>
                     <input
                       ref={fileRef}
                       accept={accepts}
@@ -1609,23 +1639,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       <span>{progress}%</span>
                     </div>
                   )}
-                  {file && !basicsComplete && (
-                    <p className="studio-upload-requirement" id="studio-upload-requirement">
-                      Completa título, región y resumen para subir el archivo.
-                    </p>
-                  )}
-                  <button
-                    aria-describedby={
-                      file && !basicsComplete ? "studio-upload-requirement" : undefined
-                    }
-                    className="studio-button studio-button-secondary"
-                    disabled={!file || busy !== null || !basicsComplete}
-                    type="button"
-                    onClick={upload}
-                  >
-                    <CloudArrowUp size={17} />
-                    {busy === "upload" ? "Subiendo..." : "Subir video"}
-                  </button>
                 </section>
               )}
 

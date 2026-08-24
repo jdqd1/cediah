@@ -18,7 +18,10 @@ import type {
   SubjectProvider,
 } from "@cediah/contracts";
 import { buildApp } from "../src/app.js";
-import { canEditContent } from "../src/content-authorization.js";
+import {
+  canEditContent,
+  isPublishedOrganizationUpdate,
+} from "../src/content-authorization.js";
 import type { ApiEnvironment } from "../src/config.js";
 import {
   isContentReadyForTransition,
@@ -836,6 +839,23 @@ describe("content API", () => {
         status: "published",
       }),
     ).toBe(false);
+  });
+
+  it("limits published updates to assignments and topic labels", () => {
+    const published = guideItem({ status: "published" });
+    const organizationUpdate = ContentDraftSchema.parse({
+      ...published,
+      subjectIds: [subjectId],
+      topic: "Cuello",
+      content: { ...published.content, regions: ["Cuello", "Cabeza"] },
+    });
+    const contentUpdate = ContentDraftSchema.parse({
+      ...organizationUpdate,
+      title: "Título modificado después de publicar",
+    });
+
+    expect(isPublishedOrganizationUpdate(published, organizationUpdate)).toBe(true);
+    expect(isPublishedOrganizationUpdate(published, contentUpdate)).toBe(false);
   });
 
   it("allows coordination to restore archived content without broadening editorial permissions", () => {

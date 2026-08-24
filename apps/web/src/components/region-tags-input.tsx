@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Tag, X } from "@phosphor-icons/react";
+import { CheckCircle, Plus, Tag, X } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioNameDialog } from "./studio-name-dialog";
@@ -31,6 +31,13 @@ export function RegionTagsInput({
       .filter((suggestion) => !query || normalizeRegion(suggestion).includes(query))
       .slice(0, 6);
   }, [cleanValues, input, suggestions]);
+  const cleanInput = cleanRegion(input);
+  const inputIsExisting = Boolean(
+    cleanInput &&
+      uniqueRegions([...suggestions, ...cleanValues]).some(
+        (region) => normalizeRegion(region) === normalizeRegion(cleanInput),
+      ),
+  );
 
   function closeDialog() {
     setDialogOpen(false);
@@ -76,7 +83,7 @@ export function RegionTagsInput({
           )}
         </div>
         <button
-          className="studio-entity-create-button studio-entity-create-button-accent"
+          className="studio-entity-create-button studio-entity-create-button-primary"
           disabled={disabled || cleanValues.length >= MAX_REGIONS}
           type="button"
           onClick={() => setDialogOpen(true)}
@@ -87,25 +94,37 @@ export function RegionTagsInput({
       </div>
 
       <StudioNameDialog
-        description="Escribe una etiqueta nueva o elige una de las sugerencias disponibles."
         icon={<Tag size={21} />}
         inputLabel="Nombre de la etiqueta"
         maxLength={80}
         open={dialogOpen}
         placeholder="Ej. Tórax"
-        submitLabel="Añadir etiqueta"
+        submitLabel={inputIsExisting ? "Añadir etiqueta" : "Crear etiqueta"}
         title="Añadir etiqueta"
         value={input}
         onChange={setInput}
         onClose={closeDialog}
         onSubmit={() => add()}
       >
+        {cleanInput && (
+          <div className={`region-tag-dialog-status ${inputIsExisting ? "is-existing" : "is-new"}`}>
+            {inputIsExisting ? (
+              <CheckCircle aria-hidden="true" size={18} weight="fill" />
+            ) : (
+              <Plus aria-hidden="true" size={18} weight="bold" />
+            )}
+            <span>
+              <strong>{inputIsExisting ? "Etiqueta existente" : "Nueva etiqueta"}</strong>
+              <small>{cleanInput}</small>
+            </span>
+          </div>
+        )}
         {available.length > 0 && (
           <div className="studio-name-dialog-suggestions">
             <span>Sugerencias</span>
             <div>
               {available.map((suggestion) => (
-                <button key={normalizeRegion(suggestion)} type="button" onClick={() => add(suggestion)}>
+                <button className="is-existing" key={normalizeRegion(suggestion)} type="button" onClick={() => add(suggestion)}>
                   <Tag aria-hidden="true" size={14} /> {suggestion}
                 </button>
               ))}

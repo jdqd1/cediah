@@ -1,5 +1,7 @@
 import type {
   ContentCapabilities,
+  ContentDraft,
+  ContentItem,
   ContentStatus,
   PlatformRole,
 } from "@cediah/contracts";
@@ -52,4 +54,24 @@ export function canEditContent(input: {
     input.actorUserId === input.authorUserId &&
     (input.status === "draft" || input.status === "changes_requested")
   );
+}
+
+export function isPublishedOrganizationUpdate(
+  current: ContentItem,
+  next: ContentDraft,
+) {
+  if (
+    current.kind !== next.kind ||
+    current.slug !== next.slug ||
+    current.title !== next.title ||
+    current.summary !== next.summary ||
+    current.estimatedMinutes !== next.estimatedMinutes ||
+    current.featured !== next.featured
+  ) {
+    return false;
+  }
+
+  const currentContent = { ...current.content, regions: [] };
+  const nextContent = { ...next.content, regions: [] };
+  return JSON.stringify(currentContent) === JSON.stringify(nextContent);
 }

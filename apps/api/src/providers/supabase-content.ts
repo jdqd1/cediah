@@ -19,7 +19,11 @@ import {
   type ContentTransitionRequest,
   type PlatformRole,
 } from "@cediah/contracts";
-import { canEditContent, getContentCapabilities } from "../content-authorization.js";
+import {
+  canEditContent,
+  getContentCapabilities,
+  isPublishedOrganizationUpdate,
+} from "../content-authorization.js";
 import type { SupabaseStorageConfiguration } from "../config.js";
 
 const assetSelection =
@@ -778,15 +782,24 @@ export function createSupabaseContentProvider(
     async updateContent(input) {
       const access = await getStoredAccess(input.contentId);
       if (!access) return { status: "not_found" };
-      if (
-        !canEditContent({
-          actorUserId: input.actorUserId,
-          authorUserId: access.authorUserId,
-          roles: input.roles,
-          status: access.status,
-        })
-      ) {
+      const canEdit = canEditContent({
+        actorUserId: input.actorUserId,
+        authorUserId: access.authorUserId,
+        roles: input.roles,
+        status: access.status,
+      });
+      const canOrganizePublished =
+        access.status === "published" &&
+        getContentCapabilities(input.roles).canEditAll;
+      if (!canEdit && !canOrganizePublished) {
         return { status: "not_found" };
+      }
+      if (access.status === "published") {
+        const current = await getItemById(input.contentId);
+        if (!current) return { status: "not_found" };
+        if (!isPublishedOrganizationUpdate(current, input.draft)) {
+          return { status: "not_found" };
+        }
       }
       if (
         (access.status === "published" || access.status === "archived") &&

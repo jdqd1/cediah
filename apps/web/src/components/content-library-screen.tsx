@@ -4,8 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  ArrowDown,
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   CardsThree,
   ClipboardText,
@@ -95,13 +95,6 @@ function itemRegions(item: ContentItem) {
   return item.content.regions.length > 0 ? item.content.regions : [item.topic];
 }
 
-function topicAnchor(topic: string) {
-  const slug = normalize(topic)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return `tema-${slug || "otros"}`;
-}
-
 function CatalogCard({ item, video = false }: { item: ContentItem; video?: boolean }) {
   const Icon = kindIcons[item.kind];
 
@@ -131,6 +124,51 @@ function CatalogCard({ item, video = false }: { item: ContentItem; video?: boole
         <p>{item.summary}</p>
       </div>
     </Link>
+  );
+}
+
+function CatalogList({
+  id,
+  items,
+  labelledBy,
+}: {
+  id?: string;
+  items: ContentItem[];
+  labelledBy?: string;
+}) {
+  return (
+    <ul aria-labelledby={labelledBy} className="content-catalog-list" id={id}>
+      {items.map((item) => {
+        const Icon = kindIcons[item.kind];
+        return (
+          <li key={item.id}>
+            <Link className="content-catalog-list-item" href={itemHref(item)}>
+              <span className="content-catalog-list-media">
+                <Image
+                  alt=""
+                  fill
+                  sizes="(max-width: 620px) 92px, 132px"
+                  src={kindImages[item.kind]}
+                />
+                <span aria-hidden="true"><Icon size={18} weight={item.kind === "video" ? "fill" : "regular"} /></span>
+              </span>
+              <span className="content-catalog-list-copy">
+                <small>
+                  {kindLabels[item.kind]}
+                  {item.estimatedMinutes ? ` · ${item.estimatedMinutes} min` : ""}
+                  {item.featured ? " · Destacado" : ""}
+                </small>
+                <strong>{item.title}</strong>
+                <p>{item.summary}</p>
+              </span>
+              <span className="content-catalog-list-action" aria-hidden="true">
+                <ArrowRight size={18} />
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -344,9 +382,6 @@ export function ContentLibraryScreen({
               </button>
             )}
           </label>
-          <span className="content-catalog-result-count" aria-live="polite">
-            {visibleItems.length === 1 ? "1 resultado" : `${visibleItems.length} resultados`}
-          </span>
         </div>
 
         {!selectedSubject && subjects.length > 0 && (
@@ -396,50 +431,12 @@ export function ContentLibraryScreen({
         )}
 
         {visibleItems.length > 0 && isContextualCatalog && selectedSubject ? (
-          <>
-            {contextualTopicGroups.length > 1 && (
-              <nav className="content-catalog-topic-browser" aria-labelledby="content-topic-browser-title">
-                <div className="content-catalog-topic-browser-heading">
-                  <div>
-                    <span>Temas disponibles</span>
-                    <h2 id="content-topic-browser-title">Explora por tema</h2>
-                  </div>
-                  <p>Ve directamente a la sección que quieres estudiar.</p>
-                </div>
-                <ul className="content-catalog-topic-directory">
-                  {contextualTopicGroups.map((group) => (
-                    <li key={group.name}>
-                      <a className="content-catalog-topic-link" href={`#${topicAnchor(group.name)}`}>
-                        <span className="content-catalog-topic-icon" aria-hidden="true">
-                          <ContextKindIcon size={23} />
-                        </span>
-                        <span className="content-catalog-topic-copy">
-                          <span className="content-catalog-topic-meta">
-                            {group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}
-                          </span>
-                          <strong>{group.name}</strong>
-                          <p>Material de {selectedSubject.name} reunido en esta sección</p>
-                        </span>
-                        <span className="content-catalog-topic-action">
-                          Ir a la sección <ArrowDown aria-hidden="true" size={15} />
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            )}
-
-            <div className="content-catalog-topic-groups" id="content-catalog-results">
-              {contextualTopicGroups.map((group) => {
-                const headingId = `${topicAnchor(group.name)}-title`;
+          topic ? (
+            <div className="content-catalog-topic-groups is-selected-topic" id="content-catalog-results">
+              {contextualTopicGroups.map((group, index) => {
+                const headingId = `content-topic-result-${index}`;
                 return (
-                  <section
-                    className="content-catalog-topic-section"
-                    id={topicAnchor(group.name)}
-                    key={group.name}
-                    aria-labelledby={headingId}
-                  >
+                  <section className="content-catalog-topic-section" key={group.name} aria-labelledby={headingId}>
                     <header className="content-catalog-topic-section-heading">
                       <span className="content-catalog-topic-section-icon" aria-hidden="true">
                         <ContextKindIcon size={21} />
@@ -450,16 +447,50 @@ export function ContentLibraryScreen({
                       </div>
                       <small>{group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}</small>
                     </header>
-                    <CatalogGrid
-                      items={group.items}
-                      labelledBy={headingId}
-                      video={kind === "video"}
-                    />
+                    <CatalogList items={group.items} labelledBy={headingId} />
                   </section>
                 );
               })}
             </div>
-          </>
+          ) : (
+            <nav
+              className="content-catalog-topic-browser"
+              id="content-catalog-results"
+              aria-labelledby="content-topic-browser-title"
+            >
+              <div className="content-catalog-topic-browser-heading">
+                <h2 id="content-topic-browser-title">Temas</h2>
+              </div>
+              <ul className="content-catalog-topic-directory">
+                {contextualTopicGroups.map((group) => {
+                  const href = catalogHref(kind, group.name, subjectSlug);
+                  return (
+                    <li key={group.name}>
+                      <Link
+                        className="content-catalog-topic-link"
+                        href={href}
+                        onClick={(event) => navigateCatalog(event, href)}
+                        prefetch={false}
+                      >
+                        <span className="content-catalog-topic-icon" aria-hidden="true">
+                          <ContextKindIcon size={22} />
+                        </span>
+                        <span className="content-catalog-topic-copy">
+                          <span className="content-catalog-topic-meta">
+                            {group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}
+                          </span>
+                          <strong>{group.name}</strong>
+                        </span>
+                        <span className="content-catalog-topic-action">
+                          Ver {contextualKindLabel} <ArrowRight aria-hidden="true" size={15} />
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          )
         ) : visibleItems.length > 0 ? (
           <CatalogGrid id="content-catalog-results" items={visibleItems} video={kind === "video"} />
         ) : (

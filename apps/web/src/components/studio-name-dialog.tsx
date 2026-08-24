@@ -23,7 +23,7 @@ export function StudioNameDialog({
 }: {
   busy?: boolean;
   children?: ReactNode;
-  description: string;
+  description?: string;
   icon: ReactNode;
   inputLabel: string;
   maxLength: number;
@@ -100,7 +100,7 @@ export function StudioNameDialog({
     >
       <section
         aria-busy={busy}
-        aria-describedby={descriptionId}
+        aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
         className="studio-name-dialog"
@@ -112,7 +112,7 @@ export function StudioNameDialog({
           <span aria-hidden="true" className="studio-name-dialog-icon">{icon}</span>
           <div>
             <h3 id={titleId}>{title}</h3>
-            <p id={descriptionId}>{description}</p>
+            {description && <p id={descriptionId}>{description}</p>}
           </div>
           <button
             aria-label="Cerrar"

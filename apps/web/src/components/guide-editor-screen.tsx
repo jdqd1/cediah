@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   ArrowUDownLeft,
   ArrowUUpLeft,
+  BookOpen,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -69,6 +70,8 @@ import {
   type NumberedGuideOutlineItem,
 } from "@/lib/guide-document";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { PlatformToast, type PlatformNotice } from "./platform-toast";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 type GuideDraft = Extract<ContentDraft, { kind: "guide" }>;
@@ -625,13 +628,13 @@ function QuizPanel({
     <section className={`guide-companion-panel ${collapsed ? "is-collapsed" : ""}`}>
       <header>
         <button type="button" onClick={() => setCollapsed((value) => !value)}>
-          <span><Question size={19} /> Preguntas y respuestas <small className="guide-count guide-count-quiz">{questions.length}</small></span>
+          <span><Question size={19} /> Cuestionario <small className="guide-count guide-count-quiz">{questions.length}</small></span>
           {collapsed ? <CaretDown size={16} /> : <CaretUp size={16} />}
         </button>
       </header>
       {!collapsed && (
         <div className="guide-companion-body guide-quiz-builder">
-          <p>Crea tarjetas de repaso con una pregunta y su respuesta directa.</p>
+          <p>Crea preguntas breves para comprobar la comprensión de la guía.</p>
           {questions.map((question, questionIndex) => {
             const complete = Boolean(
               question.prompt.trim() &&
@@ -732,9 +735,12 @@ function GuideReaderPreview({
   title: string;
 }) {
   const [outlineExpanded, setOutlineExpanded] = useState(true);
+  const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
+  useBodyScrollLock(mobileDrawer !== null);
 
   function scrollToHeading(id: string) {
     setOutlineExpanded(false);
+    setMobileDrawer(null);
     window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
@@ -745,8 +751,39 @@ function GuideReaderPreview({
         <h1>{title || "Guía sin título"}</h1>
         {summary && <p>{summary}</p>}
       </header>
+      <section className="published-reader-mobile-toolbar guide-editor-preview-mobile-toolbar" aria-label="Paneles de la vista previa">
+        <div className="published-reader-mobile-toolbar-row">
+          <button
+            aria-expanded={mobileDrawer === "outline"}
+            aria-label="Abrir índice"
+            className="published-reader-mobile-side-button"
+            type="button"
+            onClick={() => setMobileDrawer((current) => current === "outline" ? null : "outline")}
+          >
+            <ListBullets aria-hidden="true" size={19} />
+          </button>
+          <span className="guide-editor-preview-mobile-label">Vista previa</span>
+          <button
+            aria-expanded={mobileDrawer === "support"}
+            aria-label="Abrir recursos de estudio"
+            className="published-reader-mobile-side-button"
+            type="button"
+            onClick={() => setMobileDrawer((current) => current === "support" ? null : "support")}
+          >
+            <BookOpen aria-hidden="true" size={19} />
+          </button>
+        </div>
+      </section>
+      {mobileDrawer && (
+        <button
+          aria-label="Cerrar panel lateral"
+          className="published-reader-drawer-backdrop"
+          type="button"
+          onClick={() => setMobileDrawer(null)}
+        />
+      )}
       <div className="published-rich-guide-layout guide-editor-reader-preview-layout">
-        <nav className="published-rich-guide-outline" aria-label="Índice de la guía">
+        <nav className={`published-rich-guide-outline${mobileDrawer === "outline" ? " is-mobile-open" : ""}`} aria-label="Índice de la guía">
           <button
             aria-controls="guide-editor-preview-outline"
             aria-expanded={outlineExpanded}
@@ -780,8 +817,11 @@ function GuideReaderPreview({
           <RichTextRenderer document={guideDocument} />
         </article>
 
-        <aside className="published-rich-guide-support guide-editor-reader-preview-support" aria-label="Recursos de estudio">
-          <section className="guide-reader-preview-resource">
+        <aside className={`published-rich-guide-support guide-editor-reader-preview-support${mobileDrawer === "support" ? " is-mobile-open" : ""}`} aria-label="Recursos de estudio">
+          <div className="published-rich-guide-support-heading">
+            <span><BookOpen aria-hidden="true" size={18} /><strong>Recursos de estudio</strong></span>
+          </div>
+          <section className="guide-editor-reader-preview-resource">
             <header><HighlighterCircle size={19} /><strong>Puntos clave</strong><small>{keyPoints.length}</small></header>
             {keyPoints.length > 0 ? (
               <ul>
@@ -789,8 +829,8 @@ function GuideReaderPreview({
               </ul>
             ) : <p>No hay puntos clave.</p>}
           </section>
-          <section className="guide-reader-preview-resource">
-            <header><Question size={19} /><strong>Preguntas y respuestas</strong><small>{questions.length}</small></header>
+          <section className="guide-editor-reader-preview-resource">
+            <header><Question size={19} /><strong>Cuestionario</strong><small>{questions.length}</small></header>
             {questions.length > 0 ? (
               <div className="guide-reader-preview-question-list">
                 {questions.slice(0, 3).map((question, index) => (
@@ -802,7 +842,7 @@ function GuideReaderPreview({
                   </article>
                 ))}
               </div>
-            ) : <p>No hay preguntas.</p>}
+            ) : <p>No hay preguntas en el cuestionario.</p>}
           </section>
         </aside>
       </div>
@@ -817,6 +857,7 @@ export function GuideEditorScreen({
   hasUnsavedChanges,
   isNew,
   notice,
+  onDismissNotice,
   onChange,
   onLeave,
   onSave,
@@ -827,9 +868,10 @@ export function GuideEditorScreen({
   editable: boolean;
   hasUnsavedChanges: boolean;
   isNew: boolean;
-  notice: { text: string; tone: "error" | "success" } | null;
+  notice: PlatformNotice | null;
   onChange: (draft: EditableGuideDraft) => void;
   onLeave: (discard: boolean) => void;
+  onDismissNotice: () => void;
   onSave: () => Promise<boolean>;
   status?: ContentStatus;
 }) {
@@ -848,6 +890,7 @@ export function GuideEditorScreen({
   const [tableControlsPosition, setTableControlsPosition] = useState<TableControlsPosition | null>(null);
   const [tableContextMenu, setTableContextMenu] = useState<TableContextMenuState | null>(null);
   const [mobileDrawer, setMobileDrawer] = useState<MobileEditorDrawer>(null);
+  useBodyScrollLock(mobileDrawer !== null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const hoveredTableRef = useRef<HTMLTableElement | null>(null);
   const tableContextMenuRef = useRef<HTMLDivElement>(null);
@@ -863,6 +906,7 @@ export function GuideEditorScreen({
   const outline = useMemo(() => extractGuideOutline(documentState), [documentState]);
   const numberedOutline = useMemo(() => numberGuideOutline(outline), [outline]);
   const isEditing = canEditDocument && editMode;
+  const isEditingRef = useRef(isEditing);
   const releaseFallbackSentinel = useCallback((continuation?: () => void) => {
     const state = historyStateRecord(window.history.state);
     if (state[fallbackGuardStateKey] !== fallbackGuardId || fallbackReleasingRef.current) {
@@ -893,6 +937,10 @@ export function GuideEditorScreen({
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -933,6 +981,7 @@ export function GuideEditorScreen({
       },
     },
     onUpdate({ editor: currentEditor }) {
+      if (!isEditingRef.current) return;
       const parsed = RichTextDocumentSchema.safeParse(sanitizeEditorJson(currentEditor.getJSON()));
       if (!parsed.success) return;
       setDocumentState(parsed.data);
@@ -1534,11 +1583,7 @@ export function GuideEditorScreen({
         </BubbleMenu>
       )}
 
-      {notice && (
-        <p className={`guide-editor-notice guide-editor-notice-${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}>
-          {notice.text}
-        </p>
-      )}
+      <PlatformToast notice={notice} onDismiss={onDismissNotice} />
 
       {preview ? (
         <GuideReaderPreview
@@ -1649,8 +1694,7 @@ export function GuideEditorScreen({
             onMouseMove={handleTablePointerMove}
           >
             <div className="guide-editor-canvas-label">
-              <span>{isEditing ? "Documento editable" : "Documento de la guía"}</span>
-              <span>{richTextDocumentToPlainText(documentState).trim().split(/\s+/).filter(Boolean).length} palabras</span>
+              <span><TableIcon aria-hidden="true" size={15} /> Pega una tabla o escribe Markdown: el contenido seguirá siendo editable.</span>
             </div>
             <div onPasteCapture={handlePlainPaste}>
               <EditorContent editor={editor} />
@@ -1758,7 +1802,6 @@ export function GuideEditorScreen({
                 </div>
               </div>
             )}
-            <p className="guide-editor-paste-hint">Al pegar tablas o Markdown se conservará su estructura y formato para que puedas seguir editándolos.</p>
           </main>
 
           <aside className={`guide-editor-companions${companionsCollapsed && mobileDrawer !== "companions" ? " is-collapsed" : ""}${mobileDrawer === "companions" ? " is-mobile-open" : ""}`} aria-label="Complementos de la guía">

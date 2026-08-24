@@ -10,10 +10,11 @@ import {
 } from "@cediah/contracts";
 import { type FormEvent, useState } from "react";
 import { AppShell } from "./app-shell";
+import { PlatformToast, type PlatformNotice } from "./platform-toast";
 
 type Props = { initialUser: AdminRoleUser };
 
-type Notice = { tone: "error" | "success"; text: string } | null;
+type Notice = PlatformNotice | null;
 type BusyState =
   | { kind: "lookup" }
   | { action: AdminRoleAction; kind: "mutation"; role: PlatformRole }
@@ -147,6 +148,7 @@ export function RoleManagementScreen({ initialUser }: Props) {
       headerTitle="Roles y permisos"
       mainClassName="role-management-main"
     >
+      <PlatformToast notice={notice} onDismiss={() => setNotice(null)} />
       <section className="role-management-page" aria-label="Roles y permisos">
         <div className="role-management-workflow">
           <section className="role-account-panel" aria-labelledby="role-account-search-title">
@@ -190,16 +192,6 @@ export function RoleManagementScreen({ initialUser }: Props) {
               </div>
             </form>
           </section>
-
-          {notice && (
-            <p
-              className={`role-management-feedback studio-notice studio-notice-${notice.tone}`}
-              id="role-management-feedback"
-              role={notice.tone === "error" ? "alert" : "status"}
-            >
-              {notice.text}
-            </p>
-          )}
 
           {target ? (
             <section

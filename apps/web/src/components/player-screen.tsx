@@ -82,7 +82,7 @@ export function PlayerScreen({ isAdministrator = false }: { isAdministrator?: bo
 
           {activeTab === "questions" ? (
             <section className="question-section" aria-labelledby="question-title">
-              <div className="question-heading"><div><h3 id="question-title"><Question size={20} /> Preguntas y respuestas</h3><p>Repasa los conceptos clave del video.</p></div><button className="outline-action small" type="button"><Printer size={17} /> Imprimir</button></div>
+              <div className="question-heading"><div><h3 id="question-title"><Question size={20} /> Cuestionario</h3><p>Repasa los conceptos clave del video.</p></div><button className="outline-action small" type="button"><Printer size={17} /> Imprimir</button></div>
               <div className="question-list">{questions.map(([question, answer]) => <details className="question-row" key={question}><summary><span className="question-mark">?</span><span><strong>{question}</strong><small>{answer}</small></span><CaretDown size={17} /></summary></details>)}</div>
               <button className="show-more-questions" type="button">Ver más preguntas <CaretDown size={17} /></button>
             </section>

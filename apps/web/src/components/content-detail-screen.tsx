@@ -36,6 +36,7 @@ import {
 } from "react";
 import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
 import { questionAnswer } from "@/lib/question-answer";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { AppShell } from "./app-shell";
 import { RichTextRenderer } from "./rich-text-renderer";
 
@@ -212,6 +213,7 @@ function GuideBody({ item }: { item: GuideItem }) {
   const [favorite, setFavorite] = useState(false);
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
+  useBodyScrollLock(mobileDrawer !== null);
   const manualNavigationRef = useRef(false);
   const navigationFrameRef = useRef<number | null>(null);
   const headingHighlightTimerRef = useRef<number | null>(null);
@@ -678,13 +680,13 @@ function GuideBody({ item }: { item: GuideItem }) {
                 defaultExpanded
                 icon={<ClipboardText aria-hidden="true" size={20} />}
                 id="published-guide-quiz"
-                title="Preguntas y respuestas"
+                title="Cuestionario"
                 tone="quiz"
               >
                 {item.content.quiz.questions.length > 0 ? (
                   <QuestionAnswerCards questions={item.content.quiz.questions} />
                 ) : (
-                  <p className="published-rich-guide-resource-empty">Esta guía no incluye preguntas y respuestas.</p>
+                  <p className="published-rich-guide-resource-empty">Esta guía no incluye un cuestionario.</p>
                 )}
               </ReaderSupportPanel>
             </div>
@@ -752,7 +754,7 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
   const tabs: { id: VideoResource; label: string }[] = [
     { id: "guide", label: "Guía" },
     { id: "key-points", label: "Puntos clave" },
-    { id: "quiz", label: "Preguntas y respuestas" },
+    { id: "quiz", label: "Cuestionario" },
   ];
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -868,7 +870,7 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
           displayedQuiz.length > 0 ? (
             <QuestionAnswerCards mode="flashcards" questions={displayedQuiz} />
           ) : (
-            <p className="published-rich-guide-resource-empty">Esta guía no incluye preguntas y respuestas.</p>
+            <p className="published-rich-guide-resource-empty">Esta guía no incluye un cuestionario.</p>
           )
         )}
       </section>
@@ -900,8 +902,8 @@ function QuestionAnswerCards({
       <div className="published-tool-heading">
         <ClipboardText size={34} />
         <div>
-          <h3>Preguntas y respuestas</h3>
-          <p>{questions.length} {questions.length === 1 ? "tarjeta" : "tarjetas"} de repaso</p>
+          <h3>Cuestionario</h3>
+          <p>{questions.length} {questions.length === 1 ? "pregunta" : "preguntas"} de repaso</p>
         </div>
       </div>
       <div className="published-question-answer-list">
@@ -932,7 +934,7 @@ function QuestionAnswerFlashcards({ questions }: { questions: QuizQuestion[] }) 
   const [revealed, setRevealed] = useState<number | null>(null);
 
   return (
-    <section className="video-question-flashcards" aria-label="Tarjetas de preguntas y respuestas">
+    <section className="video-question-flashcards" aria-label="Cuestionario de repaso">
       <header className="video-question-flashcards-heading">
         <div>
           <span>Repaso activo</span>
