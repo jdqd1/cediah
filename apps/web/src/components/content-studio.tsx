@@ -4,6 +4,7 @@ import type { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent } from
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  CaretDown,
   CaretLeft,
   CaretRight,
   CardsThree,
@@ -795,6 +796,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (current.kind === "guide") {
       guideEntryDraftRef.current = itemDraft(current);
     }
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setPublicationsCollapsed(true);
+    }
     setGuideEditing(false);
   }
 
@@ -998,11 +1002,14 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (
       item &&
       !isNew &&
-      (item.status === "published" || item.status === "archived") &&
+      (item.status === "published" ||
+        (item.status === "archived" && !capabilities.canPublish)) &&
       !subjectOnlyAssignment
     ) {
       setNotice({
-        text: "El contenido publicado sólo permite actualizar sus asignaturas desde este editor.",
+        text: item.status === "published"
+          ? "El contenido publicado sólo permite actualizar sus asignaturas desde este editor."
+          : "Sólo coordinación o administración pueden editar contenido archivado.",
         tone: "error",
       });
       return false;
@@ -1260,7 +1267,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
       ]
     : [];
-const videoComplete = videoChecklist.length > 0 && videoChecklist.every((requirement) => requirement.ready);
+  const videoComplete = videoChecklist.length > 0 && videoChecklist.every((requirement) => requirement.ready);
+  const videoReadyCount = videoChecklist.filter((requirement) => requirement.ready).length;
   const basicsComplete = Boolean(
     draft?.title.trim() &&
       draft.topic.trim() &&
@@ -1281,7 +1289,7 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
           key={`${editingId ?? "new"}-${draft.kind}`}
           busy={busy !== null}
           draft={draft}
-          editable={editable}
+          editable={editable && (item?.status !== "archived" || capabilities.canPublish)}
           hasUnsavedChanges={hasUnsavedChanges}
           isNew={isNew}
           notice={notice}
@@ -1313,15 +1321,18 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
         {capabilities.canCreate && (
           <div className="studio-create-actions" aria-label="Crear contenido">
             {primaryKinds.map((option) => {
+              const CreateIcon = kindIcons[option.value];
               return (
                 <button
+                  aria-label={`Crear ${option.label.toLocaleLowerCase("es")}`}
                   className="studio-create-button"
                   disabled={busy !== null}
                   key={option.value}
+                  title={`Crear ${option.label.toLocaleLowerCase("es")}`}
                   type="button"
                   onClick={() => create(option.value)}
                 >
-                  <Plus aria-hidden="true" size={16} weight="bold" />
+                  <CreateIcon aria-hidden="true" size={18} weight="bold" />
                   <span>{option.label}</span>
                 </button>
               );
@@ -1362,6 +1373,19 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
             ))}
           </div>
         </div>
+        <label className="studio-kind-select">
+          <span className="sr-only">Filtrar por tipo</span>
+          <select
+            aria-label="Filtrar por tipo"
+            value={kindFilter}
+            onChange={(event) => setKindFilter(event.target.value as "all" | ContentKind)}
+          >
+            <option value="all">Todos los tipos</option>
+            <option value="video">Videos</option>
+            <option value="guide">Guías</option>
+            <option value="topic">Temas</option>
+          </select>
+        </label>
         <label className="studio-status-filter">
           <FunnelSimple aria-hidden="true" size={17} />
           <span>Estado</span>
@@ -1506,25 +1530,41 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
               </header>
 
               {draft.kind === "video" && (
-                <div className="studio-package-checklist" aria-label="Requisitos del video">
-                  {videoChecklist.map((requirement) => {
-                    const Icon = requirement.icon;
-                    return (
-                      <span
-                        aria-label={`${requirement.label}: ${requirement.ready ? "completo" : "pendiente"}`}
-                        className={requirement.ready ? "is-ready" : ""}
-                        key={requirement.label}
-                      >
-                        {requirement.ready ? (
-                          <Check aria-hidden="true" size={16} weight="bold" />
-                        ) : (
-                          <Icon aria-hidden="true" size={16} />
-                        )}
-                        {requirement.label}
+                <details className="studio-package-checklist">
+                  <summary>
+                    <span className={videoComplete ? "is-ready" : ""}>
+                      {videoComplete ? (
+                        <CheckCircle aria-hidden="true" size={19} weight="fill" />
+                      ) : (
+                        <FileVideo aria-hidden="true" size={19} />
+                      )}
+                      <span>
+                        <strong>Preparación del video</strong>
+                        <small>{videoReadyCount} de {videoChecklist.length} requisitos completos</small>
                       </span>
-                    );
-                  })}
-                </div>
+                    </span>
+                    <CaretDown aria-hidden="true" size={17} />
+                  </summary>
+                  <div className="studio-package-requirements" aria-label="Requisitos del video">
+                    {videoChecklist.map((requirement) => {
+                      const Icon = requirement.icon;
+                      return (
+                        <span
+                          aria-label={`${requirement.label}: ${requirement.ready ? "completo" : "pendiente"}`}
+                          className={requirement.ready ? "is-ready" : ""}
+                          key={requirement.label}
+                        >
+                          {requirement.ready ? (
+                            <Check aria-hidden="true" size={15} weight="bold" />
+                          ) : (
+                            <Icon aria-hidden="true" size={15} />
+                          )}
+                          {requirement.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </details>
               )}
 
               {notice && (
@@ -1553,7 +1593,7 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                   </div>
                   <label className={`studio-upload-zone ${file ? "has-file" : ""}`}>
                     <CloudArrowUp size={24} />
-                    <span>{file ? file.name : "Seleccionar video"}</span>
+                    <span>{file ? file.name : item?.asset ? "Reemplazar video" : "Seleccionar video"}</span>
                     <small>MP4, MOV o WebM</small>
                     <input
                       ref={fileRef}
@@ -1659,7 +1699,7 @@ const videoComplete = videoChecklist.length > 0 && videoChecklist.every((require
                         </div>
                         <div className="studio-new-subject">
                           <button
-                            className="studio-entity-create-button"
+                            className="studio-entity-create-button studio-entity-create-button-primary"
                             disabled={!editable || busy !== null}
                             type="button"
                             onClick={() => setSubjectCreateOpen(true)}

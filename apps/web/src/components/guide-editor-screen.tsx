@@ -838,9 +838,8 @@ export function GuideEditorScreen({
   const [documentState, setDocumentState] = useState<RichTextDocument>(initialDocument);
   const [exitPrompt, setExitPrompt] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [editMode, setEditMode] = useState(
-    () => isNew || (editable && status !== "published" && status !== "archived"),
-  );
+  const canEditDocument = editable && status !== "published";
+  const [editMode, setEditMode] = useState(() => isNew || canEditDocument);
   const [editingTitle, setEditingTitle] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [companionsCollapsed, setCompanionsCollapsed] = useState(false);
@@ -863,7 +862,7 @@ export function GuideEditorScreen({
   const pendingNavigationRef = useRef<PendingNavigationIntent | null>(null);
   const outline = useMemo(() => extractGuideOutline(documentState), [documentState]);
   const numberedOutline = useMemo(() => numberGuideOutline(outline), [outline]);
-  const isEditing = editable && editMode;
+  const isEditing = canEditDocument && editMode;
   const releaseFallbackSentinel = useCallback((continuation?: () => void) => {
     const state = historyStateRecord(window.history.state);
     if (state[fallbackGuardStateKey] !== fallbackGuardId || fallbackReleasingRef.current) {
@@ -1412,9 +1411,17 @@ export function GuideEditorScreen({
         <div className="guide-editor-heading-actions">
           {!preview && (
             <button
+              aria-label={isEditing ? "Editando la guía" : "Editar la guía"}
               aria-pressed={isEditing}
               className={isEditing ? "is-active" : ""}
-              disabled={!editable || busy}
+              disabled={!canEditDocument || busy}
+              title={
+                canEditDocument
+                  ? "Editar guía"
+                  : status === "published"
+                    ? "Archiva la guía antes de editarla"
+                    : "No tienes permisos para editar esta guía"
+              }
               type="button"
               onClick={() => {
                 setEditMode(true);
@@ -1424,9 +1431,23 @@ export function GuideEditorScreen({
               <NotePencil size={17} /> <span>{isEditing ? "Editando" : "Editar"}</span>
             </button>
           )}
+          {isEditing && (
+            <button
+              aria-label="Guardar guía"
+              className="guide-editor-save"
+              disabled={busy || !hasUnsavedChanges}
+              title="Guardar guía"
+              type="button"
+              onClick={() => void onSave()}
+            >
+              {busy ? <span className="guide-editor-saving" /> : <Check size={17} weight="bold" />}
+              {busy ? "Guardando…" : "Guardar"}
+            </button>
+          )}
           <button
             aria-label={preview ? "Volver al editor" : "Vista previa de lector"}
             className={preview ? "is-active" : ""}
+            title={preview ? "Volver al editor" : "Vista previa"}
             type="button"
             onClick={() => {
               setMobileDrawer(null);
@@ -1434,14 +1455,8 @@ export function GuideEditorScreen({
               setPreview((value) => !value);
             }}
           >
-            <Eye size={17} /> {preview ? "Seguir editando" : "Vista previa"}
+            <Eye size={17} /> <span>{preview ? "Seguir editando" : "Vista previa"}</span>
           </button>
-          {isEditing && (
-            <button className="guide-editor-save" disabled={busy || !hasUnsavedChanges} type="button" onClick={() => void onSave()}>
-              {busy ? <span className="guide-editor-saving" /> : <Check size={17} weight="bold" />}
-              {busy ? "Guardando…" : "Guardar"}
-            </button>
-          )}
         </div>
       </header>
 

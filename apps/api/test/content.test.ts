@@ -791,17 +791,33 @@ describe("content API", () => {
     await app.close();
   });
 
-  it("locks published and archived content for every editorial role", () => {
-    for (const status of ["published", "archived"] as const) {
-      expect(
-        canEditContent({
-          actorUserId: users.editor.id,
-          authorUserId: users.contributor.id,
-          roles: ["academic_editor"],
-          status,
-        }),
-      ).toBe(false);
-    }
+  it("keeps published content locked and reserves archived edits for publishers", () => {
+    expect(
+      canEditContent({
+        actorUserId: users.coordinator.id,
+        authorUserId: users.contributor.id,
+        roles: ["coordination"],
+        status: "published",
+      }),
+    ).toBe(false);
+
+    expect(
+      canEditContent({
+        actorUserId: users.editor.id,
+        authorUserId: users.contributor.id,
+        roles: ["academic_editor"],
+        status: "archived",
+      }),
+    ).toBe(false);
+
+    expect(
+      canEditContent({
+        actorUserId: users.coordinator.id,
+        authorUserId: users.contributor.id,
+        roles: ["coordination"],
+        status: "archived",
+      }),
+    ).toBe(true);
 
     expect(
       canEditContent({

@@ -76,7 +76,7 @@ export function RegionTagsInput({
           )}
         </div>
         <button
-          className="studio-entity-create-button"
+          className="studio-entity-create-button studio-entity-create-button-accent"
           disabled={disabled || cleanValues.length >= MAX_REGIONS}
           type="button"
           onClick={() => setDialogOpen(true)}
