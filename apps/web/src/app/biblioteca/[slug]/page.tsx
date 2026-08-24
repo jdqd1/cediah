@@ -7,10 +7,27 @@ export const dynamic = "force-dynamic";
 
 type ContentPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function ContentPage({ params }: ContentPageProps) {
-  const { slug } = await params;
+function firstSearchValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function ContentPage({ params, searchParams }: ContentPageProps) {
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const subjectSlug = firstSearchValue(query.asignatura)?.trim() ?? "";
+  const topic = firstSearchValue(query.tema)?.trim() ?? "";
+  const requestedKind = firstSearchValue(query.tipo)?.trim() ?? "";
+  const returnKind = ["flashcards", "quiz", "video"].includes(requestedKind)
+    ? requestedKind
+    : "video";
+  const returnParams = new URLSearchParams({ tipo: returnKind });
+  if (subjectSlug) returnParams.set("asignatura", subjectSlug);
+  if (topic) returnParams.set("tema", topic);
+  const returnHref = subjectSlug || topic
+    ? `/biblioteca?${returnParams.toString()}`
+    : undefined;
   const [result, isAdministrator] = await Promise.all([
     getPublishedContentItem(slug),
     currentUserIsAdministrator(),
@@ -28,6 +45,7 @@ export default async function ContentPage({ params }: ContentPageProps) {
         item={result.item}
         isAdministrator={isAdministrator}
         linkedGuide={linkedGuide}
+        returnHref={returnHref}
       />
     );
   }

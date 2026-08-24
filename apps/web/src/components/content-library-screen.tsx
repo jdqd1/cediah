@@ -64,10 +64,11 @@ const kindOptions: { icon: typeof BookOpen; label: string; value: CatalogKind }[
   { icon: CardsThree, label: "Flashcards", value: "flashcards" },
 ];
 
-function itemHref(item: ContentItem) {
-  return item.kind === "guide"
+function itemHref(item: ContentItem, contextQuery = "") {
+  const pathname = item.kind === "guide"
     ? "/guias/" + item.slug
     : "/biblioteca/" + item.slug;
+  return contextQuery ? `${pathname}?${contextQuery}` : pathname;
 }
 
 function isContentKind(value: string | null): value is Exclude<ContentKind, "topic"> {
@@ -128,10 +129,12 @@ function CatalogCard({ item, video = false }: { item: ContentItem; video?: boole
 }
 
 function CatalogList({
+  contextQuery,
   id,
   items,
   labelledBy,
 }: {
+  contextQuery?: string;
   id?: string;
   items: ContentItem[];
   labelledBy?: string;
@@ -140,24 +143,24 @@ function CatalogList({
     <ul aria-labelledby={labelledBy} className="content-catalog-list" id={id}>
       {items.map((item) => {
         const Icon = kindIcons[item.kind];
+        const metadata = [
+          item.estimatedMinutes ? `${item.estimatedMinutes} min` : "",
+          item.featured ? "Destacado" : "",
+        ].filter(Boolean);
         return (
           <li key={item.id}>
-            <Link className="content-catalog-list-item" href={itemHref(item)}>
+            <Link className="content-catalog-list-item" href={itemHref(item, contextQuery)}>
               <span className="content-catalog-list-media">
                 <Image
                   alt=""
                   fill
-                  sizes="(max-width: 620px) 92px, 132px"
+                  sizes="(max-width: 620px) 78px, 104px"
                   src={kindImages[item.kind]}
                 />
                 <span aria-hidden="true"><Icon size={18} weight={item.kind === "video" ? "fill" : "regular"} /></span>
               </span>
               <span className="content-catalog-list-copy">
-                <small>
-                  {kindLabels[item.kind]}
-                  {item.estimatedMinutes ? ` · ${item.estimatedMinutes} min` : ""}
-                  {item.featured ? " · Destacado" : ""}
-                </small>
+                {metadata.length > 0 && <small>{metadata.join(" · ")}</small>}
                 <strong>{item.title}</strong>
                 <p>{item.summary}</p>
               </span>
@@ -351,15 +354,6 @@ export function ContentLibraryScreen({
               <ArrowLeft aria-hidden="true" size={16} />
               Volver a {selectedSubject.name}
             </Link>
-            {topic && (
-              <Link
-                href={catalogHref(kind, "", subjectSlug)}
-                onClick={(event) => navigateCatalog(event, catalogHref(kind, "", subjectSlug))}
-                prefetch={false}
-              >
-                Ver todos los temas
-              </Link>
-            )}
           </div>
         )}
 
@@ -445,9 +439,16 @@ export function ContentLibraryScreen({
                         <span>{title} · {selectedSubject.name}</span>
                         <h2 id={headingId}>{group.name}</h2>
                       </div>
-                      <small>{group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}</small>
                     </header>
-                    <CatalogList items={group.items} labelledBy={headingId} />
+                    <CatalogList
+                      contextQuery={new URLSearchParams({
+                        asignatura: subjectSlug,
+                        tema: group.name,
+                        tipo: kind,
+                      }).toString()}
+                      items={group.items}
+                      labelledBy={headingId}
+                    />
                   </section>
                 );
               })}
@@ -459,7 +460,7 @@ export function ContentLibraryScreen({
               aria-labelledby="content-topic-browser-title"
             >
               <div className="content-catalog-topic-browser-heading">
-                <h2 id="content-topic-browser-title">Temas</h2>
+                <h2 id="content-topic-browser-title">Temario</h2>
               </div>
               <ul className="content-catalog-topic-directory">
                 {contextualTopicGroups.map((group) => {
@@ -476,9 +477,6 @@ export function ContentLibraryScreen({
                           <ContextKindIcon size={22} />
                         </span>
                         <span className="content-catalog-topic-copy">
-                          <span className="content-catalog-topic-meta">
-                            {group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}
-                          </span>
                           <strong>{group.name}</strong>
                         </span>
                         <span className="content-catalog-topic-action">

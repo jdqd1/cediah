@@ -194,6 +194,7 @@ function contentProvider(
   return {
     createAssetUpload: async () => ({ status: "not_found" }),
     createContent: async () => ({ status: "conflict" }),
+    deleteAsset: async () => ({ status: "not_found" }),
     deleteContent: async () => ({ status: "not_found" }),
     finalizeAsset: async () => ({ status: "not_found" }),
     getPublishedBySlug: async () => null,
@@ -1065,6 +1066,34 @@ describe("content API", () => {
     expect(provisioned.json()).toEqual(upload);
     expect(finalized.statusCode).toBe(200);
     expect(finalized.json()).toMatchObject({ id: assetId, status: "ready" });
+    await app.close();
+  });
+
+  it("removes an attached asset through the authenticated editor API", async () => {
+    const removals: Parameters<ContentProvider["deleteAsset"]>[0][] = [];
+    const updated = videoItem({ asset: null });
+    const provider = contentProvider(["community_contributor"], {
+      deleteAsset: async (input) => {
+        removals.push(input);
+        return { status: "success", value: updated };
+      },
+    });
+    const app = await buildApp(testEnvironment, {
+      contentProvider: provider,
+      identityProvider: identityProvider(),
+    });
+
+    const response = await app.inject({
+      headers: auth("contributor-token"),
+      method: "DELETE",
+      url: `/v1/editor/assets/${assetId}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ asset: null, id: contentId });
+    expect(removals).toEqual([
+      { actorUserId: users.contributor.id, assetId, roles: ["community_contributor"] },
+    ]);
     await app.close();
   });
 

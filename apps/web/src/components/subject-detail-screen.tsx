@@ -6,7 +6,6 @@ import {
   ArrowRight,
   BookOpen,
   CardsThree,
-  CheckCircle,
   ClipboardText,
   PlayCircle,
 } from "@phosphor-icons/react";
@@ -38,8 +37,6 @@ export function SubjectDetailScreen({
     ...definition,
     count: items.filter((item) => item.kind === definition.kind).length,
   }));
-  const availableSections = sections.filter((section) => section.count > 0).length;
-
   return (
     <AppShell
       activeKey="subjects"
@@ -53,14 +50,7 @@ export function SubjectDetailScreen({
           <Link className="subject-detail-back" href="/asignaturas">
             <ArrowLeft size={17} /> Volver a asignaturas
           </Link>
-          <span className="eyebrow dark">Asignatura</span>
           <h2 id="subject-detail-title">{subject.name}</h2>
-          <p>Elige el tipo de material que quieres estudiar. Llegarás directamente al catálogo filtrado de esta asignatura.</p>
-          <div className="subject-detail-stats">
-            <span><CheckCircle size={16} /> Contenido seleccionado</span>
-            <span>{items.length === 1 ? "1 recurso" : `${items.length} recursos`}</span>
-            <span>{availableSections} {availableSections === 1 ? "sección disponible" : "secciones disponibles"}</span>
-          </div>
         </header>
 
         <nav className="subject-destination-grid" aria-label={`Material de estudio de ${subject.name}`}>

@@ -541,6 +541,79 @@ export function createSupabaseContentProvider(
       return { status: "success", value: { id: input.contentId } };
     },
 
+    async deleteAsset(input) {
+      const { data, error } = await client
+        .from("content_assets")
+        .select(assetSelection)
+        .eq("id", input.assetId)
+        .maybeSingle();
+      if (error) throw error;
+
+      const row = asRecord(data);
+      const contentId = readString(row?.content_item_id);
+      const bucketName = readString(row?.storage_bucket);
+      const path = readString(row?.storage_path);
+      if (!row || !contentId || !bucketName || !path) return { status: "not_found" };
+
+      const access = await getStoredAccess(contentId);
+      if (!access) return { status: "not_found" };
+      if (
+        !canEditContent({
+          actorUserId: input.actorUserId,
+          authorUserId: access.authorUserId,
+          roles: input.roles,
+          status: access.status,
+        })
+      ) {
+        return { status: "not_found" };
+      }
+
+      if (access.status === "in_review" || access.status === "approved") {
+        const { data: resetData, error: resetError } = await client
+          .from("content_items")
+          .update({
+            reviewed_at: null,
+            reviewed_by: null,
+            status: "draft",
+            version: access.version + 1,
+          })
+          .eq("id", contentId)
+          .eq("version", access.version)
+          .select("id")
+          .maybeSingle();
+        if (resetError) throw resetError;
+        if (!resetData) return { status: "conflict" };
+      }
+
+      const { data: deletedData, error: deleteError } = await client
+        .from("content_assets")
+        .delete()
+        .eq("id", input.assetId)
+        .eq("content_item_id", contentId)
+        .select("id")
+        .maybeSingle();
+      if (deleteError) throw deleteError;
+      if (!deletedData) return { status: "conflict" };
+
+      const { error: storageError } = await client.storage.from(bucketName).remove([path]);
+      try {
+        await writeAudit({
+          action: "content_asset_deleted",
+          actorUserId: input.actorUserId,
+          contentId,
+          metadata: { assetId: input.assetId, storageCleanupFailed: Boolean(storageError) },
+        });
+      } catch {
+        // The asset record is already gone; audit availability must not turn
+        // a completed deletion into a misleading error response.
+      }
+
+      const item = await getItemById(contentId);
+      return item
+        ? { status: "success", value: item }
+        : { status: "not_found" };
+    },
+
     async finalizeAsset(input) {
       const { data, error } = await client
         .from("content_assets")

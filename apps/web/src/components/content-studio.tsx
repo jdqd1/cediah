@@ -1288,6 +1288,40 @@ export function ContentStudio({ initialWorkspace }: Props) {
     }
   }
 
+  async function removeAsset() {
+    const asset = item?.asset;
+    if (!item || !asset || !editable || !capabilities.canUpload || busy) return;
+    if (item.status === "published") {
+      setNotice({
+        text: "Archiva el video antes de quitar el archivo para no dejar una publicación activa incompleta.",
+        tone: "warning",
+      });
+      return;
+    }
+    if (!window.confirm(`¿Quitar el video “${asset.fileName}”? Esta acción no se puede deshacer.`)) return;
+
+    setBusy("asset-delete");
+    setNotice(null);
+    try {
+      const updated = await contentItemJson(
+        `/api/editor/assets/${encodeURIComponent(asset.id)}`,
+        { method: "DELETE" },
+      );
+      upsert(updated);
+      setFile(null);
+      setProgress(0);
+      if (fileRef.current) fileRef.current.value = "";
+      setNotice({ text: "Video eliminado del contenido.", tone: "success" });
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error ? error.message : "No fue posible quitar el video.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const actions = item ? workflow(item, capabilities) : [];
   const accepts = draft?.kind === "video"
     ? "video/mp4,video/quicktime,video/webm"
@@ -1620,6 +1654,19 @@ export function ContentStudio({ initialWorkspace }: Props) {
                         </p>
                       )}
                     </div>
+                    {item?.asset && (
+                      <button
+                        aria-label={`Quitar video ${item.asset.fileName}`}
+                        className="studio-asset-remove"
+                        disabled={busy !== null}
+                        title="Quitar video"
+                        type="button"
+                        onClick={() => void removeAsset()}
+                      >
+                        <Trash aria-hidden="true" size={16} />
+                        <span>{busy === "asset-delete" ? "Quitando…" : "Quitar"}</span>
+                      </button>
+                    )}
                   </div>
                   <label className={`studio-upload-zone ${file ? "has-file" : ""}`}>
                     <CloudArrowUp size={24} />

@@ -736,12 +736,33 @@ function GuideReaderPreview({
 }) {
   const [outlineExpanded, setOutlineExpanded] = useState(true);
   const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
+  const drawerActionTimerRef = useRef<number | null>(null);
   useBodyScrollLock(mobileDrawer !== null);
+
+  useEffect(() => {
+    return () => {
+      if (drawerActionTimerRef.current !== null) window.clearTimeout(drawerActionTimerRef.current);
+    };
+  }, []);
+
+  function runAfterClosingDrawer(action: () => void) {
+    setMobileDrawer(null);
+    if (drawerActionTimerRef.current !== null) window.clearTimeout(drawerActionTimerRef.current);
+    // Let the body-scroll lock restore its saved position before navigating.
+    drawerActionTimerRef.current = window.setTimeout(() => {
+      drawerActionTimerRef.current = null;
+      window.requestAnimationFrame(action);
+    }, 80);
+  }
 
   function scrollToHeading(id: string) {
     setOutlineExpanded(false);
-    setMobileDrawer(null);
-    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    const scroll = () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (mobileDrawer) {
+      runAfterClosingDrawer(scroll);
+    } else {
+      scroll();
+    }
   }
 
   return (
@@ -758,7 +779,10 @@ function GuideReaderPreview({
             aria-label="Abrir índice"
             className="published-reader-mobile-side-button"
             type="button"
-            onClick={() => setMobileDrawer((current) => current === "outline" ? null : "outline")}
+            onClick={() => {
+              setOutlineExpanded(true);
+              setMobileDrawer((current) => current === "outline" ? null : "outline");
+            }}
           >
             <ListBullets aria-hidden="true" size={19} />
           </button>
@@ -878,10 +902,11 @@ export function GuideEditorScreen({
   const router = useRouter();
   const [initialDocument] = useState(() => guideDocument(draft)); // Editor remounts for each selected publication.
   const [documentState, setDocumentState] = useState<RichTextDocument>(initialDocument);
+  const [interactionNotice, setInteractionNotice] = useState<PlatformNotice | null>(null);
   const [exitPrompt, setExitPrompt] = useState(false);
   const [preview, setPreview] = useState(false);
   const canEditDocument = editable && status !== "published";
-  const [editMode, setEditMode] = useState(() => isNew || canEditDocument);
+  const [editMode, setEditMode] = useState(() => isNew);
   const [editingTitle, setEditingTitle] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [companionsCollapsed, setCompanionsCollapsed] = useState(false);
@@ -890,6 +915,7 @@ export function GuideEditorScreen({
   const [tableControlsPosition, setTableControlsPosition] = useState<TableControlsPosition | null>(null);
   const [tableContextMenu, setTableContextMenu] = useState<TableContextMenuState | null>(null);
   const [mobileDrawer, setMobileDrawer] = useState<MobileEditorDrawer>(null);
+  const mobileDrawerActionTimerRef = useRef<number | null>(null);
   useBodyScrollLock(mobileDrawer !== null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const hoveredTableRef = useRef<HTMLTableElement | null>(null);
@@ -1038,6 +1064,12 @@ export function GuideEditorScreen({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [mobileDrawer]);
+
+  useEffect(() => () => {
+    if (mobileDrawerActionTimerRef.current !== null) {
+      window.clearTimeout(mobileDrawerActionTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -1408,6 +1440,20 @@ export function GuideEditorScreen({
     }
   }
 
+  function runAfterClosingMobileDrawer(action: () => void) {
+    if (!mobileDrawer) {
+      action();
+      return;
+    }
+    setMobileDrawer(null);
+    if (mobileDrawerActionTimerRef.current !== null) window.clearTimeout(mobileDrawerActionTimerRef.current);
+    // Let the body-scroll lock restore its saved position before navigating.
+    mobileDrawerActionTimerRef.current = window.setTimeout(() => {
+      mobileDrawerActionTimerRef.current = null;
+      window.requestAnimationFrame(action);
+    }, 80);
+  }
+
   const disabled = !isEditing || busy || preview || !editor;
 
   return (
@@ -1463,7 +1509,7 @@ export function GuideEditorScreen({
               aria-label={isEditing ? "Editando la guía" : "Editar la guía"}
               aria-pressed={isEditing}
               className={isEditing ? "is-active" : ""}
-              disabled={!canEditDocument || busy}
+              disabled={busy}
               title={
                 canEditDocument
                   ? "Editar guía"
@@ -1473,8 +1519,19 @@ export function GuideEditorScreen({
               }
               type="button"
               onClick={() => {
+                if (!canEditDocument) {
+                  setInteractionNotice({
+                    text: status === "published"
+                      ? "Archiva la guía antes de editar su documento."
+                      : "Tu cuenta no tiene permiso para editar esta guía.",
+                    tone: "warning",
+                  });
+                  return;
+                }
+                setInteractionNotice(null);
                 setEditMode(true);
-                window.requestAnimationFrame(() => editor?.commands.focus());
+                editor?.setEditable(true);
+                window.requestAnimationFrame(() => editor?.commands.focus("end"));
               }}
             >
               <NotePencil size={17} /> <span>{isEditing ? "Editando" : "Editar"}</span>
@@ -1583,7 +1640,13 @@ export function GuideEditorScreen({
         </BubbleMenu>
       )}
 
-      <PlatformToast notice={notice} onDismiss={onDismissNotice} />
+      <PlatformToast
+        notice={interactionNotice ?? notice}
+        onDismiss={() => {
+          if (interactionNotice) setInteractionNotice(null);
+          else onDismissNotice();
+        }}
+      />
 
       {preview ? (
         <GuideReaderPreview
@@ -1656,9 +1719,10 @@ export function GuideEditorScreen({
                         onClick={() => {
                           setActiveOutline(index);
                           setOutlineCollapsed(true);
-                          setMobileDrawer(null);
-                          const headings = canvasRef.current?.querySelectorAll(".ProseMirror h1, .ProseMirror h2, .ProseMirror h3");
-                          headings?.[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          runAfterClosingMobileDrawer(() => {
+                            const headings = canvasRef.current?.querySelectorAll(".ProseMirror h1, .ProseMirror h2, .ProseMirror h3");
+                            headings?.[index]?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          });
                         }}
                       >
                         <span className="guide-outline-number">{entry.number}</span>

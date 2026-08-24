@@ -45,40 +45,52 @@ export function ContentDetailScreen({
   item,
   isAdministrator = false,
   linkedGuide,
+  returnHref,
 }: {
   guideMode?: boolean;
   item: ContentItem;
   isAdministrator?: boolean;
   linkedGuide?: Extract<ContentItem, { kind: "guide" }>;
+  returnHref?: string;
 }) {
   const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
   const libraryLabel = isGuideView ? "Guías" : "Biblioteca";
-  const backHref = guideMode && item.kind === "video"
+  const defaultBackHref = guideMode && item.kind === "video"
     ? `/biblioteca/${item.slug}`
     : item.kind === "guide"
       ? "/guias"
       : "/biblioteca";
+  const backHref = returnHref ?? defaultBackHref;
   return (
     <AppShell
       activeKey={isGuideView ? "guides" : item.kind}
-      headerTitle={libraryLabel}
+      headerTitle={isGuideView ? libraryLabel : item.kind === "video" ? "Video" : "Material de estudio"}
       isAdministrator={isAdministrator}
       mainClassName="content-detail-main"
     >
       <article className="published-content">
         <header className={`published-content-header${isGuideView ? " published-rich-guide-header" : ""}`}>
-          <div className="published-content-context">
-            <Link href={backHref}>
-              <ArrowLeft size={17} /> Volver
-            </Link>
-            <nav className="published-content-breadcrumbs" aria-label="Ruta actual">
-              <span>{libraryLabel}</span>
-              <span aria-hidden="true">›</span>
-              <span>{item.topic}</span>
-              <span aria-hidden="true">›</span>
-              <span className="current">{item.title}</span>
+          {isGuideView ? (
+            <div className="published-content-context">
+              <Link href={backHref}>
+                <ArrowLeft size={17} /> Volver
+              </Link>
+              <nav className="published-content-breadcrumbs" aria-label="Ruta actual">
+                <span>{libraryLabel}</span>
+                <span aria-hidden="true">›</span>
+                <span>{item.topic}</span>
+                <span aria-hidden="true">›</span>
+                <span className="current">{item.title}</span>
+              </nav>
+            </div>
+          ) : (
+            <nav className="published-content-flow-navigation" aria-label="Volver al temario">
+              <Link href={backHref}>
+                <ArrowLeft aria-hidden="true" size={16} />
+                Volver al temario
+              </Link>
             </nav>
-          </div>
+          )}
           <div className="published-guide-title-row">
             <h2>{item.title}</h2>
           </div>
@@ -213,6 +225,7 @@ function GuideBody({ item }: { item: GuideItem }) {
   const [favorite, setFavorite] = useState(false);
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
+  const drawerActionTimerRef = useRef<number | null>(null);
   useBodyScrollLock(mobileDrawer !== null);
   const manualNavigationRef = useRef(false);
   const navigationFrameRef = useRef<number | null>(null);
@@ -255,6 +268,7 @@ function GuideBody({ item }: { item: GuideItem }) {
   useEffect(
     () => () => {
       if (navigationFrameRef.current !== null) window.cancelAnimationFrame(navigationFrameRef.current);
+      if (drawerActionTimerRef.current !== null) window.clearTimeout(drawerActionTimerRef.current);
       if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
       if (passageHighlightTimerRef.current !== null) window.clearTimeout(passageHighlightTimerRef.current);
       highlightedHeadingRef.current?.classList.remove("is-navigation-target");
@@ -263,81 +277,103 @@ function GuideBody({ item }: { item: GuideItem }) {
     [],
   );
 
+  function runAfterClosingDrawer(action: () => void) {
+    setMobileDrawer(null);
+    if (drawerActionTimerRef.current !== null) window.clearTimeout(drawerActionTimerRef.current);
+    // The scroll lock restores the saved page position during effect cleanup.
+    // Run the requested jump just after that restoration has completed.
+    drawerActionTimerRef.current = window.setTimeout(() => {
+      drawerActionTimerRef.current = null;
+      window.requestAnimationFrame(action);
+    }, 80);
+  }
+
   function goToHeading(id: string) {
     const target = document.getElementById(id);
     if (!target) return;
-    manualNavigationRef.current = true;
-    if (navigationFrameRef.current !== null) window.cancelAnimationFrame(navigationFrameRef.current);
-    if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
-    highlightedHeadingRef.current?.classList.remove("is-navigation-target");
-    setActiveHeadingId(id);
-    if (window.matchMedia("(max-width: 760px)").matches) {
-      setMobileDrawer(null);
-    } else {
-      setOutlineExpanded(false);
-    }
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const beginNavigation = () => {
+      manualNavigationRef.current = true;
+      if (navigationFrameRef.current !== null) window.cancelAnimationFrame(navigationFrameRef.current);
+      if (headingHighlightTimerRef.current !== null) window.clearTimeout(headingHighlightTimerRef.current);
+      highlightedHeadingRef.current?.classList.remove("is-navigation-target");
+      setActiveHeadingId(id);
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    let previousScrollY = window.scrollY;
-    let stableFrames = 0;
-    let frameCount = 0;
-    let observedMovement = false;
+      let previousScrollY = window.scrollY;
+      let stableFrames = 0;
+      let frameCount = 0;
+      let observedMovement = false;
 
-    const monitorArrival = () => {
-      frameCount += 1;
-      const currentScrollY = window.scrollY;
-      if (Math.abs(currentScrollY - previousScrollY) > 0.5) {
-        observedMovement = true;
-        stableFrames = 0;
-      } else {
-        stableFrames += 1;
-      }
-      previousScrollY = currentScrollY;
+      const monitorArrival = () => {
+        frameCount += 1;
+        const currentScrollY = window.scrollY;
+        if (Math.abs(currentScrollY - previousScrollY) > 0.5) {
+          observedMovement = true;
+          stableFrames = 0;
+        } else {
+          stableFrames += 1;
+        }
+        previousScrollY = currentScrollY;
 
-      const scrollMarginTop = Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
-      const targetTop = target.getBoundingClientRect().top;
-      const reachedRequestedOffset = Math.abs(targetTop - scrollMarginTop) <= 24;
-      const targetIsVisible = targetTop >= scrollMarginTop - 24 && targetTop <= window.innerHeight * 0.82;
-      const scrollingFinished = observedMovement && stableFrames >= 4 && targetIsVisible;
-      const alreadyAtSection = !observedMovement && frameCount > 6 && stableFrames >= 4 && targetIsVisible;
+        const scrollMarginTop = Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
+        const targetTop = target.getBoundingClientRect().top;
+        const reachedRequestedOffset = Math.abs(targetTop - scrollMarginTop) <= 24;
+        const targetIsVisible = targetTop >= scrollMarginTop - 24 && targetTop <= window.innerHeight * 0.82;
+        const scrollingFinished = observedMovement && stableFrames >= 4 && targetIsVisible;
+        const alreadyAtSection = !observedMovement && frameCount > 6 && stableFrames >= 4 && targetIsVisible;
 
-      if ((reachedRequestedOffset && stableFrames >= 2) || scrollingFinished || alreadyAtSection || frameCount > 160) {
-        navigationFrameRef.current = null;
-        manualNavigationRef.current = false;
-        target.classList.remove("is-navigation-target");
-        void target.offsetWidth;
-        target.classList.add("is-navigation-target");
-        highlightedHeadingRef.current = target;
-        headingHighlightTimerRef.current = window.setTimeout(() => {
+        if ((reachedRequestedOffset && stableFrames >= 2) || scrollingFinished || alreadyAtSection || frameCount > 160) {
+          navigationFrameRef.current = null;
+          manualNavigationRef.current = false;
           target.classList.remove("is-navigation-target");
-          if (highlightedHeadingRef.current === target) highlightedHeadingRef.current = null;
-          headingHighlightTimerRef.current = null;
-        }, 1_500);
-        return;
-      }
+          void target.offsetWidth;
+          target.classList.add("is-navigation-target");
+          highlightedHeadingRef.current = target;
+          headingHighlightTimerRef.current = window.setTimeout(() => {
+            target.classList.remove("is-navigation-target");
+            if (highlightedHeadingRef.current === target) highlightedHeadingRef.current = null;
+            headingHighlightTimerRef.current = null;
+          }, 1_500);
+          return;
+        }
+
+        navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
+      };
 
       navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
     };
 
-    navigationFrameRef.current = window.requestAnimationFrame(monitorArrival);
+    if (window.matchMedia("(max-width: 760px)").matches && mobileDrawer) {
+      runAfterClosingDrawer(beginNavigation);
+    } else {
+      if (!window.matchMedia("(max-width: 760px)").matches) setOutlineExpanded(false);
+      beginNavigation();
+    }
   }
 
   function goToKeyPoint(point: string) {
     const target = findGuidePassage(point);
     if (!target) return;
-    if (passageHighlightTimerRef.current !== null) window.clearTimeout(passageHighlightTimerRef.current);
-    highlightedPassageRef.current?.classList.remove("is-key-point-target");
-    setMobileDrawer(null);
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
-    target.classList.remove("is-key-point-target");
-    void target.offsetWidth;
-    target.classList.add("is-key-point-target");
-    highlightedPassageRef.current = target;
-    passageHighlightTimerRef.current = window.setTimeout(() => {
+    const beginNavigation = () => {
+      if (passageHighlightTimerRef.current !== null) window.clearTimeout(passageHighlightTimerRef.current);
+      highlightedPassageRef.current?.classList.remove("is-key-point-target");
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
       target.classList.remove("is-key-point-target");
-      if (highlightedPassageRef.current === target) highlightedPassageRef.current = null;
-      passageHighlightTimerRef.current = null;
-    }, 1_800);
+      void target.offsetWidth;
+      target.classList.add("is-key-point-target");
+      highlightedPassageRef.current = target;
+      passageHighlightTimerRef.current = window.setTimeout(() => {
+        target.classList.remove("is-key-point-target");
+        if (highlightedPassageRef.current === target) highlightedPassageRef.current = null;
+        passageHighlightTimerRef.current = null;
+      }, 1_800);
+    };
+
+    if (mobileDrawer) {
+      runAfterClosingDrawer(beginNavigation);
+    } else {
+      beginNavigation();
+    }
   }
 
   function toggleFavorite() {
@@ -646,7 +682,6 @@ function GuideBody({ item }: { item: GuideItem }) {
             <div className="published-rich-guide-support-grid">
               <ReaderSupportPanel
                 count={item.content.keyPoints.length}
-                defaultExpanded
                 icon={<Lightbulb aria-hidden="true" size={20} />}
                 id="published-guide-key-points"
                 title="Puntos clave"
@@ -664,7 +699,6 @@ function GuideBody({ item }: { item: GuideItem }) {
                           type="button"
                           onClick={() => goToKeyPoint(point)}
                         >
-                          <span>Ver en texto</span>
                           <ArrowRight aria-hidden="true" size={14} />
                         </button>
                       </li>
@@ -677,7 +711,6 @@ function GuideBody({ item }: { item: GuideItem }) {
 
               <ReaderSupportPanel
                 count={item.content.quiz.questions.length}
-                defaultExpanded
                 icon={<ClipboardText aria-hidden="true" size={20} />}
                 id="published-guide-quiz"
                 title="Cuestionario"
@@ -823,11 +856,7 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
             <header className="video-linked-guide-heading">
               <span className="video-linked-guide-icon" aria-hidden="true"><BookOpen size={19} /></span>
               <div>
-                <span>Modo de estudio</span>
-                <h3>{linkedGuide?.title ?? "Continúa en la guía interactiva"}</h3>
-                <p>
-                  {linkedGuide?.summary ?? "Abre el lector para usar el índice, los puntos clave y las herramientas de lectura."}
-                </p>
+                <h3>{linkedGuide?.title ?? "Guía interactiva"}</h3>
               </div>
               <Link href={guideHref}>
                 Abrir guía <ArrowRight aria-hidden="true" size={16} />
@@ -935,13 +964,6 @@ function QuestionAnswerFlashcards({ questions }: { questions: QuizQuestion[] }) 
 
   return (
     <section className="video-question-flashcards" aria-label="Cuestionario de repaso">
-      <header className="video-question-flashcards-heading">
-        <div>
-          <span>Repaso activo</span>
-          <h3>Comprueba lo que aprendiste</h3>
-        </div>
-        <small>{questions.length} {questions.length === 1 ? "tarjeta" : "tarjetas"}</small>
-      </header>
       <div className="video-question-flashcards-list">
         {questions.map((question, index) => {
           const isRevealed = revealed === index;
@@ -958,15 +980,20 @@ function QuestionAnswerFlashcards({ questions }: { questions: QuizQuestion[] }) 
                   <small>Pregunta</small>
                   <strong>{question.prompt}</strong>
                 </span>
-                <span className="video-question-flashcard-action">
-                  {isRevealed ? "Ocultar" : "Ver respuesta"}
+                <span aria-hidden="true" className="video-question-flashcard-action">
                   <CaretDown aria-hidden="true" size={15} />
                 </span>
               </button>
-              <div className="video-question-flashcard-answer" hidden={!isRevealed} id={`video-question-answer-${index}`}>
-                <span><CheckCircle aria-hidden="true" size={16} weight="fill" /> Respuesta</span>
-                <p>{questionAnswer(question)}</p>
-                {question.explanation && <small>{question.explanation}</small>}
+              <div
+                aria-hidden={!isRevealed}
+                className={`video-question-flashcard-answer${isRevealed ? " is-expanded" : ""}`}
+                id={`video-question-answer-${index}`}
+              >
+                <div className="video-question-flashcard-answer-inner">
+                  <span><CheckCircle aria-hidden="true" size={16} weight="fill" /> Respuesta</span>
+                  <p>{questionAnswer(question)}</p>
+                  {question.explanation && <small>{question.explanation}</small>}
+                </div>
               </div>
             </article>
           );

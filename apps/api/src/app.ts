@@ -895,6 +895,44 @@ export async function buildApp(
     },
   );
 
+  app.delete<{ Params: { assetId: string } }>(
+    "/v1/editor/assets/:assetId",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        request.headers.authorization,
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canUpload) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const params = ContentAssetIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+
+      try {
+        const result = await contentProvider!.deleteAsset({
+          actorUserId: editor.user.id,
+          assetId: params.data.assetId,
+          roles: editor.roles,
+        });
+        if (result.status !== "success") return sendContentMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(ContentItemSchema.parse(result.value));
+      } catch {
+        request.log.error("Content-asset deletion failed");
+        return reply
+          .status(503)
+          .header("Cache-Control", "no-store")
+          .send({ error: "content_unavailable" });
+      }
+    },
+  );
+
   app.get<{ Querystring: unknown }>("/v1/admin/roles", async (request, reply) => {
     const administrator = await resolveAdministratorUser(
       request.headers.authorization,
