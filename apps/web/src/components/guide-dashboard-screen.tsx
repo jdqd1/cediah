@@ -1,10 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Books,
@@ -16,25 +14,12 @@ import { type MouseEvent, useMemo, useState } from "react";
 import { publishedContentHref } from "@/lib/content-navigation";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
+import { IconBackLink, NavigationTrail } from "./compact-navigation";
+import { ContentResourceList } from "./content-resource-list";
 
 type GuideItem = ContentItem & { kind: "guide" };
 
 const UNASSIGNED = "sin-asignatura";
-const guideImages = [
-  "/anatomy/skull-light.png",
-  "/anatomy/heart-light.png",
-  "/anatomy/back-light.png",
-  "/anatomy/intestines.png",
-  "/anatomy/thigh-light.png",
-] as const;
-
-function guideImage(guide: GuideItem) {
-  const position = Array.from(guide.slug).reduce(
-    (total, character) => total + character.codePointAt(0)!,
-    0,
-  );
-  return guideImages[position % guideImages.length]!;
-}
 
 function normalize(value: string) {
   return value
@@ -47,43 +32,40 @@ function guideTopics(guide: GuideItem) {
   return uniqueRegions(guide.content.regions.length > 0 ? guide.content.regions : [guide.topic]);
 }
 
-function queryHref(pathname: string, subjectSlug = "", topic = "") {
+function queryHref(pathname: string, subjectSlug = "") {
   const params = new URLSearchParams();
   if (subjectSlug) params.set("asignatura", subjectSlug);
-  if (topic) params.set("tema", topic);
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
 }
 
-function GuideList({ guides, subjectSlug, topic }: {
+function GuideList({ guides, showSubject = false, subjectSlug, subjects, topic }: {
   guides: GuideItem[];
+  showSubject?: boolean;
   subjectSlug: string;
+  subjects: Subject[];
   topic: string;
 }) {
   return (
-    <ul className="guide-directory-list">
-      {guides.map((guide) => (
-        <li key={guide.id}>
-          <Link
-            className="guide-directory-item"
-            href={publishedContentHref(guide, {
-              origin: "guias",
-              subjectSlug: subjectSlug === UNASSIGNED ? undefined : subjectSlug,
-              topic,
-            })}
-          >
-            <span className="guide-directory-cover">
-              <Image alt="" fill sizes="(max-width: 620px) 64px, 78px" src={guideImage(guide)} />
-            </span>
-            <span className="guide-directory-copy">
-              <strong>{guide.title}</strong>
-              <span>{guide.summary}</span>
-            </span>
-            <ArrowRight aria-hidden="true" size={18} />
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <ContentResourceList
+      ariaLabel="Guías disponibles"
+      className="guide-directory-list"
+      contextForItem={(guide) => [
+        ...(showSubject
+          ? guide.subjectIds.map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name ?? "")
+          : []),
+        ...(topic ? [topic] : guideTopics(guide)),
+      ]}
+      hrefForItem={(guide) => {
+        const fallbackSubject = subjects.find((subject) => guide.subjectIds.includes(subject.id));
+        return publishedContentHref(guide, {
+          origin: "guias",
+          subjectSlug: subjectSlug === UNASSIGNED ? undefined : subjectSlug || fallbackSubject?.slug,
+          topic: topic || guideTopics(guide)[0],
+        });
+      }}
+      items={guides}
+    />
   );
 }
 
@@ -102,7 +84,6 @@ export function GuideDashboardScreen({
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const selectedSlug = searchParams.get("asignatura")?.trim() ?? "";
-  const selectedTopic = searchParams.get("tema")?.trim() ?? "";
   const selectedSubject = subjects.find((subject) => subject.slug === selectedSlug);
   const isUnassigned = selectedSlug === UNASSIGNED;
   const hasSelection = Boolean(selectedSubject || isUnassigned);
@@ -124,50 +105,50 @@ export function GuideDashboardScreen({
     if (selectedSubject) return guides.filter((guide) => guide.subjectIds.includes(selectedSubject.id));
     return [];
   }, [guides, isUnassigned, selectedSubject]);
-  const topics = useMemo(
-    () => uniqueRegions(selectedGuides.flatMap(guideTopics)).sort((left, right) => left.localeCompare(right, "es")),
-    [selectedGuides],
-  );
   const visibleGuides = useMemo(() => {
     const search = normalize(query.trim());
-    const topic = normalize(selectedTopic);
     return selectedGuides.filter((guide) => {
-      const matchesTopic = !topic || guideTopics(guide).some((value) => normalize(value) === topic);
-      const matchesSearch = !search || normalize(`${guide.title} ${guide.summary} ${guide.topic}`).includes(search);
-      return matchesTopic && matchesSearch;
+      return !search || normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")}`).includes(search);
     });
-  }, [query, selectedGuides, selectedTopic]);
-  const visibleBuckets = useMemo(() => {
+  }, [query, selectedGuides]);
+  const globalSearchResults = useMemo(() => {
     const search = normalize(query.trim());
-    return buckets.filter((bucket) => !search || normalize(bucket.name).includes(search));
-  }, [buckets, query]);
+    if (!search || hasSelection) return [];
+
+    return guides.filter((guide) => {
+      const subjectNames = guide.subjectIds
+        .map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name ?? "")
+        .join(" ");
+      return normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")} ${subjectNames}`).includes(search);
+    });
+  }, [guides, hasSelection, query, subjects]);
   const topicGroups = useMemo(() => {
     const groups = new Map<string, GuideItem[]>();
     for (const guide of visibleGuides) {
       for (const name of guideTopics(guide)) {
-        if (selectedTopic && normalize(name) !== normalize(selectedTopic)) continue;
         const current = groups.get(name);
         if (current) current.push(guide);
         else groups.set(name, [guide]);
       }
     }
     return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right, "es"));
-  }, [selectedTopic, visibleGuides]);
+  }, [visibleGuides]);
 
-  function push(nextSubject = "", nextTopic = "") {
+  function push(nextSubject = "") {
     setQuery("");
-    const href = queryHref(pathname, nextSubject, nextTopic);
+    const href = queryHref(pathname, nextSubject);
     const currentHref = window.location.pathname + window.location.search;
     if (currentHref !== href) window.history.pushState(null, "", href);
   }
 
-  function navigate(event: MouseEvent<HTMLAnchorElement>, nextSubject = "", nextTopic = "") {
+  function navigate(event: MouseEvent<HTMLAnchorElement>, nextSubject = "") {
     if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     event.preventDefault();
-    push(nextSubject, nextTopic);
+    push(nextSubject);
   }
 
   const selectionName = selectedSubject?.name ?? (isUnassigned ? "Sin asignatura" : "");
+  const hasGlobalQuery = !hasSelection && Boolean(query.trim());
 
   return (
     <AppShell
@@ -181,9 +162,10 @@ export function GuideDashboardScreen({
 
         {hasSelection && (
           <header className="guide-directory-context">
-            <Link href="/guias" onClick={(event) => navigate(event)}>
-              <ArrowLeft aria-hidden="true" size={16} /> Todas las asignaturas
-            </Link>
+            <nav className="compact-navigation-row" aria-label="Navegación de guías">
+              <IconBackLink href="/guias" label="Volver a todas las asignaturas" onClick={(event) => navigate(event)} />
+              <NavigationTrail segments={["guias", selectedSubject?.slug ?? UNASSIGNED]} />
+            </nav>
             <div>
               <span>Guías</span>
               <h3>{selectionName}</h3>
@@ -191,13 +173,13 @@ export function GuideDashboardScreen({
           </header>
         )}
 
-        <div className="guide-directory-filters" role="search" aria-label="Buscar y filtrar guías">
+        <div className="guide-directory-filters" role="search" aria-label="Buscar guías">
           <label className="guide-directory-search">
             <MagnifyingGlass aria-hidden="true" size={18} />
             <input
-              aria-label={hasSelection ? "Buscar guías" : "Buscar asignatura"}
+              aria-label="Buscar guía"
               autoComplete="off"
-              placeholder={hasSelection ? "Buscar por título o descripción" : "Buscar asignatura"}
+              placeholder="Buscar guía"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -208,33 +190,13 @@ export function GuideDashboardScreen({
               </button>
             )}
           </label>
-          <label className="guide-directory-select">
-            <span className="sr-only">Asignatura</span>
-            <select value={hasSelection ? selectedSlug : ""} onChange={(event) => push(event.target.value)}>
-              <option value="">Asignatura</option>
-              {buckets.map((bucket) => (
-                <option key={bucket.id} value={bucket.slug}>{bucket.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="guide-directory-select">
-            <span className="sr-only">Tema</span>
-            <select
-              disabled={!hasSelection}
-              value={selectedTopic}
-              onChange={(event) => push(selectedSlug, event.target.value)}
-            >
-              <option value="">Todos los temas</option>
-              {topics.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
-            </select>
-          </label>
         </div>
 
-        {!hasSelection && visibleBuckets.length > 0 && (
+        {!hasSelection && !hasGlobalQuery && buckets.length > 0 && (
           <nav className="guide-subject-browser" aria-label="Guías por asignatura">
             <h3>Asignaturas</h3>
             <ul>
-              {visibleBuckets.map((bucket) => {
+              {buckets.map((bucket) => {
                 const href = queryHref(pathname, bucket.slug);
                 return (
                   <li key={bucket.id}>
@@ -253,6 +215,21 @@ export function GuideDashboardScreen({
           </nav>
         )}
 
+        {hasGlobalQuery && globalSearchResults.length > 0 && (
+          <div className="subject-search-results guide-search-results" aria-live="polite">
+            <span>
+              {globalSearchResults.length === 1 ? "1 resultado" : `${globalSearchResults.length} resultados`}
+            </span>
+            <GuideList
+              guides={globalSearchResults}
+              showSubject
+              subjectSlug=""
+              subjects={subjects}
+              topic=""
+            />
+          </div>
+        )}
+
         {hasSelection && visibleGuides.length > 0 && (
           <div className="guide-topic-groups" aria-live="polite">
             {topicGroups.map(([topic, topicGuides]) => (
@@ -261,25 +238,26 @@ export function GuideDashboardScreen({
                   <h3 id={`guide-topic-${normalize(topic).replace(/[^a-z0-9]+/g, "-")}`}>{topic}</h3>
                   <span>{topicGuides.length}</span>
                 </header>
-                <GuideList guides={topicGuides} subjectSlug={selectedSlug} topic={topic} />
+                <GuideList guides={topicGuides} subjectSlug={selectedSlug} subjects={subjects} topic={topic} />
               </section>
             ))}
           </div>
         )}
 
-        {((!hasSelection && visibleBuckets.length === 0) || (hasSelection && visibleGuides.length === 0)) && (
+        {((!hasSelection && (hasGlobalQuery ? globalSearchResults.length === 0 : buckets.length === 0)) ||
+          (hasSelection && visibleGuides.length === 0)) && (
           <div className="guide-catalog-empty" role="status">
             <BookOpen size={34} aria-hidden="true" />
             <h3>
-              {query || selectedTopic
-                ? "No encontramos guías con esos filtros."
+              {query
+                ? "No encontramos guías con esa búsqueda."
                 : available
                   ? "Aún no hay guías en esta selección."
                   : "No pudimos cargar las guías."}
             </h3>
-            {(query || selectedTopic) && (
-              <button type="button" onClick={() => selectedTopic ? push(selectedSlug) : setQuery("")}>
-                Limpiar filtros
+            {query && (
+              <button type="button" onClick={() => setQuery("")}>
+                Limpiar búsqueda
               </button>
             )}
           </div>

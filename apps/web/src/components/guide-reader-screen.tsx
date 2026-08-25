@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import {
   ArrowDown,
   ArrowLeft,
@@ -20,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import { AppShell } from "./app-shell";
+import { IconBackLink, NavigationTrail } from "./compact-navigation";
 
 type GuideIndexItem = {
   active?: boolean;
@@ -71,7 +71,10 @@ export function GuideReaderScreen({ isAdministrator = false }: { isAdministrator
             <h2>Guía: Músculos del compartimento anterior del muslo</h2>
             <span className="guide-version-pill">Versión extensa</span>
           </div>
-          <Link className="back-to-guide" href="/guias"><ArrowLeft size={17} /> Volver a guías</Link>
+          <nav className="compact-navigation-row guide-reader-return" aria-label="Navegación de la guía">
+            <IconBackLink className="back-to-guide" href="/guias" label="Volver a guías" />
+            <NavigationTrail segments={["guias", "miembro inferior", "musculos"]} />
+          </nav>
         </div>
         <div className="guide-reader-actions">
           <button className={`toggle-action ${highlightImportant ? "is-on" : ""}`} type="button" onClick={() => setHighlightImportant((value) => !value)}>

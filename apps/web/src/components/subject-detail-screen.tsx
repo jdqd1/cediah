@@ -1,10 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CardsThree,
@@ -25,6 +23,8 @@ import {
 } from "@/lib/content-navigation";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
+import { IconBackLink, NavigationTrail } from "./compact-navigation";
+import { ContentResourceList } from "./content-resource-list";
 
 const sectionDefinitions: Array<{
   description: string;
@@ -37,11 +37,18 @@ const sectionDefinitions: Array<{
   { icon: ClipboardText, kind: "quiz", description: "Preguntas para comprobar lo aprendido" },
 ];
 
-const kindImages: Record<StudyContentKind, string> = {
-  flashcards: "/anatomy/thigh-light.png",
-  guide: "/anatomy/back-light.png",
-  quiz: "/anatomy/heart-light.png",
-  video: "/anatomy/neck-muscles.png",
+const kindSearchLabels: Record<StudyContentKind, string> = {
+  flashcards: "Buscar flashcard",
+  guide: "Buscar guía",
+  quiz: "Buscar cuestionario",
+  video: "Buscar video",
+};
+
+const kindPathSegments: Record<StudyContentKind, string> = {
+  flashcards: "flashcards",
+  guide: "guias",
+  quiz: "cuestionarios",
+  video: "videos",
 };
 
 function normalize(value: string) {
@@ -57,39 +64,25 @@ function itemTopics(item: ContentItem) {
 
 function ResourceList({
   items,
-  kind,
   subject,
   topic,
 }: {
   items: ContentItem[];
-  kind: StudyContentKind;
   subject: Subject;
-  topic: string;
+  topic?: string;
 }) {
   return (
-    <ul className="subject-resource-list">
-      {items.map((item) => (
-        <li key={item.id}>
-          <Link
-            className="subject-resource-item"
-            href={publishedContentHref(item, {
-              origin: "asignatura",
-              subjectSlug: subject.slug,
-              topic,
-            })}
-          >
-            <span className="subject-resource-media">
-              <Image alt="" fill sizes="(max-width: 620px) 64px, 76px" src={kindImages[kind]} />
-            </span>
-            <span className="subject-resource-copy">
-              <strong>{item.title}</strong>
-              <span>{item.summary}</span>
-            </span>
-            <ArrowRight aria-hidden="true" size={18} />
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <ContentResourceList
+      ariaLabel={`Recursos de ${subject.name}`}
+      className="subject-resource-list"
+      contextForItem={(item) => itemTopics(item)}
+      hrefForItem={(item) => publishedContentHref(item, {
+        origin: "asignatura",
+        subjectSlug: subject.slug,
+        topic: topic || itemTopics(item)[0],
+      })}
+      items={items}
+    />
   );
 }
 
@@ -108,6 +101,7 @@ export function SubjectDetailScreen({
   const requestedKind = searchParams.get("tipo");
   const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
+  const searching = Boolean(search.trim());
   const kindItems = useMemo(
     () => kind ? items.filter((item) => item.kind === kind) : [],
     [items, kind],
@@ -115,11 +109,13 @@ export function SubjectDetailScreen({
   const filteredItems = useMemo(() => {
     const query = normalize(search.trim());
     return kindItems.filter((item) => {
-      const matchesTopic = !topic || itemTopics(item).some((value) => normalize(value) === normalize(topic));
-      const matchesSearch = !query || normalize(`${item.title} ${item.summary} ${item.topic}`).includes(query);
+      const matchesTopic = searching || !topic || itemTopics(item).some((value) => normalize(value) === normalize(topic));
+      const matchesSearch = !query || normalize(
+        `${item.title} ${item.summary} ${item.topic} ${itemTopics(item).join(" ")}`,
+      ).includes(query);
       return matchesTopic && matchesSearch;
     });
-  }, [kindItems, search, topic]);
+  }, [kindItems, search, searching, topic]);
   const topicGroups = useMemo(() => {
     const groups = new Map<string, { name: string; items: ContentItem[] }>();
     for (const item of filteredItems) {
@@ -148,13 +144,11 @@ export function SubjectDetailScreen({
   const KindIcon = kind ? sectionDefinitions.find((section) => section.kind === kind)?.icon ?? Compass : Compass;
   const label = kind ? studyContentKindLabels[kind] : "";
   const activeKey = kind === "guide" ? "guides" : kind ?? "subjects";
-  const breadcrumbs = ["Asignaturas", subject.name, ...(kind ? [label] : []), ...(topic ? [topic] : [])];
 
   return (
     <AppShell
       activeKey={activeKey}
-      breadcrumbs={breadcrumbs}
-      headerTitle="Asignaturas"
+      headerTitle={topic || label || subject.name}
       isAdministrator={isAdministrator}
       mainClassName="subject-detail-main"
     >
@@ -162,9 +156,10 @@ export function SubjectDetailScreen({
         {!kind ? (
           <>
             <header className="subject-detail-heading">
-              <Link className="subject-detail-back" href="/asignaturas">
-                <ArrowLeft aria-hidden="true" size={16} /> Asignaturas
-              </Link>
+              <nav className="compact-navigation-row" aria-label="Navegación de la asignatura">
+                <IconBackLink className="subject-detail-back" href="/asignaturas" label="Volver a asignaturas" />
+                <NavigationTrail segments={[subject.slug]} />
+              </nav>
               <h2>{subject.name}</h2>
             </header>
             <nav className="subject-destination-grid" aria-label={`Material de estudio de ${subject.name}`}>
@@ -198,15 +193,16 @@ export function SubjectDetailScreen({
         ) : (
           <>
             <header className={`subject-flow-heading${topic ? " is-topic" : ""}`}>
-              <Link
-                className="subject-detail-back"
-                href={topic ? subjectContentHref(subject.slug, kind) : pathname}
-                onClick={(event) => navigate(event, topic ? subjectContentHref(subject.slug, kind) : pathname)}
-              >
-                <ArrowLeft aria-hidden="true" size={16} />
-                {topic ? "Volver al temario" : `Volver a ${subject.name}`}
-              </Link>
-              <div>
+              <nav className="compact-navigation-row" aria-label="Navegación del material">
+                <IconBackLink
+                  className="subject-detail-back"
+                  href={topic ? subjectContentHref(subject.slug, kind) : pathname}
+                  label={topic ? "Volver al temario" : `Volver a ${subject.name}`}
+                  onClick={(event) => navigate(event, topic ? subjectContentHref(subject.slug, kind) : pathname)}
+                />
+                <NavigationTrail segments={[subject.slug, topic || kindPathSegments[kind]]} />
+              </nav>
+              <div className="subject-flow-title">
                 <span>{subject.name}</span>
                 <h2>{topic || label}</h2>
               </div>
@@ -215,9 +211,9 @@ export function SubjectDetailScreen({
             <label className="subject-flow-search">
               <MagnifyingGlass aria-hidden="true" size={18} />
               <input
-                aria-label={`Buscar ${label.toLocaleLowerCase("es")}`}
+                aria-label={kindSearchLabels[kind]}
                 autoComplete="off"
-                placeholder={topic ? `Buscar en ${topic}` : `Buscar en el temario de ${label.toLocaleLowerCase("es")}`}
+                placeholder={kindSearchLabels[kind]}
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -230,11 +226,16 @@ export function SubjectDetailScreen({
             </label>
 
             {filteredItems.length > 0 ? (
-              topic ? (
-                <ResourceList items={filteredItems} kind={kind} subject={subject} topic={topic} />
+              searching ? (
+                <div className="subject-search-results" aria-live="polite">
+                  <span>{filteredItems.length === 1 ? "1 resultado" : `${filteredItems.length} resultados`}</span>
+                  <ResourceList items={filteredItems} subject={subject} />
+                </div>
+              ) : topic ? (
+                <ResourceList items={filteredItems} subject={subject} topic={topic} />
               ) : (
                 <nav className="subject-topic-browser" aria-label={`Temario de ${label} en ${subject.name}`}>
-                  <ul className="subject-topic-list">
+                  <ul className={`subject-topic-list subject-topic-list-${kind}`}>
                     {topicGroups.map((group) => {
                       const href = subjectContentHref(subject.slug, kind, group.name);
                       return (
@@ -256,8 +257,8 @@ export function SubjectDetailScreen({
             ) : (
               <div className="subject-detail-empty" role="status">
                 <KindIcon aria-hidden="true" size={34} />
-                <h3>{search ? "No encontramos resultados" : `Aún no hay ${label.toLocaleLowerCase("es")}`}</h3>
-                <p>{search ? "Prueba con otra búsqueda." : `Vuelve a ${subject.name} para explorar otro tipo de material.`}</p>
+                <h3>{searching ? "No encontramos resultados" : `Aún no hay ${label.toLocaleLowerCase("es")}`}</h3>
+                <p>{searching ? "Prueba con otra búsqueda." : `Vuelve a ${subject.name} para explorar otro tipo de material.`}</p>
               </div>
             )}
           </>

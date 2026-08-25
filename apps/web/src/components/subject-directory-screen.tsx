@@ -16,11 +16,14 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { ContentItem, Subject } from "@cediah/contracts";
 import {
+  publishedContentHref,
   subjectContentHref,
   studyContentKindLabels,
   type StudyContentKind,
 } from "@/lib/content-navigation";
+import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
+import { ContentResourceList } from "./content-resource-list";
 
 function normalize(value: string) {
   return value
@@ -37,6 +40,13 @@ const subjectVisuals = [
   { icon: Brain, pattern: /neuro|psico/, tone: "neuro" },
   { icon: Atom, pattern: /fisic|biofis/, tone: "science" },
 ] as const;
+
+const kindSearchLabels: Record<StudyContentKind, string> = {
+  flashcards: "Buscar flashcard",
+  guide: "Buscar guía",
+  quiz: "Buscar cuestionario",
+  video: "Buscar video",
+};
 
 function visualFor(subject: Subject) {
   const normalized = normalize(`${subject.slug} ${subject.name}`);
@@ -66,6 +76,10 @@ export function SubjectDirectoryScreen({
   subjects: Subject[];
 }) {
   const [search, setSearch] = useState("");
+  const subjectById = useMemo(
+    () => new Map(subjects.map((subject) => [subject.id, subject])),
+    [subjects],
+  );
   const subjectCounts = useMemo(
     () => new Map(subjects.map((subject) => [
       subject.id,
@@ -83,8 +97,21 @@ export function SubjectDirectoryScreen({
       return matchesSearch && hasRequestedContent;
     });
   }, [initialKind, search, subjectCounts, subjects]);
+  const resourceSearchResults = useMemo(() => {
+    const query = normalize(search.trim());
+    if (!initialKind || !query) return [];
+
+    return items.filter((item) => {
+      const subjectNames = item.subjectIds
+        .map((subjectId) => subjectById.get(subjectId)?.name ?? "")
+        .join(" ");
+      const regions = uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic]);
+      return normalize(`${item.title} ${item.summary} ${item.topic} ${regions.join(" ")} ${subjectNames}`).includes(query);
+    });
+  }, [initialKind, items, search, subjectById]);
   const activeKey = initialKind === "guide" ? "guides" : initialKind ?? "subjects";
   const headerTitle = initialKind ? studyContentKindLabels[initialKind] : "Asignaturas";
+  const showingResourceResults = Boolean(initialKind && search.trim());
 
   return (
     <AppShell
@@ -99,9 +126,9 @@ export function SubjectDirectoryScreen({
         <label className="subject-directory-search">
           <MagnifyingGlass aria-hidden="true" size={19} />
           <input
-            aria-label="Buscar asignaturas"
+            aria-label={initialKind ? kindSearchLabels[initialKind] : "Buscar asignatura"}
             autoComplete="off"
-            placeholder={initialKind ? `Buscar asignatura con ${headerTitle.toLocaleLowerCase("es")}` : "Buscar asignatura"}
+            placeholder={initialKind ? kindSearchLabels[initialKind] : "Buscar asignatura"}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -113,7 +140,31 @@ export function SubjectDirectoryScreen({
           )}
         </label>
 
-        {visibleSubjects.length > 0 ? (
+        {showingResourceResults && resourceSearchResults.length > 0 ? (
+          <div className="subject-search-results" aria-live="polite">
+            <span>
+              {resourceSearchResults.length === 1 ? "1 resultado" : `${resourceSearchResults.length} resultados`}
+            </span>
+            <ContentResourceList
+              ariaLabel={`Resultados en ${headerTitle.toLocaleLowerCase("es")}`}
+              className="subject-resource-list"
+              contextForItem={(item) => [
+                ...item.subjectIds.map((subjectId) => subjectById.get(subjectId)?.name ?? ""),
+                ...uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic]),
+              ]}
+              hrefForItem={(item) => {
+                const subject = item.subjectIds.map((subjectId) => subjectById.get(subjectId)).find(Boolean);
+                const topic = uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic])[0];
+                return publishedContentHref(item, {
+                  origin: "asignatura",
+                  subjectSlug: subject?.slug,
+                  topic,
+                });
+              }}
+              items={resourceSearchResults}
+            />
+          </div>
+        ) : !showingResourceResults && visibleSubjects.length > 0 ? (
           <ul className="subject-directory-grid">
             {visibleSubjects.map((subject, index) => {
               const visual = visualFor(subject);
@@ -144,11 +195,19 @@ export function SubjectDirectoryScreen({
         ) : (
           <div className="subject-directory-empty" role="status">
             <Books aria-hidden="true" size={34} />
-            <h3>{available ? "No encontramos asignaturas" : "Las asignaturas no están disponibles"}</h3>
+            <h3>
+              {available
+                ? showingResourceResults
+                  ? "No encontramos recursos"
+                  : "No encontramos asignaturas"
+                : "Las asignaturas no están disponibles"}
+            </h3>
             <p>
               {available
-                ? initialKind
-                  ? `No hay ${headerTitle.toLocaleLowerCase("es")} en esta selección.`
+                ? showingResourceResults
+                  ? "Prueba con otro título, tema o asignatura."
+                  : initialKind
+                    ? `No hay ${headerTitle.toLocaleLowerCase("es")} en esta selección.`
                   : "Prueba con otra búsqueda."
                 : "Intenta de nuevo en unos minutos."}
             </p>

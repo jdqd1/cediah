@@ -39,6 +39,7 @@ import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { contentKindLabel } from "@/lib/content-navigation";
 import { AppShell } from "./app-shell";
+import { IconBackLink, NavigationTrail } from "./compact-navigation";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 export function ContentDetailScreen({
@@ -67,6 +68,7 @@ export function ContentDetailScreen({
       : "/asignaturas";
   const backHref = returnHref ?? defaultBackHref;
   const backLabel = returnLabel ?? (isGuideView ? "Volver a guías" : "Volver a asignaturas");
+  const navigationSegments = [contextLabel ?? sectionLabel, item.topic, item.slug];
   return (
     <AppShell
       activeKey={isGuideView ? "guides" : item.kind === "topic" ? "subjects" : item.kind}
@@ -78,23 +80,13 @@ export function ContentDetailScreen({
         <header className={`published-content-header${isGuideView ? " published-rich-guide-header" : ""}`}>
           {isGuideView ? (
             <div className="published-content-context">
-              <Link href={backHref}>
-                <ArrowLeft size={17} /> {backLabel}
-              </Link>
-              <nav className="published-content-breadcrumbs" aria-label="Ruta actual">
-                <span>{contextLabel ?? sectionLabel}</span>
-                <span aria-hidden="true">›</span>
-                <span>{item.topic}</span>
-                <span aria-hidden="true">›</span>
-                <span className="current">{item.title}</span>
-              </nav>
+              <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
+              <NavigationTrail segments={navigationSegments} />
             </div>
           ) : (
             <nav className="published-content-flow-navigation" aria-label={backLabel}>
-              <Link href={backHref}>
-                <ArrowLeft aria-hidden="true" size={16} />
-                {backLabel}
-              </Link>
+              <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
+              <NavigationTrail segments={navigationSegments} />
             </nav>
           )}
           <div className="published-guide-title-row">

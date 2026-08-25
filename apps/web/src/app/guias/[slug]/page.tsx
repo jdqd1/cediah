@@ -36,7 +36,6 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
     const guideMode = result.item.kind === "video";
     const guideParams = new URLSearchParams();
     if (subject) guideParams.set("asignatura", subject.slug);
-    if (topic) guideParams.set("tema", topic);
     const returnHref = guideMode
       ? `/contenido/${result.item.slug}`
       : origin === "asignatura" && subject
