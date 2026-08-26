@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CediahLogo } from "@/components/cediah-logo";
 import { VideoTestUploader } from "@/components/video-test-uploader";
 import { getCurrentUser } from "@/lib/server/current-user";
 
@@ -13,9 +14,8 @@ export default async function VideoTestPage() {
     return (
       <main className="auth-page">
         <header className="auth-header">
-          <Link className="brand" href="/" aria-label="CEDIAH, inicio">
-            <span className="brand-mark" aria-hidden="true">C</span>
-            <span>CEDIAH</span>
+          <Link className="brand" href="/" aria-label="Koraz, inicio">
+            <CediahLogo variant="dark" />
           </Link>
         </header>
         <div className="auth-content">
@@ -39,9 +39,8 @@ export default async function VideoTestPage() {
     <main className="video-test-page">
       <div className="video-test-top">
         <header className="site-header course-header">
-          <Link className="brand" href="/" aria-label="CEDIAH, inicio">
-            <span className="brand-mark" aria-hidden="true">C</span>
-            <span>CEDIAH</span>
+          <Link className="brand" href="/" aria-label="Koraz, inicio">
+            <CediahLogo variant="light" />
           </Link>
           <nav aria-label="Navegación del laboratorio de video">
             <Link href="/panel">Panel</Link>
@@ -89,7 +88,7 @@ export default async function VideoTestPage() {
       </section>
 
       <footer>
-        <span>CEDIAH</span>
+        <span>KORAZ</span>
         <p>Prueba privada del reproductor - no publica contenido académico</p>
         <p>Caracas, Venezuela</p>
       </footer>

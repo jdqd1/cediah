@@ -73,7 +73,7 @@ export function AuthForm({ mode, nextPath }: AuthFormProps) {
     }
   }
 
-  const heading = isRecovery ? "Recupera tu acceso" : isSignUp ? "Crea tu cuenta" : "Accede a CEDIAH";
+  const heading = isRecovery ? "Recupera tu acceso" : isSignUp ? "Crea tu cuenta" : "Accede a Koraz";
   const submitLabel = isRecovery ? "Enviar enlace" : isSignUp ? "Crear cuenta" : "Iniciar sesión";
 
   return (

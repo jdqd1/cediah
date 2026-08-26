@@ -7,8 +7,8 @@ export function BrandFooter() {
       <div className="brand-footer-lockup">
         <CediahLogo variant="dark" />
         <div>
-          <p>CEDIAH — Comunidad Estudiantil para la Difusión e Investigación de la Anatomía Humana</p>
-          <span>Aprende. Enseña. Investiga. Comparte.</span>
+          <p>Koraz — Conocimiento que conecta y transforma</p>
+          <span>Aprende. Explora. Crece.</span>
         </div>
       </div>
       <div className="brand-footer-socials" aria-label="Redes sociales">

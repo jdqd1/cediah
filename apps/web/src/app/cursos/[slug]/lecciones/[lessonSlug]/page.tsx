@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CediahLogo } from "@/components/cediah-logo";
 import { demoCourses, getDemoLesson } from "@/data/demo-courses";
 
 type LessonPageProps = {
@@ -18,10 +19,10 @@ export async function generateMetadata({ params }: LessonPageProps): Promise<Met
   const { lessonSlug, slug } = await params;
   const lesson = getDemoLesson(slug, lessonSlug);
 
-  if (!lesson) return { title: "Lección no encontrada | CEDIAH" };
+  if (!lesson) return { title: "Lección no encontrada | Koraz" };
 
   return {
-    title: `${lesson.title} - Demo | CEDIAH`,
+    title: `${lesson.title} - Demo | Koraz`,
     description: lesson.summary,
   };
 }
@@ -36,9 +37,8 @@ export default async function LessonPage({ params }: LessonPageProps) {
     <main className="lesson-page">
       <div className="lesson-top">
         <header className="site-header course-header">
-          <Link className="brand" href="/#inicio" aria-label="CEDIAH, inicio">
-            <span className="brand-mark" aria-hidden="true">C</span>
-            <span>CEDIAH</span>
+          <Link className="brand" href="/#inicio" aria-label="Koraz, inicio">
+            <CediahLogo variant="light" />
           </Link>
           <nav aria-label="Navegación de la lección">
             <Link href={`/cursos/${lesson.course.slug}`}>Ficha del curso</Link>
@@ -127,7 +127,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
       </section>
 
       <footer>
-        <span>CEDIAH</span>
+        <span>KORAZ</span>
         <p>Lección demostrativa - Fase 1 en desarrollo</p>
         <p>Caracas, Venezuela</p>
       </footer>

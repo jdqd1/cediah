@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
+import { CediahLogo } from "@/components/cediah-logo";
 
 type AccessPageProps = {
   searchParams: Promise<{ next?: string; modo?: string }>;
@@ -12,9 +13,8 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
   return (
     <main className="auth-page">
       <header className="auth-header">
-        <Link className="brand" href="/" aria-label="CEDIAH, inicio">
-          <span className="brand-mark" aria-hidden="true">C</span>
-          <span>CEDIAH</span>
+        <Link className="brand" href="/" aria-label="Koraz, inicio">
+          <CediahLogo variant="dark" />
         </Link>
         <Link href={mode === "sign-up" ? "/acceder" : "/acceder?modo=registro"}>
           {mode === "sign-up" ? "Ya tengo cuenta" : "Crear cuenta"}

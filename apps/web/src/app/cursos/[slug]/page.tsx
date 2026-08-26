@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CediahLogo } from "@/components/cediah-logo";
 import { demoCourses, getDemoCourse } from "@/data/demo-courses";
 
 const plannedJourney = [
   {
     number: "01",
     title: "Definición académica",
-    description: "Programa, objetivos, docentes y autorización de uso aportados y aprobados por CEDIAH.",
+    description: "Programa, objetivos, docentes y autorización de uso aportados y aprobados por Koraz.",
   },
   {
     number: "02",
@@ -35,12 +36,12 @@ export async function generateMetadata({ params }: CoursePageProps): Promise<Met
   const course = getDemoCourse(slug);
 
   if (!course) {
-    return { title: "Curso no encontrado | CEDIAH" };
+    return { title: "Curso no encontrado | Koraz" };
   }
 
   return {
-    title: `${course.title} - Catálogo demo | CEDIAH`,
-    description: `Ficha de demostración del recorrido de ${course.title} en CEDIAH.`,
+    title: `${course.title} - Catálogo demo | Koraz`,
+    description: `Ficha de demostración del recorrido de ${course.title} en Koraz.`,
   };
 }
 
@@ -56,9 +57,8 @@ export default async function CoursePage({ params }: CoursePageProps) {
     <main className="course-page">
       <div className="course-top">
         <header className="site-header course-header">
-          <Link className="brand" href="/#inicio" aria-label="CEDIAH, inicio">
-            <span className="brand-mark" aria-hidden="true">C</span>
-            <span>CEDIAH</span>
+          <Link className="brand" href="/#inicio" aria-label="Koraz, inicio">
+            <CediahLogo variant="light" />
           </Link>
           <nav aria-label="Navegación del curso">
             <Link href="/#modelo">Modelo</Link>
@@ -99,7 +99,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
         <div className="course-overview-body">
           <p>
             Esta página valida la navegación y la jerarquía del futuro curso. Las cifras son datos de interfaz para la
-            demostración; CEDIAH todavía debe confirmar el programa, docentes, duración y materiales definitivos.
+            demostración; Koraz todavía debe confirmar el programa, docentes, duración y materiales definitivos.
           </p>
           <dl aria-label="Datos de demostración del curso">
             <div><dt>Región</dt><dd>{course.region}</dd></div>
@@ -145,7 +145,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
       </section>
 
       <footer>
-        <span>CEDIAH</span>
+        <span>KORAZ</span>
         <p>Ficha de curso demostrativa - Fase 1 en desarrollo</p>
         <p>Caracas, Venezuela</p>
       </footer>

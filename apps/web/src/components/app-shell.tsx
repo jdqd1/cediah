@@ -322,7 +322,7 @@ export function AppShell({
           <Link
             className="sidebar-brand"
             href="/dashboard"
-            aria-label="CEDIAH, inicio"
+            aria-label="Koraz, inicio"
             onClick={closeSidebar}
             title="Ir al inicio"
           >
