@@ -244,6 +244,12 @@ textarea:focus-visible {
   box-shadow: 0 0 0 4px rgb(67 97 238 / 10%);
 }
 
+.landing-field.is-invalid,
+.landing-field.is-invalid:focus-within {
+  border-color: #b42318;
+  box-shadow: 0 0 0 4px rgb(180 35 24 / 10%);
+}
+
 .landing-field input::placeholder {
   color: #94a3b8;
 }
@@ -259,8 +265,7 @@ textarea:focus-visible {
 }
 
 .landing-form-options a,
-.landing-register a,
-.landing-demo-link:hover {
+.landing-register a {
   color: var(--koraz-blue);
 }
 
@@ -297,6 +302,18 @@ textarea:focus-visible {
 .auth-message {
   border-left-color: var(--koraz-blue);
   color: var(--koraz-blue) !important;
+}
+
+.landing-auth-message.is-success,
+.auth-message.is-success {
+  border-left-color: #067647;
+  color: #067647 !important;
+}
+
+.landing-auth-message.is-error,
+.auth-message.is-error {
+  border-left-color: #b42318;
+  color: #b42318 !important;
 }
 
 .landing-visual-column {
@@ -460,6 +477,28 @@ textarea:focus-visible {
 .auth-form input:focus {
   border-color: var(--koraz-blue);
   box-shadow: 0 0 0 4px rgb(67 97 238 / 10%);
+}
+
+.auth-input-shell {
+  border-color: var(--koraz-line-strong);
+  border-radius: 12px;
+}
+
+.auth-input-shell:focus-within {
+  border-color: var(--koraz-blue);
+  box-shadow: 0 0 0 4px rgb(67 97 238 / 10%);
+}
+
+.auth-input-shell.is-invalid,
+.auth-input-shell.is-invalid:focus-within {
+  border-color: #b42318;
+  box-shadow: 0 0 0 4px rgb(180 35 24 / 10%);
+}
+
+.auth-form .auth-input-shell input,
+.auth-form .auth-input-shell input:focus {
+  border: 0;
+  box-shadow: none;
 }
 
 /* Shared app chrome ----------------------------------------------------- */
@@ -2221,5 +2260,125 @@ a.icon-back-link:hover,
   .landing-visual-column::before,
   .landing-visual-column::after {
     transform: none;
+  }
+}
+
+/* Shared feedback refinements belong at the end of the brand cascade. */
+
+.app-shell .app-topbar.app-topbar-simplified,
+.app-shell.dashboard-shell .app-topbar.app-topbar-simplified {
+  border-bottom-color: rgb(255 255 255 / 16%);
+  background: var(--koraz-blue);
+  color: #ffffff;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 8%);
+}
+
+.app-topbar.app-topbar-simplified .menu-trigger,
+.app-topbar.app-topbar-simplified .topbar-actions,
+.app-topbar.app-topbar-simplified .profile-trigger {
+  color: #ffffff;
+}
+
+.app-topbar.app-topbar-simplified .menu-trigger:hover {
+  background: rgb(255 255 255 / 12%);
+  color: #ffffff;
+}
+
+.topbar-brand .cediah-logo-light,
+.topbar-brand .cediah-logo-light .koraz-logo-copy {
+  color: #ffffff;
+}
+
+.topbar-brand .cediah-logo .koraz-logo-mark {
+  width: 31px !important;
+  height: 31px !important;
+  flex-basis: 31px;
+}
+
+.app-sidebar .sidebar-submenu {
+  padding-left: 0;
+}
+
+.app-main .subject-destination,
+.app-main .subject-destination-guide,
+.app-main .subject-destination-flashcards,
+.app-main .subject-destination-quiz {
+  border-left-color: var(--koraz-blue);
+}
+
+.app-main .subject-destination.is-empty:hover {
+  border-left-color: var(--koraz-blue);
+  background: rgb(255 255 255 / 42%);
+}
+
+@media (max-width: 700px) {
+  .app-shell .app-topbar.app-topbar-simplified,
+  .app-shell.dashboard-shell .app-topbar.app-topbar-simplified {
+    background: var(--koraz-blue);
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar-brand .cediah-logo .koraz-logo-mark {
+    width: 28px !important;
+    height: 28px !important;
+    flex-basis: 28px;
+  }
+}
+
+.app-shell:has(.published-rich-guide-reader) .topbar-brand .cediah-logo .koraz-logo-mark {
+  width: 25px !important;
+  height: 25px !important;
+  flex-basis: 25px;
+}
+
+.content-search-match {
+  border-radius: 0.2em;
+  background: #fde68a;
+  color: #78350f;
+  box-shadow: 0 0 0 1px rgb(217 119 6 / 22%);
+}
+
+/* Koraz logo lockup: use the supplied symbol and wordmark artwork. */
+
+.cediah-logo .koraz-logo-wordmark {
+  display: block;
+  width: 8.6rem !important;
+  height: auto !important;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.landing-logo .koraz-logo-wordmark {
+  width: 12rem !important;
+}
+
+.landing-brand-seal .cediah-logo-light {
+  justify-content: center;
+}
+
+.sidebar-brand .koraz-logo-wordmark {
+  width: 6.8rem !important;
+}
+
+.brand-footer .koraz-logo-wordmark {
+  width: 7.1rem !important;
+}
+
+.site-header .koraz-logo-wordmark {
+  width: 8rem !important;
+}
+
+.topbar-brand .koraz-logo-wordmark {
+  width: 6.5rem !important;
+}
+
+.app-shell:has(.published-rich-guide-reader) .topbar-brand .koraz-logo-wordmark {
+  width: 5.6rem !important;
+}
+
+@media (max-width: 520px) {
+  .topbar-brand .koraz-logo-wordmark {
+    width: 5.7rem !important;
   }
 }

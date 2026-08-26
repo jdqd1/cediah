@@ -1,5 +1,6 @@
 import "server-only";
 import type { CurrentUser } from "@cediah/contracts";
+import { cache } from "react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAdminRoleUser } from "./admin-role-api";
 
@@ -8,21 +9,25 @@ export type CurrentUserResult =
   | { status: "anonymous" }
   | { status: "unavailable" };
 
-export async function getCurrentUser(): Promise<CurrentUserResult> {
+async function resolveCurrentUser(): Promise<CurrentUserResult> {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "unavailable" };
 
-  const [claimsResult, sessionResult] = await Promise.all([
-    supabase.auth.getClaims(),
-    supabase.auth.getSession(),
-  ]);
-  const { data: claimsData, error: claimsError } = claimsResult;
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
   const claims = claimsData?.claims;
-  if (claimsError || !claims) return { status: "anonymous" };
+  if (
+    claimsError ||
+    !claims ||
+    claims.role !== "authenticated" ||
+    claims.is_anonymous === true
+  ) {
+    return { status: "anonymous" };
+  }
 
+  const sessionResult = await supabase.auth.getSession();
   const session = sessionResult.data.session;
   const email = typeof claims.email === "string" ? claims.email : null;
-  if (!session?.access_token || !email) {
+  if (!session?.access_token || !email || typeof claims.sub !== "string") {
     return { status: "anonymous" };
   }
 
@@ -32,6 +37,8 @@ export async function getCurrentUser(): Promise<CurrentUserResult> {
     user: { email, id: claims.sub },
   };
 }
+
+export const getCurrentUser = cache(resolveCurrentUser);
 
 export async function currentUserIsAdministrator(): Promise<boolean> {
   const current = await getCurrentUser();

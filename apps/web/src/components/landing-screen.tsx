@@ -1,27 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import {
-  ArrowUpRight,
   BookOpen,
   ChartLineUp,
-  Check,
   ClipboardText,
-  Eye,
-  EyeSlash,
-  EnvelopeSimple,
-  GithubLogo,
-  GoogleLogo,
   GraduationCap,
-  LockKey,
   PlayCircle,
   Skull,
   CardsThree,
   UsersThree,
 } from "@phosphor-icons/react";
-import { type FormEvent, useState } from "react";
-import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { AuthForm } from "./auth-form";
 import { CediahLogo } from "./cediah-logo";
 
 const featureItems = [
@@ -42,7 +32,7 @@ export function LandingScreen() {
           <h1 id="landing-title">Bienvenido</h1>
           <p>Inicia sesión para continuar</p>
         </div>
-        <LandingAuthForm />
+        <AuthForm mode="sign-in" variant="landing" />
       </section>
 
       <section className="landing-visual-column" aria-labelledby="landing-visual-title">
@@ -69,55 +59,5 @@ export function LandingScreen() {
         </div>
       </section>
     </main>
-  );
-}
-
-function LandingAuthForm() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
-  const [message, setMessage] = useState<string>();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const supabase = getBrowserSupabaseClient();
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(undefined);
-    setIsSubmitting(true);
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
-
-    if (!supabase) {
-      setMessage("El acceso todavía no está configurado para este ambiente.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      window.location.assign("/dashboard");
-    } catch {
-      setMessage("No fue posible completar el acceso. Verifica los datos e inténtalo de nuevo.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  return (
-    <form className="landing-auth-form" method="post" onSubmit={onSubmit} noValidate>
-      <div className="social-buttons">
-        <button type="button" onClick={() => setMessage("El acceso con Google estará disponible próximamente.")}><GoogleLogo size={24} weight="regular" /> Continuar con Google</button>
-        <button type="button" onClick={() => setMessage("El acceso con GitHub estará disponible próximamente.")}><GithubLogo size={24} weight="fill" /> Continuar con GitHub</button>
-      </div>
-      <div className="auth-divider"><span />o continúa con tu correo<span /></div>
-      {message && <p className="landing-auth-message" role="status">{message}</p>}
-      <label className="landing-field"><EnvelopeSimple size={21} /><input autoComplete="email" name="email" placeholder="Correo electrónico" required type="email" /></label>
-      <label className="landing-field"><LockKey size={21} /><input autoComplete="current-password" minLength={12} name="password" placeholder="Contraseña" required type={showPassword ? "text" : "password"} /><button type="button" aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeSlash size={21} /> : <Eye size={21} />}</button></label>
-      <div className="landing-form-options"><label><button className={`check-control ${remember ? "is-checked" : ""}`} type="button" aria-pressed={remember} onClick={() => setRemember((value) => !value)}>{remember && <Check size={15} weight="bold" />}</button>Recordarme</label><Link href="/recuperar-acceso">¿Olvidaste tu contraseña?</Link></div>
-      <button className="landing-submit" disabled={isSubmitting} type="submit">{isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"}</button>
-      <p className="landing-register">¿No tienes una cuenta? <Link href="/acceder?modo=registro">Regístrate</Link></p>
-      <Link className="landing-demo-link" href="/dashboard">Explorar la interfaz <ArrowUpRight size={16} /></Link>
-    </form>
   );
 }

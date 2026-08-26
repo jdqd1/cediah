@@ -55,13 +55,16 @@ En el panel de Vercel selecciona el preset Next.js, configura Root Directory com
 
 La web usa Supabase Auth solo para crear y mantener la sesión. Los datos académicos siguen pasando por la API y no se conceden permisos directos a tablas desde el navegador.
 
-- En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`, `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. La cookie de sesión se marca `Secure` automáticamente en producción; `NEXT_PUBLIC_SUPABASE_COOKIE_SECURE=false` se reserva exclusivamente para probar `next start` sobre HTTP local.
 - En Render: la API usa `WEB_ORIGINS=https://koraz-app.vercel.app,https://cediah.vercel.app`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_CONTENT_BUCKET=content-assets`; el servicio web usa `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
-- En Supabase Auth: define `https://koraz-app.vercel.app` como URL del sitio y autoriza `https://koraz-app.vercel.app/auth/callback`. Conserva temporalmente `https://cediah.vercel.app/auth/callback` para enlaces emitidos antes de la migración, además de `http://localhost:3000/auth/callback` y los previews autorizados; configura SMTP antes del piloto.
+- En Supabase Auth: define `https://koraz-app.vercel.app` como URL del sitio y autoriza `https://koraz-app.vercel.app/auth/callback`. Conserva temporalmente `https://cediah.vercel.app/auth/callback` para enlaces emitidos antes de la migración, además de `http://localhost:3000/auth/callback` y únicamente los previews necesarios. No uses comodines en producción.
+- Activa confirmación de correo, cambio seguro de contraseña y SMTP propio. Configura una longitud mínima de 12, exige mayúscula, minúscula, número y símbolo y, en planes compatibles, activa la protección de contraseñas filtradas.
+- Activa Cloudflare Turnstile en Supabase Auth con su clave secreta y coloca solo la site key pública en `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Los formularios de acceso, registro y recuperación enviarán el token a Supabase. Conserva los límites de Auth para inicio/registro y correo; ajústalos con datos reales sin penalizar redes universitarias compartidas.
+- En planes compatibles, aplica sesiones con un máximo de 30 días y 7 días de inactividad. El access token permanece en una hora y la rotación de refresh tokens debe seguir activa con el intervalo de reutilización recomendado de 10 segundos.
 
 `https://koraz-app.vercel.app` es el origen canónico. Vercel redirige permanentemente `https://cediah.vercel.app`, y la configuración de Next.js aplica la misma redirección al dominio legado y a `https://web-cediah.onrender.com`, conservando la ruta y los parámetros de consulta.
 
-Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y el acceso a `/panel` con una cuenta de prueba. La API debe validar siempre el bearer token antes de servir datos protegidos.
+Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y revocación de sesiones anteriores. Comprueba también que `/dashboard`, las rutas de estudio y `/panel` redirigen al acceso sin una sesión válida, incluso mediante navegación RSC o prefetch. La API debe validar siempre el bearer token antes de servir datos protegidos.
 
 ## Pruebas privadas de video
 

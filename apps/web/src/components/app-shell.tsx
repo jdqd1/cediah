@@ -300,8 +300,6 @@ export function AppShell({
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [sidebarOpen]);
-  const showHeaderHeading = showBreadcrumbs || Boolean(headerTitle || headerSubtitle);
-
   return (
     <div
       className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`.trim()}
@@ -399,37 +397,28 @@ export function AppShell({
 
       <div className="app-body">
         <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
-          <button
-            className="menu-trigger"
-            ref={menuTriggerRef}
-            type="button"
-            aria-label={menuButtonLabel}
-            aria-controls="app-sidebar"
-            aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
-            title={menuButtonLabel}
-            onClick={togglePrimaryMenu}
-          >
-            <List size={28} />
-          </button>
-          {showHeaderHeading && (
-            <div className="topbar-heading">
-              {showBreadcrumbs ? (
-                <div className="topbar-breadcrumbs" aria-label="Ruta actual">
-                  {breadcrumbs?.map((breadcrumb, index) => (
-                    <span key={`${breadcrumb}-${index}`} className={index === breadcrumbs.length - 1 ? "current" : ""}>
-                      {breadcrumb}
-                      {index < breadcrumbs.length - 1 && <span className="breadcrumb-chevron">›</span>}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <h1>{headerTitle}</h1>
-                  {headerSubtitle && <p>{headerSubtitle}</p>}
-                </>
-              )}
-            </div>
-          )}
+          <div className="topbar-leading">
+            <button
+              className="menu-trigger"
+              ref={menuTriggerRef}
+              type="button"
+              aria-label={menuButtonLabel}
+              aria-controls="app-sidebar"
+              aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
+              title={menuButtonLabel}
+              onClick={togglePrimaryMenu}
+            >
+              <List size={28} />
+            </button>
+          </div>
+          <Link className="topbar-brand" href="/dashboard" aria-label="Koraz, ir al inicio">
+            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+          </Link>
+          <div className="topbar-page-context sr-only">
+            <h1>{headerTitle || "Koraz"}</h1>
+            {headerSubtitle && <p>{headerSubtitle}</p>}
+            {showBreadcrumbs && <p>Ruta actual: {breadcrumbs?.join(" / ")}</p>}
+          </div>
           <div className="topbar-actions">
             <div className="topbar-popover-wrap">
               {viewer ? (

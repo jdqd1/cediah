@@ -64,10 +64,12 @@ function itemTopics(item: ContentItem) {
 
 function ResourceList({
   items,
+  searchQuery = "",
   subject,
   topic,
 }: {
   items: ContentItem[];
+  searchQuery?: string;
   subject: Subject;
   topic?: string;
 }) {
@@ -82,6 +84,7 @@ function ResourceList({
         topic: topic || itemTopics(item)[0],
       })}
       items={items}
+      searchQuery={searchQuery}
     />
   );
 }
@@ -166,14 +169,8 @@ export function SubjectDetailScreen({
               {sections.map((section) => {
                 const Icon = section.icon;
                 const href = subjectContentHref(subject.slug, section.kind);
-                return (
-                  <Link
-                    aria-label={`${studyContentKindLabels[section.kind]}: ${section.count} ${section.count === 1 ? "recurso" : "recursos"} en ${subject.name}`}
-                    className={`subject-destination subject-destination-${section.kind}${section.count === 0 ? " is-empty" : ""}`}
-                    href={href}
-                    key={section.kind}
-                    onClick={(event) => navigate(event, href)}
-                  >
+                const content = (
+                  <>
                     <span className="subject-destination-icon" aria-hidden="true">
                       <Icon size={22} weight={section.kind === "video" ? "fill" : "regular"} />
                     </span>
@@ -185,6 +182,32 @@ export function SubjectDetailScreen({
                       <small>{section.count}</small>
                       <ArrowRight aria-hidden="true" size={18} />
                     </span>
+                  </>
+                );
+
+                if (section.count === 0) {
+                  return (
+                    <span
+                      aria-disabled="true"
+                      aria-label={`${studyContentKindLabels[section.kind]}: sin recursos disponibles en ${subject.name}`}
+                      className={`subject-destination subject-destination-${section.kind} is-empty`}
+                      key={section.kind}
+                      role="link"
+                    >
+                      {content}
+                    </span>
+                  );
+                }
+
+                return (
+                  <Link
+                    aria-label={`${studyContentKindLabels[section.kind]}: ${section.count} ${section.count === 1 ? "recurso" : "recursos"} en ${subject.name}`}
+                    className={`subject-destination subject-destination-${section.kind}`}
+                    href={href}
+                    key={section.kind}
+                    onClick={(event) => navigate(event, href)}
+                  >
+                    {content}
                   </Link>
                 );
               })}
@@ -203,7 +226,6 @@ export function SubjectDetailScreen({
                 <NavigationTrail segments={[subject.slug, topic || kindPathSegments[kind]]} />
               </nav>
               <div className="subject-flow-title">
-                <span>{subject.name}</span>
                 <h2>{topic || label}</h2>
               </div>
             </header>
@@ -229,7 +251,7 @@ export function SubjectDetailScreen({
               searching ? (
                 <div className="subject-search-results" aria-live="polite">
                   <span>{filteredItems.length === 1 ? "1 resultado" : `${filteredItems.length} resultados`}</span>
-                  <ResourceList items={filteredItems} subject={subject} />
+                  <ResourceList items={filteredItems} searchQuery={search} subject={subject} />
                 </div>
               ) : topic ? (
                 <ResourceList items={filteredItems} subject={subject} topic={topic} />

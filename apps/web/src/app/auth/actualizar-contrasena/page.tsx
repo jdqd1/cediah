@@ -1,10 +1,21 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CediahLogo } from "@/components/cediah-logo";
 import { UpdatePasswordForm } from "@/components/update-password-form";
+import { getCurrentUser } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
-export default function UpdatePasswordPage() {
+export default async function UpdatePasswordPage() {
+  const current = await getCurrentUser();
+  if (current.status !== "authenticated") {
+    redirect(
+      current.status === "unavailable"
+        ? "/acceder?error=configuracion"
+        : "/acceder?error=sesion",
+    );
+  }
+
   return (
     <main className="auth-page">
       <header className="auth-header">

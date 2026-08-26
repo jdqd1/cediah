@@ -17,14 +17,18 @@ export function CediahLogo({ className = "", priority = false, variant = "light"
         className="koraz-logo-mark"
         src="/brand/koraz-mark.png"
         alt=""
-        width={72}
-        height={72}
+        width={1512}
+        height={1512}
         priority={priority}
       />
-      <span className="koraz-logo-copy" aria-hidden="true">
-        <strong>KORAZ</strong>
-        <small>Aprende. Explora. Crece.</small>
-      </span>
+      <Image
+        className="koraz-logo-wordmark"
+        src="/brand/koraz-wordmark.png"
+        alt=""
+        width={2000}
+        height={496}
+        priority={priority}
+      />
     </span>
   );
 }

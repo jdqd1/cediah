@@ -2,7 +2,10 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getPublicSupabaseConfiguration } from "./environment";
+import {
+  getPublicSupabaseConfiguration,
+  getSupabaseCookieOptions,
+} from "./environment";
 
 let client: SupabaseClient | null | undefined;
 
@@ -11,7 +14,9 @@ export function getBrowserSupabaseClient() {
 
   const configuration = getPublicSupabaseConfiguration();
   client = configuration
-    ? createBrowserClient(configuration.url, configuration.publishableKey)
+    ? createBrowserClient(configuration.url, configuration.publishableKey, {
+        cookieOptions: getSupabaseCookieOptions(),
+      })
     : null;
 
   return client;

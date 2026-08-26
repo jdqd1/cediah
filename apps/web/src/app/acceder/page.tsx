@@ -1,14 +1,26 @@
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
 import { CediahLogo } from "@/components/cediah-logo";
+import { getSafeNextPath } from "@/lib/auth/validation";
 
 type AccessPageProps = {
-  searchParams: Promise<{ next?: string; modo?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; modo?: string }>;
+};
+
+const callbackErrorMessages: Record<string, string> = {
+  confirmacion: "El enlace de acceso no es válido o ya expiró. Solicita uno nuevo.",
+  configuracion: "El acceso no está disponible en este ambiente.",
+  sesion: "Tu sesión terminó. Inicia sesión de nuevo para continuar.",
 };
 
 export default async function AccessPage({ searchParams }: AccessPageProps) {
-  const { modo, next } = await searchParams;
+  const { error, modo, next } = await searchParams;
   const mode = modo === "registro" ? "sign-up" : "sign-in";
+  const nextPath = getSafeNextPath(next);
+  const toggleParameters = new URLSearchParams();
+  if (mode !== "sign-up") toggleParameters.set("modo", "registro");
+  if (nextPath !== "/dashboard") toggleParameters.set("next", nextPath);
+  const toggleHref = `/acceder${toggleParameters.size ? `?${toggleParameters}` : ""}`;
 
   return (
     <main className="auth-page">
@@ -16,13 +28,16 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
         <Link className="brand" href="/" aria-label="Koraz, inicio">
           <CediahLogo variant="dark" />
         </Link>
-        <Link href={mode === "sign-up" ? "/acceder" : "/acceder?modo=registro"}>
+        <Link href={toggleHref}>
           {mode === "sign-up" ? "Ya tengo cuenta" : "Crear cuenta"}
         </Link>
       </header>
       <div className="auth-content">
-        <AuthForm mode={mode} nextPath={next} />
-        {mode === "sign-in" && <Link className="auth-helper" href="/recuperar-acceso">¿Olvidaste tu contraseña?</Link>}
+        <AuthForm
+          initialMessage={error ? callbackErrorMessages[error] : undefined}
+          mode={mode}
+          nextPath={nextPath}
+        />
       </div>
     </main>
   );

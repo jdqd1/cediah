@@ -37,7 +37,7 @@ La primera lectura academica se expone como `GET /v1/learning/dashboard` y solo 
 
 La web crea la sesión de Supabase Auth con la clave publicable y la conserva en cookies SSR. El proxy refresca claims verificados con `getClaims`; el servidor reenvía el access token a `GET /v1/auth/me` y Fastify lo valida de nuevo mediante `auth.getUser` con una clave secreta que solo existe en Render. Ninguna decisión de autorización usa `user_metadata`, una sesión sin token validado no habilita el panel y la web no consulta tablas directamente.
 
-El registro, confirmación por callback, recuperación y actualización de contraseña requieren que Supabase tenga autorizadas las URL de redirección del ambiente y SMTP configurado antes de probar con usuarios reales.
+El registro, confirmación por callback, recuperación y actualización de contraseña requieren que Supabase tenga autorizadas las URL exactas de redirección del ambiente, SMTP y Turnstile configurados antes de probar con usuarios reales. El proxy cubre todas las páginas —incluidas solicitudes RSC y prefetch— y cada árbol de rutas de la aplicación vuelve a exigir una identidad validada desde un layout de servidor. Solo `/`, `/acceder`, `/recuperar-acceso` y el callback de Auth son públicos.
 
 Las migraciones iniciales son `20260801172906_initial_platform_foundation.sql` y `20260801173029_add_platform_foreign_key_indexes.sql`. Sus indices cubren todas las claves foraneas y los asesores de Supabase no reportan defectos de seguridad ni claves foraneas sin indice.
 
@@ -66,6 +66,6 @@ El workflow permitido es `draft -> in_review -> changes_requested|approved -> pu
 
 Los videos y PDF se cargan directamente al bucket privado con una URL firmada reservada por la API. El endpoint de finalización verifica propietario, permiso, existencia, tamaño y MIME reales antes de marcar el asset como listo. Las lecturas públicas solo devuelven elementos con estado `published` y emiten URLs de descarga temporales.
 
-Las rutas públicas `/dashboard`, `/guias`, `/biblioteca` y `/biblioteca/[slug]` consumen el catálogo real. El área protegida `/panel/contenido` ofrece bandeja, filtros, formularios por tipo, carga con progreso y controles de workflow según las capacidades del usuario.
+Las rutas autenticadas `/dashboard`, `/guias`, `/biblioteca` y `/biblioteca/[slug]` consumen el catálogo real. El área autorizada `/panel/contenido` ofrece bandeja, filtros, formularios por tipo, carga con progreso y controles de workflow según las capacidades del usuario.
 
 La administración de roles está separada del estudio editorial. `/panel/administracion/roles` sólo se renderiza para una identidad validada cuyo `user_roles` incluye `administrator`; permite consultar cuentas por correo y asignar o revocar un único rol por operación. La cuenta debe existir en Supabase Auth. La primera cuenta se bootstrappea una vez mediante el SQL Editor; después todas las mutaciones pasan por Fastify, se auditan y mantienen al menos un administrador.

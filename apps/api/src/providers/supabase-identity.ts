@@ -20,7 +20,14 @@ export function createSupabaseIdentityProvider(
   return {
     async getUser(accessToken: string): Promise<ProviderUser | null> {
       const { data, error } = await client.auth.getUser(accessToken);
-      if (error || !data.user?.email) return null;
+      if (
+        error ||
+        !data.user?.email ||
+        !data.user.email_confirmed_at ||
+        data.user.is_anonymous
+      ) {
+        return null;
+      }
 
       return { email: data.user.email, id: data.user.id };
     },

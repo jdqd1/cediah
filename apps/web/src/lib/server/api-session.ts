@@ -10,6 +10,17 @@ export async function getApiAccessToken(): Promise<ApiAccessTokenResult> {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return { status: "unavailable" };
 
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims;
+  if (
+    claimsError ||
+    !claims ||
+    claims.role !== "authenticated" ||
+    claims.is_anonymous === true
+  ) {
+    return { status: "anonymous" };
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();

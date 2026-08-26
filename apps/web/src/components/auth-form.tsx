@@ -1,121 +1,428 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import {
+  Check,
+  EnvelopeSimple,
+  Eye,
+  EyeSlash,
+  LockKey,
+} from "@phosphor-icons/react";
+import Link from "next/link";
+import { type FormEvent, useCallback, useState } from "react";
+import {
+  type AuthFieldErrors,
+  type AuthFormMode,
+  AUTH_EMAIL_MAX_LENGTH,
+  AUTH_PASSWORD_MAX_LENGTH,
+  AUTH_PASSWORD_MIN_LENGTH,
+  getPublicAuthErrorMessage,
+  getSafeNextPath,
+  passwordRequirementChecks,
+  validateAuthInput,
+} from "@/lib/auth/validation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { getPublicTurnstileSiteKey } from "@/lib/supabase/environment";
+import { TurnstileWidget } from "./turnstile-widget";
 
-type AuthMode = "recover" | "sign-in" | "sign-up";
+type AuthMode = Exclude<AuthFormMode, "update-password">;
+type AuthFormVariant = "card" | "landing";
 
 type AuthFormProps = {
+  initialMessage?: string;
   mode: AuthMode;
   nextPath?: string;
+  variant?: AuthFormVariant;
 };
 
-function safeNextPath(value: string | undefined) {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
+type Feedback = {
+  message: string;
+  tone: "error" | "success";
+};
+
+function getHeading(mode: AuthMode) {
+  if (mode === "recover") return "Recupera tu acceso";
+  if (mode === "sign-up") return "Crea tu cuenta";
+  return "Accede a Koraz";
 }
 
-export function AuthForm({ mode, nextPath }: AuthFormProps) {
-  const [message, setMessage] = useState<string>();
+function getSubmitLabel(mode: AuthMode) {
+  if (mode === "recover") return "Enviar enlace";
+  if (mode === "sign-up") return "Crear cuenta";
+  return "Iniciar sesión";
+}
+
+export function AuthForm({
+  initialMessage,
+  mode,
+  nextPath,
+  variant = "card",
+}: AuthFormProps) {
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [errors, setErrors] = useState<AuthFieldErrors>({});
+  const [feedback, setFeedback] = useState<Feedback | undefined>(
+    initialMessage ? { message: initialMessage, tone: "error" } : undefined,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const supabase = getBrowserSupabaseClient();
+  const captchaSiteKey = getPublicTurnstileSiteKey();
   const isRecovery = mode === "recover";
   const isSignUp = mode === "sign-up";
-  const targetPath = safeNextPath(nextPath);
+  const targetPath = getSafeNextPath(nextPath);
+  const formClassName = variant === "landing" ? "landing-auth-form" : "auth-form";
+
+  const clearError = useCallback((field: keyof AuthFieldErrors) => {
+    setErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const handleCaptchaError = useCallback(() => {
+    setCaptchaToken(null);
+    setFeedback({
+      message:
+        "No pudimos cargar la verificación de seguridad. Revisa tu conexión e inténtalo de nuevo.",
+      tone: "error",
+    });
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase) return;
+    if (!supabase || isSubmitting) return;
 
+    const validation = validateAuthInput(mode, {
+      confirmPassword,
+      email,
+      password,
+    });
+    if (!validation.success) {
+      setErrors(validation.errors);
+      setFeedback({
+        message: "Revisa los campos marcados antes de continuar.",
+        tone: "error",
+      });
+      const firstInvalidField = ["email", "password", "confirmPassword"].find(
+        (field) => validation.errors[field as keyof AuthFieldErrors],
+      );
+      if (firstInvalidField) {
+        document.getElementById(`auth-${firstInvalidField}`)?.focus();
+      }
+      return;
+    }
+
+    if (captchaSiteKey && !captchaToken) {
+      setFeedback({
+        message: "Completa la verificación de seguridad antes de continuar.",
+        tone: "error",
+      });
+      return;
+    }
+
+    setErrors({});
+    setFeedback(undefined);
     setIsSubmitting(true);
-    setMessage(undefined);
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
     const callbackUrl = new URL("/auth/callback", window.location.origin);
-    callbackUrl.searchParams.set("next", isRecovery ? "/auth/actualizar-contrasena" : targetPath);
+    callbackUrl.searchParams.set(
+      "next",
+      isRecovery ? "/auth/actualizar-contrasena" : targetPath,
+    );
+    const captchaOptions = captchaToken ? { captchaToken } : {};
 
     try {
-      if (isRecovery) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: callbackUrl.toString(),
-        });
+      if (validation.value.mode === "recover") {
+        const { error } = await supabase.auth.resetPasswordForEmail(
+          validation.value.email,
+          {
+            ...captchaOptions,
+            redirectTo: callbackUrl.toString(),
+          },
+        );
         if (error) throw error;
-        setMessage("Si el correo está registrado, recibirás un enlace para restablecer el acceso.");
+        setEmail("");
+        setFeedback({
+          message:
+            "Si el correo está registrado, recibirás un enlace para restablecer el acceso.",
+          tone: "success",
+        });
         return;
       }
 
-      if (isSignUp) {
+      if (validation.value.mode === "sign-up") {
         const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: callbackUrl.toString() },
+          email: validation.value.email,
+          password: validation.value.password,
+          options: {
+            ...captchaOptions,
+            emailRedirectTo: callbackUrl.toString(),
+          },
         });
         if (error) throw error;
-        if (data.session) {
-          window.location.assign(targetPath);
+        setPassword("");
+        setConfirmPassword("");
+
+        if (
+          data.session &&
+          data.user?.email_confirmed_at &&
+          !data.user.is_anonymous
+        ) {
+          window.location.replace(targetPath);
           return;
         }
-        setMessage("Revisa tu correo para confirmar la cuenta antes de continuar.");
+
+        setFeedback({
+          message:
+            "Si el correo puede registrarse, recibirás un enlace de confirmación. Revísalo antes de iniciar sesión.",
+          tone: "success",
+        });
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: validation.value.email,
+        password: validation.value.password,
+        options: captchaOptions,
+      });
       if (error) throw error;
-      window.location.assign(targetPath);
-    } catch {
-      setMessage(
-        isRecovery
-          ? "No fue posible solicitar el enlace. Inténtalo de nuevo más tarde."
-          : "No fue posible completar el acceso. Verifica los datos e inténtalo de nuevo.",
-      );
+      if (!data.user?.email_confirmed_at || data.user.is_anonymous) {
+        await supabase.auth.signOut({ scope: "local" });
+        throw new Error("Permanent account required");
+      }
+      window.location.replace(targetPath);
+    } catch (error) {
+      setFeedback({
+        message: getPublicAuthErrorMessage(error, mode),
+        tone: "error",
+      });
     } finally {
       setIsSubmitting(false);
+      if (captchaSiteKey) setCaptchaResetKey((value) => value + 1);
     }
   }
 
-  const heading = isRecovery ? "Recupera tu acceso" : isSignUp ? "Crea tu cuenta" : "Accede a Koraz";
-  const submitLabel = isRecovery ? "Enviar enlace" : isSignUp ? "Crear cuenta" : "Iniciar sesión";
+  const feedbackElement = feedback && (
+    <p
+      className={`${variant === "landing" ? "landing-auth-message" : "auth-message"} is-${feedback.tone}`}
+      role={feedback.tone === "error" ? "alert" : "status"}
+    >
+      {feedback.message}
+    </p>
+  );
+
+  const emailInput = (
+    <input
+      aria-describedby={errors.email ? "auth-email-error" : undefined}
+      aria-invalid={Boolean(errors.email)}
+      autoCapitalize="none"
+      autoComplete="email"
+      disabled={!supabase || isSubmitting}
+      id="auth-email"
+      inputMode="email"
+      maxLength={AUTH_EMAIL_MAX_LENGTH}
+      name="email"
+      onChange={(event) => {
+        setEmail(event.target.value);
+        clearError("email");
+      }}
+      placeholder={variant === "landing" ? "Correo electrónico" : undefined}
+      required
+      spellCheck={false}
+      type="email"
+      value={email}
+    />
+  );
+
+  const passwordInput = (
+    <input
+      aria-describedby={errors.password ? "auth-password-error" : undefined}
+      aria-invalid={Boolean(errors.password)}
+      autoComplete={isSignUp ? "new-password" : "current-password"}
+      disabled={!supabase || isSubmitting}
+      id="auth-password"
+      maxLength={AUTH_PASSWORD_MAX_LENGTH}
+      minLength={isSignUp ? AUTH_PASSWORD_MIN_LENGTH : undefined}
+      name="password"
+      onChange={(event) => {
+        setPassword(event.target.value);
+        clearError("password");
+      }}
+      placeholder={variant === "landing" ? "Contraseña" : undefined}
+      required
+      type={showPassword ? "text" : "password"}
+      value={password}
+    />
+  );
 
   return (
-    <form className="auth-form" method="post" onSubmit={onSubmit} noValidate>
-      <div>
-        <p className="eyebrow">Acceso protegido</p>
-        <h1>{heading}</h1>
-        <p>
-          {isRecovery
-            ? "Te enviaremos un enlace de un solo uso."
-            : "La cuenta te permitirá continuar tu recorrido cuando el curso piloto esté disponible."}
-        </p>
-      </div>
+    <form className={formClassName} method="post" noValidate onSubmit={onSubmit}>
+      {variant === "card" && (
+        <div>
+          <p className="eyebrow">Acceso protegido</p>
+          <h1>{getHeading(mode)}</h1>
+          <p>
+            {isRecovery
+              ? "Te enviaremos un enlace de recuperación de un solo uso."
+              : isSignUp
+                ? "Crea una cuenta verificada para acceder a la plataforma."
+                : "Inicia sesión con tu cuenta verificada para continuar."}
+          </p>
+        </div>
+      )}
 
       {!supabase && (
-        <p className="auth-message" role="alert">
+        <p
+          className={variant === "landing" ? "landing-auth-message is-error" : "auth-message is-error"}
+          role="alert"
+        >
           El acceso todavía no está configurado para este ambiente.
         </p>
       )}
-      {message && <p className="auth-message" role="status">{message}</p>}
+      {feedbackElement}
 
-      <label htmlFor="email">Correo institucional o personal</label>
-      <input autoComplete="email" disabled={!supabase || isSubmitting} id="email" name="email" required type="email" />
+      {variant === "landing" ? (
+        <label className={`landing-field ${errors.email ? "is-invalid" : ""}`}>
+          <span className="sr-only">Correo electrónico</span>
+          <EnvelopeSimple aria-hidden="true" size={21} />
+          {emailInput}
+        </label>
+      ) : (
+        <>
+          <label htmlFor="auth-email">Correo institucional o personal</label>
+          {emailInput}
+        </>
+      )}
+      {errors.email && (
+        <p className="auth-field-error" id="auth-email-error">
+          {errors.email}
+        </p>
+      )}
 
       {!isRecovery && (
         <>
-          <label htmlFor="password">Contraseña</label>
-          <input
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-            disabled={!supabase || isSubmitting}
-            id="password"
-            minLength={12}
-            name="password"
-            required
-            type="password"
-          />
+          {variant === "landing" ? (
+            <label className={`landing-field ${errors.password ? "is-invalid" : ""}`}>
+              <span className="sr-only">Contraseña</span>
+              <LockKey aria-hidden="true" size={21} />
+              {passwordInput}
+              <button
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                onClick={() => setShowPassword((value) => !value)}
+                type="button"
+              >
+                {showPassword ? <EyeSlash size={21} /> : <Eye size={21} />}
+              </button>
+            </label>
+          ) : (
+            <>
+              <label htmlFor="auth-password">Contraseña</label>
+              <div className={`auth-input-shell ${errors.password ? "is-invalid" : ""}`}>
+                {passwordInput}
+                <button
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  onClick={() => setShowPassword((value) => !value)}
+                  type="button"
+                >
+                  {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </>
+          )}
+          {errors.password && (
+            <p className="auth-field-error" id="auth-password-error">
+              {errors.password}
+            </p>
+          )}
         </>
       )}
 
-      <button className="button button-primary" disabled={!supabase || isSubmitting} type="submit">
-        {isSubmitting ? "Procesando..." : submitLabel}
+      {isSignUp && (
+        <>
+          <ul className="password-requirements" aria-label="Requisitos de contraseña">
+            {passwordRequirementChecks.map((requirement) => {
+              const passed = requirement.test(password);
+              return (
+                <li className={passed ? "is-valid" : ""} key={requirement.label}>
+                  <span aria-hidden="true">{passed ? <Check size={13} weight="bold" /> : "•"}</span>
+                  {requirement.label}
+                </li>
+              );
+            })}
+          </ul>
+          <label htmlFor="auth-confirmPassword">Confirma la contraseña</label>
+          <div className={`auth-input-shell ${errors.confirmPassword ? "is-invalid" : ""}`}>
+            <input
+              aria-describedby={errors.confirmPassword ? "auth-confirm-password-error" : undefined}
+              aria-invalid={Boolean(errors.confirmPassword)}
+              autoComplete="new-password"
+              disabled={!supabase || isSubmitting}
+              id="auth-confirmPassword"
+              maxLength={AUTH_PASSWORD_MAX_LENGTH}
+              minLength={AUTH_PASSWORD_MIN_LENGTH}
+              name="confirmPassword"
+              onChange={(event) => {
+                setConfirmPassword(event.target.value);
+                clearError("confirmPassword");
+              }}
+              required
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+            />
+            <button
+              aria-label={showConfirmPassword ? "Ocultar confirmación" : "Mostrar confirmación"}
+              onClick={() => setShowConfirmPassword((value) => !value)}
+              type="button"
+            >
+              {showConfirmPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
+          {errors.confirmPassword && (
+            <p className="auth-field-error" id="auth-confirm-password-error">
+              {errors.confirmPassword}
+            </p>
+          )}
+        </>
+      )}
+
+      {captchaSiteKey && (
+        <TurnstileWidget
+          onError={handleCaptchaError}
+          onTokenChange={setCaptchaToken}
+          resetKey={captchaResetKey}
+          siteKey={captchaSiteKey}
+        />
+      )}
+
+      {variant === "landing" && mode === "sign-in" && (
+        <div className="landing-form-options is-link-only">
+          <Link href="/recuperar-acceso">¿Olvidaste tu contraseña?</Link>
+        </div>
+      )}
+
+      <button
+        className={variant === "landing" ? "landing-submit" : "button button-primary"}
+        disabled={!supabase || isSubmitting || Boolean(captchaSiteKey && !captchaToken)}
+        type="submit"
+      >
+        {isSubmitting ? "Procesando..." : getSubmitLabel(mode)}
       </button>
+
+      {variant === "landing" && mode === "sign-in" && (
+        <p className="landing-register">
+          ¿No tienes una cuenta? <Link href="/acceder?modo=registro">Regístrate</Link>
+        </p>
+      )}
+      {variant === "card" && mode === "sign-in" && (
+        <Link className="auth-helper" href="/recuperar-acceso">
+          ¿Olvidaste tu contraseña?
+        </Link>
+      )}
     </form>
   );
 }
