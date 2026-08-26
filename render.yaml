@@ -13,7 +13,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: WEB_ORIGINS
-        sync: false
+        value: https://koraz-app.vercel.app,https://cediah.vercel.app
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SECRET_KEY

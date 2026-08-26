@@ -55,9 +55,11 @@ En el panel de Vercel selecciona el preset Next.js, configura Root Directory com
 
 La web usa Supabase Auth solo para crear y mantener la sesión. Los datos académicos siguen pasando por la API y no se conceden permisos directos a tablas desde el navegador.
 
-- En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-- En Render: `WEB_ORIGINS`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_CONTENT_BUCKET=content-assets`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
-- En Supabase Auth: define la URL del sitio y las URL de redirección exactas para `http://localhost:3000/auth/callback`, previews autorizados y `https://cediah.vercel.app/auth/callback`; configura SMTP antes del piloto.
+- En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`, `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- En Render: la API usa `WEB_ORIGINS=https://koraz-app.vercel.app,https://cediah.vercel.app`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_CONTENT_BUCKET=content-assets`; el servicio web usa `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
+- En Supabase Auth: define `https://koraz-app.vercel.app` como URL del sitio y autoriza `https://koraz-app.vercel.app/auth/callback`. Conserva temporalmente `https://cediah.vercel.app/auth/callback` para enlaces emitidos antes de la migración, además de `http://localhost:3000/auth/callback` y los previews autorizados; configura SMTP antes del piloto.
+
+`https://koraz-app.vercel.app` es el origen canónico. Vercel redirige permanentemente `https://cediah.vercel.app`, y la configuración de Next.js aplica la misma redirección al dominio legado y a `https://web-cediah.onrender.com`, conservando la ruta y los parámetros de consulta.
 
 Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y el acceso a `/panel` con una cuenta de prueba. La API debe validar siempre el bearer token antes de servir datos protegidos.
 
