@@ -264,15 +264,8 @@ export function AuthForm({
     <form className={formClassName} method="post" noValidate onSubmit={onSubmit}>
       {variant === "card" && (
         <div>
-          <p className="eyebrow">Acceso protegido</p>
           <h1>{getHeading(mode)}</h1>
-          <p>
-            {isRecovery
-              ? "Te enviaremos un enlace de recuperación de un solo uso."
-              : isSignUp
-                ? "Crea una cuenta verificada para acceder a la plataforma."
-                : "Inicia sesión con tu cuenta verificada para continuar."}
-          </p>
+          {isRecovery && <p>Te enviaremos un enlace de recuperación de un solo uso.</p>}
         </div>
       )}
 
@@ -294,7 +287,7 @@ export function AuthForm({
         </label>
       ) : (
         <>
-          <label htmlFor="auth-email">Correo institucional o personal</label>
+          <label htmlFor="auth-email">Correo</label>
           {emailInput}
         </>
       )}

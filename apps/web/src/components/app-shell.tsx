@@ -24,6 +24,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { signOut } from "@/app/panel/actions";
 import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CediahLogo } from "./cediah-logo";
+import { GlobalContentSearch } from "./global-content-search";
 import {
   setSidebarCollapsedPreference,
   useSidebarCollapsedPreference,
@@ -411,9 +412,7 @@ export function AppShell({
               <List size={28} />
             </button>
           </div>
-          <Link className="topbar-brand" href="/dashboard" aria-label="Koraz, ir al inicio">
-            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
-          </Link>
+          <GlobalContentSearch />
           <div className="topbar-page-context sr-only">
             <h1>{headerTitle || "Koraz"}</h1>
             {headerSubtitle && <p>{headerSubtitle}</p>}
