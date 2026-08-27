@@ -3361,3 +3361,37 @@ a.icon-back-link:hover,
     gap: 0.6rem;
   }
 }
+
+/* August 2026 annotated mobile review: navigation and reading flow. */
+
+.subject-detail-heading,
+.subject-flow-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.subject-detail-heading > h2,
+.subject-flow-heading > .subject-flow-title {
+  min-width: 0;
+  margin: 0;
+}
+
+.video-rich-guide-document .rich-guide-heading-1 {
+  color: #213073;
+}
+
+.video-linked-guide-heading a,
+.video-linked-guide-heading a:hover {
+  color: #000000;
+}
+
+@media (max-width: 960px) {
+  .sidebar-menu-trigger {
+    display: grid;
+  }
+
+  .app-shell.sidebar-open .topbar-leading .menu-trigger {
+    visibility: hidden;
+  }
+}

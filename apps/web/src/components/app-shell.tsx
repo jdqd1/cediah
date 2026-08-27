@@ -11,7 +11,6 @@ import {
   Notebook,
   PlayCircle,
   PencilSimpleLine,
-  X,
   UserCircle,
   ShieldCheck,
 } from "@phosphor-icons/react";
@@ -200,13 +199,20 @@ export function AppShell({
     ? sidebarCollapsed
       ? "Expandir menú principal"
       : "Contraer menú principal"
-    : "Abrir menú principal";
+    : sidebarOpen
+      ? "Cerrar menú principal"
+      : "Abrir menú principal";
 
   function togglePrimaryMenu() {
     if (window.matchMedia("(min-width: 961px)").matches) {
       setSidebarCollapsedPreference(!sidebarCollapsed);
     } else {
-      setSidebarOpen(true);
+      if (sidebarOpen) {
+        setSidebarOpen(false);
+        window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
+      } else {
+        setSidebarOpen(true);
+      }
     }
   }
 
@@ -302,7 +308,7 @@ export function AppShell({
           </Link>
           <button
             aria-controls="app-sidebar"
-            aria-expanded={!sidebarCollapsed}
+            aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
             aria-label={menuButtonLabel}
             className="sidebar-menu-trigger"
             title={menuButtonLabel}
@@ -310,17 +316,6 @@ export function AppShell({
             onClick={togglePrimaryMenu}
           >
             <List aria-hidden="true" size={25} />
-          </button>
-          <button
-            className="sidebar-close"
-            type="button"
-            aria-label="Cerrar menú"
-            onClick={() => {
-              closeSidebar();
-              menuTriggerRef.current?.focus();
-            }}
-          >
-            <X size={22} />
           </button>
         </div>
         <nav className="sidebar-nav">
@@ -383,14 +378,6 @@ export function AppShell({
       <div className="app-body">
         <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
           <div className="topbar-leading">
-            <Link
-              className="topbar-brand"
-              href="/dashboard"
-              aria-label="Koraz, inicio"
-              title="Ir al inicio"
-            >
-              <CediahLogo variant="light" priority={activeKey === "dashboard"} />
-            </Link>
             <button
               className="menu-trigger"
               ref={menuTriggerRef}
