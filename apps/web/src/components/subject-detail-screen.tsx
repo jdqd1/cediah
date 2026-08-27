@@ -23,7 +23,7 @@ import {
 } from "@/lib/content-navigation";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
-import { IconBackLink, NavigationTrail } from "./compact-navigation";
+import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
 
 const sectionDefinitions: Array<{
@@ -42,13 +42,6 @@ const kindSearchLabels: Record<StudyContentKind, string> = {
   guide: "Buscar guía",
   quiz: "Buscar cuestionario",
   video: "Buscar video",
-};
-
-const kindPathSegments: Record<StudyContentKind, string> = {
-  flashcards: "flashcards",
-  guide: "guias",
-  quiz: "cuestionarios",
-  video: "videos",
 };
 
 function normalize(value: string) {
@@ -159,9 +152,8 @@ export function SubjectDetailScreen({
         {!kind ? (
           <>
             <header className="subject-detail-heading">
-              <nav className="compact-navigation-row" aria-label="Navegación de la asignatura">
-                <IconBackLink className="subject-detail-back" href="/asignaturas" label="Volver a asignaturas" />
-                <NavigationTrail segments={[subject.slug]} />
+              <nav className="compact-navigation-row" aria-label="Navegación de la materia">
+                <IconBackLink className="subject-detail-back" href="/asignaturas" label="Volver a materias" />
               </nav>
               <h2>{subject.name}</h2>
             </header>
@@ -223,7 +215,6 @@ export function SubjectDetailScreen({
                   label={topic ? "Volver al temario" : `Volver a ${subject.name}`}
                   onClick={(event) => navigate(event, topic ? subjectContentHref(subject.slug, kind) : pathname)}
                 />
-                <NavigationTrail segments={[subject.slug, topic || kindPathSegments[kind]]} />
               </nav>
               <div className="subject-flow-title">
                 <h2>{topic || label}</h2>

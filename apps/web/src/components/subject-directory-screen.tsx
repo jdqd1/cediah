@@ -110,7 +110,7 @@ export function SubjectDirectoryScreen({
     });
   }, [initialKind, items, search, subjectById]);
   const activeKey = initialKind === "guide" ? "guides" : initialKind ?? "subjects";
-  const headerTitle = initialKind ? studyContentKindLabels[initialKind] : "Asignaturas";
+  const headerTitle = initialKind ? studyContentKindLabels[initialKind] : "Materias";
   const showingResourceResults = Boolean(initialKind && search.trim());
 
   return (
@@ -121,14 +121,14 @@ export function SubjectDirectoryScreen({
       mainClassName="subject-directory-main"
     >
       <section className="subject-directory-page" aria-label={headerTitle}>
-        <h2 className="sr-only">{headerTitle} por asignatura</h2>
+        <h2 className="sr-only">{initialKind ? `${headerTitle} por materia` : headerTitle}</h2>
 
         <label className="subject-directory-search">
           <MagnifyingGlass aria-hidden="true" size={19} />
           <input
-            aria-label={initialKind ? kindSearchLabels[initialKind] : "Buscar asignatura"}
+            aria-label={initialKind ? kindSearchLabels[initialKind] : "Buscar materia"}
             autoComplete="off"
-            placeholder={initialKind ? kindSearchLabels[initialKind] : "Buscar asignatura"}
+            placeholder={initialKind ? kindSearchLabels[initialKind] : "Buscar materia"}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -199,13 +199,13 @@ export function SubjectDirectoryScreen({
               {available
                 ? showingResourceResults
                   ? "No encontramos recursos"
-                  : "No encontramos asignaturas"
-                : "Las asignaturas no están disponibles"}
+                  : "No encontramos materias"
+                : "Las materias no están disponibles"}
             </h3>
             <p>
               {available
                 ? showingResourceResults
-                  ? "Prueba con otro título, tema o asignatura."
+                  ? "Prueba con otro título, tema o materia."
                   : initialKind
                     ? `No hay ${headerTitle.toLocaleLowerCase("es")} en esta selección.`
                   : "Prueba con otra búsqueda."

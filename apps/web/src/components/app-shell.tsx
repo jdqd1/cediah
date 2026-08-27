@@ -58,7 +58,7 @@ type NavItem = {
 
 const mainNavigation: NavItem[] = [
   { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
-  { key: "subjects", label: "Asignaturas", href: "/asignaturas", icon: GraduationCap },
+  { key: "subjects", label: "Materias", href: "/asignaturas", icon: GraduationCap },
 ];
 
 const studyNavigation: NavItem[] = [

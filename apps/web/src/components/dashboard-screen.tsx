@@ -162,7 +162,7 @@ export function DashboardScreen({
             <div className="section-heading-row">
               <h2 id="materials-title">Material de estudio</h2>
               <Link href="/asignaturas">
-                Explorar asignaturas <ArrowRight size={17} />
+                Explorar materias <ArrowRight size={17} />
               </Link>
             </div>
             <div className="study-material-grid">
@@ -194,29 +194,31 @@ export function DashboardScreen({
               Ver todo <ArrowRight size={17} />
             </Link>
           </div>
-          {highlighted.length > 0 ? (
-            <ol className="most-viewed-list">
-              {highlighted.map((item, index) => (
-                <li key={item.id}>
-                  <span className="most-viewed-rank">{index + 1}</span>
-                  <Link href={contentHref(item)} className="most-viewed-link">
-                    <span className="most-viewed-image">
-                      <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
-                    </span>
-                    <span className="most-viewed-copy">
-                      <strong>{item.title}</strong>
-                      <small>{item.topic}</small>
-                      <small>{kindLabels[item.kind]} · {formatDuration(item)}</small>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="dynamic-aside-empty">
-              La selección destacada se llenará desde el panel editorial.
-            </p>
-          )}
+          <div className="dashboard-featured-content">
+            {highlighted.length > 0 ? (
+              <ol className="most-viewed-list">
+                {highlighted.map((item, index) => (
+                  <li key={item.id}>
+                    <span className="most-viewed-rank">{index + 1}</span>
+                    <Link href={contentHref(item)} className="most-viewed-link">
+                      <span className="most-viewed-image">
+                        <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
+                      </span>
+                      <span className="most-viewed-copy">
+                        <strong>{item.title}</strong>
+                        <small>{item.topic}</small>
+                        <small>{kindLabels[item.kind]} · {formatDuration(item)}</small>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="dynamic-aside-empty">
+                La selección destacada se llenará desde el panel editorial.
+              </p>
+            )}
+          </div>
         </aside>
       </div>
 

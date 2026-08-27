@@ -29,7 +29,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
 
   return (
     <main className="content-unavailable-page">
-      <h1>No pudimos cargar esta asignatura.</h1>
+      <h1>No pudimos cargar esta materia.</h1>
       <p>Intenta actualizar la página en unos minutos.</p>
     </main>
   );

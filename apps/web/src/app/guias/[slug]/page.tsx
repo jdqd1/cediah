@@ -43,7 +43,6 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
         : `/guias${guideParams.size > 0 ? `?${guideParams.toString()}` : ""}`;
     return (
       <ContentDetailScreen
-        contextLabel={subject?.name}
         guideMode={guideMode}
         item={result.item}
         isAdministrator={isAdministrator}

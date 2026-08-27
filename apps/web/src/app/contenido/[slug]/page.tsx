@@ -48,7 +48,7 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
       ? `Volver a ${topic}`
       : subject
         ? `Volver a ${subject.name}`
-        : "Volver a asignaturas";
+        : "Volver a materias";
     const linkedGuideResult = result.item.kind === "video"
       ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 1 })
       : null;
@@ -58,7 +58,6 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
 
     return (
       <ContentDetailScreen
-        contextLabel={subject?.name}
         item={result.item}
         isAdministrator={isAdministrator}
         linkedGuide={linkedGuide}

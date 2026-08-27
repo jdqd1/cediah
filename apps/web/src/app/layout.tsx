@@ -5,7 +5,7 @@ import "./koraz-theme.css";
 export const metadata: Metadata = {
   title: "Koraz | Aprende, explora y crece",
   description:
-    "Plataforma educativa para aprender con videos, guías y recursos organizados por asignatura.",
+    "Plataforma educativa para aprender con videos, guías y recursos organizados por materia.",
   icons: {
     icon: "/brand/koraz-mark.png",
     apple: "/brand/koraz-mark.png",

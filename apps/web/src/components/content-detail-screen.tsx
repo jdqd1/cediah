@@ -39,11 +39,10 @@ import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { contentKindLabel } from "@/lib/content-navigation";
 import { AppShell } from "./app-shell";
-import { IconBackLink, NavigationTrail } from "./compact-navigation";
+import { IconBackLink } from "./compact-navigation";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 export function ContentDetailScreen({
-  contextLabel,
   guideMode = false,
   item,
   isAdministrator = false,
@@ -51,7 +50,6 @@ export function ContentDetailScreen({
   returnHref,
   returnLabel,
 }: {
-  contextLabel?: string;
   guideMode?: boolean;
   item: ContentItem;
   isAdministrator?: boolean;
@@ -67,8 +65,7 @@ export function ContentDetailScreen({
       ? "/guias"
       : "/asignaturas";
   const backHref = returnHref ?? defaultBackHref;
-  const backLabel = returnLabel ?? (isGuideView ? "Volver a guías" : "Volver a asignaturas");
-  const navigationSegments = [contextLabel ?? sectionLabel, item.topic, item.slug];
+  const backLabel = returnLabel ?? (isGuideView ? "Volver a guías" : "Volver a materias");
   return (
     <AppShell
       activeKey={isGuideView ? "guides" : item.kind === "topic" ? "subjects" : item.kind}
@@ -78,17 +75,12 @@ export function ContentDetailScreen({
     >
       <article className="published-content">
         <header className={`published-content-header${isGuideView ? " published-rich-guide-header" : ""}`}>
-          {isGuideView ? (
-            <div className="published-content-context">
-              <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
-              <NavigationTrail segments={navigationSegments} />
-            </div>
-          ) : (
-            <nav className="published-content-flow-navigation" aria-label={backLabel}>
-              <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
-              <NavigationTrail segments={navigationSegments} />
-            </nav>
-          )}
+          <nav
+            aria-label={backLabel}
+            className={isGuideView ? "published-content-context" : "published-content-flow-navigation"}
+          >
+            <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
+          </nav>
           <div className="published-guide-title-row">
             <h2>{item.title}</h2>
           </div>

@@ -14,7 +14,7 @@ import { type MouseEvent, useMemo, useState } from "react";
 import { publishedContentHref } from "@/lib/content-navigation";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
-import { IconBackLink, NavigationTrail } from "./compact-navigation";
+import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
 
 type GuideItem = ContentItem & { kind: "guide" };
@@ -100,7 +100,7 @@ export function GuideDashboardScreen({
     })).filter((subject) => subject.count > 0);
     const unassignedCount = guides.filter((guide) => guide.subjectIds.length === 0).length;
     if (unassignedCount > 0) {
-      assigned.push({ count: unassignedCount, id: UNASSIGNED, name: "Sin asignatura", slug: UNASSIGNED });
+      assigned.push({ count: unassignedCount, id: UNASSIGNED, name: "Sin materia", slug: UNASSIGNED });
     }
     return assigned;
   }, [guides, subjects]);
@@ -175,11 +175,8 @@ export function GuideDashboardScreen({
             <nav className="compact-navigation-row" aria-label="Navegación de guías">
               <IconBackLink
                 href={selectedTopic ? queryHref(pathname, selectedSlug) : "/guias"}
-                label={selectedTopic ? "Volver a los temas" : "Volver a todas las asignaturas"}
+                label={selectedTopic ? "Volver a los temas" : "Volver a todas las materias"}
                 onClick={(event) => navigate(event, selectedTopic ? selectedSlug : "")}
-              />
-              <NavigationTrail
-                segments={["guias", selectedSubject?.slug ?? UNASSIGNED, ...(selectedTopic ? [selectedTopic] : [])]}
               />
             </nav>
           </header>
@@ -205,7 +202,7 @@ export function GuideDashboardScreen({
         </div>
 
         {!hasSelection && !hasGlobalQuery && buckets.length > 0 && (
-          <nav className="guide-subject-browser" aria-label="Guías por asignatura">
+          <nav className="guide-subject-browser" aria-label="Guías por materia">
             <ul>
               {buckets.map((bucket) => {
                 const href = queryHref(pathname, bucket.slug);

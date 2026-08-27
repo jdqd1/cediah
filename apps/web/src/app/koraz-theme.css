@@ -575,8 +575,20 @@ textarea:focus-visible {
 }
 
 .sidebar-nav {
+  align-content: safe center;
   gap: 0.45rem;
   padding: 0.8rem 0.7rem 1rem;
+}
+
+.app-sidebar .sidebar-link,
+.app-sidebar .sidebar-group-link {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.app-sidebar .sidebar-link-label {
+  flex: 1 1 auto;
+  text-align: left;
 }
 
 .sidebar-link,
@@ -795,6 +807,7 @@ textarea:focus-visible {
 .dashboard-video-card {
   border-radius: 18px;
   padding: 0.48rem;
+  box-shadow: none;
 }
 
 .dashboard-video-card:hover,
@@ -802,6 +815,10 @@ textarea:focus-visible {
 .subject-resource-card:hover {
   border-color: #a5b4fc;
   box-shadow: var(--koraz-shadow-md);
+}
+
+.dashboard-video-card:hover {
+  box-shadow: none;
 }
 
 .dashboard-video-media {
@@ -869,12 +886,35 @@ textarea:focus-visible {
 }
 
 .dashboard-most-viewed {
-  margin-top: 1.45rem;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 1.5rem 0 2.2rem;
+  box-shadow: none;
+}
+
+.dashboard-featured-content {
+  margin-top: 1.15rem;
   border: 1px solid var(--koraz-line);
   border-radius: 20px;
   background: #ffffff;
   padding: 1.25rem;
   box-shadow: var(--koraz-shadow-sm);
+}
+
+.dashboard-featured-content .most-viewed-list {
+  margin-top: 0;
+}
+
+.dashboard-featured-content .dynamic-aside-empty {
+  margin: 0;
+  border-top: 0;
+  padding: 1.2rem 0;
+}
+
+.dashboard-section > .dynamic-empty-state {
+  margin-top: 1.15rem;
 }
 
 .most-viewed-rank {
@@ -1156,6 +1196,15 @@ textarea:focus-visible {
 
 .app-main .subject-destination-quiz {
   border-left-color: var(--koraz-green);
+}
+
+.app-main .subject-destination-meta svg {
+  color: var(--koraz-ink);
+}
+
+.published-content-header .published-guide-title-row h2,
+.video-linked-guide-heading h3 {
+  color: var(--koraz-ink);
 }
 
 a.icon-back-link,
@@ -2118,7 +2167,11 @@ a.icon-back-link:hover,
   }
 
   .dashboard-most-viewed {
-    margin-top: 1rem;
+    margin-top: 0;
+    padding: 1rem 0;
+  }
+
+  .dashboard-featured-content {
     padding: 1rem;
   }
 
