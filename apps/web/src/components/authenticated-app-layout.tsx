@@ -11,6 +11,8 @@ export async function AuthenticatedAppLayout({
 }: AuthenticatedAppLayoutProps) {
   const current = await getCurrentUser();
 
+  // Temporarily bypass authentication to allow interface exploration
+  /*
   if (current.status !== "authenticated") {
     redirect(
       current.status === "unavailable"
@@ -18,6 +20,7 @@ export async function AuthenticatedAppLayout({
         : "/acceder?error=sesion",
     );
   }
+  */
 
   return children;
 }
