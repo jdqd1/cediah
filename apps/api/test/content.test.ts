@@ -26,7 +26,7 @@ import type { ApiEnvironment } from "../src/config.js";
 import {
   isContentReadyForTransition,
   isContentTransitionAllowed,
-} from "../src/providers/supabase-content.js";
+} from "../src/providers/postgres-content.js";
 
 const contentId = "7a8a6513-9384-4b5d-a825-439f42355714";
 const subjectId = "19d4f11b-9ff1-45c2-b2b5-50686038fe42";
@@ -183,7 +183,8 @@ function identityProvider(): IdentityProvider {
   ]);
 
   return {
-    getUser: async (token) => byToken.get(token) ?? null,
+    getUser: async (request) =>
+      byToken.get(request.authorization?.replace(/^Bearer\s+/, "") ?? "") ?? null,
     revokeSessions: async () => undefined,
   };
 }

@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   let isAdministrator = false;
   let canManageContent = false;
   if (current.status === "authenticated") {
-    const admin = await getAdminRoleUser(current.accessToken, current.user.email);
+    const admin = await getAdminRoleUser(current.user.email);
     if (admin.status === "ready") {
       isAdministrator = admin.user.roles.includes("administrator");
       canManageContent = admin.user.roles.some(

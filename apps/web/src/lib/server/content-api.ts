@@ -13,10 +13,11 @@ import {
   type ContentWorkspaceResponse,
 } from "@cediah/contracts";
 import { getServerEnvironment } from "./env";
+import { getApiRequestCookie } from "./api-session";
 
 type ContentApiRequest = {
-  accessToken?: string;
   body?: unknown;
+  cookie?: string;
   method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
 };
@@ -73,7 +74,7 @@ export async function requestContentApi(
   try {
     const environment = getServerEnvironment();
     const headers = new Headers({ Accept: "application/json" });
-    if (input.accessToken) headers.set("Authorization", "Bearer " + input.accessToken);
+    if (input.cookie) headers.set("Cookie", input.cookie);
     if (input.body !== undefined) headers.set("Content-Type", "application/json");
 
     const response = await fetch(new URL(input.path, environment.API_BASE_URL), {
@@ -149,11 +150,11 @@ export async function getPublishedContentItem(
     : { status: "unavailable" };
 }
 
-export async function getContentWorkspace(
-  accessToken: string,
-): Promise<ContentWorkspaceResult> {
+export async function getContentWorkspace(): Promise<ContentWorkspaceResult> {
+  const session = await getApiRequestCookie();
+  if (session.status === "anonymous") return { status: "forbidden" };
   const response = await requestContentApi({
-    accessToken,
+    cookie: session.cookie,
     method: "GET",
     path: "/v1/editor/content",
   });

@@ -1,3 +1,9 @@
+databases:
+  # Free is suitable for the current test environment. Select a durable plan
+  # before using this database for production data.
+  - name: cediah-postgres
+    plan: free
+
 services:
   - type: web
     name: cediah-api
@@ -14,22 +20,36 @@ services:
         value: 0.0.0.0
       - key: WEB_ORIGINS
         value: https://koraz-app.vercel.app,https://cediah.vercel.app
-      - key: SUPABASE_URL
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cediah-postgres
+          property: connectionString
+      - key: DATABASE_MIGRATIONS_ENABLED
+        value: "true"
+      - key: BETTER_AUTH_URL
+        value: https://koraz-app.vercel.app
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: AUTH_REQUIRE_EMAIL_VERIFICATION
+        value: "false"
+      # Use server-side S3 access keys from Supabase Storage. These keys must
+      # never be exposed through NEXT_PUBLIC_* variables.
+      - key: STORAGE_S3_ENDPOINT
         sync: false
-      - key: SUPABASE_SECRET_KEY
+      - key: STORAGE_S3_REGION
         sync: false
-      - key: SUPABASE_STORAGE_BUCKET
+      - key: STORAGE_S3_ACCESS_KEY_ID
+        sync: false
+      - key: STORAGE_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: STORAGE_S3_FORCE_PATH_STYLE
+        value: "true"
+      - key: VIDEO_STORAGE_BUCKET
         value: video-test
-      - key: CLOUDFLARE_STREAM_ACCOUNT_ID
-        sync: false
-      - key: CLOUDFLARE_STREAM_API_TOKEN
-        sync: false
-      - key: CLOUDFLARE_STREAM_CUSTOMER_CODE
-        sync: false
       - key: VIDEO_TEST_UPLOAD_ENABLED
         value: "true"
       - key: VIDEO_TEST_PROVIDER
-        value: supabase
+        value: s3
       - key: VIDEO_TEST_UPLOADER_IDS
         sync: false
       - key: VIDEO_TEST_MAX_DURATION_SECONDS

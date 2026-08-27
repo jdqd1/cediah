@@ -1,71 +1,153 @@
-# Arquitectura de la Fase 0
+# Arquitectura portable de CEDIAH
 
 ## Objetivo
 
-Evitar acoplar el dominio de CEDIAH a Vercel, Render, Supabase o un proveedor de pagos. La aplicacion consume contratos propios y cada proveedor se integra mediante adaptadores.
+Mantener el dominio de CEDIAH independiente del hosting. La web, la API, la identidad, la persistencia y el almacenamiento se comunican mediante límites propios para que cambiar Vercel, Render, PostgreSQL administrado o el proveedor de objetos no obligue a reescribir el producto.
 
-## Distribucion inicial
+El desacoplamiento ya está aplicado en identidad y datos. Supabase solo permanece detrás del adaptador S3 del flujo privado de videos.
 
-```text
+## Distribución
+
+~~~text
 Navegador
    |
+   | HTTPS + cookies de sesión
    v
-Next.js / Vercel  ----->  Fastify / Render  ----->  Postgres / Supabase
-   |                              |                         |
-   +-- proxy de salud             +-- reglas de dominio     +-- RLS y migraciones
-```
+Next.js
+   |
+   | BFF/proxy: Cookie + contratos HTTP
+   v
+Fastify
+   |             |                 |
+   |             |                 +--> SMTP / Turnstile opcionales
+   |             |
+   |             +--> adaptador S3 --> Supabase Storage (solo videos)
+   |
+   +--> Kysely --> PostgreSQL
+         |
+         +--> Better Auth
+         +--> dominio académico y editorial
+~~~
 
-## Limites
+## Responsabilidades
 
-- La web nunca recibe secretos de servidor ni claves `service_role`.
-- La API es stateless y se configura mediante variables de entorno.
-- Los contratos de identidad, almacenamiento, video, correo y pagos viven en `packages/contracts`.
-- Las migraciones usan SQL compatible con Postgres y se versionan en `supabase/migrations`.
-- Los archivos de usuario no se guardaran en el filesystem efimero de Render.
+### Web
 
-## Fundacion de datos
+apps/web contiene la interfaz Next.js. El navegador habla con rutas del mismo origen para autenticación y la web reenvía las cookies a Fastify cuando renderiza recursos protegidos. La web puede ocultar superficies sin sesión como ayuda de experiencia, pero no es un límite de autorización.
 
-La primera migracion de Supabase crea perfiles minimos, roles gestionados por servidor, cursos, modulos, lecciones, recursos, inscripciones, progreso y auditoria. No incorpora contenido academico, estudiantes ni archivos reales.
+La web no recibe DATABASE_URL, BETTER_AUTH_SECRET, credenciales SMTP ni credenciales S3. NEXT_PUBLIC_VIDEO_STORAGE_ORIGIN solo amplía la política CSP para el origen de carga y reproducción; no concede acceso por sí mismo.
 
-Todas las tablas de `public` tienen RLS activado y no conceden privilegios a `anon` ni `authenticated`. La API sera el unico limite inicial de autorizacion; una pantalla no accedera a una tabla directamente hasta que su migracion incorpore grants minimos, politicas RLS y pruebas de acceso positivo y negativo.
+### API
 
-## Recorrido academico inicial
+apps/api es el límite de confianza:
 
-La primera lectura academica se expone como `GET /v1/learning/dashboard` y solo devuelve cursos cuya matricula esta activa y dentro de su ventana de acceso. `PATCH /v1/learning/lessons/{lessonId}/progress` valida la identidad, comprueba la matricula del mismo usuario antes de persistir el progreso y responde como recurso inexistente cuando la leccion no le corresponde. La web solo reenvia el bearer token desde su componente de servidor; no recibe la clave secreta ni consulta tablas. Las superficies publicas de contenido y el espacio editorial se incorporan en la migracion y el corte descritos a continuacion.
+- valida la sesión de Better Auth;
+- consulta roles desde PostgreSQL;
+- aplica propiedad y capacidades editoriales;
+- valida los contratos Zod;
+- ejecuta las reglas de workflow;
+- registra mutaciones relevantes en audit_log;
+- emite URLs firmadas para videos privados;
+- nunca confía en roles o identificadores enviados por el navegador.
+
+La API es stateless fuera de PostgreSQL y de los servicios configurados. Puede ejecutarse como proceso Node.js o en un contenedor.
+
+### Contratos
+
+packages/contracts contiene formas de entrada, respuesta e interfaces de proveedores. Ningún contrato de dominio expone un cliente Supabase, una service-role key ni tipos de Auth específicos de un proveedor.
+
+### PostgreSQL
+
+PostgreSQL almacena identidad y dominio:
+
+- auth_users, auth_sessions, auth_accounts, auth_verifications y auth_rate_limits para Better Auth;
+- profiles y user_roles;
+- cursos, módulos, lecciones, recursos, inscripciones y progreso;
+- catálogo editorial, assets como metadatos, asignaturas y auditoría.
+
+Los adaptadores de apps/api/src/providers realizan las consultas mediante Kysely. La API es el único camino de acceso previsto para la aplicación; el navegador no tiene credenciales de base de datos.
+
+## Migraciones
+
+La fuente activa está en database/migrations:
+
+| Archivo | Responsabilidad |
+| --- | --- |
+| 0001_auth.sql | Tablas, índices y triggers de Better Auth |
+| 0002_platform.sql | Perfiles, roles, cursos, inscripciones, progreso y auditoría |
+| 0003_content.sql | Catálogo editorial, workflow y metadatos de assets |
+| 0004_subjects.sql | Asignaturas y relación con contenido |
+
+Al arrancar, la API toma un advisory lock, crea public.cediah_schema_migrations, compara checksums y ejecuta en transacción cada archivo pendiente. Un checksum diferente para una migración aplicada detiene el arranque. Esta política evita cambios silenciosos de esquema durante un despliegue concurrente.
+
+Los archivos de supabase/migrations pertenecen a la implementación anterior. No deben aplicarse en instalaciones nuevas ni mezclarse con database/migrations.
 
 ## Identidad y sesión
 
-La web crea la sesión de Supabase Auth con la clave publicable y la conserva en cookies SSR. El proxy refresca claims verificados con `getClaims`; el servidor reenvía el access token a `GET /v1/auth/me` y Fastify lo valida de nuevo mediante `auth.getUser` con una clave secreta que solo existe en Render. Ninguna decisión de autorización usa `user_metadata`, una sesión sin token validado no habilita el panel y la web no consulta tablas directamente.
+Better Auth se ejecuta dentro de Fastify y persiste todo en PostgreSQL. Next.js expone un proxy de mismo origen bajo /api/auth para que el navegador reciba cookies HTTP-only sin conocer la ubicación interna de la API.
 
-El registro, confirmación por callback, recuperación y actualización de contraseña requieren que Supabase tenga autorizadas las URL exactas de redirección del ambiente, SMTP y Turnstile configurados antes de probar con usuarios reales. El proxy cubre todas las páginas —incluidas solicitudes RSC y prefetch— y cada árbol de rutas de la aplicación vuelve a exigir una identidad validada desde un layout de servidor. Solo `/`, `/acceder`, `/recuperar-acceso` y el callback de Auth son públicos.
+Características actuales:
 
-Las migraciones iniciales son `20260801172906_initial_platform_foundation.sql` y `20260801173029_add_platform_foreign_key_indexes.sql`. Sus indices cubren todas las claves foraneas y los asesores de Supabase no reportan defectos de seguridad ni claves foraneas sin indice.
+- correo y contraseña con mínimo de 12 caracteres;
+- cookies HTTP-only, SameSite=Lax y Secure en producción;
+- rate limiting persistido en la base de datos;
+- revocación de sesiones al restablecer la contraseña;
+- verificación de correo configurable;
+- SMTP y Cloudflare Turnstile opcionales;
+- identidad revalidada por Fastify en toda operación protegida.
+
+BETTER_AUTH_URL debe ser el origen canónico visible de la web, no la URL interna de PostgreSQL ni una antigua URL de Supabase. WEB_ORIGINS contiene una lista exacta de orígenes autorizados.
+
+Las contraseñas y sesiones anteriores de Supabase Auth no forman parte de esta arquitectura. Las cuentas deben recrearse mediante Better Auth; la recuperación de contraseña solo está disponible para cuentas que ya existen en el nuevo esquema.
+
+## Autorización
+
+La creación de una cuenta genera su perfil y el rol student mediante un trigger de PostgreSQL. Los roles adicionales son administrados por un administrator a través de la API:
+
+- community_contributor y presenter crean y editan contenido permitido;
+- academic_editor revisa y aprueba;
+- coordination y administrator publican y archivan;
+- solo administrator administra roles;
+- un trigger impide eliminar al último administrador.
+
+El workflow editorial es draft -> in_review -> changes_requested o approved -> published -> archived. Las transiciones, propiedad y versión optimista se validan en la API y las acciones se auditan.
+
+Las rutas de lectura académica también validan que cursos, lecciones, inscripciones y progreso pertenezcan al usuario autenticado. Una ausencia de autorización se responde sin revelar recursos ajenos.
+
+## Almacenamiento de videos
+
+El único uso actual de Supabase es su endpoint S3 compatible para el bucket privado de videos. La implementación depende de las operaciones estándar PutObject, GetObject, HeadObject y DeleteObject, no del SDK de Supabase.
+
+El flujo es:
+
+1. Una cuenta autorizada solicita una carga de prueba.
+2. La API crea un UUID y una URL firmada PUT bajo test-videos/{userId}/{videoId}.
+3. El navegador carga directamente al bucket.
+4. La API confirma existencia, tamaño y MIME mediante HEAD.
+5. Para reproducir, la API emite una URL GET de duración limitada y ligada al propietario.
+
+Cambiar Supabase Storage por otro servicio compatible con S3 debería requerir únicamente endpoint, región, bucket y credenciales. Un proveedor sin compatibilidad S3 requerirá un nuevo adaptador que implemente el mismo contrato de video.
+
+Este flujo es deliberadamente independiente del catálogo académico. Los uploads dinámicos de assets editoriales no-video están deshabilitados hasta que exista una estrategia de almacenamiento portable y verificada. Los metadatos históricos de content_assets pueden permanecer en PostgreSQL, pero no se emiten nuevas cargas desde el estudio editorial.
 
 ## Ambientes
 
-| Ambiente | Web | API | Datos | Uso |
+| Ambiente | Web | API | PostgreSQL | Videos |
 | --- | --- | --- | --- | --- |
-| Local | localhost:3000 | localhost:4000 | Supabase local o proyecto de desarrollo | Desarrollo |
-| Preview | Vercel Preview | Render de prueba | Proyecto Supabase de pruebas | QA por cambio |
-| Produccion | Vercel | Render | Proyecto Supabase de produccion | Piloto aprobado |
+| Local | localhost:3000 | localhost:4000 | Base local o administrada de desarrollo | Desactivados por defecto |
+| Preview | Preview aislado | API de prueba | Base de prueba | Bucket de prueba separado |
+| Producción | Dominio canónico | API productiva | Base productiva con backups | Bucket privado productivo |
 
-Los ambientes no comparten bases de datos, buckets ni secretos.
+Los ambientes no deben compartir DATABASE_URL, BETTER_AUTH_SECRET, credenciales SMTP, cuentas S3 ni buckets. La verificación de correo puede permanecer desactivada solo durante pruebas controladas.
 
-## Contenido editorial dinámico
+## Portabilidad lograda
 
-La migración `20260810211907_add_dynamic_content_studio.sql` incorpora `content_items`, `content_assets`, el rol `community_contributor` y un bucket privado `content-assets`. Guías, videos, cuestionarios, flashcards y temas comparten metadatos publicables, mientras su contenido específico permanece tipado y validado por los contratos Zod de la plataforma.
+Para mover la API o la web a otro hosting no se necesita modificar el dominio. Se trasladan el proceso Node.js, las variables y la conectividad. Para mover los datos se usa pg_dump/pg_restore y después se valida la tabla de migraciones. Para mover videos se copian objetos conservando sus claves o se introduce un adaptador equivalente.
 
-Fastify sigue siendo el único límite de autorización. La web obtiene la sesión SSR y la reenvía mediante rutas BFF; el navegador nunca recibe `SUPABASE_SECRET_KEY` ni escribe directamente en Postgres. La matriz de capacidades es:
+Quedan tres dependencias operativas, no estructurales:
 
-- `community_contributor` y `presenter`: crean, editan y adjuntan archivos a contenido propio; pueden enviarlo a revisión.
-- `academic_editor`: edita cualquier contenido, solicita cambios y aprueba.
-- `coordination` y `administrator`: además pueden publicar y archivar.
-- `student`, `finance_readonly` y cuentas anónimas: no acceden al espacio editorial.
+- un servicio PostgreSQL;
+- un mecanismo de correo si se activa verificación o recuperación;
+- un servicio de objetos S3 compatible para videos.
 
-El workflow permitido es `draft -> in_review -> changes_requested|approved -> published -> archived`. Toda mutación vuelve a consultar `user_roles`, aplica control de propiedad, usa versión optimista y registra una entrada en `audit_log`.
-
-Los videos y PDF se cargan directamente al bucket privado con una URL firmada reservada por la API. El endpoint de finalización verifica propietario, permiso, existencia, tamaño y MIME reales antes de marcar el asset como listo. Las lecturas públicas solo devuelven elementos con estado `published` y emiten URLs de descarga temporales.
-
-Las rutas autenticadas `/dashboard`, `/guias`, `/biblioteca` y `/biblioteca/[slug]` consumen el catálogo real. El área autorizada `/panel/contenido` ofrece bandeja, filtros, formularios por tipo, carga con progreso y controles de workflow según las capacidades del usuario.
-
-La administración de roles está separada del estudio editorial. `/panel/administracion/roles` sólo se renderiza para una identidad validada cuyo `user_roles` incluye `administrator`; permite consultar cuentas por correo y asignar o revocar un único rol por operación. La cuenta debe existir en Supabase Auth. La primera cuenta se bootstrappea una vez mediante el SQL Editor; después todas las mutaciones pasan por Fastify, se auditan y mantienen al menos un administrador.
+Supabase ya no participa en registro, login, sesiones, roles, base de datos académica, auditoría ni contenido.

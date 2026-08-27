@@ -4,12 +4,15 @@ import {
   type StudentLearningDashboardResponse,
 } from "@cediah/contracts";
 import { getServerEnvironment } from "./env";
+import { getApiRequestCookie } from "./api-session";
 
 export type LearningDashboardResult =
   | { dashboard: StudentLearningDashboardResponse; status: "ready" }
   | { status: "unavailable" };
 
-export async function getLearningDashboard(accessToken: string): Promise<LearningDashboardResult> {
+export async function getLearningDashboard(): Promise<LearningDashboardResult> {
+  const session = await getApiRequestCookie();
+  if (session.status === "anonymous") return { status: "unavailable" };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 2_500);
 
@@ -19,7 +22,7 @@ export async function getLearningDashboard(accessToken: string): Promise<Learnin
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Cookie: session.cookie,
       },
       signal: controller.signal,
     });

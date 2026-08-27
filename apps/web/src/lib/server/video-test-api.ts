@@ -2,8 +2,8 @@ import "server-only";
 import { getServerEnvironment } from "./env";
 
 type VideoTestApiRequest = {
-  accessToken: string;
   body?: unknown;
+  cookie: string;
   method: "GET" | "POST";
   path: string;
 };
@@ -37,7 +37,7 @@ export async function requestVideoTestApi(
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        Authorization: "Bearer " + input.accessToken,
+        Cookie: input.cookie,
         ...(input.body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       method: input.method,

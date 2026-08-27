@@ -1,124 +1,91 @@
-# CEDIAH - Plataforma educativa de anatomia
+# CEDIAH - Plataforma educativa de anatomía
 
-Base tecnica de la plataforma semivirtual de CEDIAH. La Fase 0 separa la web, la API y los proveedores externos para poder comenzar con Vercel, Render y Supabase y migrar mas adelante sin reescribir el producto.
+CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fastify y una base de datos PostgreSQL. La aplicación ya no usa Supabase para identidad ni para datos del dominio: la única integración restante es Supabase Storage mediante su interfaz compatible con S3, y está aislada al flujo privado de videos de prueba.
+
+## Arquitectura actual
+
+- apps/web: Next.js y TypeScript. Mantiene la sesión en cookies y reenvía las operaciones de autenticación a la API.
+- apps/api: Fastify, Better Auth, Kysely y PostgreSQL. Es el límite de autenticación, autorización y reglas de negocio.
+- packages/contracts: esquemas Zod y contratos independientes del proveedor.
+- database/migrations: migraciones SQL versionadas y portátiles.
+- docs: arquitectura, seguridad y procedimientos de migración.
+- supabase: material legado de la implementación anterior. No es la fuente de migraciones activa.
+
+La frontera restante con Supabase es deliberadamente pequeña:
+
+~~~text
+Navegador -> Next.js -> Fastify -> PostgreSQL
+                          |
+                          +-> S3 compatible -> Supabase Storage (solo videos)
+~~~
 
 ## Requisitos
 
-- Node.js 24 o superior.
+- Node.js 24.
 - pnpm 11.9.0.
-- Docker, solo para verificar la imagen de la API.
-- Supabase CLI, solo cuando se trabaje con una instancia local o remota.
+- PostgreSQL accesible desde la API.
+- Un bucket privado compatible con S3 únicamente si se habilita la prueba de videos.
+- Docker es opcional para comprobar la imagen de la API.
 
 ## Inicio local
 
-1. Copia `.env.example` a `.env.local` solo si necesitas cambiar los valores locales. No uses secretos reales en archivos versionados.
-2. Ejecuta `pnpm install`.
-3. Ejecuta `pnpm dev`.
-4. Abre `http://localhost:3000`. La API queda en `http://localhost:4000/health`.
+1. Crea una base de datos PostgreSQL vacía para desarrollo.
+2. Usa .env.example como guía y carga las variables de la API en el entorno del proceso. Para la web local puedes colocar sus variables en apps/web/.env.local.
+3. Sustituye DATABASE_URL y genera un BETTER_AUTH_SECRET de al menos 32 caracteres. Por ejemplo: openssl rand -base64 32.
+4. Ejecuta pnpm install.
+5. Ejecuta pnpm dev.
+6. Abre http://localhost:3000. La API responde en http://localhost:4000/health.
 
-También se pueden iniciar por separado con `pnpm dev:web` y `pnpm dev:api`.
+También se pueden iniciar por separado con pnpm dev:web y pnpm dev:api.
 
-## Comprobaciones
+Al arrancar, la API aplica por defecto las migraciones de database/migrations. Cada archivo se ejecuta una sola vez y su checksum queda registrado en public.cediah_schema_migrations. Una migración ya aplicada no debe modificarse; cualquier cambio posterior requiere un archivo nuevo. DATABASE_MIGRATIONS_ENABLED=false desactiva esta ejecución automática y DATABASE_MIGRATIONS_PATH permite indicar otra ubicación.
 
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm audit --audit-level high`
-- `pnpm build`
+## Variables esenciales
 
-## Estructura
+En la API:
 
-- `apps/web`: Next.js y TypeScript, preparado para Vercel.
-- `apps/api`: Fastify y TypeScript, preparado para Render mediante Docker.
-- `packages/contracts`: esquemas y contratos independientes de proveedor.
-- `docs`: arquitectura, decisiones, seguridad y migracion.
-- `supabase`: configuracion y migraciones versionadas cuando se inicialice el CLI.
+~~~dotenv
+DATABASE_URL=postgresql://cediah:replace_me@127.0.0.1:5432/cediah
+DATABASE_MIGRATIONS_ENABLED=true
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=replace_with_at_least_32_random_characters
+AUTH_REQUIRE_EMAIL_VERIFICATION=false
+WEB_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+~~~
 
-## Seguridad
+En la web:
 
-El archivo local `Cediah web.txt` esta ignorado por Git, pero eso no reemplaza la rotacion de las credenciales que contiene. No debe eliminarse hasta confirmar la rotacion y MFA. Consulta `docs/security.md`.
+~~~dotenv
+API_BASE_URL=http://127.0.0.1:4000
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+~~~
 
-El nombre oficial confirmado es CEDIAH. La identidad visual y los contenidos actuales siguen siendo provisionales hasta la aprobacion de la coordinacion.
+DATABASE_URL, BETTER_AUTH_SECRET y BETTER_AUTH_URL son secretos o configuración de servidor y deben permanecer en la API. No uses el prefijo NEXT_PUBLIC_ para valores de base de datos, autenticación, SMTP o almacenamiento.
 
-## Despliegue en Vercel
+## Autenticación
 
-El proyecto de Vercel debe usar `apps/web` como Root Directory. El archivo `apps/web/vercel.json`:
+Better Auth administra registro, inicio y cierre de sesión, recuperación de contraseña y sesiones persistidas en PostgreSQL. Las cookies son HTTP-only, SameSite=Lax y Secure en producción. La API valida la sesión en cada operación protegida; la web no consulta PostgreSQL directamente.
 
-- identifica el frontend como Next.js;
-- instala el monorepo desde la raiz con el lockfile congelado;
-- compila primero `@cediah/contracts` y despues `@cediah/web`;
-- deja que Vercel administre la salida nativa `.next`.
+Para pruebas locales puede mantenerse AUTH_REQUIRE_EMAIL_VERIFICATION=false. Para exigir verificación de correo o habilitar recuperación de contraseña, configura SMTP_HOST y SMTP_FROM; SMTP_USER y SMTP_PASSWORD son opcionales pero deben definirse juntos. TURNSTILE_SECRET_KEY en la API y NEXT_PUBLIC_TURNSTILE_SITE_KEY en la web habilitan Cloudflare Turnstile.
 
-En el panel de Vercel selecciona el preset Next.js, configura Root Directory como `apps/web` y no fuerces `public` como Output Directory. La API se despliega por separado en Render.
-
-## Configuración de acceso
-
-La web usa Supabase Auth solo para crear y mantener la sesión. Los datos académicos siguen pasando por la API y no se conceden permisos directos a tablas desde el navegador.
-
-- En Vercel: `API_BASE_URL`, `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` y `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. La cookie de sesión se marca `Secure` automáticamente en producción; `NEXT_PUBLIC_SUPABASE_COOKIE_SECURE=false` se reserva exclusivamente para probar `next start` sobre HTTP local.
-- En Render: la API usa `WEB_ORIGINS=https://koraz-app.vercel.app,https://cediah.vercel.app`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y `SUPABASE_CONTENT_BUCKET=content-assets`; el servicio web usa `NEXT_PUBLIC_SITE_URL=https://koraz-app.vercel.app`. La clave secreta no se copia a Vercel ni se declara con el prefijo `NEXT_PUBLIC_`.
-- En Supabase Auth: define `https://koraz-app.vercel.app` como URL del sitio y autoriza `https://koraz-app.vercel.app/auth/callback`. Conserva temporalmente `https://cediah.vercel.app/auth/callback` para enlaces emitidos antes de la migración, además de `http://localhost:3000/auth/callback` y únicamente los previews necesarios. No uses comodines en producción.
-- Activa confirmación de correo, cambio seguro de contraseña y SMTP propio. Configura una longitud mínima de 12, exige mayúscula, minúscula, número y símbolo y, en planes compatibles, activa la protección de contraseñas filtradas.
-- Activa Cloudflare Turnstile en Supabase Auth con su clave secreta y coloca solo la site key pública en `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. Los formularios de acceso, registro y recuperación enviarán el token a Supabase. Conserva los límites de Auth para inicio/registro y correo; ajústalos con datos reales sin penalizar redes universitarias compartidas.
-- En planes compatibles, aplica sesiones con un máximo de 30 días y 7 días de inactividad. El access token permanece en una hora y la rotación de refresh tokens debe seguir activa con el intervalo de reutilización recomendado de 10 segundos.
-
-`https://koraz-app.vercel.app` es el origen canónico. Vercel redirige permanentemente `https://cediah.vercel.app`, y la configuración de Next.js aplica la misma redirección al dominio legado y a `https://web-cediah.onrender.com`, conservando la ruta y los parámetros de consulta.
-
-Después de configurar los ambientes, prueba registro, confirmación de correo, inicio y cierre de sesión, recuperación de contraseña y revocación de sesiones anteriores. Comprueba también que `/dashboard`, las rutas de estudio y `/panel` redirigen al acceso sin una sesión válida, incluso mediante navegación RSC o prefetch. La API debe validar siempre el bearer token antes de servir datos protegidos.
-
-## Pruebas privadas de video
-
-La ruta `/pruebas/video` está pensada para que una cuenta de prueba autorizada suba un video propio y compruebe carga y reproducción antes de introducir contenido académico real. Está desactivada por defecto y no crea cursos, matrículas ni publicaciones.
-
-Configura únicamente en el servidor de la API:
-
-- `VIDEO_TEST_PROVIDER=supabase` para usar el flujo gratuito de prueba. El valor `cloudflare` queda disponible para una futura cuenta de Stream con plan activo.
-- `SUPABASE_STORAGE_BUCKET=video-test`, un bucket privado creado en Supabase Storage con un límite de 50 MB y los MIME `video/mp4`, `video/quicktime` y `video/webm`.
-- `SUPABASE_URL` y `SUPABASE_SECRET_KEY`; la clave secreta nunca se declara en Vercel ni con el prefijo `NEXT_PUBLIC_`.
-- `VIDEO_TEST_UPLOAD_ENABLED=true`.
-- `VIDEO_TEST_UPLOADER_IDS` con los UUID de Supabase, separados por coma, de las cuentas que podrán realizar la prueba.
-- `VIDEO_TEST_MAX_DURATION_SECONDS` y `VIDEO_TEST_MAX_FILE_BYTES` si se requieren límites menores que los valores de prueba predeterminados (15 minutos y 50 MB).
-- `WEB_ORIGINS` con cada origen exacto que podrá solicitar la prueba, incluido el sitio de Vercel y `localhost` durante la prueba local.
-
-La API emite un enlace firmado de carga, asigna el archivo a la cuenta autorizada y vuelve a emitir una URL firmada de reproducción por 10 minutos. El navegador usa el reproductor nativo HTML5 sobre Supabase Storage; no es el iframe de Cloudflare, pero permite validar el flujo real de archivo privado sin contratar Stream.
-
-Al terminar la validación, elimina manualmente los videos de prueba desde Supabase Storage. No se deben usar grabaciones de clases, datos de pacientes, materiales de terceros ni archivos que puedan confundirse con contenido académico publicado.
-
-## Contenido dinámico y espacio editorial
-
-Después de aplicar las migraciones de Supabase, una cuenta autorizada puede abrir `/panel/contenido` para crear videos, guías, cuestionarios, flashcards y temas. El contenido comienza como borrador, pasa por revisión y solo aparece en `/dashboard`, `/guias` y `/biblioteca` después de que coordinación o un administrador lo publique.
-
-Los roles se asignan en `public.user_roles` desde un proceso administrativo de servidor o el SQL Editor de Supabase. Para autorizar a un miembro de la comunidad, usa UUID reales de `auth.users`:
-
-```sql
-insert into public.user_roles (user_id, role, assigned_by)
-values ('UUID_DEL_COLABORADOR', 'community_contributor', 'UUID_DEL_ADMINISTRADOR')
-on conflict (user_id, role) do nothing;
-```
-
-`community_contributor` y `presenter` administran contenido propio; `academic_editor` revisa y aprueba; `coordination` y `administrator` publican. No concedas `service_role` al navegador ni abras grants directos a `authenticated` para este flujo.
-
-El bucket `content-assets` se crea privado con límites de MIME y tamaño. La API reserva la ruta, entrega una URL firmada y valida el objeto antes de finalizarlo. Configura `SUPABASE_CONTENT_BUCKET=content-assets` solo en Render o en el proceso local de la API.
+Las cuentas de Supabase Auth no se migran automáticamente. En particular, no se copian contraseñas ni sesiones. Para este entorno de pruebas, la opción recomendada es que cada usuario vuelva a registrarse con Better Auth. La recuperación por correo solo funciona después de que la cuenta ya existe en el nuevo sistema y se configura SMTP.
 
 ### Bootstrap del primer administrador
 
-La primera cuenta administradora se crea una sola vez desde el SQL Editor porque todavía no existe una cuenta con permiso para abrir la pantalla de roles:
+Registra primero la cuenta mediante la aplicación. Después ejecuta el siguiente bloque en la base de datos PostgreSQL, cambiando el correo:
 
-1. Crea y confirma la cuenta en Supabase Auth (Authentication > Users).
-2. Sustituye el correo del siguiente bloque y ejecútalo en el proyecto correcto:
-
-```sql
+~~~sql
 do $$
 declare
   admin_id uuid;
 begin
   select id into admin_id
-  from auth.users
+  from public.auth_users
   where lower(email) = lower('admin@universidad.edu')
   limit 1;
 
   if admin_id is null then
-    raise exception 'Primero crea y confirma la cuenta en Supabase Auth';
+    raise exception 'Primero registra la cuenta en CEDIAH';
   end if;
 
   insert into public.user_roles (user_id, role, assigned_by)
@@ -126,9 +93,54 @@ begin
   on conflict (user_id, role) do nothing;
 end;
 $$;
-```
+~~~
 
-3. Inicia sesión con esa cuenta y abre `/panel/administracion/roles` (también aparece en el menú de Gestión de contenido).
-4. Escribe el correo exacto de una cuenta existente, pulsa **Consultar cuenta**, elige **Asignar rol** o **Revocar rol**, selecciona el rol y guarda.
+Después inicia sesión y abre /panel/administracion/roles. La API vuelve a comprobar el rol en cada petición, audita las mutaciones y la base de datos impide eliminar al último administrador.
 
-El rol `administrator` es el máximo y es el único que puede gestionar roles. La API vuelve a comprobarlo en cada petición, registra la acción en `audit_log` y la migración `20260810215000_add_administrator_role_guard.sql` impide eliminar al último administrador. Asignar o revocar un rol no crea ni elimina cuentas; tampoco concede `service_role` al navegador.
+## Videos privados de prueba
+
+El flujo /pruebas/video conserva Supabase exclusivamente como almacenamiento S3 compatible. La API genera URLs firmadas de carga PUT y reproducción; las credenciales S3 nunca llegan al navegador. Para habilitarlo configura solo en la API:
+
+~~~dotenv
+VIDEO_TEST_PROVIDER=s3
+VIDEO_TEST_UPLOAD_ENABLED=true
+VIDEO_TEST_UPLOADER_IDS=UUID_DE_UNA_CUENTA_BETTER_AUTH
+STORAGE_S3_ENDPOINT=https://PROJECT_REF.storage.supabase.co/storage/v1/s3
+STORAGE_S3_REGION=us-east-1
+STORAGE_S3_ACCESS_KEY_ID=replace_me
+STORAGE_S3_SECRET_ACCESS_KEY=replace_me
+STORAGE_S3_FORCE_PATH_STYLE=true
+VIDEO_STORAGE_BUCKET=video-test
+VIDEO_TEST_MAX_DURATION_SECONDS=900
+VIDEO_TEST_MAX_FILE_BYTES=50000000
+~~~
+
+En la web, NEXT_PUBLIC_VIDEO_STORAGE_ORIGIN debe contener solo el origen del endpoint de Storage para que la política CSP permita cargar y reproducir los archivos. El bucket debe ser privado y su CORS debe autorizar los orígenes exactos de la web y los métodos PUT, GET y HEAD necesarios. No uses service-role ni claves de Supabase Auth/Database.
+
+Los archivos se organizan por propietario bajo test-videos/{userId}/{videoId}. La API confirma existencia, MIME y tamaño antes de considerarlos listos. La prueba admite MP4, QuickTime y WebM, y sigue estando desactivada por defecto.
+
+## Contenido editorial
+
+El catálogo, workflow, roles, auditoría, cursos, inscripciones y progreso viven en PostgreSQL. El contenido se crea como borrador, puede pasar por revisión y solo se expone públicamente después de ser publicado.
+
+Los uploads dinámicos de archivos editoriales no-video están deshabilitados temporalmente. Guías basadas en texto, cuestionarios, flashcards, temas y videos referenciados mediante URL externa pueden seguir probándose. El flujo privado /pruebas/video es independiente y no publica contenido académico.
+
+## Comprobaciones
+
+- pnpm lint
+- pnpm typecheck
+- pnpm test
+- pnpm audit --audit-level high
+- pnpm build
+
+## Despliegue
+
+La web y la API pueden desplegarse en proveedores diferentes. En Vercel, apps/web debe ser el Root Directory y API_BASE_URL debe apuntar a la API pública. La API requiere conectividad TLS hacia PostgreSQL, BETTER_AUTH_URL con el origen canónico de la web, WEB_ORIGINS con orígenes exactos y un secreto de autenticación distinto por ambiente.
+
+Los ambientes de desarrollo, preview y producción no deben compartir base de datos, secretos ni buckets. Consulta docs/architecture.md para los límites y docs/migration-runbook.md para mover PostgreSQL o reemplazar el almacenamiento de videos.
+
+## Seguridad
+
+No versiones secretos. El archivo local Cediah web.txt está ignorado por Git, pero eso no reemplaza la rotación de sus credenciales ni MFA. Consulta docs/security.md.
+
+El nombre oficial confirmado es CEDIAH. La identidad visual y el contenido académico siguen sujetos a aprobación de coordinación.

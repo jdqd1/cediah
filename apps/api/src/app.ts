@@ -1,6 +1,11 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply } from "fastify";
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from "fastify";
 import { z } from "zod";
 import {
   AdminRoleLookupQuerySchema,
@@ -23,6 +28,7 @@ import {
   SubjectResponseSchema,
   CurrentUserResponseSchema,
   type ContentMutationFailure,
+  type IdentityRequest,
   type SubjectMutationFailure,
   type SubjectProvider,
   type ContentProvider,
@@ -40,16 +46,20 @@ import {
   type VideoProvider,
 } from "@cediah/contracts";
 import { type ApiEnvironment, readEnvironment } from "./config.js";
+import { type AuthService, createBetterAuthService } from "./auth.js";
 import { getContentCapabilities } from "./content-authorization.js";
+import { createPostgresDatabase, createPostgresPool } from "./db/database.js";
+import { applySqlMigrations } from "./db/migrate.js";
 import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
-import { createSupabaseContentProvider } from "./providers/supabase-content.js";
-import { createSupabaseRoleManagementProvider } from "./providers/supabase-role-management.js";
-import { createSupabaseIdentityProvider } from "./providers/supabase-identity.js";
-import { createSupabaseLearningProvider } from "./providers/supabase-learning.js";
-import { createSupabaseStorageVideoProvider } from "./providers/supabase-storage.js";
-import { createSupabaseSubjectProvider } from "./providers/supabase-subjects.js";
+import { createPostgresLearningProvider } from "./providers/postgres-learning.js";
+import { createPostgresContentProvider } from "./providers/postgres-content.js";
+import { createPostgresRoleManagementProvider } from "./providers/postgres-role-management.js";
+import { createPostgresSubjectProvider } from "./providers/postgres-subjects.js";
+import { createS3ObjectStorage } from "./providers/s3-object-storage.js";
+import { createS3VideoProvider } from "./providers/s3-video.js";
 
 type AppDependencies = {
+  authService?: AuthService;
   contentProvider?: ContentProvider;
   subjectProvider?: SubjectProvider;
   roleManagementProvider?: RoleManagementProvider;
@@ -102,25 +112,25 @@ const directUploadLifetimeMilliseconds = 15 * 60 * 1_000;
 const playbackLifetimeSeconds = 10 * 60;
 const VideoIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
 
-function readBearerToken(authorization: string | undefined) {
-  if (!authorization) return null;
-
-  const [scheme, token, extra] = authorization.trim().split(/\s+/);
-  if (scheme !== "Bearer" || !token || extra) return null;
-
-  return token;
+function toIdentityRequest(headers: FastifyRequest["headers"]): IdentityRequest {
+  const forwardedFor = headers["x-forwarded-for"];
+  return {
+    authorization: headers.authorization,
+    cookie: headers.cookie,
+    forwardedFor: Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor,
+    userAgent: headers["user-agent"],
+  };
 }
 
 async function resolveRequestUser(
-  authorization: string | undefined,
+  request: IdentityRequest,
   identityProvider: IdentityProvider | undefined,
 ): Promise<UserResolution> {
-  const accessToken = readBearerToken(authorization);
-  if (!accessToken) return { kind: "unauthorized" };
+  if (!request.authorization && !request.cookie) return { kind: "unauthorized" };
   if (!identityProvider) return { kind: "identity_unavailable" };
 
   try {
-    const user = await identityProvider.getUser(accessToken);
+    const user = await identityProvider.getUser(request);
     return user ? { kind: "authenticated", user } : { kind: "unauthorized" };
   } catch {
     return { kind: "identity_unavailable" };
@@ -128,11 +138,11 @@ async function resolveRequestUser(
 }
 
 async function resolveEditorUser(
-  authorization: string | undefined,
+  request: IdentityRequest,
   identityProvider: IdentityProvider | undefined,
   contentProvider: ContentProvider | undefined,
 ): Promise<EditorResolution> {
-  const resolution = await resolveRequestUser(authorization, identityProvider);
+  const resolution = await resolveRequestUser(request, identityProvider);
   if (resolution.kind !== "authenticated") return resolution;
   if (!contentProvider) return { kind: "content_unavailable" };
 
@@ -150,11 +160,11 @@ async function resolveEditorUser(
 }
 
 async function resolveAdministratorUser(
-  authorization: string | undefined,
+  request: IdentityRequest,
   identityProvider: IdentityProvider | undefined,
   roleManagementProvider: RoleManagementProvider | undefined,
 ): Promise<AdministratorResolution> {
-  const resolution = await resolveRequestUser(authorization, identityProvider);
+  const resolution = await resolveRequestUser(request, identityProvider);
   if (resolution.kind !== "authenticated") return resolution;
   if (!roleManagementProvider) return { kind: "role_unavailable" };
 
@@ -252,32 +262,45 @@ export async function buildApp(
   environment: ApiEnvironment = readEnvironment(),
   dependencies: AppDependencies = {},
 ): Promise<FastifyInstance> {
+  const pool = environment.databaseUrl
+    ? createPostgresPool({ connectionString: environment.databaseUrl })
+    : undefined;
+  if (pool && environment.migrationsEnabled !== false && environment.migrationsPath) {
+    try {
+      await applySqlMigrations(pool, environment.migrationsPath);
+    } catch (error) {
+      await pool.end();
+      throw error;
+    }
+  }
+  const database = pool ? createPostgresDatabase(pool) : undefined;
+  const createdAuthService =
+    environment.auth && pool
+      ? createBetterAuthService(environment.auth, { pool })
+      : undefined;
+  const authService = dependencies.authService ?? createdAuthService;
   const contentProvider =
     dependencies.contentProvider ??
-    (environment.contentStorage
-      ? createSupabaseContentProvider(environment.contentStorage)
-      : undefined);
+    (database ? createPostgresContentProvider(database) : undefined);
   const subjectProvider =
     dependencies.subjectProvider ??
-    (environment.contentStorage
-      ? createSupabaseSubjectProvider(environment.contentStorage)
-      : undefined);
+    (database ? createPostgresSubjectProvider(database) : undefined);
   const roleManagementProvider =
     dependencies.roleManagementProvider ??
-    (environment.supabase
-      ? createSupabaseRoleManagementProvider(environment.supabase)
-      : undefined);
+    (database ? createPostgresRoleManagementProvider(database) : undefined);
   const identityProvider =
     dependencies.identityProvider ??
-    (environment.supabase ? createSupabaseIdentityProvider(environment.supabase) : undefined);
+    authService;
   const learningProvider =
     dependencies.learningProvider ??
-    (environment.supabase ? createSupabaseLearningProvider(environment.supabase) : undefined);
+    (database ? createPostgresLearningProvider(database) : undefined);
   const videoProvider =
     dependencies.videoProvider ??
-    (environment.VIDEO_TEST_PROVIDER === "supabase"
-      ? environment.supabaseStorage
-        ? createSupabaseStorageVideoProvider(environment.supabaseStorage)
+    (environment.VIDEO_TEST_PROVIDER === "s3"
+      ? environment.videoStorage
+        ? createS3VideoProvider(createS3ObjectStorage(environment.videoStorage), {
+            maxFileSizeBytes: environment.testVideoUpload?.maxFileSizeBytes,
+          })
         : undefined
       : environment.cloudflareStream
         ? createCloudflareStreamVideoProvider(
@@ -308,8 +331,8 @@ export async function buildApp(
   });
 
   await app.register(cors, {
-    credentials: false,
-    methods: ["GET", "HEAD", "OPTIONS", "PATCH", "POST"],
+    credentials: true,
+    methods: ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST"],
     origin(origin, callback) {
       if (!origin || environment.webOrigins.has(origin)) {
         callback(null, true);
@@ -317,6 +340,52 @@ export async function buildApp(
       }
       callback(new Error("Origin not allowed"), false);
     },
+  });
+
+  if (authService) {
+    app.route({
+      method: ["GET", "POST"],
+      url: "/api/auth/*",
+      async handler(request, reply) {
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(request.headers)) {
+          if (Array.isArray(value)) {
+            value.forEach((item) => headers.append(name, item));
+          } else if (value !== undefined) {
+            headers.set(name, String(value));
+          }
+        }
+
+        const method = request.method.toUpperCase();
+        const body =
+          method === "GET" || method === "HEAD" || request.body === undefined
+            ? undefined
+            : typeof request.body === "string"
+              ? request.body
+              : JSON.stringify(request.body);
+        const authRequest = new Request(
+          new URL(request.url, `http://${request.headers.host ?? "localhost"}`),
+          { body, headers, method },
+        );
+        const response = await authService.handle(authRequest);
+
+        reply.status(response.status);
+        response.headers.forEach((value, name) => {
+          if (name.toLowerCase() !== "set-cookie") reply.header(name, value);
+        });
+        const responseHeaders = response.headers as Headers & {
+          getSetCookie?: () => string[];
+        };
+        const setCookies = responseHeaders.getSetCookie?.() ?? [];
+        if (setCookies.length > 0) reply.header("set-cookie", setCookies);
+        return reply.send(response.body ? await response.text() : null);
+      },
+    });
+  }
+
+  app.addHook("onClose", async () => {
+    await createdAuthService?.close();
+    await database?.destroy();
   });
 
   app.get("/health", async (_request, reply) => {
@@ -331,7 +400,7 @@ export async function buildApp(
   });
 
   app.get("/v1/auth/me", async (request, reply) => {
-    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
     if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
 
     const response = CurrentUserResponseSchema.parse({ user: resolution.user });
@@ -339,7 +408,7 @@ export async function buildApp(
   });
 
   app.get("/v1/learning/dashboard", async (request, reply) => {
-    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
     if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
     if (!learningProvider) {
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "learning_unavailable" });
@@ -357,7 +426,7 @@ export async function buildApp(
   app.patch<{ Body: unknown; Params: { lessonId: string } }>(
     "/v1/learning/lessons/:lessonId/progress",
     async (request, reply) => {
-      const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+      const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
       if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
       if (!learningProvider) {
         return reply.status(503).header("Cache-Control", "no-store").send({ error: "learning_unavailable" });
@@ -495,7 +564,7 @@ export async function buildApp(
 
   app.get("/v1/editor/content", async (request, reply) => {
     const editor = await resolveEditorUser(
-      request.headers.authorization,
+      toIdentityRequest(request.headers),
       identityProvider,
       contentProvider,
     );
@@ -514,7 +583,7 @@ export async function buildApp(
         : [];
       return reply.header("Cache-Control", "no-store").send(
         ContentWorkspaceResponseSchema.parse({
-          capabilities: editor.capabilities,
+          capabilities: { ...editor.capabilities, canUpload: false },
           items,
           roles: editor.roles,
           subjects,
@@ -531,7 +600,7 @@ export async function buildApp(
 
   app.post<{ Body: unknown }>("/v1/editor/subjects", async (request, reply) => {
     const editor = await resolveEditorUser(
-      request.headers.authorization,
+      toIdentityRequest(request.headers),
       identityProvider,
       contentProvider,
     );
@@ -567,7 +636,7 @@ export async function buildApp(
     "/v1/editor/subjects/:subjectId",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -601,7 +670,7 @@ export async function buildApp(
   );
   app.post<{ Body: unknown }>("/v1/editor/content", async (request, reply) => {
     const editor = await resolveEditorUser(
-      request.headers.authorization,
+      toIdentityRequest(request.headers),
       identityProvider,
       contentProvider,
     );
@@ -642,7 +711,7 @@ export async function buildApp(
     "/v1/editor/content/:contentId/subjects",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -684,7 +753,7 @@ export async function buildApp(
     "/v1/editor/content/:contentId",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -730,7 +799,7 @@ export async function buildApp(
     "/v1/editor/content/:contentId",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -768,7 +837,7 @@ export async function buildApp(
     "/v1/editor/content/:contentId/transition",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -814,7 +883,7 @@ export async function buildApp(
     "/v1/editor/content/:contentId/assets",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -861,7 +930,7 @@ export async function buildApp(
     "/v1/editor/assets/:assetId/finalize",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -899,7 +968,7 @@ export async function buildApp(
     "/v1/editor/assets/:assetId",
     async (request, reply) => {
       const editor = await resolveEditorUser(
-        request.headers.authorization,
+        toIdentityRequest(request.headers),
         identityProvider,
         contentProvider,
       );
@@ -935,7 +1004,7 @@ export async function buildApp(
 
   app.get<{ Querystring: unknown }>("/v1/admin/roles", async (request, reply) => {
     const administrator = await resolveAdministratorUser(
-      request.headers.authorization,
+      toIdentityRequest(request.headers),
       identityProvider,
       roleManagementProvider,
     );
@@ -970,7 +1039,7 @@ export async function buildApp(
 
   app.post<{ Body: unknown }>("/v1/admin/roles", async (request, reply) => {
     const administrator = await resolveAdministratorUser(
-      request.headers.authorization,
+      toIdentityRequest(request.headers),
       identityProvider,
       roleManagementProvider,
     );
@@ -1010,7 +1079,7 @@ export async function buildApp(
       return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
     }
 
-    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
     if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
     if (!testVideoUpload.uploaderIds.has(resolution.user.id.toLowerCase())) {
       return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
@@ -1029,12 +1098,21 @@ export async function buildApp(
         .header("Cache-Control", "no-store")
         .send({ error: "video_test_file_too_large" });
     }
+    if (input.data.durationSeconds > testVideoUpload.maxDurationSeconds) {
+      return reply
+        .status(422)
+        .header("Cache-Control", "no-store")
+        .send({ error: "video_test_duration_too_long" });
+    }
 
     try {
       const upload = await videoProvider.createDirectUpload({
         creatorId: resolution.user.id,
+        durationSeconds: input.data.durationSeconds,
         expiresAt: new Date(Date.now() + directUploadLifetimeMilliseconds).toISOString(),
+        fileSizeBytes: input.data.fileSizeBytes,
         maxDurationSeconds: testVideoUpload.maxDurationSeconds,
+        mimeType: input.data.mimeType,
       });
       const response = TestVideoUploadResponseSchema.parse({
         constraints: {
@@ -1059,7 +1137,7 @@ export async function buildApp(
       return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
     }
 
-    const resolution = await resolveRequestUser(request.headers.authorization, identityProvider);
+    const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
     if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
     if (!testVideoUpload.uploaderIds.has(resolution.user.id.toLowerCase())) {
       return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });

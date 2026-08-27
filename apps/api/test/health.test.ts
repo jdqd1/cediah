@@ -39,8 +39,8 @@ describe("GET /health", () => {
 
   it("validates a bearer token through the configured identity provider", async () => {
     const identityProvider: IdentityProvider = {
-      getUser: async (accessToken) =>
-        accessToken === "valid-access-token"
+      getUser: async (request) =>
+        request.authorization === "Bearer valid-access-token"
           ? { email: "estudiante@example.test", id: "04761a7d-4c02-48d7-b3a2-94b8baadf021" }
           : null,
       revokeSessions: async () => undefined,
@@ -79,15 +79,15 @@ describe("GET /health", () => {
     await app.close();
   });
 
-  it("requires the Supabase URL and secret key to be configured together", () => {
-    expect(() => readEnvironment({ SUPABASE_URL: "https://project.supabase.co" })).toThrow(
-      "SUPABASE_URL and SUPABASE_SECRET_KEY must be configured together",
+  it("requires the database and Better Auth settings to be configured together", () => {
+    expect(() => readEnvironment({ BETTER_AUTH_URL: "https://cediah.example" })).toThrow(
+      "DATABASE_URL, BETTER_AUTH_SECRET and BETTER_AUTH_URL must be configured together",
     );
   });
 
-  it("fails closed when private video testing is enabled without Supabase configuration", () => {
+  it("fails closed when private video testing is enabled without S3 configuration", () => {
     expect(() => readEnvironment({ VIDEO_TEST_UPLOAD_ENABLED: "true" })).toThrow(
-      "Supabase must be configured when VIDEO_TEST_PROVIDER is supabase",
+      "S3-compatible video storage must be configured when VIDEO_TEST_PROVIDER is s3",
     );
   });
 

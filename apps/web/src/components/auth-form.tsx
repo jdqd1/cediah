@@ -20,8 +20,8 @@ import {
   passwordRequirementChecks,
   validateAuthInput,
 } from "@/lib/auth/validation";
-import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
-import { getPublicTurnstileSiteKey } from "@/lib/supabase/environment";
+import { authClient } from "@/lib/auth/client";
+import { getPublicTurnstileSiteKey } from "@/lib/auth/environment";
 import { TurnstileWidget } from "./turnstile-widget";
 
 type AuthMode = Exclude<AuthFormMode, "update-password">;
@@ -29,6 +29,7 @@ type AuthFormVariant = "card" | "landing";
 
 type AuthFormProps = {
   initialMessage?: string;
+  initialMessageTone?: Feedback["tone"];
   mode: AuthMode;
   nextPath?: string;
   variant?: AuthFormVariant;
@@ -53,6 +54,7 @@ function getSubmitLabel(mode: AuthMode) {
 
 export function AuthForm({
   initialMessage,
+  initialMessageTone = "error",
   mode,
   nextPath,
   variant = "card",
@@ -63,13 +65,14 @@ export function AuthForm({
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [feedback, setFeedback] = useState<Feedback | undefined>(
-    initialMessage ? { message: initialMessage, tone: "error" } : undefined,
+    initialMessage
+      ? { message: initialMessage, tone: initialMessageTone }
+      : undefined,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [password, setPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const supabase = getBrowserSupabaseClient();
   const captchaSiteKey = getPublicTurnstileSiteKey();
   const isRecovery = mode === "recover";
   const isSignUp = mode === "sign-up";
@@ -96,7 +99,7 @@ export function AuthForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || isSubmitting) return;
+    if (isSubmitting) return;
 
     const validation = validateAuthInput(mode, {
       confirmPassword,
@@ -129,21 +132,22 @@ export function AuthForm({
     setErrors({});
     setFeedback(undefined);
     setIsSubmitting(true);
-    const callbackUrl = new URL("/auth/callback", window.location.origin);
-    callbackUrl.searchParams.set(
-      "next",
-      isRecovery ? "/auth/actualizar-contrasena" : targetPath,
-    );
-    const captchaOptions = captchaToken ? { captchaToken } : {};
+    const captchaFetchOptions = captchaToken
+      ? { headers: { "x-captcha-response": captchaToken } }
+      : undefined;
 
     try {
       if (validation.value.mode === "recover") {
-        const { error } = await supabase.auth.resetPasswordForEmail(
-          validation.value.email,
+        const resetUrl = new URL(
+          "/auth/actualizar-contrasena",
+          window.location.origin,
+        );
+        const { error } = await authClient.requestPasswordReset(
           {
-            ...captchaOptions,
-            redirectTo: callbackUrl.toString(),
+            email: validation.value.email,
+            redirectTo: resetUrl.toString(),
           },
+          captchaFetchOptions,
         );
         if (error) throw error;
         setEmail("");
@@ -156,23 +160,22 @@ export function AuthForm({
       }
 
       if (validation.value.mode === "sign-up") {
-        const { data, error } = await supabase.auth.signUp({
-          email: validation.value.email,
-          password: validation.value.password,
-          options: {
-            ...captchaOptions,
-            emailRedirectTo: callbackUrl.toString(),
+        const callbackUrl = new URL("/auth/callback", window.location.origin);
+        callbackUrl.searchParams.set("next", targetPath);
+        const { data, error } = await authClient.signUp.email(
+          {
+            callbackURL: callbackUrl.toString(),
+            email: validation.value.email,
+            name: validation.value.email,
+            password: validation.value.password,
           },
-        });
+          captchaFetchOptions,
+        );
         if (error) throw error;
         setPassword("");
         setConfirmPassword("");
 
-        if (
-          data.session &&
-          data.user?.email_confirmed_at &&
-          !data.user.is_anonymous
-        ) {
+        if (data?.token) {
           window.location.replace(targetPath);
           return;
         }
@@ -185,16 +188,14 @@ export function AuthForm({
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: validation.value.email,
-        password: validation.value.password,
-        options: captchaOptions,
-      });
+      const { error } = await authClient.signIn.email(
+        {
+          email: validation.value.email,
+          password: validation.value.password,
+        },
+        captchaFetchOptions,
+      );
       if (error) throw error;
-      if (!data.user?.email_confirmed_at || data.user.is_anonymous) {
-        await supabase.auth.signOut({ scope: "local" });
-        throw new Error("Permanent account required");
-      }
       window.location.replace(targetPath);
     } catch (error) {
       setFeedback({
@@ -222,7 +223,7 @@ export function AuthForm({
       aria-invalid={Boolean(errors.email)}
       autoCapitalize="none"
       autoComplete="email"
-      disabled={!supabase || isSubmitting}
+      disabled={isSubmitting}
       id="auth-email"
       inputMode="email"
       maxLength={AUTH_EMAIL_MAX_LENGTH}
@@ -244,7 +245,7 @@ export function AuthForm({
       aria-describedby={errors.password ? "auth-password-error" : undefined}
       aria-invalid={Boolean(errors.password)}
       autoComplete={isSignUp ? "new-password" : "current-password"}
-      disabled={!supabase || isSubmitting}
+      disabled={isSubmitting}
       id="auth-password"
       maxLength={AUTH_PASSWORD_MAX_LENGTH}
       minLength={isSignUp ? AUTH_PASSWORD_MIN_LENGTH : undefined}
@@ -269,14 +270,6 @@ export function AuthForm({
         </div>
       )}
 
-      {!supabase && (
-        <p
-          className={variant === "landing" ? "landing-auth-message is-error" : "auth-message is-error"}
-          role="alert"
-        >
-          El acceso todavía no está configurado para este ambiente.
-        </p>
-      )}
       {feedbackElement}
 
       {variant === "landing" ? (
@@ -354,7 +347,7 @@ export function AuthForm({
               aria-describedby={errors.confirmPassword ? "auth-confirm-password-error" : undefined}
               aria-invalid={Boolean(errors.confirmPassword)}
               autoComplete="new-password"
-              disabled={!supabase || isSubmitting}
+              disabled={isSubmitting}
               id="auth-confirmPassword"
               maxLength={AUTH_PASSWORD_MAX_LENGTH}
               minLength={AUTH_PASSWORD_MIN_LENGTH}
@@ -400,7 +393,7 @@ export function AuthForm({
 
       <button
         className={variant === "landing" ? "landing-submit" : "button button-primary"}
-        disabled={!supabase || isSubmitting || Boolean(captchaSiteKey && !captchaToken)}
+        disabled={isSubmitting || Boolean(captchaSiteKey && !captchaToken)}
         type="submit"
       >
         {isSubmitting ? "Procesando..." : getSubmitLabel(mode)}

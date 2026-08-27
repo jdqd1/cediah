@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { TestVideoUploadResponseSchema } from "@cediah/contracts";
-import { getApiAccessToken } from "@/lib/server/api-session";
+import { getApiRequestCookie } from "@/lib/server/api-session";
 import {
   getVideoTestApiError,
   requestVideoTestApi,
@@ -17,9 +17,8 @@ function noStoreJson(body: unknown, status = 200) {
 }
 
 export async function POST(request: Request) {
-  const session = await getApiAccessToken();
+  const session = await getApiRequestCookie();
   if (session.status === "anonymous") return noStoreJson({ error: "unauthorized" }, 401);
-  if (session.status === "unavailable") return noStoreJson({ error: "identity_unavailable" }, 503);
 
   let body: unknown;
   try {
@@ -29,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   const response = await requestVideoTestApi({
-    accessToken: session.accessToken,
+    cookie: session.cookie,
     body,
     method: "POST",
     path: "/v1/videos/test-uploads",

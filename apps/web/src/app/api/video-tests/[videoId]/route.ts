@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { TestVideoAssetResponseSchema } from "@cediah/contracts";
-import { getApiAccessToken } from "@/lib/server/api-session";
+import { getApiRequestCookie } from "@/lib/server/api-session";
 import {
   getVideoTestApiError,
   requestVideoTestApi,
@@ -21,13 +21,12 @@ function noStoreJson(body: unknown, status = 200) {
 }
 
 export async function GET(_request: Request, { params }: VideoTestRouteProps) {
-  const session = await getApiAccessToken();
+  const session = await getApiRequestCookie();
   if (session.status === "anonymous") return noStoreJson({ error: "unauthorized" }, 401);
-  if (session.status === "unavailable") return noStoreJson({ error: "identity_unavailable" }, 503);
 
   const { videoId } = await params;
   const response = await requestVideoTestApi({
-    accessToken: session.accessToken,
+    cookie: session.cookie,
     method: "GET",
     path: "/v1/videos/test-assets/" + encodeURIComponent(videoId),
   });

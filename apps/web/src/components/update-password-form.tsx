@@ -10,9 +10,13 @@ import {
   passwordRequirementChecks,
   validateAuthInput,
 } from "@/lib/auth/validation";
-import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { authClient } from "@/lib/auth/client";
 
-export function UpdatePasswordForm() {
+type UpdatePasswordFormProps = {
+  token: string;
+};
+
+export function UpdatePasswordForm({ token }: UpdatePasswordFormProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [message, setMessage] = useState<string>();
@@ -20,7 +24,6 @@ export function UpdatePasswordForm() {
   const [password, setPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const supabase = getBrowserSupabaseClient();
 
   function clearError(field: "confirmPassword" | "password") {
     setErrors((current) => {
@@ -33,7 +36,7 @@ export function UpdatePasswordForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || isSubmitting) return;
+    if (isSubmitting) return;
 
     const validation = validateAuthInput("update-password", {
       confirmPassword,
@@ -54,17 +57,12 @@ export function UpdatePasswordForm() {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase.auth.updateUser({
-        password: validation.value.password,
+      const { error } = await authClient.resetPassword({
+        newPassword: validation.value.password,
+        token,
       });
       if (error) throw error;
-      if (!data.user || data.user.is_anonymous) {
-        throw new Error("Permanent account required");
-      }
-
-      // Keep this recovery session active, but revoke sessions on other devices.
-      await supabase.auth.signOut({ scope: "others" });
-      window.location.replace("/dashboard");
+      window.location.replace("/acceder?mensaje=contrasena-actualizada");
     } catch (error) {
       setMessage(getPublicAuthErrorMessage(error, "update-password"));
     } finally {
@@ -78,14 +76,9 @@ export function UpdatePasswordForm() {
         <p className="eyebrow">Acceso protegido</p>
         <h1>Elige una nueva contraseña</h1>
         <p>
-          Usa una contraseña única. Al guardarla, cerraremos las demás sesiones de tu cuenta.
+          Usa una contraseña única. Al guardarla, cerraremos las sesiones activas de tu cuenta.
         </p>
       </div>
-      {!supabase && (
-        <p className="auth-message is-error" role="alert">
-          El acceso todavía no está configurado para este ambiente.
-        </p>
-      )}
       {message && (
         <p className="auth-message is-error" role="alert">
           {message}
@@ -98,7 +91,7 @@ export function UpdatePasswordForm() {
           aria-describedby={errors.password ? "new-password-error" : undefined}
           aria-invalid={Boolean(errors.password)}
           autoComplete="new-password"
-          disabled={!supabase || isSubmitting}
+          disabled={isSubmitting}
           id="new-password"
           maxLength={AUTH_PASSWORD_MAX_LENGTH}
           minLength={AUTH_PASSWORD_MIN_LENGTH}
@@ -147,7 +140,7 @@ export function UpdatePasswordForm() {
           }
           aria-invalid={Boolean(errors.confirmPassword)}
           autoComplete="new-password"
-          disabled={!supabase || isSubmitting}
+          disabled={isSubmitting}
           id="confirm-new-password"
           maxLength={AUTH_PASSWORD_MAX_LENGTH}
           minLength={AUTH_PASSWORD_MIN_LENGTH}
@@ -176,7 +169,7 @@ export function UpdatePasswordForm() {
 
       <button
         className="button button-primary"
-        disabled={!supabase || isSubmitting}
+        disabled={isSubmitting}
         type="submit"
       >
         {isSubmitting ? "Actualizando..." : "Guardar contraseña"}

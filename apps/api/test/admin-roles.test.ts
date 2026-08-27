@@ -29,7 +29,8 @@ function identityProvider(): IdentityProvider {
     ["student-token", users.student],
   ]);
   return {
-    getUser: async (token) => byToken.get(token) ?? null,
+    getUser: async (request) =>
+      byToken.get(request.authorization?.replace(/^Bearer\s+/, "") ?? "") ?? null,
     revokeSessions: async () => undefined,
   };
 }

@@ -21,7 +21,7 @@ const directUploadMaximumBytes = 200_000_000;
 
 const errorMessages: Record<string, string> = {
   forbidden:
-    "Esta cuenta no está autorizada para las pruebas de video. Debe agregarse su UUID de Supabase en el servidor.",
+    "Esta cuenta no está autorizada para las pruebas de video. Debe agregarse su UUID en el servidor.",
   identity_unavailable:
     "La identidad no está disponible en este ambiente. Inicia sesión de nuevo después de completar la configuración.",
   invalid_video_test_upload:
@@ -31,6 +31,8 @@ const errorMessages: Record<string, string> = {
   unauthorized: "Tu sesión terminó. Vuelve a iniciar sesión para solicitar una carga.",
   video_test_file_too_large:
     "El archivo supera el límite configurado para esta prueba. Usa un video más pequeño.",
+  video_test_duration_too_long:
+    "El video supera la duración configurada para esta prueba. Usa un video más corto.",
   video_test_unavailable:
     "La prueba de video no está configurada o el proveedor no respondió. Inténtalo cuando el servidor esté listo.",
 };
@@ -56,6 +58,42 @@ function getErrorCode(value: unknown) {
 function getErrorMessage(error: unknown) {
   const code = error instanceof Error ? error.message : "video_test_unavailable";
   return errorMessages[code] ?? errorMessages.video_test_unavailable;
+}
+
+function readVideoDurationSeconds(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(file);
+    const finish = () => {
+      video.removeAttribute("src");
+      video.load();
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    video.preload = "metadata";
+    video.addEventListener(
+      "loadedmetadata",
+      () => {
+        const duration = video.duration;
+        finish();
+        if (Number.isFinite(duration) && duration > 0) {
+          resolve(duration);
+          return;
+        }
+        reject(new Error("invalid_video_test_upload"));
+      },
+      { once: true },
+    );
+    video.addEventListener(
+      "error",
+      () => {
+        finish();
+        reject(new Error("invalid_video_test_upload"));
+      },
+      { once: true },
+    );
+    video.src = objectUrl;
+  });
 }
 
 function isTestVideoUploadResponse(value: unknown): value is TestVideoUploadResponse {
@@ -98,16 +136,26 @@ function uploadFile(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    const formData = new FormData();
-    const isSupabaseUpload = upload.uploadType === "supabase_signed";
-    if (isSupabaseUpload) {
-      formData.append("cacheControl", "3600");
-      formData.append("", file);
+    if (upload.uploadType === "signed_put") {
       request.open("PUT", upload.uploadUrl);
-      request.setRequestHeader("x-upsert", "false");
+      request.setRequestHeader("Content-Type", file.type);
     } else {
+      const formData = new FormData();
       formData.append("file", file);
       request.open("POST", upload.uploadUrl);
+      request.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+      });
+      request.addEventListener("error", () => reject(new Error("video_test_unavailable")));
+      request.addEventListener("load", () => {
+        if (request.status >= 200 && request.status < 300) {
+          resolve();
+          return;
+        }
+        reject(new Error("video_test_unavailable"));
+      });
+      request.send(formData);
+      return;
     }
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
@@ -120,7 +168,7 @@ function uploadFile(
       }
       reject(new Error("video_test_unavailable"));
     });
-    request.send(formData);
+    request.send(file);
   });
 }
 
@@ -216,8 +264,10 @@ export function VideoTestUploader() {
     setProgress(0);
 
     try {
+      const durationSeconds = await readVideoDurationSeconds(file);
       const provisionResponse = await fetch("/api/video-tests/uploads", {
         body: JSON.stringify({
+          durationSeconds,
           fileName: file.name,
           fileSizeBytes: file.size,
           mimeType: file.type,
@@ -253,8 +303,9 @@ export function VideoTestUploader() {
         <p className="eyebrow dark">Carga privada de prueba</p>
         <h2 id="video-test-upload-title">Sube un video para probar el reproductor.</h2>
         <p>
-          El enlace de carga es de un solo uso. El archivo no se publica en cursos, no habilita
-          matrículas y requiere una sesión firmada para reproducirse.
+          El enlace de carga vence en pocos minutos y queda limitado a la ruta privada de esta
+          prueba. El archivo no se publica en cursos, no habilita matrículas y requiere una sesión
+          firmada para reproducirse.
         </p>
       </div>
 

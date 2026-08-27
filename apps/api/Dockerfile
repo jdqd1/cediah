@@ -11,6 +11,7 @@ COPY packages/contracts/package.json packages/contracts/package.json
 RUN pnpm install --frozen-lockfile --filter @cediah/api... --filter @cediah/contracts...
 
 COPY apps/api apps/api
+COPY database/migrations database/migrations
 COPY packages/contracts packages/contracts
 RUN pnpm --filter @cediah/contracts build && pnpm --filter @cediah/api build
 
@@ -24,6 +25,7 @@ COPY --from=build --chown=cediah:cediah /app/node_modules ./node_modules
 COPY --from=build --chown=cediah:cediah /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build --chown=cediah:cediah /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build --chown=cediah:cediah /app/apps/api/dist ./apps/api/dist
+COPY --from=build --chown=cediah:cediah /app/database/migrations ./database/migrations
 COPY --from=build --chown=cediah:cediah /app/packages/contracts/package.json ./packages/contracts/package.json
 COPY --from=build --chown=cediah:cediah /app/packages/contracts/node_modules ./packages/contracts/node_modules
 COPY --from=build --chown=cediah:cediah /app/packages/contracts/dist ./packages/contracts/dist

@@ -16,21 +16,21 @@ export default async function RoleManagementPage() {
         <section>
           <p className="eyebrow dark">Administración de roles</p>
           <h1>La identidad no está disponible.</h1>
-          <p>Configura Supabase Auth y la API antes de abrir el control de acceso.</p>
+          <p>Configura PostgreSQL, Better Auth y la API antes de abrir el control de acceso.</p>
           <Link href="/panel">Volver al panel</Link>
         </section>
       </main>
     );
   }
 
-  const result = await getAdminRoleUser(current.accessToken, current.user.email);
+  const result = await getAdminRoleUser(current.user.email);
   if (result.status === "forbidden") {
     return (
       <main className="studio-gate">
         <section>
           <p className="eyebrow dark">Acceso restringido</p>
           <h1>Sólo un administrador puede asignar roles.</h1>
-          <p>Solicita a la cuenta administradora inicial que te otorgue permisos desde el SQL Editor de Supabase.</p>
+          <p>Solicita a la cuenta administradora inicial que te otorgue permisos desde el panel de roles.</p>
           <Link href="/panel">Volver a mi panel</Link>
         </section>
       </main>

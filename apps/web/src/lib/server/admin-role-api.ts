@@ -5,17 +5,19 @@ import {
   type AdminRoleUser,
 } from "@cediah/contracts";
 import { getContentApiError, requestContentApi } from "./content-api";
+import { getApiRequestCookie } from "./api-session";
 
 export type AdminRoleUserResult =
   | { status: "forbidden" | "not_found" | "unavailable" }
   | { status: "ready"; user: AdminRoleUser };
 
 export async function getAdminRoleUser(
-  accessToken: string,
   email: string,
 ): Promise<AdminRoleUserResult> {
+  const session = await getApiRequestCookie();
+  if (session.status === "anonymous") return { status: "forbidden" };
   const response = await requestContentApi({
-    accessToken,
+    cookie: session.cookie,
     method: "GET",
     path: "/v1/admin/roles?email=" + encodeURIComponent(email),
   });
@@ -28,14 +30,15 @@ export async function getAdminRoleUser(
 }
 
 export async function mutateAdminRole(
-  accessToken: string,
   input: AdminRoleMutationRequest,
 ): Promise<
   | { status: "ready"; user: AdminRoleUser }
   | { status: "forbidden" | "last_administrator" | "not_found" | "conflict" | "unavailable" }
 > {
+  const session = await getApiRequestCookie();
+  if (session.status === "anonymous") return { status: "forbidden" };
   const response = await requestContentApi({
-    accessToken,
+    cookie: session.cookie,
     body: input,
     method: "POST",
     path: "/v1/admin/roles",

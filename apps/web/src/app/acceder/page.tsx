@@ -4,7 +4,12 @@ import { CediahLogo } from "@/components/cediah-logo";
 import { getSafeNextPath } from "@/lib/auth/validation";
 
 type AccessPageProps = {
-  searchParams: Promise<{ error?: string; next?: string; modo?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    mensaje?: string;
+    next?: string;
+    modo?: string;
+  }>;
 };
 
 const callbackErrorMessages: Record<string, string> = {
@@ -13,8 +18,13 @@ const callbackErrorMessages: Record<string, string> = {
   sesion: "Tu sesión terminó. Inicia sesión de nuevo para continuar.",
 };
 
+const authMessages: Record<string, string> = {
+  "contrasena-actualizada":
+    "Tu contraseña fue actualizada. Inicia sesión con la nueva contraseña.",
+};
+
 export default async function AccessPage({ searchParams }: AccessPageProps) {
-  const { error, modo, next } = await searchParams;
+  const { error, mensaje, modo, next } = await searchParams;
   const mode = modo === "registro" ? "sign-up" : "sign-in";
   const nextPath = getSafeNextPath(next);
   const toggleParameters = new URLSearchParams();
@@ -34,7 +44,14 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
       </header>
       <div className="auth-content">
         <AuthForm
-          initialMessage={error ? callbackErrorMessages[error] : undefined}
+          initialMessage={
+            error
+              ? callbackErrorMessages[error]
+              : mensaje
+                ? authMessages[mensaje]
+                : undefined
+          }
+          initialMessageTone={mensaje && !error ? "success" : "error"}
           mode={mode}
           nextPath={nextPath}
         />

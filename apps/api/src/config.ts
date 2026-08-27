@@ -1,20 +1,37 @@
 import { z } from "zod";
+import { fileURLToPath } from "node:url";
+import type { BetterAuthConfiguration } from "./auth.js";
 
 const UuidSchema = z.string().uuid();
 
 const EnvironmentSchema = z
   .object({
+    AUTH_REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false"]).default("false"),
+    BETTER_AUTH_SECRET: z.string().min(32).optional(),
+    BETTER_AUTH_URL: z.string().url().optional(),
     CLOUDFLARE_STREAM_ACCOUNT_ID: z.string().regex(/^[a-z0-9]{32}$/i).optional(),
     CLOUDFLARE_STREAM_API_TOKEN: z.string().min(1).optional(),
     CLOUDFLARE_STREAM_CUSTOMER_CODE: z.string().regex(/^[a-z0-9-]+$/i).optional(),
+    DATABASE_URL: z.string().min(1).optional(),
+    DATABASE_MIGRATIONS_ENABLED: z.enum(["true", "false"]).default("true"),
+    DATABASE_MIGRATIONS_PATH: z.string().min(1).optional(),
     HOST: z.string().min(1).default("0.0.0.0"),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
-    SUPABASE_CONTENT_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,62}$/).default("content-assets"),
-    SUPABASE_SECRET_KEY: z.string().min(1).optional(),
-    SUPABASE_STORAGE_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{1,62}$/).default("video-test"),
-    SUPABASE_URL: z.string().url().optional(),
-    VIDEO_TEST_PROVIDER: z.enum(["cloudflare", "supabase"]).default("supabase"),
+    SMTP_FROM: z.string().email().optional(),
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(587),
+    SMTP_SECURE: z.enum(["true", "false"]).default("false"),
+    SMTP_USER: z.string().min(1).optional(),
+    STORAGE_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    STORAGE_S3_ENDPOINT: z.string().url().optional(),
+    STORAGE_S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
+    STORAGE_S3_REGION: z.string().min(1).default("us-east-1"),
+    STORAGE_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+    VIDEO_STORAGE_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,62}$/).default("video-test"),
+    VIDEO_TEST_PROVIDER: z.enum(["cloudflare", "s3"]).default("s3"),
     VIDEO_TEST_MAX_DURATION_SECONDS: z.coerce.number().int().min(60).max(36_000).default(900),
     VIDEO_TEST_MAX_FILE_BYTES: z.coerce.number().int().min(1_000_000).max(200_000_000).default(50_000_000),
     VIDEO_TEST_UPLOAD_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -22,13 +39,26 @@ const EnvironmentSchema = z
     WEB_ORIGINS: z.string().default("http://localhost:3000,http://127.0.0.1:3000"),
   })
   .superRefine((environment, context) => {
-    const hasSupabaseUrl = Boolean(environment.SUPABASE_URL);
-    const hasSupabaseSecret = Boolean(environment.SUPABASE_SECRET_KEY);
-
-    if (hasSupabaseUrl !== hasSupabaseSecret) {
+    const authValues = [environment.BETTER_AUTH_SECRET, environment.BETTER_AUTH_URL];
+    if (authValues.some(Boolean) && (!environment.DATABASE_URL || !authValues.every(Boolean))) {
       context.addIssue({
         code: "custom",
-        message: "SUPABASE_URL and SUPABASE_SECRET_KEY must be configured together",
+        message:
+          "DATABASE_URL, BETTER_AUTH_SECRET and BETTER_AUTH_URL must be configured together for authentication",
+      });
+    }
+
+    const smtpValues = [environment.SMTP_FROM, environment.SMTP_HOST];
+    if (smtpValues.some(Boolean) && !smtpValues.every(Boolean)) {
+      context.addIssue({ code: "custom", message: "SMTP_FROM and SMTP_HOST must be configured together" });
+    }
+    if (Boolean(environment.SMTP_USER) !== Boolean(environment.SMTP_PASSWORD)) {
+      context.addIssue({ code: "custom", message: "SMTP_USER and SMTP_PASSWORD must be configured together" });
+    }
+    if (environment.AUTH_REQUIRE_EMAIL_VERIFICATION === "true" && !smtpValues.every(Boolean)) {
+      context.addIssue({
+        code: "custom",
+        message: "SMTP must be configured when email verification is required",
       });
     }
 
@@ -48,6 +78,21 @@ const EnvironmentSchema = z
       });
     }
 
+    const s3Values = [
+      environment.STORAGE_S3_ACCESS_KEY_ID,
+      environment.STORAGE_S3_ENDPOINT,
+      environment.STORAGE_S3_SECRET_ACCESS_KEY,
+    ];
+    const hasSomeS3Configuration = s3Values.some(Boolean);
+    const hasCompleteS3Configuration = s3Values.every(Boolean);
+    if (hasSomeS3Configuration && !hasCompleteS3Configuration) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "STORAGE_S3_ENDPOINT, STORAGE_S3_ACCESS_KEY_ID and STORAGE_S3_SECRET_ACCESS_KEY must be configured together",
+      });
+    }
+
     if (environment.VIDEO_TEST_UPLOAD_ENABLED === "true") {
       if (environment.VIDEO_TEST_PROVIDER === "cloudflare" && !hasCompleteCloudflareConfiguration) {
         context.addIssue({
@@ -56,10 +101,10 @@ const EnvironmentSchema = z
         });
       }
 
-      if (environment.VIDEO_TEST_PROVIDER === "supabase" && !hasSupabaseUrl && !hasSupabaseSecret) {
+      if (environment.VIDEO_TEST_PROVIDER === "s3" && !hasCompleteS3Configuration) {
         context.addIssue({
           code: "custom",
-          message: "Supabase must be configured when VIDEO_TEST_PROVIDER is supabase",
+          message: "S3-compatible video storage must be configured when VIDEO_TEST_PROVIDER is s3",
         });
       }
 
@@ -75,7 +120,7 @@ const EnvironmentSchema = z
         if (!UuidSchema.safeParse(id).success) {
           context.addIssue({
             code: "custom",
-            message: "VIDEO_TEST_UPLOADER_IDS must contain comma-separated Supabase user UUIDs",
+            message: "VIDEO_TEST_UPLOADER_IDS must contain comma-separated user UUIDs",
           });
         }
       });
@@ -95,12 +140,15 @@ export type CloudflareStreamConfiguration = {
   customerCode: string;
 };
 
-export type VideoTestProvider = "cloudflare" | "supabase";
+export type VideoTestProvider = "cloudflare" | "s3";
 
-export type SupabaseStorageConfiguration = {
+export type S3StorageConfiguration = {
+  accessKeyId: string;
   bucket: string;
-  secretKey: string;
-  url: string;
+  endpoint: string;
+  forcePathStyle: boolean;
+  region: string;
+  secretAccessKey: string;
 };
 
 export type TestVideoUploadConfiguration = {
@@ -110,24 +158,22 @@ export type TestVideoUploadConfiguration = {
 };
 
 export type ApiEnvironment = {
+  auth?: BetterAuthConfiguration;
   cloudflareStream?: CloudflareStreamConfiguration;
-  contentStorage?: SupabaseStorageConfiguration;
+  databaseUrl?: string;
+  migrationsEnabled?: boolean;
+  migrationsPath?: string;
   HOST: string;
   NODE_ENV: "development" | "test" | "production";
   PORT: number;
-  SUPABASE_CONTENT_BUCKET?: string;
-  SUPABASE_SECRET_KEY?: string;
-  SUPABASE_STORAGE_BUCKET?: string;
-  SUPABASE_URL?: string;
   VIDEO_TEST_PROVIDER?: VideoTestProvider;
   WEB_ORIGINS: string;
-  supabase?: { secretKey: string; url: string };
-  supabaseStorage?: SupabaseStorageConfiguration;
   testVideoUpload?: TestVideoUploadConfiguration;
+  videoStorage?: S3StorageConfiguration;
   webOrigins: Set<string>;
 };
 
-export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
+export function readEnvironment(source: NodeJS.ProcessEnv = process.env): ApiEnvironment {
   const environment = EnvironmentSchema.parse(source);
   const webOrigins = new Set(
     environment.WEB_ORIGINS.split(",")
@@ -135,11 +181,6 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
       .filter(Boolean)
       .map((origin) => new URL(origin).origin),
   );
-
-  const supabase =
-    environment.SUPABASE_URL && environment.SUPABASE_SECRET_KEY
-      ? { secretKey: environment.SUPABASE_SECRET_KEY, url: environment.SUPABASE_URL }
-      : undefined;
 
   const cloudflareStream =
     environment.CLOUDFLARE_STREAM_ACCOUNT_ID &&
@@ -152,21 +193,44 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
         }
       : undefined;
 
-  const supabaseStorage = supabase
-    ? {
-        bucket: environment.SUPABASE_STORAGE_BUCKET,
-        secretKey: supabase.secretKey,
-        url: supabase.url,
-      }
-    : undefined;
+  const videoStorage =
+    environment.STORAGE_S3_ACCESS_KEY_ID &&
+    environment.STORAGE_S3_ENDPOINT &&
+    environment.STORAGE_S3_SECRET_ACCESS_KEY
+      ? {
+          accessKeyId: environment.STORAGE_S3_ACCESS_KEY_ID,
+          bucket: environment.VIDEO_STORAGE_BUCKET,
+          endpoint: environment.STORAGE_S3_ENDPOINT,
+          forcePathStyle: environment.STORAGE_S3_FORCE_PATH_STYLE === "true",
+          region: environment.STORAGE_S3_REGION,
+          secretAccessKey: environment.STORAGE_S3_SECRET_ACCESS_KEY,
+        }
+      : undefined;
 
-  const contentStorage = supabase
-    ? {
-        bucket: environment.SUPABASE_CONTENT_BUCKET,
-        secretKey: supabase.secretKey,
-        url: supabase.url,
-      }
-    : undefined;
+  const smtp =
+    environment.SMTP_FROM && environment.SMTP_HOST
+      ? {
+          from: environment.SMTP_FROM,
+          host: environment.SMTP_HOST,
+          password: environment.SMTP_PASSWORD,
+          port: environment.SMTP_PORT,
+          secure: environment.SMTP_SECURE === "true",
+          user: environment.SMTP_USER,
+        }
+      : undefined;
+
+  const auth =
+    environment.DATABASE_URL && environment.BETTER_AUTH_SECRET && environment.BETTER_AUTH_URL
+      ? {
+          databaseUrl: environment.DATABASE_URL,
+          publicUrl: new URL(environment.BETTER_AUTH_URL).origin,
+          requireEmailVerification: environment.AUTH_REQUIRE_EMAIL_VERIFICATION === "true",
+          secret: environment.BETTER_AUTH_SECRET,
+          smtp,
+          turnstileSecretKey: environment.TURNSTILE_SECRET_KEY,
+          trustedOrigins: [...webOrigins],
+        }
+      : undefined;
 
   const testVideoUpload =
     environment.VIDEO_TEST_UPLOAD_ENABLED === "true"
@@ -178,12 +242,20 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env) {
       : undefined;
 
   return {
-    ...environment,
+    auth,
     cloudflareStream,
-    contentStorage,
-    supabase,
-    supabaseStorage,
+    databaseUrl: environment.DATABASE_URL,
+    HOST: environment.HOST,
+    NODE_ENV: environment.NODE_ENV,
+    PORT: environment.PORT,
+    migrationsEnabled: environment.DATABASE_MIGRATIONS_ENABLED === "true",
+    migrationsPath:
+      environment.DATABASE_MIGRATIONS_PATH ??
+      fileURLToPath(new URL("../../../database/migrations/", import.meta.url)),
     testVideoUpload,
+    VIDEO_TEST_PROVIDER: environment.VIDEO_TEST_PROVIDER,
+    videoStorage,
+    WEB_ORIGINS: environment.WEB_ORIGINS,
     webOrigins,
   };
 }

@@ -2,18 +2,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CediahLogo } from "@/components/cediah-logo";
 import { UpdatePasswordForm } from "@/components/update-password-form";
-import { getCurrentUser } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
-export default async function UpdatePasswordPage() {
-  const current = await getCurrentUser();
-  if (current.status !== "authenticated") {
-    redirect(
-      current.status === "unavailable"
-        ? "/acceder?error=configuracion"
-        : "/acceder?error=sesion",
-    );
+type UpdatePasswordPageProps = {
+  searchParams: Promise<{ error?: string; token?: string }>;
+};
+
+export default async function UpdatePasswordPage({
+  searchParams,
+}: UpdatePasswordPageProps) {
+  const { error, token } = await searchParams;
+  if (
+    error ||
+    !token ||
+    token.length > 512 ||
+    /[\u0000-\u001f\u007f]/.test(token)
+  ) {
+    redirect("/acceder?error=confirmacion");
   }
 
   return (
@@ -24,7 +30,7 @@ export default async function UpdatePasswordPage() {
         </Link>
       </header>
       <div className="auth-content">
-        <UpdatePasswordForm />
+        <UpdatePasswordForm token={token} />
       </div>
     </main>
   );

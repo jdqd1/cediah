@@ -1,45 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSafeNextPath } from "@/lib/auth/validation";
 import {
-  getPublicSupabaseConfiguration,
   getPublicTurnstileSiteKey,
-} from "@/lib/supabase/environment";
-import {
-  type SupabaseCookie,
-  updateSupabaseSession,
-} from "@/lib/supabase/proxy";
+  getPublicVideoStorageOrigin,
+} from "@/lib/auth/environment";
 
 function createNonce() {
   return Buffer.from(crypto.randomUUID()).toString("base64");
-}
-
-const publicPagePaths = new Set([
-  "/",
-  "/acceder",
-  "/auth/callback",
-  "/recuperar-acceso",
-]);
-
-function normalizePathname(pathname: string) {
-  return pathname.length > 1 && pathname.endsWith("/")
-    ? pathname.slice(0, -1)
-    : pathname;
-}
-
-function applySessionCookies(
-  response: NextResponse,
-  cookies: SupabaseCookie[],
-) {
-  cookies.forEach(({ name, options, value }) => {
-    response.cookies.set(name, value, options);
-  });
 }
 
 export async function proxy(request: NextRequest) {
   const nonce = createNonce();
   const developmentScriptPolicy =
     process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
-  const supabaseUrl = getPublicSupabaseConfiguration()?.url;
+  const videoStorageOrigin = getPublicVideoStorageOrigin();
   const turnstileEnabled = Boolean(getPublicTurnstileSiteKey());
   const turnstileOrigin = "https://challenges.cloudflare.com";
   const contentSecurityPolicy = [
@@ -48,8 +21,8 @@ export async function proxy(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    `media-src 'self'${supabaseUrl ? ` ${new URL(supabaseUrl).origin}` : ""} blob:`,
-    `connect-src 'self'${supabaseUrl ? ` ${new URL(supabaseUrl).origin}` : ""}${turnstileEnabled ? ` ${turnstileOrigin}` : ""}`,
+    `media-src 'self'${videoStorageOrigin ? ` ${videoStorageOrigin}` : ""} blob:`,
+    `connect-src 'self'${videoStorageOrigin ? ` ${videoStorageOrigin}` : ""}${turnstileEnabled ? ` ${turnstileOrigin}` : ""}`,
     ...(turnstileEnabled ? [`frame-src ${turnstileOrigin}`] : []),
     "object-src 'none'",
     "base-uri 'self'",
@@ -64,32 +37,7 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
 
-  const requestWithNonce = new NextRequest(request, { headers: requestHeaders });
-  const session = await updateSupabaseSession(requestWithNonce);
-  const pathname = normalizePathname(request.nextUrl.pathname);
-  const isPublicPage = publicPagePaths.has(pathname);
-  let response = session.response;
-
-  if (!session.isAuthenticated && !isPublicPage) {
-    const destination = request.nextUrl.clone();
-    destination.pathname = "/acceder";
-    destination.search = "";
-    destination.searchParams.set(
-      "next",
-      getSafeNextPath(`${request.nextUrl.pathname}${request.nextUrl.search}`),
-    );
-    response = NextResponse.redirect(destination, 307);
-    applySessionCookies(response, session.cookiesToSet);
-  } else if (
-    session.isAuthenticated &&
-    (pathname === "/" || pathname === "/acceder" || pathname === "/recuperar-acceso")
-  ) {
-    const destination = request.nextUrl.clone();
-    destination.pathname = "/dashboard";
-    destination.search = "";
-    response = NextResponse.redirect(destination, 307);
-    applySessionCookies(response, session.cookiesToSet);
-  }
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   response.headers.set("Content-Security-Policy", contentSecurityPolicy);
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");

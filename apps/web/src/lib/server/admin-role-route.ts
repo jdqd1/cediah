@@ -1,6 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { getApiAccessToken } from "./api-session";
+import { getApiRequestCookie } from "./api-session";
 import { getContentApiError, requestContentApi, safeContentApiStatus } from "./content-api";
 
 export function noStoreAdminRoleJson(body: unknown, status = 200) {
@@ -23,16 +23,13 @@ export async function forwardAdminRoleRequest(input: {
   method: "GET" | "POST";
   path: string;
 }) {
-  const session = await getApiAccessToken();
+  const session = await getApiRequestCookie();
   if (session.status === "anonymous") {
     return noStoreAdminRoleJson({ error: "unauthorized" }, 401);
   }
-  if (session.status === "unavailable") {
-    return noStoreAdminRoleJson({ error: "identity_unavailable" }, 503);
-  }
 
   const response = await requestContentApi({
-    accessToken: session.accessToken,
+    cookie: session.cookie,
     body: input.body,
     method: input.method,
     path: input.path,

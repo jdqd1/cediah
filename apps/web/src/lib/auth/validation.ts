@@ -200,25 +200,31 @@ export function getPublicAuthErrorMessage(
   mode: AuthFormMode,
 ) {
   const authError = error as AuthErrorLike | null;
-  const code = authError?.code;
+  const code = authError?.code?.toUpperCase();
 
   if (
     authError?.status === 429 ||
-    code === "over_email_send_rate_limit" ||
-    code === "over_request_rate_limit"
+    code === "OVER_EMAIL_SEND_RATE_LIMIT" ||
+    code === "OVER_REQUEST_RATE_LIMIT" ||
+    code === "TOO_MANY_REQUESTS"
   ) {
     return "Has realizado demasiados intentos. Espera unos minutos antes de volver a probar.";
   }
 
-  if (code === "captcha_failed") {
+  if (code === "CAPTCHA_FAILED" || code === "MISSING_RESPONSE" || code === "VERIFICATION_FAILED") {
     return "No pudimos verificar que eres una persona. Completa la verificación e inténtalo de nuevo.";
   }
 
-  if (code === "email_not_confirmed" && mode === "sign-in") {
+  if ((code === "EMAIL_NOT_CONFIRMED" || code === "EMAIL_NOT_VERIFIED") && mode === "sign-in") {
     return "Confirma tu correo con el enlace que te enviamos antes de iniciar sesión.";
   }
 
-  if (code === "weak_password" && (mode === "sign-up" || mode === "update-password")) {
+  if (
+    (code === "WEAK_PASSWORD" ||
+      code === "PASSWORD_TOO_SHORT" ||
+      code === "PASSWORD_TOO_LONG") &&
+    (mode === "sign-up" || mode === "update-password")
+  ) {
     return "La contraseña no cumple la política de seguridad. Revisa todos los requisitos.";
   }
 

@@ -23,9 +23,9 @@ const testEnvironment: ApiEnvironment = {
 
 function createIdentityProvider(): IdentityProvider {
   return {
-    getUser: async (accessToken) => {
-      if (accessToken === "student-token") return student;
-      if (accessToken === "another-student-token") return anotherStudent;
+    getUser: async (request) => {
+      if (request.authorization === "Bearer student-token") return student;
+      if (request.authorization === "Bearer another-student-token") return anotherStudent;
       return null;
     },
     revokeSessions: async () => undefined,

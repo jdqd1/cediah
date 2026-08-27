@@ -27,9 +27,9 @@ const testEnvironment: ApiEnvironment = {
 
 function createIdentityProvider(): IdentityProvider {
   return {
-    getUser: async (accessToken) => {
-      if (accessToken === "test-user-token") return testUser;
-      if (accessToken === "other-user-token") return otherUser;
+    getUser: async (request) => {
+      if (request.authorization === "Bearer test-user-token") return testUser;
+      if (request.authorization === "Bearer other-user-token") return otherUser;
       return null;
     },
     revokeSessions: async () => undefined,
@@ -66,6 +66,7 @@ describe("test-video API", () => {
       },
       method: "POST",
       payload: {
+        durationSeconds: 420,
         fileName: "prueba-reproductor.mp4",
         fileSizeBytes: 42_000_000,
         mimeType: "video/mp4",
@@ -87,7 +88,10 @@ describe("test-video API", () => {
     });
     expect(directUploadInput).toMatchObject({
       creatorId: testUser.id,
+      durationSeconds: 420,
+      fileSizeBytes: 42_000_000,
       maxDurationSeconds: 900,
+      mimeType: "video/mp4",
     });
     expect(Date.parse(directUploadInput?.expiresAt ?? "")).toBeGreaterThan(Date.now());
 
@@ -121,6 +125,7 @@ describe("test-video API", () => {
       },
       method: "POST",
       payload: {
+        durationSeconds: 60,
         fileName: "prueba.mp4",
         fileSizeBytes: 1,
         mimeType: "video/mp4",
@@ -134,6 +139,7 @@ describe("test-video API", () => {
       },
       method: "POST",
       payload: {
+        durationSeconds: 60,
         fileName: "prueba.mp4",
         fileSizeBytes: 190_000_001,
         mimeType: "video/mp4",
@@ -148,6 +154,41 @@ describe("test-video API", () => {
     expect(oversized.statusCode).toBe(413);
     expect(oversized.json()).toEqual({ error: "video_test_file_too_large" });
 
+    await app.close();
+  });
+
+  it("rejects a declared video duration above the configured test limit", async () => {
+    const videoProvider: VideoProvider = {
+      createDirectUpload: async () => {
+        throw new Error("The provider must not be called");
+      },
+      createPlaybackSession: async () => {
+        throw new Error("The provider must not be called");
+      },
+      getVideoAsset: async () => null,
+    };
+    const app = await buildApp(testEnvironment, {
+      identityProvider: createIdentityProvider(),
+      videoProvider,
+    });
+
+    const response = await app.inject({
+      headers: {
+        authorization: "Bearer test-user-token",
+        "content-type": "application/json",
+      },
+      method: "POST",
+      payload: {
+        durationSeconds: 901,
+        fileName: "prueba.mp4",
+        fileSizeBytes: 42_000_000,
+        mimeType: "video/mp4",
+      },
+      url: "/v1/videos/test-uploads",
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({ error: "video_test_duration_too_long" });
     await app.close();
   });
 

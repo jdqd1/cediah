@@ -18,14 +18,14 @@ export default async function ContentStudioPage() {
         <section>
           <p className="eyebrow dark">Gestión de contenido</p>
           <h1>La identidad no está disponible.</h1>
-          <p>Configura Supabase Auth y la API antes de abrir el espacio editorial.</p>
+          <p>Configura PostgreSQL, Better Auth y la API antes de abrir el espacio editorial.</p>
           <Link href="/">Volver al inicio</Link>
         </section>
       </main>
     );
   }
 
-  const result = await getContentWorkspace(user.accessToken);
+  const result = await getContentWorkspace();
   if (result.status === "forbidden") {
     return (
       <main className="studio-gate">

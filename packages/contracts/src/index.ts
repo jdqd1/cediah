@@ -39,8 +39,15 @@ export type ProviderUser = {
   id: string;
 };
 
+export type IdentityRequest = {
+  authorization?: string;
+  cookie?: string;
+  forwardedFor?: string;
+  userAgent?: string;
+};
+
 export interface IdentityProvider {
-  getUser(accessToken: string): Promise<ProviderUser | null>;
+  getUser(request: IdentityRequest): Promise<ProviderUser | null>;
   revokeSessions(userId: string): Promise<void>;
 }
 
@@ -64,10 +71,8 @@ export type DirectVideoUpload = {
   expiresAt: string;
   externalVideoId: string;
   uploadUrl: string;
-  uploadType?: "multipart_post" | "supabase_signed";
+  uploadType?: "multipart_post" | "signed_put";
   uploadPath?: string;
-  uploadToken?: string;
-  storageBucket?: string;
 };
 
 export type VideoAsset = {
@@ -84,6 +89,7 @@ export type VideoPlaybackSession = {
 const UnsafeFileNameCharacters = /[\\/\u0000-\u001F]/;
 
 export const TestVideoUploadRequestSchema = z.object({
+  durationSeconds: z.number().finite().positive().max(36_000),
   fileName: z
     .string()
     .trim()
@@ -105,19 +111,8 @@ export const TestVideoUploadResponseSchema = z.object({
     expiresAt: z.string().datetime(),
     externalVideoId: z.string().min(1).max(64),
     uploadUrl: z.string().url(),
-    uploadType: z.enum(["multipart_post", "supabase_signed"]).default("multipart_post"),
+    uploadType: z.enum(["multipart_post", "signed_put"]).default("multipart_post"),
     uploadPath: z.string().min(1).optional(),
-    uploadToken: z.string().min(1).optional(),
-    storageBucket: z.string().min(1).optional(),
-  }).superRefine((upload, context) => {
-    if (upload.uploadType === "supabase_signed") {
-      if (!upload.uploadPath || !upload.uploadToken || !upload.storageBucket) {
-        context.addIssue({
-          code: "custom",
-          message: "Supabase signed uploads must include their path, token and bucket",
-        });
-      }
-    }
   }),
 });
 
@@ -143,8 +138,11 @@ export type TestVideoAssetResponse = z.infer<typeof TestVideoAssetResponseSchema
 export interface VideoProvider {
   createDirectUpload(input: {
     creatorId: string;
+    durationSeconds: number;
     expiresAt: string;
+    fileSizeBytes: number;
     maxDurationSeconds: number;
+    mimeType: TestVideoUploadRequest["mimeType"];
   }): Promise<DirectVideoUpload>;
   createPlaybackSession(
     videoId: string,
@@ -895,9 +893,9 @@ export type ContentAssetKind = z.infer<typeof ContentAssetKindSchema>;
 const ContentRecordSchema = z.object({
   asset: ContentAssetSchema.nullable().default(null),
   authorUserId: z.string().uuid(),
-  // Supabase serializes `timestamptz` values with a UTC offset (`+00:00`),
-  // while other providers commonly use the equivalent `Z` suffix. Both are
-  // valid RFC 3339 timestamps and must be accepted at this service boundary.
+  // PostgreSQL clients may serialize `timestamptz` values with a UTC offset
+  // (`+00:00`) or with the equivalent `Z` suffix. Both are valid RFC 3339
+  // timestamps and must be accepted at this service boundary.
   createdAt: z.string().datetime({ offset: true }),
   id: z.string().uuid(),
   publishedAt: z.string().datetime({ offset: true }).nullable(),

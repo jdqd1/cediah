@@ -19,8 +19,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { signOut } from "@/app/panel/actions";
-import { getBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { authClient } from "@/lib/auth/client";
 import { CediahLogo } from "./cediah-logo";
 import { GlobalContentSearch } from "./global-content-search";
 import {
@@ -175,12 +174,17 @@ export function AppShell({
   );
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const sidebarCollapsed = useSidebarCollapsedPreference();
-  const [viewer, setViewer] = useState<{ email: string } | null>(initialViewer ?? null);
+  const session = authClient.useSession();
+  const viewer = session.isPending
+    ? initialViewer ?? null
+    : session.data?.user.email
+      ? { email: session.data.user.email }
+      : null;
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
-  const shouldFetchViewer = !initialViewer;
 
   const closeSidebar = () => setSidebarOpen(false);
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
@@ -216,6 +220,18 @@ export function AppShell({
     }
   }
 
+  async function handleSignOut() {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    const { error } = await authClient.signOut();
+    if (error) {
+      setIsSigningOut(false);
+      return;
+    }
+
+    window.location.replace("/");
+  }
+
   useEffect(() => {
     const desktopMedia = window.matchMedia("(min-width: 961px)");
     const synchronizeViewport = () => {
@@ -227,32 +243,6 @@ export function AppShell({
     desktopMedia.addEventListener("change", synchronizeViewport);
     return () => desktopMedia.removeEventListener("change", synchronizeViewport);
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    const supabase = getBrowserSupabaseClient();
-
-    if (!supabase) return;
-
-    const synchronizeViewer = async () => {
-      const { data, error } = await supabase.auth.getUser();
-      if (!active) return;
-      setViewer(error || !data.user?.email ? null : { email: data.user.email });
-    };
-
-    if (shouldFetchViewer) void synchronizeViewer();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      setViewer(session?.user.email ? { email: session.user.email } : null);
-    });
-
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, [shouldFetchViewer]);
 
   useEffect(() => {
     setSidebarCollapsedPreference(true);
@@ -420,9 +410,14 @@ export function AppShell({
                           Administrador
                         </span>
                       )}
-                      <form action={signOut}>
-                        <button className="profile-sign-out" type="submit">Cerrar sesión</button>
-                      </form>
+                      <button
+                        className="profile-sign-out"
+                        disabled={isSigningOut}
+                        onClick={handleSignOut}
+                        type="button"
+                      >
+                        {isSigningOut ? "Cerrando sesión..." : "Cerrar sesión"}
+                      </button>
                     </div>
                   )}
                 </>

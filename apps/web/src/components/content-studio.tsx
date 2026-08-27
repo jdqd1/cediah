@@ -81,6 +81,10 @@ const primaryKinds = [
   { label: "Guía", value: "guide" },
 ] satisfies { label: string; value: ContentKind }[];
 
+// Non-video editorial assets stay disabled until they have an independent
+// storage provider. The private video test uses its own isolated flow.
+const contentAssetUploadsEnabled = false;
+
 const kindIcons: Record<ContentKind, typeof PlayCircle> = {
   flashcards: CardsThree,
   guide: Notebook,
@@ -350,11 +354,8 @@ function missingGuideContent(draft: ContentDraft) {
 function signedPut(url: string, file: File, onProgress: (value: number) => void) {
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
-    const form = new FormData();
-    form.append("cacheControl", "3600");
-    form.append("", file);
     request.open("PUT", url);
-    request.setRequestHeader("x-upsert", "false");
+    request.setRequestHeader("Content-Type", file.type);
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
     });
@@ -363,7 +364,7 @@ function signedPut(url: string, file: File, onProgress: (value: number) => void)
       if (request.status >= 200 && request.status < 300) resolve();
       else reject(new Error(`El archivo fue rechazado (${request.status}).`));
     });
-    request.send(form);
+    request.send(file);
   });
 }
 
@@ -1677,7 +1678,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                 </section>
               )}
 
-              {accepts && capabilities.canUpload && editable && (
+              {contentAssetUploadsEnabled && accepts && capabilities.canUpload && editable && (
                 <section className="studio-assets" aria-labelledby="studio-upload-title">
                   <div className="studio-assets-heading">
                     <span className="studio-assets-icon">
