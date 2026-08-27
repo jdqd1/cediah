@@ -92,10 +92,10 @@ function NavigationItem({
       href={item.href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
-      title={item.label}
     >
       <Icon size={21} weight={active ? "fill" : "regular"} />
       <span className="sidebar-link-label">{item.label}</span>
+      <span aria-hidden="true" className="sidebar-item-tooltip">{item.label}</span>
     </Link>
   );
 }
@@ -130,13 +130,13 @@ function NavigationGroup({
           aria-controls={"sidebar-submenu-" + groupKey}
           aria-expanded={open}
           className={labelClassName}
-          title={label}
           type="button"
           onClick={onToggle}
         >
           <Icon size={21} weight={active ? "fill" : "regular"} />
           <span className="sidebar-link-label">{label}</span>
           <CaretDown aria-hidden="true" className="sidebar-group-caret" size={16} />
+          <span aria-hidden="true" className="sidebar-item-tooltip">{label}</span>
         </button>
       </div>
       <div
@@ -247,6 +247,10 @@ export function AppShell({
       subscription.unsubscribe();
     };
   }, [shouldFetchViewer]);
+
+  useEffect(() => {
+    setSidebarCollapsedPreference(true);
+  }, [pathname]);
 
   useEffect(() => {
     if (!sidebarOpen || !window.matchMedia("(max-width: 960px)").matches) return;

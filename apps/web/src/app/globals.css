@@ -7495,13 +7495,13 @@ textarea:focus-visible {
   transition: grid-template-columns 180ms ease;
 }
 
-.studio-guide-delete {
+.studio-content-delete {
   border-color: #d8a2a2;
   background: #fff;
   color: #8d252a;
 }
 
-.studio-guide-delete:hover:not(:disabled) {
+.studio-content-delete:hover:not(:disabled) {
   border-color: #b9585d;
   background: #fff5f4;
 }
@@ -9112,7 +9112,7 @@ textarea:focus-visible {
 .studio-linked-video-field select { width: 100%; min-height: 42px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; padding: 0 0.65rem; color: var(--ink); font-size: 0.72rem; }
 
 .studio-editor-action.is-icon-only,
-.studio-guide-delete {
+.studio-content-delete {
   display: grid;
   width: 36px;
   min-width: 36px;

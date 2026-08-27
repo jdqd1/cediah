@@ -3198,3 +3198,166 @@ a.icon-back-link:hover,
     animation: none;
   }
 }
+
+/* August 2026 annotated review: shell hierarchy and focused UI corrections. */
+
+.app-shell,
+.app-shell.dashboard-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.app-body {
+  display: contents;
+}
+
+.app-topbar.app-topbar-simplified {
+  position: sticky;
+  z-index: 100;
+  top: 0;
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: var(--topbar-height);
+  grid-column: 1;
+  grid-row: 2;
+  height: calc(100svh - var(--topbar-height));
+}
+
+.app-main {
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.global-search-section[data-search-section="videos"] .global-search-section-heading > strong {
+  color: #18276d;
+}
+
+.global-search-section[data-search-section="guías"] .global-search-section-heading > strong {
+  color: #1a2760;
+}
+
+.published-content-header.published-rich-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.published-rich-guide-header .published-content-context {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.published-rich-guide-header .published-guide-title-row {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.studio-status-filter {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.topic-selector-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.topic-selector-controls > .studio-entity-create-button {
+  width: fit-content;
+  justify-self: start;
+}
+
+.studio-content-delete {
+  border-color: #efc4c4;
+  color: #b42318;
+}
+
+.studio-content-delete:hover {
+  border-color: #e79a9a;
+  background: #fff1f1;
+  color: #8f1d14;
+}
+
+.sidebar-item-tooltip {
+  display: none;
+}
+
+@media (min-width: 961px) {
+  .app-shell.sidebar-collapsed :is(.sidebar-link, .sidebar-group-link) {
+    position: relative;
+  }
+
+  .app-shell.sidebar-collapsed .sidebar-item-tooltip {
+    position: absolute;
+    z-index: 80;
+    left: calc(100% + 0.7rem);
+    top: 50%;
+    display: block;
+    width: max-content;
+    max-width: 13rem;
+    border: 1px solid #dbe3f5;
+    border-radius: 8px;
+    background: #18276d;
+    padding: 0.42rem 0.58rem;
+    color: #ffffff;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 16%);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.25;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(0.25rem, -50%);
+    transition: opacity 130ms ease, transform 130ms ease;
+    white-space: nowrap;
+  }
+
+  .app-shell.sidebar-collapsed :is(.sidebar-link, .sidebar-group-link):is(:hover, :focus-visible) .sidebar-item-tooltip {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+
+  .app-shell.sidebar-collapsed .app-sidebar,
+  .app-shell.sidebar-collapsed .sidebar-nav {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-shell,
+  .app-shell.dashboard-shell {
+    --topbar-height: 64px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: var(--topbar-height);
+    height: calc(100svh - var(--topbar-height));
+  }
+
+  .sidebar-backdrop {
+    top: var(--topbar-height);
+  }
+
+  .app-main {
+    grid-column: 1;
+  }
+}
+
+@media (min-width: 521px) and (max-width: 700px) {
+  .topbar-leading .topbar-brand .koraz-logo-wordmark {
+    display: block;
+  }
+}
+
+@media (max-width: 520px) {
+  .published-content-header.published-rich-guide-header {
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+}

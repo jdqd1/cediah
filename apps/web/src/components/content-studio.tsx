@@ -1180,10 +1180,11 @@ export function ContentStudio({ initialWorkspace }: Props) {
     }
   }
 
-  async function removeGuide() {
-    if (!item || item.kind !== "guide" || !capabilities.canPublish || busy) return;
+  async function removeContent() {
+    if (!item || !["guide", "video"].includes(item.kind) || !capabilities.canPublish || busy) return;
+    const kindLabel = item.kind === "guide" ? "guía" : "video";
     const confirmed = window.confirm(
-      `¿Eliminar permanentemente la guía “${item.title}”?\n\nSe borrarán su contenido y sus archivos asociados. Esta acción no se puede deshacer.`,
+      `¿Eliminar permanentemente ${kindLabel === "guía" ? "la" : "el"} ${kindLabel} “${item.title}”?\n\nSe borrarán su contenido y sus archivos asociados. Esta acción no se puede deshacer.`,
     );
     if (!confirmed) return;
 
@@ -1207,10 +1208,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setFile(null);
       setProgress(0);
       if (fileRef.current) fileRef.current.value = "";
-      setNotice({ text: "Guía eliminada permanentemente.", tone: "success" });
+      setNotice({ text: `${kindLabel === "guía" ? "Guía eliminada" : "Video eliminado"} permanentemente.`, tone: "success" });
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible eliminar la guía.",
+        text: error instanceof Error ? error.message : `No fue posible eliminar ${kindLabel === "guía" ? "la guía" : "el video"}.`,
         tone: "error",
       });
     } finally {
@@ -1517,7 +1518,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
         </label>
         <label className="studio-status-filter">
           <FunnelSimple aria-hidden="true" size={17} />
-          <span>Estado</span>
           <select
             aria-label="Filtrar por estado"
             value={statusFilter}
@@ -1630,14 +1630,14 @@ export function ContentStudio({ initialWorkspace }: Props) {
                         : action.label}
                     </button>
                   ))}
-                  {item?.kind === "guide" && capabilities.canPublish && (
+                  {item && ["guide", "video"].includes(item.kind) && capabilities.canPublish && (
                     <button
-                      aria-label={`Eliminar guía ${item.title}`}
-                      className="studio-button studio-editor-action studio-guide-delete"
+                      aria-label={`Eliminar ${item.kind === "guide" ? "guía" : "video"} ${item.title}`}
+                      className="studio-button studio-editor-action studio-content-delete"
                       disabled={busy !== null}
-                      title="Eliminar guía permanentemente"
+                      title={`Eliminar ${item.kind === "guide" ? "guía" : "video"} permanentemente`}
                       type="button"
-                      onClick={() => void removeGuide()}
+                      onClick={() => void removeContent()}
                     >
                       <Trash aria-hidden="true" size={16} />
                     </button>
@@ -1768,26 +1768,29 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                     const nextSubjectIds = event.target.checked
                                       ? Array.from(new Set([...current.subjectIds, subject.id]))
                                       : current.subjectIds.filter((id) => id !== subject.id);
-                                    const currentTopic = current.content.regions[0] ?? current.topic;
+                                    const currentTopics = uniqueRegions(
+                                      current.content.regions.length > 0
+                                        ? current.content.regions
+                                        : [current.topic],
+                                    );
                                     const previousTopics = topicsForSubjects(items, current.subjectIds);
                                     const nextTopics = topicsForSubjects(items, nextSubjectIds);
-                                    const topicWasExisting = previousTopics.some(
-                                      (value) => normalizeSearch(value) === normalizeSearch(currentTopic),
-                                    );
-                                    const topicStillAvailable = nextTopics.some(
-                                      (value) => normalizeSearch(value) === normalizeSearch(currentTopic),
-                                    );
-                                    const keepTopic = Boolean(
-                                      currentTopic &&
-                                      nextSubjectIds.length > 0 &&
-                                      (topicStillAvailable || !topicWasExisting),
-                                    );
-                                    const nextTopic = keepTopic ? currentTopic : "";
+                                    const nextRegions = nextSubjectIds.length > 0
+                                      ? currentTopics.filter((currentTopic) => {
+                                          const topicWasExisting = previousTopics.some(
+                                            (value) => normalizeSearch(value) === normalizeSearch(currentTopic),
+                                          );
+                                          const topicStillAvailable = nextTopics.some(
+                                            (value) => normalizeSearch(value) === normalizeSearch(currentTopic),
+                                          );
+                                          return topicStillAvailable || !topicWasExisting;
+                                        })
+                                      : [];
                                     return {
                                       ...current,
                                       subjectIds: nextSubjectIds,
-                                      topic: nextTopic,
-                                      content: { ...current.content, regions: nextTopic ? [nextTopic] : [] },
+                                      topic: nextRegions[0] ?? "",
+                                      content: { ...current.content, regions: nextRegions },
                                     } as ContentDraft;
                                   })}
                                 />
@@ -1827,12 +1830,14 @@ export function ContentStudio({ initialWorkspace }: Props) {
                         disabled={!editable || busy !== null}
                         subjectSelected={draft.subjectIds.length > 0}
                         suggestions={topicSuggestions}
-                        value={draft.content.regions[0] ?? draft.topic}
-                        onChange={(topic) =>
+                        values={draft.content.regions.length > 0
+                          ? draft.content.regions
+                          : draft.topic ? [draft.topic] : []}
+                        onChange={(regions) =>
                           setDraft({
                             ...draft,
-                            topic,
-                            content: { ...draft.content, regions: topic ? [topic] : [] },
+                            topic: regions[0] ?? "",
+                            content: { ...draft.content, regions },
                           } as ContentDraft)
                         }
                       />

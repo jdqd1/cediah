@@ -10,19 +10,19 @@ export function TopicSelector({
   onChange,
   subjectSelected,
   suggestions = [],
-  value,
+  values,
 }: {
   disabled?: boolean;
-  onChange: (value: string) => void;
+  onChange: (values: string[]) => void;
   subjectSelected: boolean;
   suggestions?: readonly string[];
-  value: string;
+  values: readonly string[];
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [input, setInput] = useState("");
   const options = useMemo(
-    () => uniqueRegions([...suggestions, ...(value ? [value] : [])]),
-    [suggestions, value],
+    () => uniqueRegions([...suggestions, ...values]),
+    [suggestions, values],
   );
   const cleanInput = cleanRegion(input);
   const existingTopic = options.find(
@@ -37,8 +37,17 @@ export function TopicSelector({
 
   function addTopic() {
     if (!interactive || !cleanInput) return;
-    onChange(existingTopic ?? cleanInput);
+    onChange(uniqueRegions([...values, existingTopic ?? cleanInput]));
     closeDialog();
+  }
+
+  function toggleTopic(topic: string) {
+    const selected = values.some(
+      (value) => normalizeRegion(value) === normalizeRegion(topic),
+    );
+    onChange(selected
+      ? values.filter((value) => normalizeRegion(value) !== normalizeRegion(topic))
+      : uniqueRegions([...values, topic]));
   }
 
   return (
@@ -52,14 +61,16 @@ export function TopicSelector({
           role="group"
         >
           {interactive && options.length > 0 ? options.map((topic) => {
-            const selected = normalizeRegion(topic) === normalizeRegion(value);
+            const selected = values.some(
+              (value) => normalizeRegion(value) === normalizeRegion(topic),
+            );
             return (
               <button
                 aria-pressed={selected}
                 className={selected ? "is-selected" : ""}
                 key={normalizeRegion(topic)}
                 type="button"
-                onClick={() => onChange(selected ? "" : topic)}
+                onClick={() => toggleTopic(topic)}
               >
                 <span className="topic-selector-check" aria-hidden="true">
                   {selected && <Check size={14} weight="bold" />}
@@ -88,7 +99,7 @@ export function TopicSelector({
       </div>
 
       <StudioNameDialog
-        description="El tema quedará disponible dentro de las materias seleccionadas al guardar."
+        description="El tema quedará disponible dentro de las materias seleccionadas y se sumará a tu selección actual."
         icon={<Tag size={21} />}
         inputLabel="Nombre del tema"
         maxLength={120}

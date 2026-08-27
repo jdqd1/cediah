@@ -65,7 +65,6 @@ function SearchResultItem({
         </span>
         <span className="global-search-result-copy">
           <strong><HighlightedText query={query} value={result.title} /></strong>
-          {result.topic ? <small><HighlightedText query={query} value={result.topic} /></small> : null}
           <span className={`global-search-result-excerpt is-${result.excerptType}`}>
             <HighlightedText query={query} value={result.excerpt} />
           </span>
@@ -89,22 +88,24 @@ function SearchSection({
   query: string;
   results: ContentSearchResult[];
 }) {
+  if (results.length === 0) return null;
+
   return (
-    <section className="global-search-section" aria-label={label}>
+    <section
+      className="global-search-section"
+      aria-label={label}
+      data-search-section={label.toLocaleLowerCase("es")}
+    >
       <header className="global-search-section-heading">
         <span className="global-search-section-icon" aria-hidden="true">{icon}</span>
         <strong>{label}</strong>
         <span>{resultCountLabel(results.length)}</span>
       </header>
-      {results.length > 0 ? (
-        <ul className="global-search-results">
-          {results.slice(0, 4).map((result) => (
-            <SearchResultItem key={result.id} onNavigate={onNavigate} query={query} result={result} />
-          ))}
-        </ul>
-      ) : (
-        <p className="global-search-empty-section">Sin coincidencias.</p>
-      )}
+      <ul className="global-search-results">
+        {results.slice(0, 4).map((result) => (
+          <SearchResultItem key={result.id} onNavigate={onNavigate} query={query} result={result} />
+        ))}
+      </ul>
     </section>
   );
 }

@@ -487,7 +487,7 @@ export function createSupabaseContentProvider(
     async deleteContent(input) {
       const access = await getStoredAccess(input.contentId);
       if (!access) return { status: "not_found" };
-      if (access.kind !== "guide" || !getContentCapabilities(input.roles).canPublish) {
+      if (!["guide", "video"].includes(access.kind) || !getContentCapabilities(input.roles).canPublish) {
         return { status: "not_found" };
       }
 
@@ -501,7 +501,7 @@ export function createSupabaseContentProvider(
         .from("content_items")
         .delete()
         .eq("id", input.contentId)
-        .eq("kind", "guide")
+        .eq("kind", access.kind)
         .eq("version", access.version)
         .select("id")
         .maybeSingle();
