@@ -3364,15 +3364,16 @@ a.icon-back-link:hover,
 
 /* August 2026 annotated mobile review: navigation and reading flow. */
 
-.subject-detail-heading,
-.subject-flow-heading {
+.app-main .subject-detail-heading,
+.app-main .subject-flow-heading {
   display: flex;
   align-items: center;
   gap: 0.7rem;
+  flex-wrap: nowrap;
 }
 
-.subject-detail-heading > h2,
-.subject-flow-heading > .subject-flow-title {
+.app-main .subject-detail-heading > h2,
+.app-main .subject-flow-heading > .subject-flow-title {
   min-width: 0;
   margin: 0;
 }
@@ -3393,5 +3394,19 @@ a.icon-back-link:hover,
 
   .app-shell.sidebar-open .topbar-leading .menu-trigger {
     visibility: hidden;
+  }
+
+  .app-shell.sidebar-collapsed .sidebar-group-link {
+    justify-content: flex-start;
+    gap: 0.8rem;
+    padding: 0.62rem 0.75rem;
+  }
+
+  .app-shell.sidebar-collapsed .sidebar-group-caret {
+    display: block;
+  }
+
+  .app-shell.sidebar-collapsed .sidebar-submenu {
+    display: grid;
   }
 }
