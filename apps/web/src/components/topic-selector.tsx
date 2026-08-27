@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Tag } from "@phosphor-icons/react";
+import { Check, Plus, Tag } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioNameDialog } from "./studio-name-dialog";
@@ -45,20 +45,37 @@ export function TopicSelector({
     <div className="topic-selector-field studio-field-wide">
       <span className="topic-selector-label">Seleccionar tema</span>
       <div className="topic-selector-controls">
-        <label>
-          <Tag aria-hidden="true" size={17} />
-          <select
-            aria-label="Seleccionar tema"
-            disabled={!interactive}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          >
-            <option value="">
-              {subjectSelected ? "Selecciona un tema" : "Selecciona primero una asignatura"}
-            </option>
-            {options.map((topic) => <option key={normalizeRegion(topic)} value={topic}>{topic}</option>)}
-          </select>
-        </label>
+        <div
+          aria-label="Seleccionar tema"
+          aria-disabled={!interactive}
+          className="topic-selector-options"
+          role="group"
+        >
+          {interactive && options.length > 0 ? options.map((topic) => {
+            const selected = normalizeRegion(topic) === normalizeRegion(value);
+            return (
+              <button
+                aria-pressed={selected}
+                className={selected ? "is-selected" : ""}
+                key={normalizeRegion(topic)}
+                type="button"
+                onClick={() => onChange(selected ? "" : topic)}
+              >
+                <span className="topic-selector-check" aria-hidden="true">
+                  {selected && <Check size={14} weight="bold" />}
+                </span>
+                <Tag aria-hidden="true" size={16} />
+                <span>{topic}</span>
+              </button>
+            );
+          }) : (
+            <p>
+              {subjectSelected
+                ? "Aún no hay temas. Añade el primero."
+                : "Selecciona primero una materia."}
+            </p>
+          )}
+        </div>
         <button
           className="studio-entity-create-button studio-entity-create-button-primary"
           disabled={!interactive}
@@ -71,7 +88,7 @@ export function TopicSelector({
       </div>
 
       <StudioNameDialog
-        description="El tema quedará disponible dentro de las asignaturas seleccionadas al guardar."
+        description="El tema quedará disponible dentro de las materias seleccionadas al guardar."
         icon={<Tag size={21} />}
         inputLabel="Nombre del tema"
         maxLength={120}

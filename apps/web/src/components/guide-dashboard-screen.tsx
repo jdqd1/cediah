@@ -12,6 +12,7 @@ import {
 import type { ContentItem, Subject } from "@cediah/contracts";
 import { type MouseEvent, useMemo, useState } from "react";
 import { publishedContentHref } from "@/lib/content-navigation";
+import { contentItemSearchText, getContentSearchExcerpt } from "@/lib/content-search";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
@@ -56,7 +57,6 @@ function GuideList({ guides, searchQuery = "", showSubject = false, subjectSlug,
         ...(showSubject
           ? guide.subjectIds.map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name ?? "")
           : []),
-        ...(topic ? [topic] : guideTopics(guide)),
       ]}
       hrefForItem={(guide) => {
         const fallbackSubject = subjects.find((subject) => guide.subjectIds.includes(subject.id));
@@ -68,6 +68,12 @@ function GuideList({ guides, searchQuery = "", showSubject = false, subjectSlug,
       }}
       items={guides}
       searchQuery={searchQuery}
+      summaryForItem={(guide) => {
+        const content = contentItemSearchText(guide);
+        return searchQuery.trim() && normalize(content).includes(normalize(searchQuery.trim()))
+          ? getContentSearchExcerpt(content, searchQuery)
+          : guide.summary;
+      }}
     />
   );
 }
@@ -130,7 +136,7 @@ export function GuideDashboardScreen({
   const visibleGuides = useMemo(() => {
     const search = normalize(query.trim());
     return topicGuides.filter((guide) => {
-      return !search || normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")}`).includes(search);
+      return !search || normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")} ${contentItemSearchText(guide)}`).includes(search);
     });
   }, [query, topicGuides]);
   const globalSearchResults = useMemo(() => {
@@ -141,7 +147,7 @@ export function GuideDashboardScreen({
       const subjectNames = guide.subjectIds
         .map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name ?? "")
         .join(" ");
-      return normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")} ${subjectNames}`).includes(search);
+      return normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")} ${subjectNames} ${contentItemSearchText(guide)}`).includes(search);
     });
   }, [guides, hasSelection, query, subjects]);
   function push(nextSubject = "", nextTopic = "") {

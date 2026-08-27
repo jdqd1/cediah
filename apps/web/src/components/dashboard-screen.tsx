@@ -69,10 +69,12 @@ function formatDuration(item: ContentItem) {
     return minutes + " min";
   }
   if (item.estimatedMinutes) return item.estimatedMinutes + " min";
-  return kindLabels[item.kind];
+  return null;
 }
 
 function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
+  const duration = formatDuration(item);
+
   return (
     <Link className="dashboard-video-card" href={contentHref(item)}>
       <div className="dashboard-video-media">
@@ -86,11 +88,10 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
         <span className="dashboard-play-button" aria-hidden="true">
           <PlayCircle size={49} weight="thin" />
         </span>
-        <span className="dashboard-video-duration">{formatDuration(item)}</span>
+        {duration && <span className="dashboard-video-duration">{duration}</span>}
       </div>
       <div className="dashboard-video-copy">
         <h3>{item.title}</h3>
-        <p>{item.topic}</p>
         <span className="dynamic-content-summary">{item.summary}</span>
       </div>
     </Link>
@@ -170,7 +171,6 @@ export function DashboardScreen({
                 const count = items.filter((item) => item.kind === kind).length;
                 return (
                   <Link className="study-material-card" href={href} key={kind}>
-                    <Image src={kindImages[kind]} alt="" fill sizes="200px" />
                     <span className="study-material-wash" />
                     <span className="study-material-icon">
                       <Icon size={31} weight="regular" />
@@ -197,21 +197,27 @@ export function DashboardScreen({
           <div className="dashboard-featured-content">
             {highlighted.length > 0 ? (
               <ol className="most-viewed-list">
-                {highlighted.map((item, index) => (
-                  <li key={item.id}>
-                    <span className="most-viewed-rank">{index + 1}</span>
-                    <Link href={contentHref(item)} className="most-viewed-link">
-                      <span className="most-viewed-image">
-                        <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
-                      </span>
-                      <span className="most-viewed-copy">
-                        <strong>{item.title}</strong>
-                        <small>{item.topic}</small>
-                        <small>{kindLabels[item.kind]} · {formatDuration(item)}</small>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
+                {highlighted.map((item, index) => {
+                  const duration = formatDuration(item);
+                  return (
+                    <li key={item.id}>
+                      <span className="most-viewed-rank">{index + 1}</span>
+                      <Link href={contentHref(item)} className="most-viewed-link">
+                        <span className="most-viewed-image">
+                          <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
+                        </span>
+                        <span className="most-viewed-copy">
+                          <strong>{item.title}</strong>
+                          <small>{item.topic}</small>
+                          <small>
+                            {kindLabels[item.kind]}
+                            {duration ? ` · ${duration}` : ""}
+                          </small>
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ol>
             ) : (
               <p className="dynamic-aside-empty">

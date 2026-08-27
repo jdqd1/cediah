@@ -215,6 +215,7 @@ function GuideBody({ item }: { item: GuideItem }) {
   const [favorite, setFavorite] = useState(false);
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
+  const outlineLinksRef = useRef<HTMLDivElement | null>(null);
   const drawerActionTimerRef = useRef<number | null>(null);
   useBodyScrollLock(mobileDrawer !== null);
   const manualNavigationRef = useRef(false);
@@ -254,6 +255,25 @@ function GuideBody({ item }: { item: GuideItem }) {
     headings.forEach((heading) => observer.observe(heading));
     return () => observer.disconnect();
   }, [outline]);
+
+  useEffect(() => {
+    if (!outlineExpanded || !visibleActiveHeadingId) return;
+    const container = outlineLinksRef.current;
+    const activeLink = container?.querySelector<HTMLElement>("a.is-active");
+    if (!container || !activeLink) return;
+
+    const linkTop = activeLink.offsetTop;
+    const linkBottom = linkTop + activeLink.offsetHeight;
+    const visibleTop = container.scrollTop;
+    const visibleBottom = visibleTop + container.clientHeight;
+    if (linkTop >= visibleTop + 8 && linkBottom <= visibleBottom - 8) return;
+
+    const targetTop = linkTop - (container.clientHeight - activeLink.offsetHeight) / 2;
+    container.scrollTo({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      top: Math.max(0, targetTop),
+    });
+  }, [outlineExpanded, visibleActiveHeadingId]);
 
   useEffect(
     () => () => {
@@ -335,10 +355,7 @@ function GuideBody({ item }: { item: GuideItem }) {
 
     if (window.matchMedia("(max-width: 760px)").matches && mobileDrawer) {
       runAfterClosingDrawer(beginNavigation);
-    } else {
-      if (!window.matchMedia("(max-width: 760px)").matches) setOutlineExpanded(false);
-      beginNavigation();
-    }
+    } else beginNavigation();
   }
 
   function goToKeyPoint(point: string) {
@@ -578,6 +595,7 @@ function GuideBody({ item }: { item: GuideItem }) {
             className="published-rich-guide-outline-content"
             hidden={!outlineExpanded}
             id="published-guide-outline-links"
+            ref={outlineLinksRef}
           >
             <div className="published-rich-guide-outline-links">
               {numberedOutline.map((outlineItem) => (

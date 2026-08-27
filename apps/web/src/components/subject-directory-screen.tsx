@@ -56,12 +56,6 @@ function visualFor(subject: Subject) {
   };
 }
 
-function resourceLabel(count: number, kind?: StudyContentKind) {
-  if (!kind) return count === 1 ? "1 recurso" : `${count} recursos`;
-  const label = studyContentKindLabels[kind].toLocaleLowerCase("es");
-  return `${count} ${count === 1 ? label.replace(/s$/, "") : label}`;
-}
-
 export function SubjectDirectoryScreen({
   available,
   initialKind,
@@ -150,7 +144,6 @@ export function SubjectDirectoryScreen({
               className="subject-resource-list"
               contextForItem={(item) => [
                 ...item.subjectIds.map((subjectId) => subjectById.get(subjectId)?.name ?? ""),
-                ...uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic]),
               ]}
               hrefForItem={(item) => {
                 const subject = item.subjectIds.map((subjectId) => subjectById.get(subjectId)).find(Boolean);
@@ -166,10 +159,9 @@ export function SubjectDirectoryScreen({
           </div>
         ) : !showingResourceResults && visibleSubjects.length > 0 ? (
           <ul className="subject-directory-grid">
-            {visibleSubjects.map((subject, index) => {
+            {visibleSubjects.map((subject) => {
               const visual = visualFor(subject);
               const Icon = visual.icon;
-              const count = subjectCounts.get(subject.id) ?? 0;
               return (
                 <li key={subject.id}>
                   <Link
@@ -181,10 +173,6 @@ export function SubjectDirectoryScreen({
                     </span>
                     <span className="subject-directory-copy">
                       <strong>{subject.name}</strong>
-                      <span>{resourceLabel(count, initialKind)}</span>
-                    </span>
-                    <span className="subject-directory-index" aria-hidden="true">
-                      {String(index + 1).padStart(2, "0")}
                     </span>
                     <ArrowRight className="subject-directory-arrow" aria-hidden="true" size={18} />
                   </Link>

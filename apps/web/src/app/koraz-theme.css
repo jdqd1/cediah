@@ -2435,3 +2435,766 @@ a.icon-back-link:hover,
     width: 5.7rem !important;
   }
 }
+
+/* August 2026 browser review: navigation, catalogs and study reader. */
+
+.app-body {
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1 0 auto;
+}
+
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-main > .brand-footer {
+  margin-top: auto;
+  padding-top: 2.25rem;
+}
+
+.app-topbar.app-topbar-simplified {
+  position: relative;
+  z-index: 100;
+  overflow: visible;
+  grid-template-columns: minmax(9rem, 1fr) minmax(20rem, 38rem) minmax(9rem, 1fr);
+  isolation: isolate;
+}
+
+.topbar-leading {
+  gap: 0.6rem;
+}
+
+.topbar-leading .topbar-brand {
+  min-width: 0;
+  grid-column: auto;
+  grid-row: auto;
+  justify-self: auto;
+}
+
+.topbar-leading .topbar-brand :is(.koraz-logo-mark, .koraz-logo-wordmark) {
+  filter: brightness(0) invert(1);
+}
+
+.topbar-popover-wrap {
+  position: relative;
+  z-index: 120;
+}
+
+.topbar-popover {
+  z-index: 130;
+}
+
+.global-content-search {
+  z-index: 115;
+}
+
+.global-content-search-panel {
+  z-index: 140;
+}
+
+.sidebar-topline {
+  justify-content: flex-end;
+}
+
+.sidebar-menu-trigger {
+  margin-left: auto;
+}
+
+.dashboard-video-grid {
+  width: 100%;
+  gap: 0.85rem;
+}
+
+.dashboard-video-card {
+  display: grid;
+  min-height: 8rem;
+  grid-template-columns: minmax(7.2rem, 42%) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.7rem;
+  border-radius: 15px;
+  padding: 0.42rem;
+  box-shadow: none;
+}
+
+.dashboard-video-card:hover {
+  border-color: #a5b4fc;
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+.dashboard-video-media {
+  min-height: 7.15rem;
+  aspect-ratio: auto;
+  border-radius: 11px;
+}
+
+.dashboard-play-button {
+  width: 42px;
+  height: 42px;
+}
+
+.dashboard-play-button svg {
+  width: 39px;
+  height: 39px;
+}
+
+.dashboard-video-duration {
+  right: 0.45rem;
+  bottom: 0.42rem;
+  padding: 0.25rem 0.36rem;
+  font-size: 0.62rem;
+}
+
+.dashboard-video-copy {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.45rem 0.5rem 0;
+}
+
+.dashboard-video-copy h3 {
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.dashboard-video-copy .dynamic-content-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.69rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.study-material-grid .study-material-card {
+  background-image:
+    linear-gradient(105deg, rgb(255 255 255 / 96%) 5%, rgb(255 255 255 / 70%) 58%, rgb(239 246 255 / 32%) 100%),
+    url("/textures/koraz-flow.jpg");
+  background-position: center;
+  background-size: cover;
+}
+
+.study-material-grid .study-material-card:nth-child(2) {
+  background-image:
+    linear-gradient(105deg, rgb(255 255 255 / 96%) 5%, rgb(238 242 255 / 68%) 62%, rgb(224 231 255 / 30%) 100%),
+    url("/textures/koraz-flow.jpg");
+}
+
+.study-material-grid .study-material-card:nth-child(3) {
+  background-image:
+    linear-gradient(105deg, rgb(255 255 255 / 96%) 5%, rgb(245 243 255 / 70%) 62%, rgb(237 233 254 / 30%) 100%),
+    url("/textures/koraz-flow.jpg");
+}
+
+.study-material-grid .study-material-card:nth-child(4) {
+  background-image:
+    linear-gradient(105deg, rgb(255 255 255 / 96%) 5%, rgb(236 253 245 / 68%) 62%, rgb(220 252 231 / 28%) 100%),
+    url("/textures/koraz-flow.jpg");
+}
+
+.study-material-grid .study-material-wash {
+  background: linear-gradient(90deg, rgb(255 255 255 / 34%), transparent 78%);
+}
+
+.app-main .subject-directory-item {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+.app-main .subject-directory-copy {
+  gap: 0;
+}
+
+.app-main .subject-destination {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.app-main .subject-destination-copy {
+  align-content: center;
+}
+
+.app-main .subject-destination-meta svg,
+.app-main .subject-directory-arrow {
+  color: #111827;
+}
+
+.published-rich-guide-outline,
+.published-rich-guide-support {
+  height: auto;
+  max-height: calc(100svh - var(--guide-topbar-height) - var(--guide-reader-actionbar-height) - 2rem);
+  align-self: start;
+  overflow: hidden;
+  border-color: #dbe3f5;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 0.85rem 2.2rem rgb(30 41 59 / 7%);
+}
+
+.published-rich-guide-outline-heading,
+.published-rich-guide-support-heading {
+  min-height: 54px;
+  background: linear-gradient(180deg, #ffffff, #fbfcff);
+  padding: 0.7rem 0.72rem 0.7rem 0.85rem;
+  color: #192557;
+}
+
+.published-rich-guide-outline-heading:hover,
+.published-rich-guide-support-heading:hover {
+  background: #f8faff;
+}
+
+.published-rich-guide-outline-heading > span:first-child svg,
+.published-rich-guide-support-heading > span svg {
+  color: #4361ee;
+}
+
+.published-rich-guide-outline-toggle,
+.published-rich-guide-support-toggle {
+  position: static;
+  width: 30px;
+  height: 30px;
+  border-color: #dbe3f5;
+  border-radius: 9px;
+  background: #f8faff;
+  color: #334155;
+  box-shadow: none;
+  transform: none;
+}
+
+.published-rich-guide-outline-toggle:hover,
+.published-rich-guide-support-toggle:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #1c35a6;
+  transform: none;
+}
+
+.published-rich-guide-support-expand {
+  border-color: #dbe3f5;
+  background: #f8faff;
+  color: #64748b;
+}
+
+.published-rich-guide-support-expand:hover,
+.published-rich-guide-support-expand[aria-pressed="true"] {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #1c35a6;
+}
+
+.published-rich-guide-outline-content,
+.published-rich-guide-support-content {
+  max-height: calc(100svh - var(--guide-topbar-height) - var(--guide-reader-actionbar-height) - 5.8rem);
+  overscroll-behavior: contain;
+  scrollbar-color: #c7d2fe transparent;
+  scrollbar-width: thin;
+}
+
+.published-rich-guide-outline-links {
+  gap: 0.16rem;
+  border-top-color: #e5eaf5;
+  padding: 0.55rem;
+}
+
+.published-rich-guide-outline-links a {
+  min-height: 36px;
+  grid-template-columns: 1.65rem minmax(0, 1fr);
+  gap: 0.42rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+  padding: 0.44rem 0.5rem;
+  color: #475569;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.published-rich-guide-outline-links a:hover {
+  border-color: #c7d2fe;
+  background: #f5f7ff;
+  color: #1c35a6;
+}
+
+.published-rich-guide-outline-links a.is-level-1.is-active,
+.published-rich-guide-outline-links a.is-level-2.is-active,
+.published-rich-guide-outline-links a.is-level-3.is-active {
+  border-left-color: #4361ee;
+  background: #eef2ff;
+  color: #1c35a6;
+  font-weight: 760;
+}
+
+.published-rich-guide-outline-links a.is-active > span {
+  color: #4361ee;
+}
+
+.published-rich-guide-outline-links a.is-level-2 {
+  padding-left: 0.78rem;
+  color: #64748b;
+}
+
+.published-rich-guide-outline-links a.is-level-3 {
+  padding-left: 1.15rem;
+  color: #7c8aa0;
+}
+
+.published-rich-guide-outline.is-collapsed,
+.published-rich-guide-support.is-collapsed {
+  width: 3.5rem;
+  min-height: 3.5rem;
+  height: 3.5rem;
+  max-height: 3.5rem;
+  border-radius: 14px;
+}
+
+.published-rich-guide-outline.is-collapsed .published-rich-guide-outline-heading,
+.published-rich-guide-support.is-collapsed .published-rich-guide-support-heading {
+  min-height: 3.4rem;
+  justify-content: center;
+  padding: 0.25rem;
+}
+
+.published-rich-guide-outline.is-collapsed .published-rich-guide-outline-heading > span,
+.published-rich-guide-support.is-collapsed .published-rich-guide-support-heading > span {
+  display: none;
+}
+
+.published-rich-guide-support-content {
+  padding: 0.7rem;
+  border-top-color: #e5eaf5;
+}
+
+.published-rich-guide-support-grid {
+  gap: 0.65rem;
+}
+
+.published-rich-guide-support-grid > .published-rich-guide-resource {
+  border-color: #e1e7f2;
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+.published-rich-guide-resource-trigger {
+  min-height: 50px;
+  padding: 0.65rem 0.72rem;
+}
+
+.published-rich-guide-resource-icon {
+  border-radius: 9px;
+  background: #eef2ff;
+  color: #4361ee;
+}
+
+.published-rich-guide-resource-key-points .published-rich-guide-resource-icon {
+  background: #fff7e6;
+  color: #b7791f;
+}
+
+.published-rich-guide-key-points {
+  overflow: hidden;
+  border: 1px solid #e1e7f2;
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.published-rich-guide-key-points li {
+  min-height: 3.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom-color: #e8edf6;
+  background: #ffffff;
+  padding: 0.68rem 2.65rem 0.68rem 0.7rem;
+  color: #334155;
+}
+
+.published-rich-guide-key-points li:nth-child(even) {
+  background: #fbfcff;
+}
+
+.published-rich-guide-key-points li > button {
+  top: 50%;
+  right: 0.58rem;
+  border-color: #dbe3f5;
+  background: #f8faff;
+  color: #4361ee;
+  transform: translateY(-50%);
+}
+
+.published-rich-guide-key-points li > button:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #1c35a6;
+  transform: translateY(-50%) translateX(1px);
+}
+
+.published-rich-guide-support .published-question-answer-list {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #e1e7f2;
+  border-radius: 11px;
+  background: #ffffff;
+}
+
+.published-rich-guide-support .published-question-answer-card {
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+.published-rich-guide-support .published-question-answer-card + .published-question-answer-card {
+  border-top: 1px solid #e8edf6;
+}
+
+.published-rich-guide-support .published-question-answer-card > header {
+  border-bottom: 0;
+  background: transparent;
+  padding: 0.75rem 0.7rem 0.55rem;
+}
+
+.published-rich-guide-support .published-question-answer-card > header > span {
+  border-radius: 8px;
+  background: #4361ee;
+}
+
+.published-rich-guide-support .published-question-answer-response {
+  border-color: #d8eee2;
+  border-radius: 9px;
+  background: #f2faf5;
+}
+
+.published-rich-guide-article .rich-guide-heading-1,
+.published-rich-guide-article h1.rich-guide-heading {
+  color: #1c35a6;
+}
+
+.published-rich-guide-article .rich-guide-heading-2,
+.published-rich-guide-article h2.rich-guide-heading {
+  color: #1c285f;
+}
+
+.published-rich-guide-article .rich-guide-heading-3,
+.published-rich-guide-article h3.rich-guide-heading {
+  color: #192557;
+}
+
+.rich-guide-table-wrap {
+  box-shadow: 0 0.7rem 1.8rem rgb(30 41 59 / 6%);
+}
+
+.rich-guide-table {
+  border-color: #d9e1f0;
+}
+
+.rich-guide-table th,
+.rich-guide-table td {
+  border-color: #e1e7f2;
+}
+
+.rich-guide-table th {
+  background: linear-gradient(180deg, #eef2ff, #f5f7ff);
+  color: #192557;
+}
+
+.rich-guide-table tbody tr:nth-child(even) td {
+  background: #f8faff;
+}
+
+.rich-guide-table tbody tr:hover td {
+  background: #f1f5ff;
+}
+
+.studio-status-filter {
+  position: relative;
+  z-index: 3;
+}
+
+.studio-status-filter select {
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.studio-subject-options {
+  display: grid;
+  max-height: 18rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.38rem;
+  overflow-y: auto;
+  padding: 0.15rem 0.25rem 0.15rem 0;
+  overscroll-behavior: contain;
+  scrollbar-color: #c7d2fe transparent;
+  scrollbar-width: thin;
+}
+
+.studio-subject-option-row {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+}
+
+.studio-subject-option {
+  min-height: 3.15rem;
+  border-color: #dfe5f1;
+  border-radius: 10px;
+  padding: 0.58rem 0.72rem;
+}
+
+.studio-subject-option:hover,
+.studio-subject-option.is-selected {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+}
+
+.studio-subject-option input {
+  accent-color: #4361ee;
+}
+
+.studio-subject-delete {
+  width: 3.15rem;
+  flex-basis: 3.15rem;
+  border-color: #dfe5f1;
+  border-radius: 10px;
+}
+
+.topic-selector-controls {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.topic-selector-options {
+  display: grid;
+  max-height: 15rem;
+  gap: 0.35rem;
+  overflow-y: auto;
+  border: 1px solid #dfe5f1;
+  border-radius: 11px;
+  background: #ffffff;
+  padding: 0.4rem;
+  overscroll-behavior: contain;
+  scrollbar-color: #c7d2fe transparent;
+  scrollbar-width: thin;
+}
+
+.topic-selector-options > button {
+  display: grid;
+  min-height: 2.75rem;
+  grid-template-columns: 1.25rem auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.45rem 0.58rem;
+  color: #475569;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.topic-selector-options > button:hover {
+  border-color: #dbe3f5;
+  background: #f8faff;
+  color: #1c35a6;
+}
+
+.topic-selector-options > button.is-selected {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #1c35a6;
+  font-weight: 700;
+}
+
+.topic-selector-check {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #ffffff;
+}
+
+.topic-selector-options > button.is-selected .topic-selector-check {
+  border-color: #4361ee;
+  background: #4361ee;
+}
+
+.topic-selector-options > p {
+  padding: 0.75rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.route-loading-screen {
+  background:
+    radial-gradient(circle at 50% 42%, rgb(224 231 255 / 70%), transparent 28rem),
+    #f8faff;
+}
+
+.route-loading-lockup {
+  display: grid;
+  width: min(18rem, 78vw);
+  justify-items: center;
+  gap: 1rem;
+  color: #64748b;
+  text-align: center;
+}
+
+.route-loading-lockup .cediah-logo {
+  width: max-content;
+  color: #192557;
+}
+
+.route-loading-lockup .koraz-logo-mark {
+  width: 2.7rem !important;
+  height: 2.7rem !important;
+  flex-basis: 2.7rem;
+}
+
+.route-loading-lockup .koraz-logo-wordmark {
+  width: 7.8rem !important;
+}
+
+.route-loading-lockup p {
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.route-loading-progress {
+  display: block;
+  width: 8rem;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dbe3f5;
+}
+
+.route-loading-progress > span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4361ee, #7c3aed);
+  animation: route-loading-travel 1.15s ease-in-out infinite alternate;
+}
+
+@keyframes route-loading-travel {
+  from { transform: translateX(-12%); }
+  to { transform: translateX(150%); }
+}
+
+@media (min-width: 961px) {
+  .sidebar-brand {
+    display: none;
+  }
+
+  .sidebar-topline,
+  .app-shell.sidebar-collapsed .sidebar-topline {
+    justify-content: flex-end;
+    padding-inline: 0.85rem;
+  }
+
+  .topbar-leading .menu-trigger {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-topbar.app-topbar-simplified {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    padding-inline: 0.85rem;
+  }
+
+  .topbar-leading .menu-trigger {
+    display: grid;
+  }
+
+  .sidebar-topline {
+    justify-content: space-between;
+  }
+
+  .sidebar-menu-trigger {
+    display: none;
+  }
+
+  .sidebar-brand {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 700px) {
+  .topbar-leading {
+    gap: 0.4rem;
+  }
+
+  .topbar-leading .topbar-brand .koraz-logo-wordmark {
+    display: none;
+  }
+
+  .topbar-leading .topbar-brand .koraz-logo-mark {
+    width: 28px !important;
+    height: 28px !important;
+    flex-basis: 28px;
+  }
+
+  .dashboard-video-card {
+    flex-basis: min(80vw, 19rem);
+    grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
+  }
+
+  .dashboard-video-media {
+    min-height: 7.4rem;
+  }
+
+  .dashboard-main > .brand-footer {
+    padding-top: 1.5rem;
+  }
+
+  .topic-selector-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topic-selector-controls > .studio-entity-create-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 760px) {
+  .published-rich-guide-outline,
+  .published-rich-guide-support,
+  .published-rich-guide-outline.is-collapsed,
+  .published-rich-guide-support.is-collapsed {
+    width: min(88vw, 22rem);
+    height: auto;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .published-rich-guide-outline.is-collapsed .published-rich-guide-outline-heading > span,
+  .published-rich-guide-support.is-collapsed .published-rich-guide-support-heading > span {
+    display: inline-flex;
+  }
+
+  .published-rich-guide-outline-content,
+  .published-rich-guide-support-content {
+    max-height: calc(100svh - var(--guide-topbar-height) - var(--guide-mobile-toolbar-clearance) - 3.6rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading-progress > span {
+    width: 62%;
+    animation: none;
+  }
+}

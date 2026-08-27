@@ -1,6 +1,8 @@
 import type { ContentItem, RichTextDocument } from "@cediah/contracts";
 import { describe, expect, it } from "vitest";
 import {
+  contentItemSearchText,
+  getContentSearchExcerpt,
   getSearchMatchRanges,
   searchPublishedContent,
 } from "./content-search";
@@ -137,5 +139,17 @@ describe("published content search", () => {
     const [range] = getSearchMatchRanges(value, "triangulo");
 
     expect(value.slice(range?.start, range?.end)).toBe("Triángulo");
+  });
+
+  it("exposes full guide text and a focused excerpt for catalog searches", () => {
+    const guide = guideItem({
+      body: "El peritoneo parietal tapiza la pared abdominopélvica y conserva sensibilidad somática.",
+      summary: "Introducción al abdomen.",
+    });
+    const searchableText = contentItemSearchText(guide);
+
+    expect(searchableText).toContain("sensibilidad somática");
+    expect(getContentSearchExcerpt(searchableText, "sensibilidad somatica"))
+      .toContain("sensibilidad somática");
   });
 });

@@ -21,20 +21,20 @@ import {
   studyContentKindLabels,
   type StudyContentKind,
 } from "@/lib/content-navigation";
+import { contentItemSearchText, getContentSearchExcerpt } from "@/lib/content-search";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
 
 const sectionDefinitions: Array<{
-  description: string;
   icon: typeof BookOpen;
   kind: StudyContentKind;
 }> = [
-  { icon: PlayCircle, kind: "video", description: "Clases y explicaciones audiovisuales" },
-  { icon: BookOpen, kind: "guide", description: "Lecturas y herramientas de estudio" },
-  { icon: CardsThree, kind: "flashcards", description: "Tarjetas para practicar recuerdo activo" },
-  { icon: ClipboardText, kind: "quiz", description: "Preguntas para comprobar lo aprendido" },
+  { icon: PlayCircle, kind: "video" },
+  { icon: BookOpen, kind: "guide" },
+  { icon: CardsThree, kind: "flashcards" },
+  { icon: ClipboardText, kind: "quiz" },
 ];
 
 const kindSearchLabels: Record<StudyContentKind, string> = {
@@ -70,7 +70,6 @@ function ResourceList({
     <ContentResourceList
       ariaLabel={`Recursos de ${subject.name}`}
       className="subject-resource-list"
-      contextForItem={(item) => itemTopics(item)}
       hrefForItem={(item) => publishedContentHref(item, {
         origin: "asignatura",
         subjectSlug: subject.slug,
@@ -78,6 +77,12 @@ function ResourceList({
       })}
       items={items}
       searchQuery={searchQuery}
+      summaryForItem={(item) => {
+        const content = contentItemSearchText(item);
+        return searchQuery.trim() && normalize(content).includes(normalize(searchQuery.trim()))
+          ? getContentSearchExcerpt(content, searchQuery)
+          : item.summary;
+      }}
     />
   );
 }
@@ -107,7 +112,7 @@ export function SubjectDetailScreen({
     return kindItems.filter((item) => {
       const matchesTopic = searching || !topic || itemTopics(item).some((value) => normalize(value) === normalize(topic));
       const matchesSearch = !query || normalize(
-        `${item.title} ${item.summary} ${item.topic} ${itemTopics(item).join(" ")}`,
+        `${item.title} ${item.summary} ${item.topic} ${itemTopics(item).join(" ")} ${contentItemSearchText(item)}`,
       ).includes(query);
       return matchesTopic && matchesSearch;
     });
@@ -168,10 +173,8 @@ export function SubjectDetailScreen({
                     </span>
                     <span className="subject-destination-copy">
                       <strong>{studyContentKindLabels[section.kind]}</strong>
-                      <span>{section.description}</span>
                     </span>
                     <span className="subject-destination-meta">
-                      <small>{section.count}</small>
                       <ArrowRight aria-hidden="true" size={18} />
                     </span>
                   </>

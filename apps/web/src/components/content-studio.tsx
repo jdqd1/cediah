@@ -79,7 +79,6 @@ const kinds: { label: string; value: ContentKind }[] = [
 const primaryKinds = [
   { label: "Video", value: "video" },
   { label: "Guía", value: "guide" },
-  { label: "Tema", value: "topic" },
 ] satisfies { label: string; value: ContentKind }[];
 
 const kindIcons: Record<ContentKind, typeof PlayCircle> = {
@@ -110,8 +109,8 @@ const errors: Record<string, string> = {
   invalid_content_transition: "La transición de estado no es válida.",
   not_found: "El contenido no existe o no tienes acceso.",
   unauthorized: "Tu sesión terminó. Vuelve a iniciar sesión.",
-  invalid_subject: "Escribe un nombre válido para la asignatura.",
-  subject_conflict: "Ya existe una asignatura con ese nombre.",
+  invalid_subject: "Escribe un nombre válido para la materia.",
+  subject_conflict: "Ya existe una materia con ese nombre.",
 };
 
 function labelOf<T extends string>(options: { label: string; value: T }[], value: T) {
@@ -1032,10 +1031,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
       );
       setNewSubjectName("");
       setSubjectCreateOpen(false);
-      setNotice({ text: `Asignatura “${parsed.data.name}” creada y seleccionada.`, tone: "success" });
+      setNotice({ text: `Materia “${parsed.data.name}” creada y seleccionada.`, tone: "success" });
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible crear la asignatura.",
+        text: error instanceof Error ? error.message : "No fue posible crear la materia.",
         tone: "error",
       });
     } finally {
@@ -1049,7 +1048,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       ? "1 publicación dejará de estar clasificada en ella"
       : `${subject.contentCount} publicaciones dejarán de estar clasificadas en ella`;
     const confirmed = window.confirm(
-      `¿Eliminar la asignatura “${subject.name}”?\n\n${resourceLabel}. Las publicaciones no se eliminarán. Esta acción no se puede deshacer.`,
+      `¿Eliminar la materia “${subject.name}”?\n\n${resourceLabel}. Las publicaciones no se eliminarán. Esta acción no se puede deshacer.`,
     );
     if (!confirmed) return;
 
@@ -1070,10 +1069,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setDraft((current) => current
         ? { ...current, subjectIds: current.subjectIds.filter((id) => id !== subject.id) } as ContentDraft
         : current);
-      setNotice({ text: `Asignatura “${subject.name}” eliminada. El contenido se conservó.`, tone: "success" });
+      setNotice({ text: `Materia “${subject.name}” eliminada. El contenido se conservó.`, tone: "success" });
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible eliminar la asignatura.",
+        text: error instanceof Error ? error.message : "No fue posible eliminar la materia.",
         tone: "error",
       });
     } finally {
@@ -1095,7 +1094,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setNotice({
         text: item.status === "published"
           ? capabilities.canEditAll
-            ? "El contenido publicado sólo permite actualizar sus asignaturas, tema y video relacionado desde este editor."
+            ? "El contenido publicado sólo permite actualizar sus materias, tema y video relacionado desde este editor."
             : "No tienes permisos para reorganizar contenido publicado."
           : "Sólo coordinación o administración pueden editar contenido archivado.",
         tone: "error",
@@ -1491,7 +1490,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
               { label: "Todo", value: "all" },
               { label: "Videos", value: "video" },
               { label: "Guías", value: "guide" },
-              { label: "Temas", value: "topic" },
             ] as const).map((option) => (
               <button
                 aria-pressed={kindFilter === option.value}
@@ -1515,7 +1513,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
             <option value="all">Todos los tipos</option>
             <option value="video">Videos</option>
             <option value="guide">Guías</option>
-            <option value="topic">Temas</option>
           </select>
         </label>
         <label className="studio-status-filter">
@@ -1756,10 +1753,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       <section className="studio-subject-assignment studio-field-wide" aria-labelledby="studio-subject-title">
                         <div className="studio-subject-heading">
                           <div>
-                            <h5 id="studio-subject-title">Asignaturas</h5>
+                            <h5 id="studio-subject-title">Materias</h5>
                           </div>
                         </div>
-                        <div className="studio-subject-options" role="group" aria-label="Asignaturas del contenido">
+                        <div className="studio-subject-options" role="group" aria-label="Materias del contenido">
                           {subjects.map((subject) => (
                             <div className="studio-subject-option-row" key={subject.id}>
                               <label className={`studio-subject-option ${draft.subjectIds.includes(subject.id) ? "is-selected" : ""}`.trim()}>
@@ -1801,7 +1798,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                               </label>
                               {capabilities.canEditAll && (
                                 <button
-                                  aria-label={`Eliminar asignatura ${subject.name}`}
+                                  aria-label={`Eliminar materia ${subject.name}`}
                                   className="studio-subject-delete"
                                   disabled={busy !== null}
                                   title={`Eliminar ${subject.name}`}
@@ -1813,7 +1810,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                               )}
                             </div>
                           ))}
-                          {subjects.length === 0 && <p className="studio-subject-empty">Crea la primera asignatura para organizar el contenido.</p>}
+                          {subjects.length === 0 && <p className="studio-subject-empty">Crea la primera materia para organizar el contenido.</p>}
                         </div>
                         <div className="studio-new-subject">
                           <button
@@ -1822,7 +1819,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                             type="button"
                             onClick={() => setSubjectCreateOpen(true)}
                           >
-                            <Plus aria-hidden="true" size={16} /> Nueva asignatura
+                            <Plus aria-hidden="true" size={16} /> Nueva materia
                           </button>
                         </div>
                       </section>
@@ -1861,29 +1858,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
                           </select>
                         </label>
                       )}
-                      {draft.kind !== "topic" && draft.kind !== "guide" && (
-                        <label className="studio-field studio-field-wide">
-                          <span>Resumen</span>
-                          <textarea
-                            required
-                            maxLength={2000}
-                            rows={3}
-                            value={draft.summary}
-                            onChange={(event) => {
-                              const summary = event.target.value;
-                              setDraft(
-                                draft.kind === "video"
-                                  ? {
-                                      ...draft,
-                                      summary,
-                                      content: { ...draft.content, description: summary },
-                                    }
-                                  : ({ ...draft, summary } as ContentDraft),
-                              );
-                            }}
-                          />
-                        </label>
-                      )}
                     </div>
                   </section>
 
@@ -1909,14 +1883,14 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
       <StudioNameDialog
         busy={busy === "subject"}
-        description="La nueva asignatura quedará seleccionada automáticamente en este contenido."
+        description="La nueva materia quedará seleccionada automáticamente en este contenido."
         icon={<GraduationCap size={22} />}
-        inputLabel="Nombre de la asignatura"
+        inputLabel="Nombre de la materia"
         maxLength={120}
         open={subjectCreateOpen}
         placeholder="Ej. Anatomía"
-        submitLabel="Crear asignatura"
-        title="Nueva asignatura"
+        submitLabel="Crear materia"
+        title="Nueva materia"
         value={newSubjectName}
         onChange={setNewSubjectName}
         onClose={() => {

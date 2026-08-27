@@ -4,7 +4,6 @@ import {
   BookOpen,
   CardsThree,
   CheckSquareOffset,
-  CircleNotch,
   ClipboardText,
   House,
   GraduationCap,
@@ -17,7 +16,7 @@ import {
   ShieldCheck,
 } from "@phosphor-icons/react";
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
-import Link, { useLinkStatus } from "next/link";
+import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -76,24 +75,6 @@ function getProfileInitials(email: string) {
   return (localPart.slice(0, 2) || "US").toUpperCase();
 }
 
-function NavigationItemStatus({ label }: { label: string }) {
-  const { pending } = useLinkStatus();
-
-  if (!pending) return null;
-
-  return (
-    <span
-      className="sidebar-link-pending"
-      role="status"
-      aria-label={`Abriendo ${label}`}
-    >
-      <span className="sidebar-link-spinner" aria-hidden="true">
-        <CircleNotch size={16} />
-      </span>
-    </span>
-  );
-}
-
 function NavigationItem({
   item,
   activeKey,
@@ -115,7 +96,6 @@ function NavigationItem({
     >
       <Icon size={21} weight={active ? "fill" : "regular"} />
       <span className="sidebar-link-label">{item.label}</span>
-      <NavigationItemStatus label={item.label} />
     </Link>
   );
 }
@@ -307,6 +287,15 @@ export function AppShell({
     >
       <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
         <div className="sidebar-topline">
+          <Link
+            className="sidebar-brand"
+            href="/dashboard"
+            aria-label="Koraz, inicio"
+            onClick={closeSidebar}
+            title="Ir al inicio"
+          >
+            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+          </Link>
           <button
             aria-controls="app-sidebar"
             aria-expanded={!sidebarCollapsed}
@@ -318,15 +307,6 @@ export function AppShell({
           >
             <List aria-hidden="true" size={25} />
           </button>
-          <Link
-            className="sidebar-brand"
-            href="/dashboard"
-            aria-label="Koraz, inicio"
-            onClick={closeSidebar}
-            title="Ir al inicio"
-          >
-            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
-          </Link>
           <button
             className="sidebar-close"
             type="button"
@@ -399,6 +379,14 @@ export function AppShell({
       <div className="app-body">
         <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
           <div className="topbar-leading">
+            <Link
+              className="topbar-brand"
+              href="/dashboard"
+              aria-label="Koraz, inicio"
+              title="Ir al inicio"
+            >
+              <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+            </Link>
             <button
               className="menu-trigger"
               ref={menuTriggerRef}
