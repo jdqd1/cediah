@@ -86,14 +86,13 @@ function NavigationItem({
   const active = item.key === activeKey;
   return (
     <Link
-      className={`sidebar-link ${active ? "is-active" : ""}`.trim()}
+      className={`modern-nav-item ${active ? "is-active" : ""}`.trim()}
       href={item.href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
     >
-      <Icon size={21} weight={active ? "fill" : "regular"} />
-      <span className="sidebar-link-label">{item.label}</span>
-      <span aria-hidden="true" className="sidebar-item-tooltip">{item.label}</span>
+      <Icon size={20} weight={active ? "fill" : "regular"} />
+      <span>{item.label}</span>
     </Link>
   );
 }
@@ -118,36 +117,35 @@ function NavigationGroup({
   groupKey: string;
 }) {
   const active = activeKey === groupKey || childItems.some((item) => item.key === activeKey);
-  const groupClassName = "sidebar-nav-group-item" + (active ? " is-active" : "");
-  const labelClassName = "sidebar-group-link" + (active ? " is-active" : "");
+  const labelClassName = `modern-nav-item ${active ? "is-active" : ""}`;
 
   return (
-    <section className={groupClassName}>
-      <div className="sidebar-group-heading">
-        <button
-          aria-controls={"sidebar-submenu-" + groupKey}
-          aria-expanded={open}
-          className={labelClassName}
-          type="button"
-          onClick={onToggle}
-        >
-          <Icon size={21} weight={active ? "fill" : "regular"} />
-          <span className="sidebar-link-label">{label}</span>
-          <CaretDown aria-hidden="true" className="sidebar-group-caret" size={16} />
-          <span aria-hidden="true" className="sidebar-item-tooltip">{label}</span>
-        </button>
-      </div>
-      <div
-        aria-hidden={!open}
-        className={"sidebar-submenu" + (open ? " is-open" : "")}
-        id={"sidebar-submenu-" + groupKey}
-        inert={!open}
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      <button
+        aria-controls={"sidebar-submenu-" + groupKey}
+        aria-expanded={open}
+        className={labelClassName}
+        style={{ width: "100%", justifyContent: "space-between", border: "none", cursor: "pointer", fontFamily: "inherit", background: active ? "var(--modern-primary-light)" : "transparent" }}
+        type="button"
+        onClick={onToggle}
       >
-        {childItems.map((item) => (
-          <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={onNavigate} />
-        ))}
-      </div>
-    </section>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <Icon size={20} weight={active ? "fill" : "regular"} />
+          <span>{label}</span>
+        </div>
+        <CaretDown aria-hidden="true" size={16} style={{ transform: open ? "rotate(180deg)" : "none", transition: "0.2s" }} />
+      </button>
+      {open && (
+        <div
+          id={"sidebar-submenu-" + groupKey}
+          style={{ paddingLeft: "16px", display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}
+        >
+          {childItems.map((item) => (
+            <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -283,24 +281,24 @@ export function AppShell({
   }, [sidebarOpen]);
   return (
     <div
-      className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`.trim()}
+      className={`modern-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`.trim()}
     >
-      <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
-        <div className="sidebar-topline">
+      <aside className={`modern-sidebar ${sidebarOpen ? "is-mobile-open" : ""} ${sidebarCollapsed && isDesktopSidebar ? "is-collapsed" : ""}`} id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
+        <div className="modern-sidebar-header">
           <Link
-            className="sidebar-brand"
             href="/dashboard"
             aria-label="Koraz, inicio"
             onClick={closeSidebar}
             title="Ir al inicio"
+            style={{ display: "flex", alignItems: "center", height: "100%", width: "100%" }}
           >
-            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+            <CediahLogo variant="dark" priority={activeKey === "dashboard"} />
           </Link>
           <button
             aria-controls="app-sidebar"
             aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
             aria-label={menuButtonLabel}
-            className="sidebar-menu-trigger"
+            className="modern-menu-trigger"
             title={menuButtonLabel}
             type="button"
             onClick={togglePrimaryMenu}
@@ -308,31 +306,32 @@ export function AppShell({
             <List aria-hidden="true" size={25} />
           </button>
         </div>
-        <nav className="sidebar-nav">
-          <div className="sidebar-nav-group">
-            {mainNavigation.map((item) => (
-              <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
-            ))}
-            <NavigationGroup
+        <nav className="modern-sidebar-nav">
+          <div className="modern-nav-group-title">Principal</div>
+          {mainNavigation.map((item) => (
+            <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
+          ))}
+          <div className="modern-nav-group-title">Estudio</div>
+          <NavigationGroup
+            activeKey={activeKey}
+            childItems={studyNavigation}
+            groupKey="study"
+            icon={BookOpen}
+            label="Material de estudio"
+            onNavigate={closeSidebar}
+            onToggle={() => setStudyMenuOpen((open) => !open)}
+            open={studyMenuOpen}
+          />
+          {includeCourses && (
+            <NavigationItem
+              item={{ key: "courses", label: "Mis cursos", href: "/cursos", icon: CheckSquareOffset }}
               activeKey={activeKey}
-              childItems={studyNavigation}
-              groupKey="study"
-              icon={BookOpen}
-              label="Material de estudio"
               onNavigate={closeSidebar}
-              onToggle={() => setStudyMenuOpen((open) => !open)}
-              open={studyMenuOpen}
             />
-
-
-            {includeCourses && (
-              <NavigationItem
-                item={{ key: "courses", label: "Mis cursos", href: "/cursos", icon: CheckSquareOffset }}
-                activeKey={activeKey}
-                onNavigate={closeSidebar}
-              />
-            )}
-            {administrationItems.length > 0 && (
+          )}
+          {administrationItems.length > 0 && (
+            <>
+              <div className="modern-nav-group-title">Administrar</div>
               <NavigationGroup
                 activeKey={activeKey}
                 childItems={administrationItems}
@@ -343,33 +342,29 @@ export function AppShell({
                 onToggle={() => setAdminMenuOpen((open) => !open)}
                 open={adminMenuOpen}
               />
-            )}
-          </div>
+            </>
+          )}
         </nav>
-
-        <div className="sidebar-watermark" aria-hidden="true">
-          <Image src="/anatomy/skull.png" alt="" width={220} height={220} />
-        </div>
       </aside>
 
       {sidebarOpen && (
-        <button
+        <div
           aria-label="Cerrar menú"
-          className="sidebar-backdrop"
+          className="modern-sidebar-backdrop is-mobile-open"
           onClick={() => {
             closeSidebar();
             menuTriggerRef.current?.focus();
           }}
           tabIndex={-1}
-          type="button"
+          role="button"
         />
       )}
 
-      <div className="app-body">
-        <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
-          <div className="topbar-leading">
+      <div className="modern-content-wrapper">
+        <header className="modern-header" data-active-key={activeKey}>
+          <div className="modern-header-left">
             <button
-              className="menu-trigger"
+              className="modern-menu-trigger"
               ref={menuTriggerRef}
               type="button"
               aria-label={menuButtonLabel}
@@ -380,59 +375,51 @@ export function AppShell({
             >
               <List size={28} />
             </button>
-          </div>
-          <GlobalContentSearch />
-          <div className="topbar-page-context sr-only">
-            <h1>{headerTitle || "Koraz"}</h1>
-            {headerSubtitle && <p>{headerSubtitle}</p>}
-            {showBreadcrumbs && <p>Ruta actual: {breadcrumbs?.join(" / ")}</p>}
-          </div>
-          <div className="topbar-actions">
-            <div className="topbar-popover-wrap">
-              {viewer ? (
-                <>
-                  <button
-                    className="profile-trigger"
-                    type="button"
-                    aria-label={"Abrir menú de perfil de " + viewer.email}
-                    aria-expanded={profileOpen}
-                    onClick={() => setProfileOpen((open) => !open)}
-                  >
-                    <span className="profile-avatar">{getProfileInitials(viewer.email)}</span>
-                    <CaretDown size={17} weight="bold" />
-                  </button>
-                  {profileOpen && (
-                    <div className="topbar-popover profile-popover">
-                      <strong>{viewer.email}</strong>
-                      {isAdministrator && (
-                        <span className="dashboard-admin-badge profile-role-badge">
-                          <ShieldCheck size={14} weight="fill" />
-                          Administrador
-                        </span>
-                      )}
-                      <button
-                        className="profile-sign-out"
-                        disabled={isSigningOut}
-                        onClick={handleSignOut}
-                        type="button"
-                      >
-                        {isSigningOut ? "Cerrando sesión..." : "Cerrar sesión"}
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <Link className="profile-trigger profile-sign-in" href="/acceder">
-                  <span className="profile-avatar" aria-hidden="true">
-                    <UserCircle size={20} weight="fill" />
-                  </span>
-                  <span>Acceder</span>
-                </Link>
-              )}
+            <div className="modern-search-bar">
+              <GlobalContentSearch />
             </div>
           </div>
+          <div className="modern-header-right">
+            {viewer ? (
+              <div style={{ position: "relative" }}>
+                <button
+                  className="modern-profile-btn"
+                  type="button"
+                  aria-label={"Abrir menú de perfil de " + viewer.email}
+                  aria-expanded={profileOpen}
+                  onClick={() => setProfileOpen((open) => !open)}
+                >
+                  <span className="modern-avatar">{getProfileInitials(viewer.email)}</span>
+                  <CaretDown size={17} weight="bold" />
+                </button>
+                {profileOpen && (
+                  <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "white", borderRadius: "12px", boxShadow: "var(--modern-shadow-lg)", border: "1px solid var(--modern-border)", padding: "16px", minWidth: "200px", display: "flex", flexDirection: "column", gap: "12px", zIndex: 50 }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <strong style={{ fontSize: "0.875rem", color: "var(--modern-text-primary)" }}>{viewer.email}</strong>
+                      {isAdministrator && (
+                        <span style={{ fontSize: "0.75rem", color: "var(--modern-primary)", fontWeight: 600 }}>Administrador</span>
+                      )}
+                    </div>
+                    <button
+                      disabled={isSigningOut}
+                      onClick={handleSignOut}
+                      style={{ background: "#fee2e2", color: "#dc2626", border: "none", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "0.875rem" }}
+                      type="button"
+                    >
+                      {isSigningOut ? "Cerrando sesión..." : "Cerrar sesión"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link href="/acceder" style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none", color: "var(--modern-primary)", fontWeight: 600, padding: "8px 16px", borderRadius: "999px", background: "var(--modern-primary-light)" }}>
+                <UserCircle size={20} weight="fill" />
+                <span>Acceder</span>
+              </Link>
+            )}
+          </div>
         </header>
-        <main className={`app-main ${mainClassName}`.trim()} data-pathname={pathname}>
+        <main className={`modern-main ${mainClassName}`.trim()} data-pathname={pathname}>
           {children}
         </main>
       </div>
