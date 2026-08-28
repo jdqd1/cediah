@@ -47,7 +47,9 @@ services:
       - key: VIDEO_STORAGE_BUCKET
         value: video-test
       - key: VIDEO_TEST_UPLOAD_ENABLED
-        value: "true"
+        # Keep optional video uploads off until all S3 credentials are set.
+        # Authentication and the rest of the API must still be able to start.
+        value: "false"
       - key: VIDEO_TEST_PROVIDER
         value: s3
       - key: VIDEO_TEST_UPLOADER_IDS
