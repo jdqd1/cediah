@@ -76,22 +76,23 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
   const duration = formatDuration(item);
 
   return (
-    <Link className="modern-card" href={contentHref(item)}>
-      <div className="modern-video-thumb">
+    <Link className="dashboard-video-card" href={contentHref(item)}>
+      <div className="dashboard-video-media">
         <Image
           src={kindImages.video}
           alt=""
           fill
           sizes="(max-width: 900px) 80vw, 28vw"
         />
-        <div className="modern-play-overlay">
-          <PlayCircle size={48} weight="fill" />
-        </div>
-        {duration && <span className="modern-duration">{duration}</span>}
+        <span className="dashboard-video-shade" />
+        <span className="dashboard-play-button" aria-hidden="true">
+          <PlayCircle size={49} weight="thin" />
+        </span>
+        {duration && <span className="dashboard-video-duration">{duration}</span>}
       </div>
-      <div className="modern-card-content">
-        <h3 className="modern-card-title">{item.title}</h3>
-        <p className="modern-card-desc">{item.summary}</p>
+      <div className="dashboard-video-copy">
+        <h3>{item.title}</h3>
+        <span className="dynamic-content-summary">{item.summary}</span>
       </div>
     </Link>
   );
@@ -118,9 +119,6 @@ export function DashboardScreen({
     ...items.filter((item) => !item.featured),
   ].slice(0, 8);
 
-  const firstName = viewer?.email.split('@')[0] || 'Estudiante';
-  const capitalizedName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-
   return (
     <AppShell
       activeKey="dashboard"
@@ -129,87 +127,90 @@ export function DashboardScreen({
       isAdministrator={isAdministrator}
       viewer={viewer}
       headerTitle=""
-      mainClassName="modern-main"
+      mainClassName="dashboard-main"
     >
-      <div className="modern-welcome">
-        <h1>¡Hola, {capitalizedName}!</h1>
-        <p>¿Qué te gustaría aprender hoy?</p>
-      </div>
-
-      <div className="modern-dashboard-grid">
-        <div className="modern-dashboard-primary">
-          <section className="modern-section" aria-labelledby="recent-title">
-            <div className="modern-section-header">
-              <h2 className="modern-section-title" id="recent-title">Videos recientes</h2>
-              <Link className="modern-link-all" href={subjectDirectoryHref("video")}>
+      <div className="dashboard-layout">
+        <div className="dashboard-primary">
+          <section className="dashboard-section dashboard-recent" aria-labelledby="recent-title">
+            <div className="section-heading-row">
+              <h2 id="recent-title">Videos recientes</h2>
+              <Link href={subjectDirectoryHref("video")}>
                 Ver todo <ArrowRight size={17} />
               </Link>
             </div>
             {videos.length > 0 ? (
-              <div className="modern-video-grid">
+              <div className="dashboard-video-grid">
                 {videos.map((item) => <VideoCard key={item.id} item={item} />)}
               </div>
             ) : (
-              <div className="modern-card" style={{ padding: '32px', textAlign: 'center', alignItems: 'center' }}>
-                <PlayCircle size={48} color="var(--modern-text-secondary)" />
-                <h3 style={{ marginTop: '16px', marginBottom: '8px' }}>
-                  {available ? "Aún no hay videos publicados." : "No pudimos cargar el catálogo."}
-                </h3>
-                <p style={{ color: 'var(--modern-text-secondary)', margin: 0 }}>
-                  {available
-                    ? "Los videos aprobados aparecerán aquí automáticamente."
-                    : "La interfaz sigue disponible; intenta actualizar en unos minutos."}
-                </p>
+              <div className="dynamic-empty-state" role="status">
+                <PlayCircle size={30} />
+                <div>
+                  <strong>
+                    {available ? "Aún no hay videos publicados." : "No pudimos cargar el catálogo."}
+                  </strong>
+                  <span>
+                    {available
+                      ? "Los videos aprobados aparecerán aquí automáticamente."
+                      : "La interfaz sigue disponible; intenta actualizar en unos minutos."}
+                  </span>
+                </div>
               </div>
             )}
           </section>
 
-          <section className="modern-section" aria-labelledby="materials-title">
-            <div className="modern-section-header">
-              <h2 className="modern-section-title" id="materials-title">Material de estudio</h2>
-              <Link className="modern-link-all" href="/asignaturas">
+          <section className="dashboard-section dashboard-materials" aria-labelledby="materials-title">
+            <div className="section-heading-row">
+              <h2 id="materials-title">Material de estudio</h2>
+              <Link href="/asignaturas">
                 Explorar materias <ArrowRight size={17} />
               </Link>
             </div>
-            <div className="modern-bento-grid">
+            <div className="study-material-grid">
               {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
                 const count = items.filter((item) => item.kind === kind).length;
                 return (
-                  <Link className="modern-bento-card" href={href} key={kind}>
-                    <div className="modern-bento-icon">
-                      <Icon size={24} weight="bold" />
-                    </div>
-                    <div>
-                      <h3>{title}</h3>
-                      <p>{count > 0 ? count + " publicados" : description}</p>
-                    </div>
+                  <Link className="study-material-card" href={href} key={kind}>
+                    <span className="study-material-wash" />
+                    <span className="study-material-icon">
+                      <Icon size={31} weight="regular" />
+                    </span>
+                    <span className="study-material-copy">
+                      <strong>{title}</strong>
+                      <small>{count > 0 ? count + " publicados" : description}</small>
+                    </span>
                   </Link>
                 );
               })}
             </div>
           </section>
+
         </div>
 
-        <aside className="modern-aside" aria-labelledby="featured-content-title">
-          <div className="modern-section-header" style={{ marginBottom: '16px' }}>
-            <h2 className="modern-section-title" id="featured-content-title" style={{ fontSize: '1.125rem' }}>Destacados</h2>
+        <aside className="dashboard-most-viewed" aria-labelledby="featured-content-title">
+          <div className="section-heading-row">
+            <h2 id="featured-content-title">Destacados</h2>
+            <Link href="/asignaturas">
+              Ver todo <ArrowRight size={17} />
+            </Link>
           </div>
-          <div>
+          <div className="dashboard-featured-content">
             {highlighted.length > 0 ? (
-              <ol className="modern-list">
+              <ol className="most-viewed-list">
                 {highlighted.map((item, index) => {
                   const duration = formatDuration(item);
                   return (
-                    <li className="modern-list-item" key={item.id}>
-                      <span className="modern-list-rank">{index + 1}</span>
-                      <Link href={contentHref(item)} className="modern-list-link">
-                        <span className="modern-list-img">
-                          <Image src={kindImages[item.kind]} alt="" fill sizes="48px" />
+                    <li key={item.id}>
+                      <span className="most-viewed-rank">{index + 1}</span>
+                      <Link href={contentHref(item)} className="most-viewed-link">
+                        <span className="most-viewed-image">
+                          <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
                         </span>
-                        <span className="modern-list-copy">
+                        <span className="most-viewed-copy">
                           <strong>{item.title}</strong>
+                          <small>{item.topic}</small>
                           <small>
-                            {item.topic} · {kindLabels[item.kind]}
+                            {kindLabels[item.kind]}
                             {duration ? ` · ${duration}` : ""}
                           </small>
                         </span>
@@ -219,7 +220,7 @@ export function DashboardScreen({
                 })}
               </ol>
             ) : (
-              <p style={{ color: 'var(--modern-text-secondary)', fontSize: '0.875rem' }}>
+              <p className="dynamic-aside-empty">
                 La selección destacada se llenará desde el panel editorial.
               </p>
             )}
