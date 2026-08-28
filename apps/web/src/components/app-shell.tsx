@@ -16,7 +16,6 @@ import {
 } from "@phosphor-icons/react";
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth/client";
@@ -151,17 +150,13 @@ function NavigationGroup({
 
 export function AppShell({
   activeKey,
-  breadcrumbs,
   canManageContent = false,
   canManageRoles = false,
   isAdministrator = false,
   viewer: initialViewer,
   children,
-  headerSubtitle,
-  headerTitle,
   includeCourses = false,
   mainClassName = "",
-  welcome = false,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [studyMenuOpen, setStudyMenuOpen] = useState(
@@ -185,7 +180,6 @@ export function AppShell({
   const pathname = usePathname();
 
   const closeSidebar = () => setSidebarOpen(false);
-  const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
   const showContentManagement = canManageContent || isAdministrator;
   const showRoleManagement = canManageRoles || isAdministrator;
   const administrationItems: NavItem[] = [

@@ -64,34 +64,25 @@ function readVideoDurationSeconds(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     const objectUrl = URL.createObjectURL(file);
-    const finish = () => {
+    const finish = (duration?: number) => {
+      window.clearTimeout(timeoutId);
+      video.onerror = null;
+      video.onloadedmetadata = null;
       video.removeAttribute("src");
       video.load();
       URL.revokeObjectURL(objectUrl);
+
+      if (duration !== undefined && Number.isFinite(duration) && duration > 0) {
+        resolve(duration);
+        return;
+      }
+      reject(new Error("invalid_video_test_upload"));
     };
 
     video.preload = "metadata";
-    video.addEventListener(
-      "loadedmetadata",
-      () => {
-        const duration = video.duration;
-        finish();
-        if (Number.isFinite(duration) && duration > 0) {
-          resolve(duration);
-          return;
-        }
-        reject(new Error("invalid_video_test_upload"));
-      },
-      { once: true },
-    );
-    video.addEventListener(
-      "error",
-      () => {
-        finish();
-        reject(new Error("invalid_video_test_upload"));
-      },
-      { once: true },
-    );
+    video.onloadedmetadata = () => finish(video.duration);
+    video.onerror = () => finish();
+    const timeoutId = window.setTimeout(() => finish(), 10_000);
     video.src = objectUrl;
   });
 }

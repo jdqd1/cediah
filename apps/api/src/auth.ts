@@ -91,6 +91,7 @@ export function createBetterAuthService(
       defaultCookieAttributes: {
         httpOnly: true,
         sameSite: "lax",
+        secure: new URL(configuration.publicUrl).protocol === "https:",
       },
     },
     baseURL: configuration.publicUrl,
