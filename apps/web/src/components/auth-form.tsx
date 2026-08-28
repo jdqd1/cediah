@@ -399,13 +399,6 @@ export function AuthForm({
         {isSubmitting ? "Procesando..." : getSubmitLabel(mode)}
       </button>
 
-      {/* Temporary button to explore interface */}
-      <div style={{ textAlign: "center", marginTop: "1rem" }}>
-        <Link href="/dashboard" className="button button-secondary" style={{ width: "100%", textDecoration: "none", display: "inline-block" }}>
-          Explorar la interfaz sin cuenta
-        </Link>
-      </div>
-
       {variant === "landing" && mode === "sign-in" && (
         <p className="landing-register">
           ¿No tienes una cuenta? <Link href="/acceder?modo=registro">Regístrate</Link>
