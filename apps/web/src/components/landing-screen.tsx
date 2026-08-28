@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
 import {
   BookOpen,
@@ -34,30 +33,6 @@ export function LandingScreen() {
           <p>Inicia sesión para continuar</p>
         </div>
         <AuthForm mode="sign-in" variant="landing" />
-        
-        <div style={{ marginTop: '24px', textAlign: 'center', width: '100%', maxWidth: '360px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
-            <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>o si solo quieres mirar</span>
-            <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
-          </div>
-          <Link 
-            href="/dashboard"
-            style={{ 
-              display: 'inline-block', 
-              width: '100%',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              border: '1px solid var(--modern-primary)',
-              color: 'var(--modern-primary)',
-              textDecoration: 'none',
-              fontWeight: 500,
-              transition: 'all 0.2s'
-            }}
-          >
-            Explorar interfaz (provisional)
-          </Link>
-        </div>
       </section>
 
       <section className="landing-visual-column" aria-labelledby="landing-visual-title">

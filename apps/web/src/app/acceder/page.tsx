@@ -55,29 +55,6 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
           mode={mode}
           nextPath={nextPath}
         />
-        <div style={{ marginTop: '24px', textAlign: 'center', width: '100%', maxWidth: '360px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
-            <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>o si solo quieres mirar</span>
-            <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
-          </div>
-          <Link 
-            href="/dashboard"
-            style={{ 
-              display: 'inline-block', 
-              width: '100%',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              border: '1px solid var(--modern-primary)',
-              color: 'var(--modern-primary)',
-              textDecoration: 'none',
-              fontWeight: 500,
-              transition: 'all 0.2s'
-            }}
-          >
-            Explorar interfaz (provisional)
-          </Link>
-        </div>
       </div>
     </main>
   );
