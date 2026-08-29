@@ -110,6 +110,7 @@ STORAGE_S3_REGION=us-east-1
 STORAGE_S3_ACCESS_KEY_ID=replace_me
 STORAGE_S3_SECRET_ACCESS_KEY=replace_me
 STORAGE_S3_FORCE_PATH_STYLE=true
+CONTENT_STORAGE_BUCKET=content-assets
 VIDEO_STORAGE_BUCKET=video-test
 VIDEO_TEST_MAX_DURATION_SECONDS=900
 VIDEO_TEST_MAX_FILE_BYTES=50000000
@@ -118,6 +119,8 @@ VIDEO_TEST_MAX_FILE_BYTES=50000000
 En la web, NEXT_PUBLIC_VIDEO_STORAGE_ORIGIN debe contener solo el origen del endpoint de Storage para que la política CSP permita cargar y reproducir los archivos. El bucket debe ser privado y su CORS debe autorizar los orígenes exactos de la web y los métodos PUT, GET y HEAD necesarios. No uses service-role ni claves de Supabase Auth/Database.
 
 Los archivos se organizan por propietario bajo test-videos/{userId}/{videoId}. La API confirma existencia, MIME y tamaño antes de considerarlos listos. La prueba admite MP4, QuickTime y WebM, y sigue estando desactivada por defecto.
+
+Las publicaciones históricas conservan sus objetos en el bucket privado content-assets. Cuando las credenciales S3 están configuradas, la API genera una URL GET de corta duración únicamente al abrir el detalle publicado; el catálogo nunca expone claves ni credenciales del almacenamiento.
 
 ## Contenido editorial
 

@@ -26,10 +26,19 @@ import type {
   DatabaseClient,
   JsonValue,
 } from "../db/database.js";
+import type { S3ObjectStorage } from "./s3-object-storage.js";
 
 type QueryDatabase = DatabaseClient | Transaction<CediahDatabase>;
 type ContentRow = Selectable<ContentItemTable>;
 type AssetRow = Selectable<ContentAssetTable>;
+type ContentAssetDownloadStorage = Pick<S3ObjectStorage, "bucket" | "createDownloadUrl">;
+
+export type PostgresContentProviderConfiguration = {
+  assetStorage?: ContentAssetDownloadStorage;
+  signedDownloadLifetimeSeconds?: number;
+};
+
+const defaultSignedDownloadLifetimeSeconds = 60 * 60;
 
 function toIsoString(value: Date | string) {
   return (value instanceof Date ? value : new Date(value)).toISOString();
@@ -131,10 +140,10 @@ export function isContentReadyForTransition(
   return true;
 }
 
-function parseAsset(row: AssetRow): ContentAsset {
+function parseAsset(row: AssetRow, downloadUrl: string | null = null): ContentAsset {
   return ContentAssetSchema.parse({
     contentId: row.content_item_id,
-    downloadUrl: null,
+    downloadUrl,
     fileName: row.original_file_name,
     id: row.id,
     kind: row.kind,
@@ -144,15 +153,52 @@ function parseAsset(row: AssetRow): ContentAsset {
   });
 }
 
-function parseContentItem(
+export async function createContentAssetDownloadUrl(
+  input: Pick<AssetRow, "status" | "storage_bucket" | "storage_path">,
+  storage: ContentAssetDownloadStorage | undefined,
+  expiresInSeconds = defaultSignedDownloadLifetimeSeconds,
+) {
+  if (
+    !storage ||
+    input.status !== "ready" ||
+    input.storage_bucket !== storage.bucket
+  ) {
+    return null;
+  }
+  if (!Number.isInteger(expiresInSeconds) || expiresInSeconds < 60 || expiresInSeconds > 604_800) {
+    throw new Error("Invalid content-asset download lifetime");
+  }
+
+  try {
+    return await storage.createDownloadUrl({
+      expiresInSeconds,
+      key: input.storage_path,
+    });
+  } catch {
+    // A storage outage must not hide the publication itself. The caller can
+    // still render its text metadata while playback remains unavailable.
+    return null;
+  }
+}
+
+async function parseContentItem(
   row: ContentRow,
   assets: AssetRow[],
   subjectIds: string[],
-): ContentItem {
+  configuration: PostgresContentProviderConfiguration = {},
+  includeDownloadUrl = false,
+): Promise<ContentItem> {
   const selectedAsset = [...assets].sort((left, right) => {
     if (left.status !== right.status) return left.status === "ready" ? -1 : 1;
     return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
   })[0];
+  const downloadUrl = selectedAsset && includeDownloadUrl
+    ? await createContentAssetDownloadUrl(
+        selectedAsset,
+        configuration.assetStorage,
+        configuration.signedDownloadLifetimeSeconds,
+      )
+    : null;
   const draft = ContentDraftSchema.parse({
     content: row.content,
     estimatedMinutes: row.estimated_minutes,
@@ -167,7 +213,7 @@ function parseContentItem(
 
   return ContentItemSchema.parse({
     ...draft,
-    asset: selectedAsset ? parseAsset(selectedAsset) : null,
+    asset: selectedAsset ? parseAsset(selectedAsset, downloadUrl) : null,
     authorUserId: row.author_user_id,
     createdAt: toIsoString(row.created_at),
     id: row.id,
@@ -177,7 +223,12 @@ function parseContentItem(
   });
 }
 
-async function hydrateRows(database: QueryDatabase, rows: ContentRow[]) {
+async function hydrateRows(
+  database: QueryDatabase,
+  rows: ContentRow[],
+  configuration: PostgresContentProviderConfiguration = {},
+  includeDownloadUrls = false,
+) {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const [assets, subjects] = await Promise.all([
@@ -206,13 +257,15 @@ async function hydrateRows(database: QueryDatabase, rows: ContentRow[]) {
       subject.subject_id,
     ]);
   }
-  return rows.map((row) =>
+  return Promise.all(rows.map((row) =>
     parseContentItem(
       row,
       assetsByContent.get(row.id) ?? [],
       subjectsByContent.get(row.id) ?? [],
+      configuration,
+      includeDownloadUrls,
     ),
-  );
+  ));
 }
 
 async function getItemById(database: QueryDatabase, contentId: string) {
@@ -295,7 +348,10 @@ async function replaceSubjectLinks(
   return true;
 }
 
-export function createPostgresContentProvider(database: DatabaseClient): ContentProvider {
+export function createPostgresContentProvider(
+  database: DatabaseClient,
+  configuration: PostgresContentProviderConfiguration = {},
+): ContentProvider {
   return {
     async createAssetUpload(input) {
       const access = await getStoredAccess(database, input.contentId);
@@ -448,7 +504,9 @@ export function createPostgresContentProvider(database: DatabaseClient): Content
         .where("slug", "=", slug)
         .where("status", "=", "published")
         .executeTakeFirst();
-      return row ? (await hydrateRows(database, [row]))[0] ?? null : null;
+      return row
+        ? (await hydrateRows(database, [row], configuration, true))[0] ?? null
+        : null;
     },
 
     async getRoles(userId) {

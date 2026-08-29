@@ -44,6 +44,8 @@ services:
         sync: false
       - key: STORAGE_S3_FORCE_PATH_STYLE
         value: "true"
+      - key: CONTENT_STORAGE_BUCKET
+        value: content-assets
       - key: VIDEO_STORAGE_BUCKET
         value: video-test
       - key: VIDEO_TEST_UPLOAD_ENABLED

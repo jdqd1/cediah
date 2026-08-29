@@ -274,6 +274,9 @@ export async function buildApp(
     }
   }
   const database = pool ? createPostgresDatabase(pool) : undefined;
+  const contentAssetStorage = environment.contentStorage
+    ? createS3ObjectStorage(environment.contentStorage)
+    : undefined;
   const createdAuthService =
     environment.auth && pool
       ? createBetterAuthService(environment.auth, { pool })
@@ -281,7 +284,9 @@ export async function buildApp(
   const authService = dependencies.authService ?? createdAuthService;
   const contentProvider =
     dependencies.contentProvider ??
-    (database ? createPostgresContentProvider(database) : undefined);
+    (database
+      ? createPostgresContentProvider(database, { assetStorage: contentAssetStorage })
+      : undefined);
   const subjectProvider =
     dependencies.subjectProvider ??
     (database ? createPostgresSubjectProvider(database) : undefined);

@@ -12,6 +12,7 @@ const EnvironmentSchema = z
     CLOUDFLARE_STREAM_ACCOUNT_ID: z.string().regex(/^[a-z0-9]{32}$/i).optional(),
     CLOUDFLARE_STREAM_API_TOKEN: z.string().min(1).optional(),
     CLOUDFLARE_STREAM_CUSTOMER_CODE: z.string().regex(/^[a-z0-9-]+$/i).optional(),
+    CONTENT_STORAGE_BUCKET: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,62}$/).default("content-assets"),
     DATABASE_URL: z.string().min(1).optional(),
     DATABASE_MIGRATIONS_ENABLED: z.enum(["true", "false"]).default("true"),
     DATABASE_MIGRATIONS_PATH: z.string().min(1).optional(),
@@ -160,6 +161,7 @@ export type TestVideoUploadConfiguration = {
 export type ApiEnvironment = {
   auth?: BetterAuthConfiguration;
   cloudflareStream?: CloudflareStreamConfiguration;
+  contentStorage?: S3StorageConfiguration;
   databaseUrl?: string;
   migrationsEnabled?: boolean;
   migrationsPath?: string;
@@ -193,19 +195,24 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env): ApiEnv
         }
       : undefined;
 
-  const videoStorage =
+  const sharedS3Configuration =
     environment.STORAGE_S3_ACCESS_KEY_ID &&
     environment.STORAGE_S3_ENDPOINT &&
     environment.STORAGE_S3_SECRET_ACCESS_KEY
       ? {
           accessKeyId: environment.STORAGE_S3_ACCESS_KEY_ID,
-          bucket: environment.VIDEO_STORAGE_BUCKET,
           endpoint: environment.STORAGE_S3_ENDPOINT,
           forcePathStyle: environment.STORAGE_S3_FORCE_PATH_STYLE === "true",
           region: environment.STORAGE_S3_REGION,
           secretAccessKey: environment.STORAGE_S3_SECRET_ACCESS_KEY,
         }
       : undefined;
+  const contentStorage = sharedS3Configuration
+    ? { ...sharedS3Configuration, bucket: environment.CONTENT_STORAGE_BUCKET }
+    : undefined;
+  const videoStorage = sharedS3Configuration
+    ? { ...sharedS3Configuration, bucket: environment.VIDEO_STORAGE_BUCKET }
+    : undefined;
 
   const smtp =
     environment.SMTP_FROM && environment.SMTP_HOST
@@ -244,6 +251,7 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env): ApiEnv
   return {
     auth,
     cloudflareStream,
+    contentStorage,
     databaseUrl: environment.DATABASE_URL,
     HOST: environment.HOST,
     NODE_ENV: environment.NODE_ENV,
