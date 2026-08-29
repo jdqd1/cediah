@@ -1,6 +1,6 @@
 # CEDIAH - Plataforma educativa de anatomía
 
-CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fastify y una base de datos PostgreSQL portable. En producción, PostgreSQL está alojado en un proyecto gratuito de Supabase y los videos permanecen en Supabase Storage en un proyecto separado. La aplicación no usa Supabase Auth ni su Data API: Better Auth y Fastify siguen siendo los únicos límites de identidad, sesión y acceso a datos.
+CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fastify y una base de datos PostgreSQL portable. En producción, el proyecto gratuito de Supabase `Koraz database` aloja tanto PostgreSQL como los buckets privados de videos. La aplicación no usa Supabase Auth ni su Data API: Better Auth y Fastify siguen siendo los únicos límites de identidad, sesión y acceso a datos.
 
 ## Arquitectura actual
 
@@ -11,12 +11,13 @@ CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fast
 - docs: arquitectura, seguridad y procedimientos de migración.
 - supabase: material legado de la implementación anterior. No es la fuente de migraciones activa.
 
-Supabase actúa como proveedor de infraestructura detrás de dos interfaces portátiles:
+Supabase actúa como proveedor de infraestructura detrás de dos interfaces portátiles dentro del mismo proyecto:
 
 ~~~text
 Navegador -> Next.js -> Fastify -> PostgreSQL estándar -> Supabase Postgres
                           |
-                          +-> S3 compatible -> Supabase Storage (proyecto separado)
+                          +-> S3 compatible -> Supabase Storage
+                                      (mismo proyecto: Koraz database)
 ~~~
 
 ## Requisitos
@@ -99,7 +100,7 @@ Después inicia sesión y abre /panel/administracion/roles. La API vuelve a comp
 
 ## Videos privados de prueba
 
-El flujo /pruebas/video usa el proyecto de Storage como almacenamiento S3 compatible, separado del proyecto que aloja PostgreSQL. La API genera URLs firmadas de carga PUT y reproducción; las credenciales S3 nunca llegan al navegador. Para habilitarlo configura solo en la API:
+El flujo /pruebas/video usa el Storage del mismo proyecto que aloja PostgreSQL, pero únicamente a través de su interfaz S3 compatible. La API genera URLs firmadas de carga PUT y reproducción; las credenciales S3 nunca llegan al navegador. Para habilitarlo configura solo en la API:
 
 ~~~dotenv
 VIDEO_TEST_PROVIDER=s3

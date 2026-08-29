@@ -11,9 +11,9 @@ La arquitectura definida en ADR-0001 separa el producto del proveedor: el esquem
 
 ## Decisión
 
-Alojar el esquema portable en un proyecto gratuito de Supabase dedicado a datos. La API de Render se conecta por TLS con un rol propio y de privilegios limitados a través del Transaction Pooler en el puerto 6543. Los roles anon y authenticated no reciben permisos sobre las tablas de CEDIAH y una política de denegación explícita protege cada tabla expuesta por el esquema public.
+Alojar el esquema portable y los buckets privados en un único proyecto gratuito de Supabase, llamado `Koraz database`, conservando interfaces y credenciales separadas para PostgreSQL y S3. La API de Render se conecta a PostgreSQL por TLS con un rol propio y de privilegios limitados a través del Transaction Pooler en el puerto 6543. Los roles anon y authenticated no reciben permisos sobre las tablas de CEDIAH y una política de denegación explícita protege cada tabla expuesta por el esquema public.
 
-El proyecto de Supabase que ya contiene los videos continúa separado y se consume exclusivamente mediante el adaptador S3. No se incorporan Supabase Auth, el SDK de Supabase ni consultas desde el navegador.
+Los buckets `content-assets` y `video-test` se consumen exclusivamente mediante el adaptador S3. La consolidación conservó todas las claves, tamaños, tipos MIME y ETags; Render y Vercel se cambiaron al nuevo origen antes de eliminar `Web CEDIAH`. No se incorporan Supabase Auth, el SDK de Supabase ni consultas desde el navegador.
 
 El corte conserva íntegramente las tablas de aplicación y cediah_schema_migrations. La base anterior de Render se mantiene temporalmente sin tráfico como fuente de rollback.
 
@@ -21,7 +21,8 @@ El pool transaccional no garantiza el estado de sesión requerido por el advisor
 
 ## Consecuencias
 
-- El costo mensual actual de la base es cero mientras el proyecto permanezca dentro de los límites del plan gratuito.
+- El costo mensual actual de PostgreSQL y Storage en Supabase es cero mientras el proyecto permanezca dentro de los límites del plan gratuito.
+- PostgreSQL y Storage consumen las cuotas del mismo proyecto gratuito, por lo que deben vigilarse conjuntamente el tamaño de base, archivos y egreso.
 - Un proyecto gratuito puede pausarse por inactividad y tiene límites de capacidad; se debe vigilar su estado y conservar respaldos lógicos recuperables.
 - La aplicación conserva portabilidad: cambiar de proveedor requiere mover PostgreSQL y DATABASE_URL, no modificar contratos ni reglas de negocio.
 - Better Auth conserva cuentas, hashes, sesiones y roles porque todos viven en las tablas portátiles de la aplicación.

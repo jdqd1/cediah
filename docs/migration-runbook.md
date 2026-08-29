@@ -5,8 +5,8 @@ Estado: operativo para la arquitectura portable. Los valores concretos de capaci
 ## Estado de producción desde el 29 de agosto de 2026
 
 - La web continúa en Vercel y la API en Render.
-- Un proyecto gratuito de Supabase aloja el esquema PostgreSQL portable. No se usa Supabase Auth ni la Data API.
-- Un segundo proyecto de Supabase conserva los buckets privados y los videos existentes mediante la interfaz S3.
+- El único proyecto gratuito de Supabase, `Koraz database`, aloja el esquema PostgreSQL portable y los buckets privados mediante interfaces separadas. No se usa Supabase Auth ni la Data API.
+- Los objetos de `content-assets` y `video-test` se copiaron conservando claves y metadatos; el proyecto anterior `Web CEDIAH` se eliminó después de verificar API, web y reproducción desde el nuevo origen.
 - Render se conecta con un rol de aplicación propio a través del Transaction Pooler TLS de Supabase, en el puerto 6543.
 - DATABASE_URL está guardada únicamente como secreto de Render.
 - DATABASE_MIGRATIONS_ENABLED=false porque el pool transaccional no conserva el advisory lock de sesión que usa el migrador de la API.

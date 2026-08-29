@@ -4,7 +4,7 @@
 
 Mantener el dominio de CEDIAH independiente del hosting. La web, la API, la identidad, la persistencia y el almacenamiento se comunican mediante límites propios para que cambiar Vercel, Render, PostgreSQL administrado o el proveedor de objetos no obligue a reescribir el producto.
 
-El desacoplamiento ya está aplicado en identidad y datos. Supabase aloja actualmente PostgreSQL estándar y, en otro proyecto, el bucket S3 de videos; la aplicación no depende de Supabase Auth, del SDK ni de la Data API.
+El desacoplamiento ya está aplicado en identidad y datos. El proyecto gratuito de Supabase `Koraz database` aloja actualmente PostgreSQL estándar y los buckets S3 privados; la aplicación no depende de Supabase Auth, del SDK ni de la Data API.
 
 ## Distribución
 
@@ -21,9 +21,9 @@ Fastify
    |             |                 |
    |             |                 +--> SMTP / Turnstile opcionales
    |             |
-   |             +--> adaptador S3 --> Supabase Storage (proyecto de archivos)
+   |             +--> adaptador S3 --> Supabase Storage (Koraz database)
    |
-   +--> Kysely --> PostgreSQL estándar --> Supabase Postgres (proyecto de datos)
+   +--> Kysely --> PostgreSQL estándar --> Supabase Postgres (Koraz database)
          |
          +--> Better Auth
          +--> dominio académico y editorial
@@ -67,7 +67,7 @@ PostgreSQL almacena identidad y dominio:
 
 Los adaptadores de apps/api/src/providers realizan las consultas mediante Kysely. La API es el único camino de acceso previsto para la aplicación; el navegador no tiene credenciales de base de datos.
 
-En producción, Supabase solo presta el servicio PostgreSQL administrado. La API se conecta con un rol propio mediante el Transaction Pooler; anon y authenticated no tienen privilegios sobre las tablas de CEDIAH y no se usa la Data API.
+En producción, Supabase presta PostgreSQL administrado dentro de `Koraz database`; el Storage que comparte ese proyecto se consume por una interfaz y credenciales distintas. La API se conecta a PostgreSQL con un rol propio mediante el Transaction Pooler; anon y authenticated no tienen privilegios sobre las tablas de CEDIAH y no se usa la Data API.
 
 ## Migraciones
 
@@ -120,7 +120,7 @@ Las rutas de lectura académica también validan que cursos, lecciones, inscripc
 
 ## Almacenamiento de videos
 
-Para archivos, Supabase se usa únicamente mediante su endpoint S3 compatible y un proyecto separado del PostgreSQL productivo. La implementación depende de las operaciones estándar PutObject, GetObject, HeadObject y DeleteObject, no del SDK de Supabase.
+Para archivos, Supabase se usa únicamente mediante el endpoint S3 compatible del mismo proyecto que aloja PostgreSQL. La separación se mantiene en la aplicación mediante adaptadores, buckets y credenciales de servidor independientes. La implementación depende de las operaciones estándar PutObject, GetObject, HeadObject y DeleteObject, no del SDK de Supabase.
 
 El flujo es:
 
@@ -140,9 +140,9 @@ Este flujo es deliberadamente independiente del catálogo académico. Los upload
 | --- | --- | --- | --- | --- |
 | Local | localhost:3000 | localhost:4000 | Base local o administrada de desarrollo | Desactivados por defecto |
 | Preview | Preview aislado | API de prueba | Base de prueba | Bucket de prueba separado |
-| Producción | Vercel | Render | Supabase Postgres, proyecto de datos | Supabase Storage, proyecto de archivos |
+| Producción | Vercel | Render | Supabase Postgres, `Koraz database` | Supabase Storage, `Koraz database` |
 
-Los ambientes no deben compartir DATABASE_URL, BETTER_AUTH_SECRET, credenciales SMTP, cuentas S3 ni buckets. La verificación de correo puede permanecer desactivada solo durante pruebas controladas.
+En producción, PostgreSQL y Storage comparten el proyecto de infraestructura, pero no sus contratos ni sus credenciales de acceso. Los ambientes no deben compartir DATABASE_URL, BETTER_AUTH_SECRET, credenciales SMTP, cuentas S3 ni buckets. La verificación de correo puede permanecer desactivada solo durante pruebas controladas.
 
 ## Portabilidad lograda
 

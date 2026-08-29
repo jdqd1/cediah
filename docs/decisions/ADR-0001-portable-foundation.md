@@ -1,8 +1,10 @@
 # ADR-0001: Fundación portable para pruebas
 
-- Estado: aceptada
+- Estado: aceptada; detalles de hosting actualizados por ADR-0002
 - Fecha: 2026-07-31
 - Actualizada: 2026-08-27
+
+ADR-0002 adopta posteriormente Supabase como hosting del PostgreSQL portable y consolida PostgreSQL y Storage en un único proyecto. Esa decisión no cambia los límites de Better Auth, Fastify ni los adaptadores definidos aquí.
 
 ## Contexto
 

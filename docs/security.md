@@ -11,7 +11,7 @@ El archivo local histórico sigue ignorado por Git. El responsable confirmó que
 - La web Next.js es el origen público. Las operaciones de autenticación pasan por `/api/auth/*` para que las cookies se creen en ese mismo origen.
 - Fastify es el límite de identidad y autorización. Cada ruta protegida vuelve a resolver la sesión; una comprobación de interfaz nunca sustituye la autorización de la API.
 - PostgreSQL conserva usuarios, sesiones, verificaciones, límites de autenticación y datos de dominio. El navegador no se conecta directamente a la base de datos.
-- Supabase solo participa como almacenamiento compatible con S3 para videos. No se usan Supabase Auth, Data API, RLS, Realtime ni el SDK de Supabase.
+- Supabase aloja PostgreSQL y el almacenamiento S3 del proyecto `Koraz database`, pero no actúa como límite de identidad ni de acceso de la aplicación. No se usan Supabase Auth, Data API, Realtime ni el SDK de Supabase; las tablas de CEDIAH mantienen RLS de denegación y Fastify es el único camino de acceso previsto.
 
 ## Controles implementados
 
@@ -26,7 +26,7 @@ El archivo local histórico sigue ignorado por Git. El responsable confirmó que
 - La web genera CSP por solicitud con nonce, además de protecciones contra framing y MIME sniffing.
 - Las credenciales S3 solo existen en la API. El navegador recibe una URL firmada limitada a la ruta del usuario y nunca recibe el access key o secret key.
 - Una URL firmada de carga `PUT` no es de un solo uso: puede reutilizarse para sobrescribir la misma ruta hasta que expire. Por eso su vigencia es corta, la ruta no es elegida por el cliente y la API vuelve a validar propietario, tamaño y MIME al confirmar. Si el objeto no cumple las restricciones, la confirmación lo marca como fallido y lo elimina del bucket.
-- Las cargas dinámicas de documentos e imágenes permanecen desactivadas hasta disponer de un proveedor y un proceso de validación independientes. El uso actual de Storage se limita a videos privados de prueba.
+- Las cargas dinámicas de documentos e imágenes permanecen desactivadas hasta disponer de un proveedor y un proceso de validación independientes. El uso actual de Storage se limita a videos privados de prueba y a los objetos de video de publicaciones existentes.
 - Las dependencias están fijadas en el lockfile para obtener instalaciones reproducibles.
 
 ## Antes de producción
