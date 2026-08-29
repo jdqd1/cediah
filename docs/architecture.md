@@ -4,7 +4,7 @@
 
 Mantener el dominio de CEDIAH independiente del hosting. La web, la API, la identidad, la persistencia y el almacenamiento se comunican mediante límites propios para que cambiar Vercel, Render, PostgreSQL administrado o el proveedor de objetos no obligue a reescribir el producto.
 
-El desacoplamiento ya está aplicado en identidad y datos. Supabase solo permanece detrás del adaptador S3 del flujo privado de videos.
+El desacoplamiento ya está aplicado en identidad y datos. Supabase aloja actualmente PostgreSQL estándar y, en otro proyecto, el bucket S3 de videos; la aplicación no depende de Supabase Auth, del SDK ni de la Data API.
 
 ## Distribución
 
@@ -21,9 +21,9 @@ Fastify
    |             |                 |
    |             |                 +--> SMTP / Turnstile opcionales
    |             |
-   |             +--> adaptador S3 --> Supabase Storage (solo videos)
+   |             +--> adaptador S3 --> Supabase Storage (proyecto de archivos)
    |
-   +--> Kysely --> PostgreSQL
+   +--> Kysely --> PostgreSQL estándar --> Supabase Postgres (proyecto de datos)
          |
          +--> Better Auth
          +--> dominio académico y editorial
@@ -67,6 +67,8 @@ PostgreSQL almacena identidad y dominio:
 
 Los adaptadores de apps/api/src/providers realizan las consultas mediante Kysely. La API es el único camino de acceso previsto para la aplicación; el navegador no tiene credenciales de base de datos.
 
+En producción, Supabase solo presta el servicio PostgreSQL administrado. La API se conecta con un rol propio mediante el Transaction Pooler; anon y authenticated no tienen privilegios sobre las tablas de CEDIAH y no se usa la Data API.
+
 ## Migraciones
 
 La fuente activa está en database/migrations:
@@ -78,7 +80,9 @@ La fuente activa está en database/migrations:
 | 0003_content.sql | Catálogo editorial, workflow y metadatos de assets |
 | 0004_subjects.sql | Asignaturas y relación con contenido |
 
-Al arrancar, la API toma un advisory lock, crea public.cediah_schema_migrations, compara checksums y ejecuta en transacción cada archivo pendiente. Un checksum diferente para una migración aplicada detiene el arranque. Esta política evita cambios silenciosos de esquema durante un despliegue concurrente.
+Cuando el proveedor ofrece una conexión de sesión, la API puede tomar un advisory lock, crear public.cediah_schema_migrations, comparar checksums y ejecutar en transacción cada archivo pendiente. Un checksum diferente para una migración aplicada detiene el arranque. Esta política evita cambios silenciosos de esquema durante un despliegue concurrente.
+
+La producción actual usa el Transaction Pooler de Supabase, que no conserva estado de sesión para ese lock. Por ello el arranque automático está desactivado con DATABASE_MIGRATIONS_ENABLED=false. Un operador aplica cada migración pendiente antes del despliegue y confirma su nombre y checksum en public.cediah_schema_migrations.
 
 Los archivos de supabase/migrations pertenecen a la implementación anterior. No deben aplicarse en instalaciones nuevas ni mezclarse con database/migrations.
 
@@ -116,7 +120,7 @@ Las rutas de lectura académica también validan que cursos, lecciones, inscripc
 
 ## Almacenamiento de videos
 
-El único uso actual de Supabase es su endpoint S3 compatible para el bucket privado de videos. La implementación depende de las operaciones estándar PutObject, GetObject, HeadObject y DeleteObject, no del SDK de Supabase.
+Para archivos, Supabase se usa únicamente mediante su endpoint S3 compatible y un proyecto separado del PostgreSQL productivo. La implementación depende de las operaciones estándar PutObject, GetObject, HeadObject y DeleteObject, no del SDK de Supabase.
 
 El flujo es:
 
@@ -136,7 +140,7 @@ Este flujo es deliberadamente independiente del catálogo académico. Los upload
 | --- | --- | --- | --- | --- |
 | Local | localhost:3000 | localhost:4000 | Base local o administrada de desarrollo | Desactivados por defecto |
 | Preview | Preview aislado | API de prueba | Base de prueba | Bucket de prueba separado |
-| Producción | Dominio canónico | API productiva | Base productiva con backups | Bucket privado productivo |
+| Producción | Vercel | Render | Supabase Postgres, proyecto de datos | Supabase Storage, proyecto de archivos |
 
 Los ambientes no deben compartir DATABASE_URL, BETTER_AUTH_SECRET, credenciales SMTP, cuentas S3 ni buckets. La verificación de correo puede permanecer desactivada solo durante pruebas controladas.
 
@@ -150,4 +154,4 @@ Quedan tres dependencias operativas, no estructurales:
 - un mecanismo de correo si se activa verificación o recuperación;
 - un servicio de objetos S3 compatible para videos.
 
-Supabase ya no participa en registro, login, sesiones, roles, base de datos académica, auditoría ni contenido.
+Supabase aloja los servicios PostgreSQL y S3 actuales, pero no define el modelo de identidad ni el acceso del producto. Registro, login y sesiones pertenecen a Better Auth; roles, auditoría y contenido pertenecen al esquema SQL portable y solo se exponen mediante Fastify.

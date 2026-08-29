@@ -1,6 +1,6 @@
 # CEDIAH - Plataforma educativa de anatomía
 
-CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fastify y una base de datos PostgreSQL. La aplicación ya no usa Supabase para identidad ni para datos del dominio: la única integración restante es Supabase Storage mediante su interfaz compatible con S3, y está aislada al flujo privado de videos de prueba.
+CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fastify y una base de datos PostgreSQL portable. En producción, PostgreSQL está alojado en un proyecto gratuito de Supabase y los videos permanecen en Supabase Storage en un proyecto separado. La aplicación no usa Supabase Auth ni su Data API: Better Auth y Fastify siguen siendo los únicos límites de identidad, sesión y acceso a datos.
 
 ## Arquitectura actual
 
@@ -11,12 +11,12 @@ CEDIAH es una plataforma semivirtual compuesta por una web Next.js, una API Fast
 - docs: arquitectura, seguridad y procedimientos de migración.
 - supabase: material legado de la implementación anterior. No es la fuente de migraciones activa.
 
-La frontera restante con Supabase es deliberadamente pequeña:
+Supabase actúa como proveedor de infraestructura detrás de dos interfaces portátiles:
 
 ~~~text
-Navegador -> Next.js -> Fastify -> PostgreSQL
+Navegador -> Next.js -> Fastify -> PostgreSQL estándar -> Supabase Postgres
                           |
-                          +-> S3 compatible -> Supabase Storage (solo videos)
+                          +-> S3 compatible -> Supabase Storage (proyecto separado)
 ~~~
 
 ## Requisitos
@@ -68,7 +68,7 @@ Better Auth administra registro, inicio y cierre de sesión, recuperación de co
 
 Para pruebas locales puede mantenerse AUTH_REQUIRE_EMAIL_VERIFICATION=false. Para exigir verificación de correo o habilitar recuperación de contraseña, configura SMTP_HOST y SMTP_FROM; SMTP_USER y SMTP_PASSWORD son opcionales pero deben definirse juntos. TURNSTILE_SECRET_KEY en la API y NEXT_PUBLIC_TURNSTILE_SITE_KEY en la web habilitan Cloudflare Turnstile.
 
-Las cuentas de Supabase Auth no se migran automáticamente. En particular, no se copian contraseñas ni sesiones. Para este entorno de pruebas, la opción recomendada es que cada usuario vuelva a registrarse con Better Auth. La recuperación por correo solo funciona después de que la cuenta ya existe en el nuevo sistema y se configura SMTP.
+Las cuentas históricas de Supabase Auth no se migran automáticamente. En particular, sus contraseñas y sesiones no son compatibles con Better Auth. Las cuentas que ya existían en Better Auth sí se trasladaron, junto con sus hashes, sesiones y roles, durante el corte de PostgreSQL de Render a Supabase del 29 de agosto de 2026. La recuperación por correo solo funciona después de configurar SMTP.
 
 ### Bootstrap del primer administrador
 
@@ -99,7 +99,7 @@ Después inicia sesión y abre /panel/administracion/roles. La API vuelve a comp
 
 ## Videos privados de prueba
 
-El flujo /pruebas/video conserva Supabase exclusivamente como almacenamiento S3 compatible. La API genera URLs firmadas de carga PUT y reproducción; las credenciales S3 nunca llegan al navegador. Para habilitarlo configura solo en la API:
+El flujo /pruebas/video usa el proyecto de Storage como almacenamiento S3 compatible, separado del proyecto que aloja PostgreSQL. La API genera URLs firmadas de carga PUT y reproducción; las credenciales S3 nunca llegan al navegador. Para habilitarlo configura solo en la API:
 
 ~~~dotenv
 VIDEO_TEST_PROVIDER=s3
@@ -139,6 +139,8 @@ Los uploads dinámicos de archivos editoriales no-video están deshabilitados te
 ## Despliegue
 
 La web y la API pueden desplegarse en proveedores diferentes. En Vercel, apps/web debe ser el Root Directory y API_BASE_URL debe apuntar a la API pública. La API requiere conectividad TLS hacia PostgreSQL, BETTER_AUTH_URL con el origen canónico de la web, WEB_ORIGINS con orígenes exactos y un secreto de autenticación distinto por ambiente.
+
+La producción actual conecta Render con el Transaction Pooler de Supabase. Por esa limitación, DATABASE_MIGRATIONS_ENABLED=false: las migraciones pendientes de database/migrations se aplican manualmente en Supabase y se validan en public.cediah_schema_migrations antes de desplegar la API. DATABASE_URL se administra como secreto de Render y nunca debe guardarse en render.yaml ni en Git.
 
 Los ambientes de desarrollo, preview y producción no deben compartir base de datos, secretos ni buckets. Consulta docs/architecture.md para los límites y docs/migration-runbook.md para mover PostgreSQL o reemplazar el almacenamiento de videos.
 

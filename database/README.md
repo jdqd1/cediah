@@ -1,6 +1,6 @@
 # Base de datos de CEDIAH
 
-Este directorio es la fuente activa del esquema PostgreSQL. Es independiente de Supabase y puede utilizarse con PostgreSQL local o administrado por cualquier proveedor compatible.
+Este directorio es la fuente activa del esquema PostgreSQL. El esquema es independiente del proveedor y puede utilizarse con PostgreSQL local o administrado por Supabase u otro servicio compatible.
 
 ## Ejecución
 
@@ -15,6 +15,8 @@ El migrador:
 - rechaza una migración aplicada cuyo contenido haya cambiado.
 
 DATABASE_MIGRATIONS_PATH puede apuntar a otra copia del directorio, por ejemplo dentro de una imagen de despliegue. Si las migraciones se ejecutan en una etapa separada del arranque, configura DATABASE_MIGRATIONS_ENABLED=false en las demás instancias para que exista un único responsable operativo.
+
+En la producción actual de CEDIAH, Render usa el Transaction Pooler de Supabase. Como ese modo no conserva el advisory lock de sesión, DATABASE_MIGRATIONS_ENABLED permanece en false. Las migraciones se aplican manualmente en Supabase antes del despliegue y se registra su nombre y checksum en public.cediah_schema_migrations. Nunca se debe desplegar código que requiera un esquema nuevo hasta completar y verificar ese paso.
 
 ## Orden actual
 

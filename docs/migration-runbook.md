@@ -2,11 +2,23 @@
 
 Estado: operativo para la arquitectura portable. Los valores concretos de capacidad, red y SLA deben completarse cuando se seleccione el proveedor destino.
 
+## Estado de producción desde el 29 de agosto de 2026
+
+- La web continúa en Vercel y la API en Render.
+- Un proyecto gratuito de Supabase aloja el esquema PostgreSQL portable. No se usa Supabase Auth ni la Data API.
+- Un segundo proyecto de Supabase conserva los buckets privados y los videos existentes mediante la interfaz S3.
+- Render se conecta con un rol de aplicación propio a través del Transaction Pooler TLS de Supabase, en el puerto 6543.
+- DATABASE_URL está guardada únicamente como secreto de Render.
+- DATABASE_MIGRATIONS_ENABLED=false porque el pool transaccional no conserva el advisory lock de sesión que usa el migrador de la API.
+- La antigua base gratuita de Render permanece intacta y sin tráfico como rollback temporal. No debe eliminarse hasta cerrar la verificación funcional.
+
+Antes de desplegar una revisión que añada SQL, aplica manualmente los nuevos archivos de database/migrations en orden, dentro de transacciones. Después registra y compara sus checksums en public.cediah_schema_migrations, comprueba conteos y permisos, y solo entonces despliega la API. No apliques supabase/migrations: pertenece a la implementación anterior.
+
 ## Alcance
 
 Este runbook cubre dos cortes distintos:
 
-1. Activar la arquitectura actual después de abandonar Supabase Auth y Supabase Database.
+1. Activar la arquitectura portable después de abandonar Supabase Auth y el acceso directo mediante la Data API.
 2. Mover en el futuro la web, la API, PostgreSQL o el bucket de videos a otro proveedor.
 
 No se deben mezclar ambos cortes en producción. Primero se valida la aplicación portable en un ambiente aislado y después se programa cualquier cambio de hosting.
@@ -29,7 +41,7 @@ No se deben mezclar ambos cortes en producción. Primero se valida la aplicació
 - conexiones TLS;
 - backup lógico con pg_dump y restauración con pg_restore o psql;
 - retención y restauración probadas;
-- una cuenta de aplicación sin privilegios de superusuario, pero capaz de crear y modificar objetos en su esquema durante migraciones.
+- una cuenta de aplicación sin privilegios de superusuario; si el pooler no soporta locks de sesión, las migraciones deben ejecutarse por una conexión o etapa administrativa separada.
 
 ### Videos
 
@@ -170,8 +182,8 @@ El rollback se activa ante pérdida de datos, errores generalizados de login, mi
 - Solo aparece contenido published.
 - Los uploads editoriales no-video permanecen deshabilitados.
 - La prueba de video acepta MIME/tamaño válidos y rechaza archivos inválidos.
-- No existen SUPABASE_URL, public keys ni service-role keys en la web o la API.
-- Las únicas credenciales Supabase restantes son claves S3 del bucket de videos, guardadas en la API.
+- No existen claves de Supabase Auth, anon ni service-role en la web o la API.
+- La API guarda únicamente la DATABASE_URL del rol PostgreSQL y las claves S3 de alcance limitado; ninguna llega al navegador.
 
 ## Información que debe completar el proveedor
 

@@ -1,6 +1,6 @@
 databases:
-  # Free is suitable for the current test environment. Select a durable plan
-  # before using this database for production data.
+  # Temporary rollback source. The API no longer reads this database after
+  # the Supabase cutover; keep it intact until production verification ends.
   - name: cediah-postgres
     plan: free
 
@@ -21,11 +21,13 @@ services:
       - key: WEB_ORIGINS
         value: https://koraz-app.vercel.app,https://cediah.vercel.app
       - key: DATABASE_URL
-        fromDatabase:
-          name: cediah-postgres
-          property: connectionString
+        # Supabase's pooled connection string is managed in Render and must
+        # never be committed to this Blueprint.
+        sync: false
       - key: DATABASE_MIGRATIONS_ENABLED
-        value: "true"
+        # The free Supabase IPv4 endpoint uses transaction pooling. Apply SQL
+        # migrations separately because the migrator takes a session lock.
+        value: "false"
       - key: BETTER_AUTH_URL
         value: https://koraz-app.vercel.app
       - key: BETTER_AUTH_SECRET
