@@ -10,7 +10,6 @@ import {
   ClockCountdown,
   BookOpen,
   Crown,
-  FacebookLogo,
   ImagesSquare,
   InstagramLogo,
   Lightning,
@@ -45,7 +44,6 @@ const plans = [
   {
     name: "Básico",
     slug: "basico",
-    level: "NIVEL 1",
     icon: Sparkle,
     monthlyPrice: 4.99,
     annualPrice: 47.9,
@@ -55,7 +53,6 @@ const plans = [
   {
     name: "Pro",
     slug: "pro",
-    level: "NIVEL 2",
     icon: Lightning,
     monthlyPrice: 8.99,
     annualPrice: 86.3,
@@ -65,7 +62,6 @@ const plans = [
   {
     name: "Premium",
     slug: "premium",
-    level: "NIVEL 3",
     icon: Crown,
     monthlyPrice: 12.99,
     annualPrice: 124.7,
@@ -75,8 +71,6 @@ const plans = [
 ] as const;
 
 const footerGroups = [
-  { title: "Plataforma", links: ["Materias", "Videos", "Flashcards", "Cuestionarios"] },
-  { title: "Recursos", links: ["Blog", "Guías gratuitas", "Casos clínicos", "Novedades"] },
   { title: "Empresa", links: ["Sobre nosotros", "Términos", "Privacidad", "Contacto"] },
   { title: "¿Necesitas ayuda?", links: ["Soporte", "Centro de ayuda", "Preguntas frecuentes"] },
 ] as const;
@@ -118,6 +112,13 @@ export function LandingScreen() {
           />
         </div>
 
+        <div className="marketing-device-brand marketing-device-brand-desktop" aria-hidden="true">
+          <CediahLogo variant="dark" priority />
+        </div>
+        <div className="marketing-device-brand marketing-device-brand-mobile" aria-hidden="true">
+          <CediahLogo variant="dark" priority />
+        </div>
+
         <header className="marketing-header">
           <Link className="marketing-brand" href="/" aria-label="Koraz, inicio">
             <CediahLogo variant="dark" priority />
@@ -129,7 +130,6 @@ export function LandingScreen() {
             </div>
             <div className="marketing-nav-actions">
               <Link className="marketing-login" href={accessHref}>Iniciar sesión</Link>
-              <Link className="marketing-register" href={registerHref}>Regístrate</Link>
             </div>
           </nav>
         </header>
@@ -141,7 +141,7 @@ export function LandingScreen() {
               <span>Llega más lejos.</span>
             </h1>
             <span className="marketing-hero-rule" aria-hidden="true" />
-            <p>Combina tus apuntes de siempre con<br className="marketing-desktop-break" /> herramientas digitales que te hacen avanzar.</p>
+            <p>Combina tus apuntes de siempre con herramientas digitales.</p>
             <div className="marketing-hero-actions">
               <Link className="marketing-primary-button" href={registerHref}>
                 Comienza gratis <ArrowRight aria-hidden="true" size={18} weight="bold" />
@@ -163,7 +163,6 @@ export function LandingScreen() {
       <section className="marketing-platform" id="plataforma" aria-labelledby="platform-title">
         <div className="marketing-platform-inner">
           <div className="marketing-platform-copy">
-            <span>TODO EN UN SOLO LUGAR</span>
             <h2 id="platform-title">Aprende.<br />Practica.<br />Retén.</h2>
             <p>La forma más visual e<br className="marketing-desktop-break" /> inteligente de estudiar medicina.</p>
             <Link className="marketing-primary-button" href={registerHref}>
@@ -184,9 +183,8 @@ export function LandingScreen() {
 
       <section className="marketing-pricing" id="planes" aria-labelledby="plans-title">
         <div className="marketing-pricing-heading">
-          <span className="marketing-pricing-eyebrow">TU PRÓXIMO NIVEL</span>
-          <h2 id="plans-title">Elige el plan que te hace avanzar</h2>
-          <p>Compara beneficios y cambia la forma de pago cuando quieras.</p>
+          <h2 id="plans-title">Elige el plan que mejor se adapte a tí</h2>
+          <p>Compara beneficios y regístrate</p>
           <div className="marketing-billing-switch" role="group" aria-label="Frecuencia de facturación">
             <button
               className={billingCycle === "monthly" ? "is-active" : ""}
@@ -223,10 +221,15 @@ export function LandingScreen() {
                 ) : null}
                 <div className="marketing-plan-heading">
                   <span className="marketing-plan-icon"><PlanIcon aria-hidden="true" size={21} weight="fill" /></span>
-                  <div><small>{plan.level}</small><h3>{plan.name}</h3></div>
+                  <h3>{plan.name}</h3>
                 </div>
                 <div className="marketing-price" aria-live="polite">
                   <strong>${displayedPrice.toFixed(2)}</strong><span>/mes</span>
+                  {billingCycle === "monthly" ? (
+                    <small className="marketing-annual-comparison">
+                      Con anual <b>${annualMonthlyPrice.toFixed(2)}/mes</b>
+                    </small>
+                  ) : null}
                 </div>
                 <div className="marketing-billing-detail">
                   {billingCycle === "yearly" ? (
@@ -235,10 +238,7 @@ export function LandingScreen() {
                       <b><Sparkle aria-hidden="true" size={12} weight="fill" /> Ahorras ${annualSavings.toFixed(2)}</b>
                     </>
                   ) : (
-                    <>
-                      <span>Facturación flexible cada mes</span>
-                      <b>Con anual: ${annualMonthlyPrice.toFixed(2)}/mes</b>
-                    </>
+                    <span>Facturación flexible cada mes</span>
                   )}
                 </div>
                 <ul>
@@ -279,7 +279,6 @@ export function LandingScreen() {
               <a href="#instagram" aria-label="Instagram"><InstagramLogo size={16} /></a>
               <a href="#youtube" aria-label="YouTube"><YoutubeLogo size={16} /></a>
               <a href="#tiktok" aria-label="TikTok"><TiktokLogo size={16} /></a>
-              <a href="#facebook" aria-label="Facebook"><FacebookLogo size={16} /></a>
             </div>
           </div>
           <div className="marketing-footer-groups">

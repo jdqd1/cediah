@@ -71,6 +71,51 @@
   display: none;
 }
 
+.marketing-page-paper .marketing-device-brand {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fff;
+  pointer-events: none;
+}
+
+.marketing-page-paper .marketing-device-brand-desktop {
+  top: 36.4%;
+  left: 60%;
+  width: clamp(124px, 10vw, 160px);
+  height: clamp(110px, 8.8vw, 140px);
+  transform: translate(-50%, -50%);
+}
+
+.marketing-page-paper .marketing-device-brand-mobile {
+  display: none;
+}
+
+.marketing-page-paper .marketing-device-brand .cediah-logo {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  align-items: center;
+  gap: 7px;
+  overflow: visible;
+  background: transparent;
+}
+
+.marketing-page-paper .marketing-device-brand .koraz-logo-mark {
+  width: clamp(35px, 3vw, 44px) !important;
+  height: clamp(35px, 3vw, 44px) !important;
+  flex-basis: auto;
+}
+
+.marketing-page-paper .marketing-device-brand .koraz-logo-wordmark {
+  width: clamp(62px, 5.1vw, 78px) !important;
+  height: auto !important;
+  filter: none;
+}
+
 .marketing-page-paper .marketing-header {
   position: relative;
   z-index: 20;
@@ -147,8 +192,7 @@
 }
 
 .marketing-page-paper .marketing-plans-link,
-.marketing-page-paper .marketing-login,
-.marketing-page-paper .marketing-register {
+.marketing-page-paper .marketing-login {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -160,28 +204,6 @@
 .marketing-page-paper .marketing-plans-link,
 .marketing-page-paper .marketing-login {
   padding-inline: 4px;
-}
-
-.marketing-page-paper .marketing-register {
-  min-width: clamp(138px, 9.3vw, 158px);
-  padding-inline: 24px;
-  background: linear-gradient(118deg, #4220f3 0%, #6418f7 48%, #5222ec 100%);
-  color: #fff;
-  box-shadow:
-    0 12px 30px rgb(76 30 239 / 20%),
-    inset 0 1px 0 rgb(255 255 255 / 18%);
-}
-
-.marketing-page-paper .marketing-navigation .marketing-register {
-  color: #fff;
-}
-
-.marketing-page-paper .marketing-register:hover {
-  color: #fff;
-  box-shadow:
-    0 16px 34px rgb(76 30 239 / 28%),
-    inset 0 1px 0 rgb(255 255 255 / 22%);
-  transform: translateY(-2px);
 }
 
 .marketing-page-paper .marketing-hero-inner {
@@ -232,6 +254,7 @@
 }
 
 .marketing-page-paper .marketing-hero-copy > p {
+  width: min(100%, 485px);
   margin-top: clamp(18px, 1.3vw, 21px);
   color: var(--marketing-ink);
   font-size: clamp(17px, 1.32vw, 22px);
@@ -273,55 +296,60 @@
   position: relative;
   z-index: 30;
   display: grid;
-  width: min(1180px, calc(100% - 80px));
+  width: min(1120px, calc(100% - 80px));
   height: auto;
-  min-height: 156px;
+  min-height: 0;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin: -54px auto 0;
-  border: 1px solid rgb(35 45 63 / 12%);
-  border-radius: 24px;
-  background: rgb(255 255 255 / 96%);
-  box-shadow:
-    0 22px 55px rgb(32 35 49 / 10%),
-    0 2px 0 rgb(255 255 255 / 70%) inset;
-  padding: 28px 30px;
-  backdrop-filter: blur(14px);
+  gap: 14px;
+  margin: -42px auto 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  backdrop-filter: none;
 }
 
 .marketing-page-paper .marketing-feature {
   position: relative;
   display: flex;
   min-width: 0;
+  min-height: 92px;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 13px;
+  border: 1px solid rgb(36 45 63 / 11%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 95%);
   color: var(--marketing-ink);
-  text-align: center;
-  flex-direction: column;
+  box-shadow: 0 12px 30px rgb(29 36 51 / 8%);
+  padding: 15px 16px;
+  text-align: left;
+  flex-direction: row;
 }
 
 .marketing-page-paper .marketing-feature:not(:last-child)::after {
-  position: absolute;
-  top: 20%;
-  right: 0;
-  width: 1px;
-  height: 60%;
-  background: #e4e0ed;
-  content: "";
+  display: none;
 }
 
 .marketing-page-paper .marketing-feature svg {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   margin: 0;
+  border: 1px solid rgb(91 36 238 / 10%);
+  border-radius: 12px;
+  background: #f3efff;
   color: var(--marketing-purple);
-  filter: drop-shadow(0 5px 10px rgb(85 34 244 / 14%));
+  padding: 8px;
 }
 
 .marketing-page-paper .marketing-feature strong {
-  max-width: 150px;
+  max-width: none;
   min-height: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
 .marketing-page-paper .marketing-platform {
@@ -368,16 +396,8 @@
   padding: 0;
 }
 
-.marketing-page-paper .marketing-platform-copy > span,
-.marketing-page-paper .marketing-pricing-eyebrow {
-  color: var(--marketing-purple);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.19em;
-}
-
 .marketing-page-paper .marketing-platform-copy h2 {
-  margin-top: 18px;
+  margin-top: 0;
   color: var(--marketing-ink);
   font-size: clamp(49px, 4.2vw, 66px);
   font-weight: 700;
@@ -451,7 +471,7 @@
 }
 
 .marketing-page-paper .marketing-pricing-heading h2 {
-  max-width: 700px;
+  max-width: 900px;
   color: var(--marketing-ink);
   font-size: clamp(34px, 3vw, 48px);
   font-weight: 700;
@@ -560,9 +580,12 @@
 }
 
 .marketing-page-paper .marketing-plan-card.is-popular {
-  border: 2px solid #6125f2;
-  box-shadow: 0 26px 60px rgb(82 38 222 / 17%);
-  transform: translateY(-10px);
+  border: 1px solid rgb(97 37 242 / 58%);
+  background: linear-gradient(180deg, #fbf9ff 0%, rgb(255 255 255 / 98%) 24%);
+  box-shadow:
+    0 28px 64px rgb(82 38 222 / 15%),
+    0 0 0 4px rgb(97 37 242 / 5%);
+  transform: translateY(-8px);
 }
 
 .marketing-page-paper .marketing-popular-badge {
@@ -617,15 +640,6 @@
   color: #4168d9;
 }
 
-.marketing-page-paper .marketing-plan-heading small {
-  display: block;
-  margin-bottom: 3px;
-  color: #7a8291;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-
 .marketing-page-paper .marketing-plan-card h3 {
   color: var(--marketing-ink);
   font-size: 22px;
@@ -651,6 +665,28 @@
   color: #5e6879;
   font-size: 12px;
   font-weight: 500;
+}
+
+.marketing-page-paper .marketing-annual-comparison {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  border: 1px solid rgb(95 36 232 / 14%);
+  border-radius: 999px;
+  background: #f5f2fc;
+  color: #777f8d;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 6px 9px;
+  white-space: nowrap;
+}
+
+.marketing-page-paper .marketing-annual-comparison b {
+  color: #5d24e7;
+  font-weight: 700;
 }
 
 .marketing-page-paper .marketing-billing-detail {
@@ -820,8 +856,10 @@
 
 .marketing-page-paper .marketing-footer-groups {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 36px;
+  max-width: 500px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 48px;
+  justify-self: end;
   padding-top: 2px;
 }
 
@@ -878,8 +916,8 @@
     gap: 18px;
   }
 
-  .marketing-page-paper .marketing-register {
-    min-width: 122px;
+  .marketing-page-paper .marketing-device-brand-desktop {
+    left: 62.5%;
   }
 
   .marketing-page-paper .marketing-hero-copy {
@@ -940,6 +978,33 @@
   .marketing-page-paper .marketing-hero-reference-mobile {
     display: block;
     object-position: center top;
+  }
+
+  .marketing-page-paper .marketing-device-brand-desktop {
+    display: none;
+  }
+
+  .marketing-page-paper .marketing-device-brand-mobile {
+    top: 60.1%;
+    left: 56.2%;
+    display: flex;
+    width: 104px;
+    height: 72px;
+    border-radius: 13px;
+    transform: translate(-50%, -50%) rotate(6deg);
+  }
+
+  .marketing-page-paper .marketing-device-brand-mobile .cediah-logo {
+    gap: 6px;
+  }
+
+  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-mark {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-wordmark {
+    width: 52px !important;
   }
 
   .marketing-page-paper .marketing-header {
@@ -1023,19 +1088,6 @@
     min-width: 77px;
   }
 
-  .marketing-page-paper .marketing-register {
-    min-width: 82px;
-    border: 0;
-    background: linear-gradient(118deg, #4320f2, #6619f8);
-    color: #fff;
-    box-shadow: 0 8px 20px rgb(75 31 226 / 22%);
-    padding-inline: 10px;
-  }
-
-  .marketing-page-paper .marketing-navigation .marketing-register {
-    color: #fff !important;
-  }
-
   .marketing-page-paper .marketing-hero-inner {
     display: block;
     width: calc(100% - 64px);
@@ -1098,19 +1150,24 @@
     width: calc(100% - 32px);
     min-height: 0;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0;
-    margin-top: -38px;
-    border-radius: 20px;
-    padding: 12px 14px;
+    gap: 10px;
+    margin-top: -30px;
+    border-radius: 0;
+    padding: 0;
   }
 
   .marketing-page-paper .marketing-feature,
   .marketing-page-paper .marketing-feature:nth-child(4),
   .marketing-page-paper .marketing-feature:nth-child(5) {
-    min-height: 112px;
+    min-height: 78px;
     grid-column: auto;
-    gap: 9px;
-    border-bottom: 1px solid #e6e2ea;
+    justify-content: flex-start;
+    gap: 10px;
+    border: 1px solid rgb(36 45 63 / 11%);
+    border-radius: 15px;
+    padding: 11px 12px;
+    text-align: left;
+    flex-direction: row;
   }
 
   .marketing-page-paper .marketing-feature:nth-child(even)::after {
@@ -1119,15 +1176,23 @@
 
   .marketing-page-paper .marketing-feature:nth-child(5) {
     grid-column: 1 / -1;
-    border-bottom: 0;
+    border-bottom: 1px solid rgb(36 45 63 / 11%);
   }
 
   .marketing-page-paper .marketing-feature:nth-child(4) {
-    border-bottom: 1px solid #e6e2ea;
+    border-bottom: 1px solid rgb(36 45 63 / 11%);
+  }
+
+  .marketing-page-paper .marketing-feature svg {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 10px;
+    padding: 7px;
   }
 
   .marketing-page-paper .marketing-feature strong {
-    font-size: 12px;
+    font-size: 11.5px;
   }
 
   .marketing-page-paper .marketing-platform {
@@ -1153,12 +1218,8 @@
     text-align: center;
   }
 
-  .marketing-page-paper .marketing-platform-copy > span {
-    font-size: 9px;
-  }
-
   .marketing-page-paper .marketing-platform-copy h2 {
-    margin-top: 14px;
+    margin-top: 0;
     font-size: clamp(43px, 12.4vw, 58px);
   }
 
@@ -1209,10 +1270,6 @@
     font-size: 32px;
   }
 
-  .marketing-page-paper .marketing-pricing-eyebrow {
-    font-size: 9px;
-  }
-
   .marketing-page-paper .marketing-pricing-heading > p {
     max-width: 330px;
     font-size: 12px;
@@ -1251,7 +1308,7 @@
   }
 
   .marketing-page-paper .marketing-footer {
-    min-height: 610px;
+    min-height: 520px;
     background:
       linear-gradient(180deg, rgb(249 248 244 / 97%), rgb(244 241 234 / 93%)),
       url("/landing/landing-reference-mobile.png") center bottom / auto 1800px no-repeat;
@@ -1259,9 +1316,9 @@
 
   .marketing-page-paper .marketing-footer-inner {
     width: calc(100% - 48px);
-    min-height: 610px;
+    min-height: 520px;
     grid-template-columns: 1fr;
-    gap: 42px;
+    gap: 36px;
     padding: 54px 0 82px;
   }
 
@@ -1270,8 +1327,11 @@
   }
 
   .marketing-page-paper .marketing-footer-groups {
+    width: 100%;
+    max-width: none;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 32px 20px;
+    justify-self: stretch;
     padding: 0;
   }
 
@@ -1323,9 +1383,18 @@
     min-width: 68px;
   }
 
-  .marketing-page-paper .marketing-register {
-    min-width: 69px;
-    padding-inline: 6px;
+  .marketing-page-paper .marketing-device-brand-mobile {
+    width: 94px;
+    height: 66px;
+  }
+
+  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-mark {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-wordmark {
+    width: 48px !important;
   }
 
   .marketing-page-paper .marketing-hero-inner {

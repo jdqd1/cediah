@@ -52,6 +52,18 @@ function getSubmitLabel(mode: AuthMode) {
   return "Iniciar sesión";
 }
 
+function getEyebrow(mode: AuthMode) {
+  if (mode === "recover") return "Acceso protegido";
+  if (mode === "sign-up") return "Empieza hoy";
+  return "Bienvenido de nuevo";
+}
+
+function getDescription(mode: AuthMode) {
+  if (mode === "recover") return "Te enviaremos un enlace de recuperación de un solo uso.";
+  if (mode === "sign-up") return "Crea tu espacio de estudio y avanza a tu propio ritmo.";
+  return "Retoma tu aprendizaje justo donde lo dejaste.";
+}
+
 export function AuthForm({
   initialMessage,
   initialMessageTone = "error",
@@ -264,9 +276,10 @@ export function AuthForm({
   return (
     <form className={formClassName} method="post" noValidate onSubmit={onSubmit}>
       {variant === "card" && (
-        <div>
+        <div className="auth-form-heading">
+          <span className="auth-form-kicker">{getEyebrow(mode)}</span>
           <h1>{getHeading(mode)}</h1>
-          {isRecovery && <p>Te enviaremos un enlace de recuperación de un solo uso.</p>}
+          <p>{getDescription(mode)}</p>
         </div>
       )}
 
