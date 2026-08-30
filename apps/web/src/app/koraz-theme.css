@@ -3410,3 +3410,1022 @@ a.icon-back-link:hover,
     display: grid;
   }
 }
+
+/* Landing page recreated from the August 2026 Koraz marketing reference. */
+
+.marketing-page {
+  --marketing-ink: #071439;
+  --marketing-navy: #010921;
+  --marketing-purple: #6f19ff;
+  --marketing-purple-bright: #8a25ff;
+  min-width: 0;
+  overflow: clip;
+  background: #ffffff;
+  color: var(--marketing-ink);
+  font-family: "Poppins", ui-sans-serif, sans-serif;
+}
+
+.marketing-page :is(a, button) {
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.marketing-page a:focus-visible,
+.marketing-page button:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 3px;
+}
+
+.marketing-hero {
+  position: relative;
+  height: 510px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 66% 98%, rgb(31 73 177 / 56%) 0%, rgb(9 29 86 / 30%) 34%, transparent 59%),
+    radial-gradient(ellipse at 54% 53%, #071748 0%, #020b2a 51%, #00051b 100%);
+  color: #ffffff;
+}
+
+.marketing-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: min(843px, calc(100% - 40px));
+  height: 70px;
+  align-items: center;
+  margin: 0 auto;
+}
+
+.marketing-brand {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.marketing-brand .cediah-logo {
+  gap: 0.5rem;
+}
+
+.marketing-brand .cediah-logo .koraz-logo-mark {
+  width: 31px !important;
+  height: 31px !important;
+  flex-basis: 31px;
+}
+
+.marketing-brand .cediah-logo .koraz-logo-wordmark {
+  width: 88px !important;
+  filter: grayscale(1) brightness(0) invert(1);
+}
+
+.marketing-navigation {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  margin-left: 88px;
+}
+
+.marketing-nav-links,
+.marketing-nav-actions {
+  display: flex;
+  align-items: center;
+}
+
+.marketing-nav-links {
+  gap: 31px;
+}
+
+.marketing-nav-actions {
+  gap: 11px;
+}
+
+.marketing-navigation a {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.marketing-navigation a:hover {
+  color: #c7b5ff;
+}
+
+.marketing-login,
+.marketing-register {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.marketing-login {
+  min-width: 96px;
+  border: 1px solid rgb(255 255 255 / 25%);
+}
+
+.marketing-register {
+  min-width: 97px;
+  background: linear-gradient(135deg, #731cff, #8c20f4);
+  box-shadow: 0 7px 25px rgb(120 31 255 / 35%);
+}
+
+.marketing-login:hover,
+.marketing-register:hover,
+.marketing-primary-button:hover,
+.marketing-plan-card > a:hover {
+  transform: translateY(-2px);
+}
+
+.marketing-menu-button {
+  display: none;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 10px;
+  color: #ffffff;
+}
+
+.marketing-hero-inner {
+  position: relative;
+  width: min(843px, calc(100% - 40px));
+  height: 440px;
+  margin: 0 auto;
+}
+
+.marketing-hero-copy {
+  position: relative;
+  z-index: 4;
+  width: 340px;
+  padding-top: 64px;
+}
+
+.marketing-hero-copy h1 {
+  color: #ffffff;
+  font-size: 43px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+}
+
+.marketing-hero-copy h1 span,
+.marketing-hero-copy h1 strong {
+  display: block;
+  font: inherit;
+}
+
+.marketing-hero-copy h1 strong {
+  width: max-content;
+  background: linear-gradient(100deg, #9150ff, #6a20ed);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.marketing-hero-copy > p {
+  margin-top: 12px;
+  color: rgb(255 255 255 / 84%);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.marketing-hero-actions {
+  display: flex;
+  gap: 13px;
+  margin-top: 29px;
+}
+
+.marketing-primary-button {
+  display: inline-flex;
+  min-height: 47px;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.marketing-primary-button {
+  min-width: 160px;
+  background: linear-gradient(135deg, #6413f4 0%, #8425ff 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgb(98 24 255 / 28%);
+}
+
+.marketing-anatomy-stage {
+  position: absolute;
+  z-index: 1;
+  top: -15px;
+  left: 340px;
+  width: 525px;
+  height: 455px;
+}
+
+.marketing-anatomy-stage::after {
+  position: absolute;
+  z-index: -1;
+  right: -58px;
+  bottom: -52px;
+  width: 440px;
+  height: 240px;
+  border-radius: 50%;
+  background: rgb(40 76 190 / 20%);
+  filter: blur(40px);
+  content: "";
+}
+
+.marketing-anatomy-hero {
+  position: absolute;
+  z-index: 1;
+  top: 1px;
+  left: 51px;
+  width: 520px;
+  max-width: none;
+  height: 520px;
+  object-fit: contain;
+  object-position: 50% 50%;
+  filter: drop-shadow(0 25px 35px rgb(0 0 0 / 32%));
+}
+
+.marketing-features {
+  position: relative;
+  z-index: 7;
+  display: grid;
+  width: min(843px, calc(100% - 40px));
+  height: 126px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: -44px auto 0;
+  border: 1px solid #eceaf5;
+  border-radius: 17px;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 18px 48px rgb(61 44 161 / 10%);
+  padding: 20px 25px 18px;
+}
+
+.marketing-feature {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--marketing-ink);
+  text-align: center;
+  flex-direction: column;
+}
+
+.marketing-feature svg {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  color: #6d22ff;
+}
+
+.marketing-feature strong {
+  max-width: 110px;
+  min-height: 31px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.marketing-platform {
+  height: 405px;
+  overflow: hidden;
+  scroll-margin-top: 70px;
+  background:
+    radial-gradient(circle at 78% 42%, rgb(148 111 255 / 24%), transparent 35%),
+    radial-gradient(circle at 38% 80%, rgb(130 103 255 / 10%), transparent 31%),
+    linear-gradient(90deg, #ffffff 0%, #fbfaff 52%, #f1efff 100%);
+}
+
+.marketing-platform-inner {
+  position: relative;
+  width: min(843px, calc(100% - 40px));
+  height: 100%;
+  margin: 0 auto;
+}
+
+.marketing-platform-copy {
+  position: relative;
+  z-index: 3;
+  width: 275px;
+  padding: 63px 0 0 28px;
+}
+
+.marketing-platform-copy > span {
+  color: #6c25f3;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.marketing-platform-copy h2 {
+  margin-top: 14px;
+  color: var(--marketing-ink);
+  font-size: 37px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}
+
+.marketing-platform-copy p {
+  margin: 14px 0 22px;
+  color: #677092;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.marketing-platform-copy .marketing-primary-button {
+  min-width: 181px;
+  min-height: 43px;
+}
+
+.marketing-devices {
+  position: absolute;
+  z-index: 2;
+  top: 1px;
+  right: -44px;
+  width: 612px;
+  height: 404px;
+}
+
+.marketing-devices img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 22px 20px rgb(73 54 204 / 20%));
+}
+
+.marketing-pricing {
+  height: 420px;
+  scroll-margin-top: 70px;
+  background: #ffffff;
+  padding-top: 19px;
+}
+
+.marketing-pricing-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 17px;
+  height: 32px;
+}
+
+.marketing-pricing-heading h2 {
+  color: var(--marketing-ink);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.marketing-pricing-heading span {
+  border: 1px solid #cebaff;
+  border-radius: 999px;
+  color: #6c22f7;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 5px 12px;
+}
+
+.marketing-plan-grid {
+  display: grid;
+  width: min(750px, calc(100% - 40px));
+  height: 335px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 13px auto 0;
+}
+
+.marketing-plan-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  border: 1px solid #e2e3ed;
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--marketing-ink);
+  box-shadow: 0 9px 22px rgb(29 26 80 / 5%);
+  flex-direction: column;
+  padding: 18px 19px 16px;
+}
+
+.marketing-plan-card.is-popular {
+  border: 1.5px solid #6d20ff;
+  box-shadow: 0 12px 28px rgb(97 41 255 / 9%);
+}
+
+.marketing-popular-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  min-width: 99px;
+  border-radius: 999px;
+  background: #6d20ff;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  line-height: 22px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.marketing-plan-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.marketing-price {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.marketing-price strong {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+
+.marketing-price span {
+  color: #42507b;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.marketing-plan-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 15px 0 13px;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-plan-card li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #5c678c;
+  font-size: 8.5px;
+  line-height: 1.2;
+}
+
+.marketing-plan-card li.is-included svg {
+  color: #6d20ff;
+  flex: 0 0 auto;
+}
+
+.marketing-plan-card li.is-excluded {
+  color: #a8adbf;
+}
+
+.marketing-plan-card li.is-excluded svg {
+  color: #d06b7e;
+  flex: 0 0 auto;
+}
+
+.marketing-plan-card > a {
+  display: inline-flex;
+  width: 100%;
+  min-height: 35px;
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  border: 1px solid #7b28ff;
+  border-radius: 6px;
+  color: #6b20f5;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.marketing-plan-card.is-popular > a {
+  background: linear-gradient(135deg, #6516f5, #7f21ff);
+  color: #ffffff;
+}
+
+.marketing-cta {
+  position: relative;
+  display: flex;
+  width: min(817px, calc(100% - 40px));
+  height: 116px;
+  align-items: center;
+  margin: 0 auto 18px;
+  overflow: hidden;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 76% 104%, rgb(103 28 255 / 72%), transparent 36%),
+    linear-gradient(115deg, #031134 0%, #071753 62%, #171a68 100%);
+  color: #ffffff;
+}
+
+.marketing-cta h2 {
+  position: relative;
+  z-index: 2;
+  width: 330px;
+  margin-left: 30px;
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.17;
+}
+
+.marketing-cta .marketing-primary-button {
+  position: relative;
+  z-index: 3;
+  min-width: 160px;
+}
+
+.marketing-cta-anatomy {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: -122px;
+  width: 310px;
+  height: 310px;
+  object-fit: contain;
+  opacity: 0.78;
+}
+
+.marketing-footer {
+  height: 179px;
+  background:
+    radial-gradient(ellipse at 62% 38%, rgb(17 44 108 / 27%), transparent 52%),
+    #010921;
+  color: #ffffff;
+}
+
+.marketing-footer-inner {
+  position: relative;
+  display: grid;
+  width: min(815px, calc(100% - 40px));
+  height: 100%;
+  grid-template-columns: 175px minmax(0, 1fr);
+  gap: 31px;
+  margin: 0 auto;
+  padding-top: 26px;
+}
+
+.marketing-footer-brand .cediah-logo {
+  gap: 0.48rem;
+}
+
+.marketing-footer-brand .cediah-logo .koraz-logo-mark {
+  width: 27px !important;
+  height: 27px !important;
+  flex-basis: 27px;
+}
+
+.marketing-footer-brand .cediah-logo .koraz-logo-wordmark {
+  width: 71px !important;
+  filter: grayscale(1) brightness(0) invert(1);
+}
+
+.marketing-footer-brand p {
+  margin-top: 8px;
+  color: rgb(255 255 255 / 73%);
+  font-size: 8.5px;
+  line-height: 1.55;
+}
+
+.marketing-socials {
+  display: flex;
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.marketing-socials a {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 62%);
+  border-radius: 50%;
+  color: #ffffff;
+}
+
+.marketing-socials a:hover {
+  border-color: #9a69ff;
+  color: #bca2ff;
+}
+
+.marketing-footer-groups {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 29px;
+  padding-top: 2px;
+}
+
+.marketing-footer-group {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.marketing-footer-group strong {
+  margin-bottom: 8px;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.marketing-footer-group a {
+  color: rgb(255 255 255 / 69%);
+  font-size: 8.5px;
+  line-height: 1.85;
+  white-space: nowrap;
+}
+
+.marketing-footer-group a:hover {
+  color: #c8b6ff;
+}
+
+.marketing-copyright {
+  position: absolute;
+  right: 0;
+  bottom: 13px;
+  left: 0;
+  color: rgb(255 255 255 / 58%);
+  font-size: 8.5px;
+  text-align: center;
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .marketing-navigation {
+    margin-left: 44px;
+  }
+
+  .marketing-nav-links {
+    gap: 19px;
+  }
+
+  .marketing-hero-copy {
+    padding-left: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .marketing-hero {
+    height: auto;
+    min-height: 790px;
+  }
+
+  .marketing-header {
+    width: calc(100% - 36px);
+    height: 68px;
+  }
+
+  .marketing-brand .cediah-logo .koraz-logo-mark {
+    width: 29px !important;
+    height: 29px !important;
+    flex-basis: 29px;
+  }
+
+  .marketing-brand .cediah-logo .koraz-logo-wordmark {
+    width: 82px !important;
+  }
+
+  .marketing-menu-button {
+    display: grid;
+    margin-left: auto;
+  }
+
+  .marketing-navigation {
+    position: absolute;
+    z-index: 12;
+    top: 59px;
+    right: 0;
+    left: 0;
+    display: none;
+    margin: 0;
+    border: 1px solid rgb(255 255 255 / 15%);
+    border-radius: 15px;
+    background: rgb(3 10 39 / 96%);
+    box-shadow: 0 18px 50px rgb(0 0 0 / 30%);
+    flex-direction: column;
+    padding: 18px;
+    backdrop-filter: blur(16px);
+  }
+
+  .marketing-navigation.is-open {
+    display: flex;
+  }
+
+  .marketing-nav-links,
+  .marketing-nav-actions {
+    width: 100%;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .marketing-nav-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .marketing-navigation a {
+    width: 100%;
+    min-height: 42px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .marketing-nav-links a {
+    display: flex;
+    align-items: center;
+  }
+
+  .marketing-hero-inner {
+    display: flex;
+    width: 100%;
+    height: auto;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .marketing-hero-copy {
+    width: calc(100% - 36px);
+    padding-top: 30px;
+    text-align: center;
+  }
+
+  .marketing-hero-copy h1 {
+    font-size: clamp(39px, 11.3vw, 51px);
+    line-height: 1.07;
+  }
+
+  .marketing-hero-copy h1 strong {
+    margin-inline: auto;
+  }
+
+  .marketing-hero-copy > p {
+    margin-top: 18px;
+    font-size: 13px;
+  }
+
+  .marketing-hero-actions {
+    justify-content: center;
+    gap: 10px;
+    margin-top: 23px;
+  }
+
+  .marketing-primary-button {
+    min-width: 0;
+    padding-inline: 17px;
+  }
+
+  .marketing-anatomy-stage {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: 390px;
+    margin-top: 10px;
+  }
+
+  .marketing-anatomy-hero {
+    top: -15px;
+    left: 50%;
+    width: 430px;
+    height: 430px;
+    transform: translateX(-45%);
+  }
+
+  .marketing-features {
+    width: calc(100% - 28px);
+    height: auto;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 24px 4px;
+    margin-top: -24px;
+    border-radius: 18px;
+    padding: 25px 10px 27px;
+  }
+
+  .marketing-feature {
+    grid-column: span 2;
+  }
+
+  .marketing-feature:nth-child(4) {
+    grid-column: 2 / span 2;
+  }
+
+  .marketing-feature:nth-child(5) {
+    grid-column: 4 / span 2;
+  }
+
+  .marketing-feature strong {
+    min-height: 0;
+    font-size: 12px;
+  }
+
+  .marketing-platform {
+    height: auto;
+    min-height: 680px;
+  }
+
+  .marketing-platform-inner {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .marketing-platform-copy {
+    width: calc(100% - 40px);
+    padding: 52px 0 0;
+    text-align: center;
+  }
+
+  .marketing-platform-copy h2 {
+    font-size: 41px;
+  }
+
+  .marketing-platform-copy p {
+    font-size: 13px;
+  }
+
+  .marketing-platform-copy .marketing-primary-button {
+    margin-inline: auto;
+  }
+
+  .marketing-desktop-break {
+    display: none;
+  }
+
+  .marketing-devices {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 115%;
+    height: auto;
+    margin-top: 10px;
+  }
+
+  .marketing-devices img {
+    aspect-ratio: 3 / 2;
+    object-fit: contain;
+  }
+
+  .marketing-pricing {
+    height: auto;
+    padding: 43px 16px 34px;
+  }
+
+  .marketing-pricing-heading {
+    height: auto;
+    flex-wrap: wrap;
+  }
+
+  .marketing-pricing-heading h2 {
+    width: 100%;
+    font-size: 24px;
+    text-align: center;
+  }
+
+  .marketing-pricing-heading span {
+    font-size: 10px;
+  }
+
+  .marketing-plan-grid {
+    width: min(100%, 420px);
+    height: auto;
+    grid-template-columns: 1fr;
+    gap: 22px;
+    margin-top: 30px;
+  }
+
+  .marketing-plan-card {
+    min-height: 355px;
+    padding: 24px;
+  }
+
+  .marketing-plan-card h3 {
+    font-size: 18px;
+  }
+
+  .marketing-price strong {
+    font-size: 30px;
+  }
+
+  .marketing-plan-card ul {
+    gap: 9px;
+    margin-block: 18px 16px;
+  }
+
+  .marketing-plan-card li {
+    font-size: 10.5px;
+  }
+
+  .marketing-plan-card > a {
+    min-height: 40px;
+    font-size: 11px;
+  }
+
+  .marketing-cta {
+    width: calc(100% - 28px);
+    height: 260px;
+    align-items: flex-start;
+    justify-content: center;
+    margin: 0 14px 18px;
+    flex-direction: column;
+    padding-left: 24px;
+  }
+
+  .marketing-cta h2 {
+    width: auto;
+    margin: 0 0 23px;
+    font-size: 25px;
+  }
+
+  .marketing-cta .marketing-primary-button {
+    min-width: 157px;
+  }
+
+  .marketing-cta-anatomy {
+    right: -56px;
+    bottom: -72px;
+    width: 270px;
+    height: 270px;
+    opacity: 0.55;
+  }
+
+  .marketing-footer {
+    height: auto;
+    min-height: 520px;
+  }
+
+  .marketing-footer-inner {
+    width: calc(100% - 40px);
+    height: auto;
+    grid-template-columns: 1fr;
+    gap: 34px;
+    padding: 38px 0 70px;
+  }
+
+  .marketing-footer-brand p {
+    font-size: 10px;
+  }
+
+  .marketing-footer-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 20px;
+    padding: 0;
+  }
+
+  .marketing-footer-group strong {
+    font-size: 11px;
+  }
+
+  .marketing-footer-group a {
+    font-size: 10px;
+    line-height: 2;
+  }
+
+  .marketing-copyright {
+    bottom: 27px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 390px) {
+  .marketing-hero {
+    min-height: 760px;
+  }
+
+  .marketing-hero-copy h1 {
+    font-size: 38px;
+  }
+
+  .marketing-hero-actions {
+    width: 100%;
+  }
+
+  .marketing-hero-actions a {
+    flex: 1;
+    gap: 7px;
+    padding-inline: 9px;
+    font-size: 10px;
+  }
+
+  .marketing-anatomy-stage {
+    height: 370px;
+  }
+
+  .marketing-anatomy-hero {
+    width: 400px;
+    height: 400px;
+  }
+
+  .marketing-devices {
+    width: 123%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-page :is(a, button) {
+    transition: none;
+  }
+}
