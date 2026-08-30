@@ -97,11 +97,30 @@ export function LandingScreen() {
   };
 
   return (
-    <main className="marketing-page">
+    <main className="marketing-page marketing-page-paper">
       <section className="marketing-hero" aria-labelledby="marketing-title">
+        <div className="marketing-hero-art" aria-hidden="true">
+          <Image
+            className="marketing-hero-reference marketing-hero-reference-desktop"
+            src="/landing/landing-reference-desktop.png"
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 700px) 1px, 100vw"
+          />
+          <Image
+            className="marketing-hero-reference marketing-hero-reference-mobile"
+            src="/landing/landing-reference-mobile.png"
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 700px) 100vw, 1px"
+          />
+        </div>
+
         <header className="marketing-header">
           <Link className="marketing-brand" href="/" aria-label="Koraz, inicio">
-            <CediahLogo variant="light" priority />
+            <CediahLogo variant="dark" priority />
           </Link>
 
           <nav className="marketing-navigation" id="marketing-navigation" aria-label="Navegación principal">
@@ -118,28 +137,16 @@ export function LandingScreen() {
         <div className="marketing-hero-inner">
           <div className="marketing-hero-copy">
             <h1 id="marketing-title">
-              <span>Medicina real.</span>
-              <span>Aprendizaje</span>
-              <strong>sin límites.</strong>
+              <span>Estudia a tu <br className="marketing-mobile-break" />manera.</span>
+              <span>Llega más lejos.</span>
             </h1>
-            <p>Explora, practica y domina<br />las materias de tu carrera.</p>
+            <span className="marketing-hero-rule" aria-hidden="true" />
+            <p>Combina tus apuntes de siempre con<br className="marketing-desktop-break" /> herramientas digitales que te hacen avanzar.</p>
             <div className="marketing-hero-actions">
               <Link className="marketing-primary-button" href={registerHref}>
                 Comienza gratis <ArrowRight aria-hidden="true" size={18} weight="bold" />
               </Link>
             </div>
-          </div>
-
-          <div className="marketing-anatomy-stage" aria-hidden="true">
-            <Image
-              className="marketing-anatomy-hero"
-              src="/landing/anatomy-hero.png"
-              alt=""
-              width={1024}
-              height={1024}
-              priority
-              sizes="(max-width: 700px) 96vw, 56vw"
-            />
           </div>
         </div>
       </section>
@@ -266,9 +273,9 @@ export function LandingScreen() {
       <footer className="marketing-footer" id="instituciones">
         <div className="marketing-footer-inner">
           <div className="marketing-footer-brand">
-            <Link href="/" aria-label="Koraz, inicio"><CediahLogo variant="light" /></Link>
+            <Link href="/" aria-label="Koraz, inicio"><CediahLogo variant="dark" /></Link>
             <p>Aprendizaje que se ve,<br />conocimiento que se queda.</p>
-            <div className="marketing-socials" aria-label="Redes sociales">
+            <div className="marketing-socials" aria-label="Redes sociales" role="group">
               <a href="#instagram" aria-label="Instagram"><InstagramLogo size={16} /></a>
               <a href="#youtube" aria-label="YouTube"><YoutubeLogo size={16} /></a>
               <a href="#tiktok" aria-label="TikTok"><TiktokLogo size={16} /></a>
@@ -283,7 +290,7 @@ export function LandingScreen() {
               </div>
             ))}
           </div>
-          <p className="marketing-copyright">© 2025 Koraz. Todos los derechos reservados.</p>
+          <p className="marketing-copyright">© 2026 Koraz. Todos los derechos reservados.</p>
         </div>
       </footer>
     </main>

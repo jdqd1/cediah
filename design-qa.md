@@ -1,57 +1,40 @@
-# Design QA — Koraz landing
+# Design QA — Koraz landing papel + digital
 
-- original visual reference: `D:\Jose (Datos)\UI Koraz Web\Imagen de Codex 29 ago 2026, 07_47_26 p.m..png`
-- annotated revision reference: `C:\Users\josed\AppData\Local\Temp\codex-clipboard-04279759-199e-41f6-a5aa-a84e69d46680.png`
-- revision source of truth: browser comments 1–14 supplied by the user
-- inspected mobile viewport range: 415–460 × 698 CSS px
-- browser-supplied desktop evidence: 1186 × 698 px
-- state: anonymous landing, closed and open mobile navigation, plans comparison
+- Referencia de escritorio: `D:\Jose (Datos)\UI Koraz Web\landing modo claro.png`
+- Referencia móvil: `D:\Jose (Datos)\UI Koraz Web\landing modo claro movil.png`
+- Superficies inspeccionadas: hero, recursos, plataforma, planes y footer
+- Estado probado: visitante sin sesión
+- Viewports de referencia: 1697 × 943 y 430 × 932 CSS px
+- Resultado final: aprobado
 
-## Revision requirements
+## Dirección implementada
 
-- Removed the four floating hero cards: Anatomía 3D, Flashcards, progress and quizzes.
-- Removed the secondary “Ver plataforma” action.
-- Simplified the main navigation to Planes plus the two account actions.
-- Reduced the resource rail to five items, removed every descriptive subtitle and removed Rutas de estudio.
-- Removed the three pricing captions below the plan names.
-- Rebuilt pricing as a cumulative comparison with one shared eight-benefit matrix.
+- La escena de escritorio y la escena móvil usan las imágenes suministradas como capa editorial de papel y lápiz.
+- El encabezado, enlaces, CTA, selector de facturación, tarjetas de planes y acciones permanecen como controles digitales reales.
+- El hero replica el texto de referencia: “Estudia a tu manera. Llega más lejos.” y “Combina tus apuntes de siempre con herramientas digitales que te hacen avanzar.”
+- El logo del encabezado, del footer y de las interfaces mostradas corresponde a la identidad normal de Koraz.
+- El resto de la landing adopta el fondo de escritorio ilustrado, con una capa tenue que evita competir con el contenido digital.
 
-## Pricing comparison
+## Paridad funcional
 
-All cards use the same benefit order so plans can be compared line by line:
+- `Planes` conserva el desplazamiento suave y lleva la sección a 88 px del borde superior.
+- `Iniciar sesión` conserva `/acceder`.
+- `Regístrate` y los CTA conservan `/acceder?modo=registro`.
+- El selector de facturación conserva sus estados `aria-pressed`.
+- El cambio de anual a mensual actualiza el plan Básico de `$3.99` a `$4.99` y cambia el parámetro a `facturacion=mensual`.
+- La comparación acumulativa de ocho beneficios permanece intacta en los tres planes.
 
-1. Materias esenciales
-2. Videos y guías
-3. Cuestionarios
-4. Seguimiento de progreso
-5. Acceso a todas las materias
-6. Flashcards ilimitadas
-7. Casos clínicos exclusivos
-8. Soporte prioritario
+## Responsive y accesibilidad
 
-Básico includes benefits 1–4 and marks 5–8 with an X. Pro inherits 1–4, adds 5–6 and marks 7–8 with an X. Premium inherits the complete Pro plan and adds 7–8. Every row also exposes its included or excluded state through an accessible label.
+- No existe desbordamiento horizontal en escritorio ni en móvil.
+- El hero usa la composición de escritorio por encima de 700 px y la referencia móvil en anchos menores.
+- La navegación móvil sigue visible y operable sin depender de un menú oculto.
+- El auditor axe-core reportó 0 violaciones WCAG 2 A/AA. La única comprobación inconclusa fue contraste automatizado sobre superficies con pseudo-elementos; los colores visibles mantienen contraste alto.
+- No se detectaron overlays de error ni errores de consola en la carga final.
 
-## Responsive evidence
+## Comprobaciones ejecutadas
 
-- `tmp/landing-qa/revision-mobile-hero.png`: clean hero without floating cards or secondary action.
-- `tmp/landing-qa/revision-mobile-features.png`: five title-only resources in a centered 3 + 2 mobile grid.
-- `tmp/landing-qa/revision-mobile-menu.png`: Planes, Iniciar sesión and Regístrate are the only mobile navigation actions.
-- `tmp/landing-qa/revision-mobile-pricing.png`: cumulative plan comparison with visible checks and X marks.
-- Mobile width has no horizontal overflow.
-- The desktop layout retains its fixed hero composition, changes the resource rail to five equal columns and gives the pricing cards enough height for all eight rows.
-
-## Interaction and runtime checks
-
-- Mobile menu opens and closes successfully.
-- Selecting Planes closes the menu and scrolls to the pricing section.
-- Registration and account routes are preserved.
-- Browser console errors and warnings: none.
-- `pnpm --filter @cediah/web typecheck`: passed.
-- `pnpm --filter @cediah/web lint`: passed.
-- `pnpm --filter @cediah/web build`: passed.
-
-## Findings
-
-No actionable P0, P1 or P2 issue remains. The black circular “N” visible in development screenshots belongs to the Next.js development overlay and is not rendered in production.
-
-final result: passed
+- `pnpm --filter @cediah/web typecheck`: aprobado.
+- `pnpm --filter @cediah/web lint`: aprobado.
+- `pnpm --filter @cediah/web build`: aprobado.
+- Navegación y selector de facturación comprobados en navegador real: aprobados.

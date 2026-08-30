@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./koraz-theme.css";
+import "./landing-paper.css";
 
 export const metadata: Metadata = {
   title: "Koraz | Aprende, explora y crece",
