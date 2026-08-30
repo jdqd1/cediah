@@ -2,18 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import {
   ArrowRight,
   Check,
   ClipboardText,
   ClockCountdown,
   BookOpen,
+  Crown,
   FacebookLogo,
   ImagesSquare,
   InstagramLogo,
-  List,
+  Lightning,
   MonitorPlay,
+  Sparkle,
   TiktokLogo,
   X,
   YoutubeLogo,
@@ -42,19 +44,31 @@ const planFeatures = [
 const plans = [
   {
     name: "Básico",
-    price: "$4.99",
+    slug: "basico",
+    level: "NIVEL 1",
+    icon: Sparkle,
+    monthlyPrice: 4.99,
+    annualPrice: 47.9,
     includedFeatures: 4,
     popular: false,
   },
   {
     name: "Pro",
-    price: "$8.99",
+    slug: "pro",
+    level: "NIVEL 2",
+    icon: Lightning,
+    monthlyPrice: 8.99,
+    annualPrice: 86.3,
     includedFeatures: 6,
     popular: true,
   },
   {
     name: "Premium",
-    price: "$12.99",
+    slug: "premium",
+    level: "NIVEL 3",
+    icon: Crown,
+    monthlyPrice: 12.99,
+    annualPrice: 124.7,
     includedFeatures: planFeatures.length,
     popular: false,
   },
@@ -71,8 +85,16 @@ const accessHref = "/acceder";
 const registerHref = "/acceder?modo=registro";
 
 export function LandingScreen() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const closeMenu = () => setMenuOpen(false);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
+
+  const scrollToPlans = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById("planes")?.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  };
 
   return (
     <main className="marketing-page">
@@ -82,28 +104,13 @@ export function LandingScreen() {
             <CediahLogo variant="light" priority />
           </Link>
 
-          <button
-            className="marketing-menu-button"
-            type="button"
-            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-            aria-expanded={menuOpen}
-            aria-controls="marketing-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <X size={24} weight="bold" /> : <List size={25} weight="bold" />}
-          </button>
-
-          <nav
-            className={'marketing-navigation ' + (menuOpen ? "is-open" : "")}
-            id="marketing-navigation"
-            aria-label="Navegación principal"
-          >
+          <nav className="marketing-navigation" id="marketing-navigation" aria-label="Navegación principal">
             <div className="marketing-nav-links">
-              <a href="#planes" onClick={closeMenu}>Planes</a>
+              <a className="marketing-plans-link" href="#planes" onClick={scrollToPlans}>Planes</a>
             </div>
             <div className="marketing-nav-actions">
-              <Link className="marketing-login" href={accessHref} onClick={closeMenu}>Iniciar sesión</Link>
-              <Link className="marketing-register" href={registerHref} onClick={closeMenu}>Regístrate</Link>
+              <Link className="marketing-login" href={accessHref}>Iniciar sesión</Link>
+              <Link className="marketing-register" href={registerHref}>Regístrate</Link>
             </div>
           </nav>
         </header>
@@ -170,47 +177,90 @@ export function LandingScreen() {
 
       <section className="marketing-pricing" id="planes" aria-labelledby="plans-title">
         <div className="marketing-pricing-heading">
-          <h2 id="plans-title">Elige tu plan</h2>
-          <span>Ahorra 20% anual ✦</span>
+          <span className="marketing-pricing-eyebrow">TU PRÓXIMO NIVEL</span>
+          <h2 id="plans-title">Elige el plan que te hace avanzar</h2>
+          <p>Compara beneficios y cambia la forma de pago cuando quieras.</p>
+          <div className="marketing-billing-switch" role="group" aria-label="Frecuencia de facturación">
+            <button
+              className={billingCycle === "monthly" ? "is-active" : ""}
+              type="button"
+              aria-pressed={billingCycle === "monthly"}
+              onClick={() => setBillingCycle("monthly")}
+            >
+              Mensual
+            </button>
+            <button
+              className={billingCycle === "yearly" ? "is-active" : ""}
+              type="button"
+              aria-pressed={billingCycle === "yearly"}
+              onClick={() => setBillingCycle("yearly")}
+            >
+              Anual <span>-20%</span>
+            </button>
+          </div>
         </div>
         <div className="marketing-plan-grid">
-          {plans.map((plan) => (
-            <article className={'marketing-plan-card ' + (plan.popular ? "is-popular" : "")} key={plan.name}>
-              {plan.popular ? <span className="marketing-popular-badge">MÁS POPULAR</span> : null}
-              <h3>{plan.name}</h3>
-              <div className="marketing-price"><strong>{plan.price}</strong><span>/mes</span></div>
-              <ul>
-                {planFeatures.map((feature, featureIndex) => {
-                  const included = featureIndex < plan.includedFeatures;
+          {plans.map((plan, planIndex) => {
+            const PlanIcon = plan.icon;
+            const annualMonthlyPrice = plan.annualPrice / 12;
+            const annualSavings = plan.monthlyPrice * 12 - plan.annualPrice;
+            const displayedPrice = billingCycle === "yearly" ? annualMonthlyPrice : plan.monthlyPrice;
 
-                  return (
-                    <li
-                      className={included ? "is-included" : "is-excluded"}
-                      key={feature}
-                      aria-label={`${feature}: ${included ? "incluido" : "no incluido"}`}
-                    >
-                      {included ? (
-                        <Check aria-hidden="true" size={12} weight="bold" />
-                      ) : (
-                        <X aria-hidden="true" size={12} weight="bold" />
-                      )}
-                      {feature}
-                    </li>
-                  );
-                })}
-              </ul>
-              <Link href={registerHref + '&plan=' + plan.name.toLowerCase()}>Elegir plan</Link>
-            </article>
-          ))}
+            return (
+              <article
+                className={`marketing-plan-card marketing-plan-tier-${planIndex + 1} ${plan.popular ? "is-popular" : ""}`}
+                key={plan.name}
+              >
+                {plan.popular ? (
+                  <span className="marketing-popular-badge"><Lightning aria-hidden="true" size={11} weight="fill" /> MÁS ELEGIDO</span>
+                ) : null}
+                <div className="marketing-plan-heading">
+                  <span className="marketing-plan-icon"><PlanIcon aria-hidden="true" size={21} weight="fill" /></span>
+                  <div><small>{plan.level}</small><h3>{plan.name}</h3></div>
+                </div>
+                <div className="marketing-price" aria-live="polite">
+                  <strong>${displayedPrice.toFixed(2)}</strong><span>/mes</span>
+                </div>
+                <div className="marketing-billing-detail">
+                  {billingCycle === "yearly" ? (
+                    <>
+                      <span>Pago único de <strong>${plan.annualPrice.toFixed(2)}</strong> al año</span>
+                      <b><Sparkle aria-hidden="true" size={12} weight="fill" /> Ahorras ${annualSavings.toFixed(2)}</b>
+                    </>
+                  ) : (
+                    <>
+                      <span>Facturación flexible cada mes</span>
+                      <b>Con anual: ${annualMonthlyPrice.toFixed(2)}/mes</b>
+                    </>
+                  )}
+                </div>
+                <ul>
+                  {planFeatures.map((feature, featureIndex) => {
+                    const included = featureIndex < plan.includedFeatures;
+
+                    return (
+                      <li
+                        className={included ? "is-included" : "is-excluded"}
+                        key={feature}
+                        aria-label={`${feature}: ${included ? "incluido" : "no incluido"}`}
+                      >
+                        {included ? (
+                          <Check aria-hidden="true" size={12} weight="bold" />
+                        ) : (
+                          <X aria-hidden="true" size={12} weight="bold" />
+                        )}
+                        {feature}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Link href={`${registerHref}&plan=${plan.slug}&facturacion=${billingCycle === "yearly" ? "anual" : "mensual"}`}>
+                  Elegir {plan.name} <ArrowRight aria-hidden="true" size={13} weight="bold" />
+                </Link>
+              </article>
+            );
+          })}
         </div>
-      </section>
-
-      <section className="marketing-cta" aria-labelledby="cta-title">
-        <Image className="marketing-cta-anatomy" src="/landing/cta-anatomy.png" alt="" width={1024} height={1024} />
-        <h2 id="cta-title">Domina tus materias.<br />Transforma tu futuro.</h2>
-        <Link className="marketing-primary-button" href={registerHref}>
-          Comienza gratis <ArrowRight aria-hidden="true" size={18} weight="bold" />
-        </Link>
       </section>
 
       <footer className="marketing-footer" id="instituciones">
