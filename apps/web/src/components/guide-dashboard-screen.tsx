@@ -12,7 +12,7 @@ import {
 import type { ContentItem, Subject } from "@cediah/contracts";
 import { type MouseEvent, useMemo, useState } from "react";
 import { publishedContentHref } from "@/lib/content-navigation";
-import { contentItemSearchText, getContentSearchExcerpt } from "@/lib/content-search";
+import { contentItemSearchText } from "@/lib/content-search";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
@@ -68,12 +68,6 @@ function GuideList({ guides, searchQuery = "", showSubject = false, subjectSlug,
       }}
       items={guides}
       searchQuery={searchQuery}
-      summaryForItem={(guide) => {
-        const content = contentItemSearchText(guide);
-        return searchQuery.trim() && normalize(content).includes(normalize(searchQuery.trim()))
-          ? getContentSearchExcerpt(content, searchQuery)
-          : guide.summary;
-      }}
     />
   );
 }

@@ -12,6 +12,8 @@ import {
   CheckCircle,
   CloudArrowUp,
   Compass,
+  FileArchive,
+  FilePdf,
   FileVideo,
   FunnelSimple,
   GraduationCap,
@@ -712,6 +714,66 @@ function TypeEditor({
           onChange({ ...draft, content: { ...draft.content, objectives } })
         }
       />
+    </section>
+  );
+}
+
+function SupportingMaterialFields() {
+  const [ankiDeck, setAnkiDeck] = useState<File | null>(null);
+  const [slideDeck, setSlideDeck] = useState<File | null>(null);
+
+  return (
+    <section className="studio-form-section studio-supporting-materials" aria-labelledby="studio-supporting-materials-title">
+      <h4 id="studio-supporting-materials-title">Archivos complementarios</h4>
+      <div className="studio-supporting-material-grid">
+        <article className={slideDeck ? "has-file" : ""}>
+          <label>
+            <span className="studio-supporting-material-icon"><FilePdf aria-hidden="true" size={24} /></span>
+            <span className="studio-supporting-material-copy">
+              <strong>Diapositivas</strong>
+              <small>{slideDeck?.name ?? "Adjuntar PDF"}</small>
+            </span>
+            <span className="studio-supporting-material-action">
+              {slideDeck ? <CheckCircle aria-hidden="true" size={19} weight="fill" /> : <CloudArrowUp aria-hidden="true" size={19} />}
+            </span>
+            <input
+              accept="application/pdf,.pdf"
+              aria-label="Adjuntar PDF de diapositivas"
+              type="file"
+              onChange={(event) => setSlideDeck(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          {slideDeck && (
+            <button aria-label="Quitar PDF de diapositivas" type="button" onClick={() => setSlideDeck(null)}>
+              <X aria-hidden="true" size={15} />
+            </button>
+          )}
+        </article>
+
+        <article className={ankiDeck ? "has-file" : ""}>
+          <label>
+            <span className="studio-supporting-material-icon"><FileArchive aria-hidden="true" size={24} /></span>
+            <span className="studio-supporting-material-copy">
+              <strong>Mazo de Anki</strong>
+              <small>{ankiDeck?.name ?? "Adjuntar APKG"}</small>
+            </span>
+            <span className="studio-supporting-material-action">
+              {ankiDeck ? <CheckCircle aria-hidden="true" size={19} weight="fill" /> : <CloudArrowUp aria-hidden="true" size={19} />}
+            </span>
+            <input
+              accept=".apkg,.colpkg,application/octet-stream"
+              aria-label="Adjuntar mazo de Anki"
+              type="file"
+              onChange={(event) => setAnkiDeck(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          {ankiDeck && (
+            <button aria-label="Quitar mazo de Anki" type="button" onClick={() => setAnkiDeck(null)}>
+              <X aria-hidden="true" size={15} />
+            </button>
+          )}
+        </article>
+      </div>
     </section>
   );
 }
@@ -1871,6 +1933,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       )}
                     </div>
                   </section>
+
+                  {draft.kind === "video" && (
+                    <SupportingMaterialFields key={`${editingId ?? "new"}-supporting-materials`} />
+                  )}
 
                   <TypeEditor draft={draft} onChange={setDraft} onOpenGuide={openGuideEditor} />
                 </fieldset>

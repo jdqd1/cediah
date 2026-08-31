@@ -724,14 +724,12 @@ function GuideReaderPreview({
   keyPoints,
   outline,
   questions,
-  summary,
   title,
 }: {
   guideDocument: RichTextDocument;
   keyPoints: string[];
   outline: NumberedGuideOutlineItem[];
   questions: QuizQuestion[];
-  summary: string;
   title: string;
 }) {
   const [outlineExpanded, setOutlineExpanded] = useState(true);
@@ -770,7 +768,6 @@ function GuideReaderPreview({
       <header className="guide-editor-reader-preview-heading">
         <span>Vista del lector</span>
         <h1>{title || "Guía sin título"}</h1>
-        {summary && <p>{summary}</p>}
       </header>
       <section className="published-reader-mobile-toolbar guide-editor-preview-mobile-toolbar" aria-label="Paneles de la vista previa">
         <div className="published-reader-mobile-toolbar-row">
@@ -1653,7 +1650,6 @@ export function GuideEditorScreen({
           guideDocument={documentState}
           outline={numberedOutline}
           questions={guideQuestions(draft)}
-          summary={draft.summary}
           title={draft.title}
           keyPoints={guideKeyPoints(draft)}
         />

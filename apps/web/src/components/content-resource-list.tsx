@@ -12,7 +12,6 @@ type ContentResourceListProps<T extends ContentItem> = {
   hrefForItem: (item: T) => string;
   items: T[];
   searchQuery?: string;
-  summaryForItem?: (item: T) => string;
 };
 
 function HighlightedText({ query, value }: { query: string; value: string }) {
@@ -43,14 +42,12 @@ export function ContentResourceList<T extends ContentItem>({
   hrefForItem,
   items,
   searchQuery = "",
-  summaryForItem,
 }: ContentResourceListProps<T>) {
   return (
     <ul aria-label={ariaLabel} className={`content-resource-list ${className}`.trim()}>
       {items.map((item) => {
         const context = [...new Set(contextForItem?.(item).filter(Boolean) ?? [])];
         const contextText = context.join(" · ");
-        const summary = summaryForItem?.(item) ?? item.summary;
 
         return (
           <li key={item.id}>
@@ -63,9 +60,6 @@ export function ContentResourceList<T extends ContentItem>({
                     <HighlightedText query={searchQuery} value={contextText} />
                   </span>
                 )}
-                <span className="content-resource-summary">
-                  <HighlightedText query={searchQuery} value={summary} />
-                </span>
               </span>
               <ArrowRight aria-hidden="true" size={18} />
             </Link>

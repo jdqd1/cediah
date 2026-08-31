@@ -21,7 +21,7 @@ import {
   studyContentKindLabels,
   type StudyContentKind,
 } from "@/lib/content-navigation";
-import { contentItemSearchText, getContentSearchExcerpt } from "@/lib/content-search";
+import { contentItemSearchText } from "@/lib/content-search";
 import { uniqueRegions } from "@/lib/content-regions";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
@@ -77,12 +77,6 @@ function ResourceList({
       })}
       items={items}
       searchQuery={searchQuery}
-      summaryForItem={(item) => {
-        const content = contentItemSearchText(item);
-        return searchQuery.trim() && normalize(content).includes(normalize(searchQuery.trim()))
-          ? getContentSearchExcerpt(content, searchQuery)
-          : item.summary;
-      }}
     />
   );
 }
