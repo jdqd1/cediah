@@ -96,7 +96,7 @@ export function LandingScreen() {
         <div className="marketing-hero-art" aria-hidden="true">
           <Image
             className="marketing-hero-reference marketing-hero-reference-desktop"
-            src="/landing/landing-reference-desktop.png"
+            src="/landing/landing-hero-integrated-desktop.png"
             alt=""
             fill
             priority
@@ -104,19 +104,12 @@ export function LandingScreen() {
           />
           <Image
             className="marketing-hero-reference marketing-hero-reference-mobile"
-            src="/landing/landing-reference-mobile.png"
+            src="/landing/landing-hero-integrated-mobile.png"
             alt=""
             fill
             priority
             sizes="(max-width: 700px) 100vw, 1px"
           />
-        </div>
-
-        <div className="marketing-device-brand marketing-device-brand-desktop" aria-hidden="true">
-          <CediahLogo variant="dark" priority />
-        </div>
-        <div className="marketing-device-brand marketing-device-brand-mobile" aria-hidden="true">
-          <CediahLogo variant="dark" priority />
         </div>
 
         <header className="marketing-header">

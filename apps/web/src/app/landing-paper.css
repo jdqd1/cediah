@@ -71,51 +71,6 @@
   display: none;
 }
 
-.marketing-page-paper .marketing-device-brand {
-  position: absolute;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: #fff;
-  pointer-events: none;
-}
-
-.marketing-page-paper .marketing-device-brand-desktop {
-  top: 36.4%;
-  left: 60%;
-  width: clamp(124px, 10vw, 160px);
-  height: clamp(110px, 8.8vw, 140px);
-  transform: translate(-50%, -50%);
-}
-
-.marketing-page-paper .marketing-device-brand-mobile {
-  display: none;
-}
-
-.marketing-page-paper .marketing-device-brand .cediah-logo {
-  display: inline-flex;
-  width: auto;
-  height: auto;
-  align-items: center;
-  gap: 7px;
-  overflow: visible;
-  background: transparent;
-}
-
-.marketing-page-paper .marketing-device-brand .koraz-logo-mark {
-  width: clamp(35px, 3vw, 44px) !important;
-  height: clamp(35px, 3vw, 44px) !important;
-  flex-basis: auto;
-}
-
-.marketing-page-paper .marketing-device-brand .koraz-logo-wordmark {
-  width: clamp(62px, 5.1vw, 78px) !important;
-  height: auto !important;
-  filter: none;
-}
-
 .marketing-page-paper .marketing-header {
   position: relative;
   z-index: 20;
@@ -916,10 +871,6 @@
     gap: 18px;
   }
 
-  .marketing-page-paper .marketing-device-brand-desktop {
-    left: 62.5%;
-  }
-
   .marketing-page-paper .marketing-hero-copy {
     width: 48%;
   }
@@ -978,33 +929,6 @@
   .marketing-page-paper .marketing-hero-reference-mobile {
     display: block;
     object-position: center top;
-  }
-
-  .marketing-page-paper .marketing-device-brand-desktop {
-    display: none;
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile {
-    top: 60.1%;
-    left: 56.2%;
-    display: flex;
-    width: 104px;
-    height: 72px;
-    border-radius: 13px;
-    transform: translate(-50%, -50%) rotate(6deg);
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile .cediah-logo {
-    gap: 6px;
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-mark {
-    width: 30px !important;
-    height: 30px !important;
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-wordmark {
-    width: 52px !important;
   }
 
   .marketing-page-paper .marketing-header {
@@ -1381,20 +1305,6 @@
 
   .marketing-page-paper .marketing-login {
     min-width: 68px;
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile {
-    width: 94px;
-    height: 66px;
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-mark {
-    width: 28px !important;
-    height: 28px !important;
-  }
-
-  .marketing-page-paper .marketing-device-brand-mobile .koraz-logo-wordmark {
-    width: 48px !important;
   }
 
   .marketing-page-paper .marketing-hero-inner {
