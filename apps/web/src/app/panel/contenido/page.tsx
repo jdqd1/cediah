@@ -33,8 +33,8 @@ export default async function ContentStudioPage() {
           <p className="eyebrow dark">Acceso restringido</p>
           <h1>Esta cuenta no tiene permisos editoriales.</h1>
           <p>
-            Coordinación debe asignarte el rol de colaborador de comunidad,
-            presentador, editor académico o administrador.
+            Un administrador debe asignarte el rol de creador de contenido,
+            coordinador o administrador.
           </p>
           <Link href="/panel">Volver a mi panel</Link>
         </section>

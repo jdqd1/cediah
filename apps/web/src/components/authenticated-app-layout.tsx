@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getCurrentUser } from "@/lib/server/current-user";
+import { AccessProvider } from "./access-context";
 
 type AuthenticatedAppLayoutProps = {
   children: ReactNode;
@@ -19,5 +20,5 @@ export async function AuthenticatedAppLayout({
     );
   }
 
-  return children;
+  return <AccessProvider roles={current.roles}>{children}</AccessProvider>;
 }

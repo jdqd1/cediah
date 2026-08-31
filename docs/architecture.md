@@ -79,6 +79,8 @@ La fuente activa está en database/migrations:
 | 0002_platform.sql | Perfiles, roles, cursos, inscripciones, progreso y auditoría |
 | 0003_content.sql | Catálogo editorial, workflow y metadatos de assets |
 | 0004_subjects.sql | Asignaturas y relación con contenido |
+| 0005_restore_legacy_content.sql | Recuperación controlada del contenido histórico |
+| 0006_simplify_platform_roles.sql | Consolidación del catálogo de acceso en cuatro roles |
 
 Cuando el proveedor ofrece una conexión de sesión, la API puede tomar un advisory lock, crear public.cediah_schema_migrations, comparar checksums y ejecutar en transacción cada archivo pendiente. Un checksum diferente para una migración aplicada detiene el arranque. Esta política evita cambios silenciosos de esquema durante un despliegue concurrente.
 
@@ -108,11 +110,13 @@ Las contraseñas y sesiones anteriores de Supabase Auth no forman parte de esta 
 
 La creación de una cuenta genera su perfil y el rol student mediante un trigger de PostgreSQL. Los roles adicionales son administrados por un administrator a través de la API:
 
-- community_contributor y presenter crean y editan contenido permitido;
-- academic_editor revisa y aprueba;
-- coordination y administrator publican y archivan;
-- solo administrator administra roles;
-- un trigger impide eliminar al último administrador.
+- student consulta el material publicado y no dispone de operaciones editoriales;
+- content_creator crea y edita su propio material, lo clasifica con materias y temas existentes y lo envía a revisión;
+- coordinator crea contenido, revisa el trabajo editorial, solicita cambios, aprueba, publica y archiva, pero no administra roles, materias ni temas;
+- administrator dispone de todas las capacidades editoriales, administra materias, temas —incluidas las publicaciones estructurales de tipo topic— y roles, y puede eliminar contenido;
+- un trigger impide eliminar al último administrator.
+
+La migración 0006 convierte los roles históricos al equivalente más cercano: community_contributor y presenter pasan a content_creator; academic_editor y coordination pasan a coordinator; finance_readonly pasa a student.
 
 El workflow editorial es draft -> in_review -> changes_requested o approved -> published -> archived. Las transiciones, propiedad y versión optimista se validan en la API y las acciones se auditan.
 

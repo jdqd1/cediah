@@ -12,11 +12,8 @@ export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
 export const PlatformRoleSchema = z.enum([
   "student",
-  "community_contributor",
-  "presenter",
-  "academic_editor",
-  "coordination",
-  "finance_readonly",
+  "content_creator",
+  "coordinator",
   "administrator",
 ]);
 
@@ -28,6 +25,7 @@ export const CurrentUserSchema = z.object({
 });
 
 export const CurrentUserResponseSchema = z.object({
+  roles: z.array(PlatformRoleSchema).default([]),
   user: CurrentUserSchema,
 });
 
@@ -914,7 +912,9 @@ export type ContentCatalogResponse = z.infer<typeof ContentCatalogResponseSchema
 
 export const ContentCapabilitiesSchema = z.object({
   canCreate: z.boolean(),
+  canDeleteContent: z.boolean(),
   canEditAll: z.boolean(),
+  canManageTaxonomy: z.boolean(),
   canPublish: z.boolean(),
   canReview: z.boolean(),
   canUpload: z.boolean(),
@@ -922,11 +922,19 @@ export const ContentCapabilitiesSchema = z.object({
 
 export type ContentCapabilities = z.infer<typeof ContentCapabilitiesSchema>;
 
+export const ContentTopicSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  subjectIds: z.array(z.string().uuid()),
+});
+
+export type ContentTopic = z.infer<typeof ContentTopicSchema>;
+
 export const ContentWorkspaceResponseSchema = z.object({
   capabilities: ContentCapabilitiesSchema,
   items: z.array(ContentItemSchema),
   roles: z.array(PlatformRoleSchema),
   subjects: z.array(SubjectSchema).default([]),
+  topics: z.array(ContentTopicSchema).default([]),
 });
 
 export type ContentWorkspaceResponse = z.infer<typeof ContentWorkspaceResponseSchema>;
@@ -1086,6 +1094,7 @@ export interface ContentProvider {
   createContent(input: {
     actorUserId: string;
     draft: ContentDraft;
+    roles: PlatformRole[];
   }): Promise<ContentMutationResult<ContentItem>>;
   deleteContent(input: {
     actorUserId: string;
@@ -1114,6 +1123,7 @@ export interface ContentProvider {
     limit: number;
     subjectId?: string;
   }): Promise<ContentItem[]>;
+  listTopics?(): Promise<ContentTopic[]>;
   transitionContent(input: {
     actorUserId: string;
     contentId: string;

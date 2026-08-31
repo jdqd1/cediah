@@ -22,11 +22,8 @@ type BusyState =
 
 const roleOptions: { label: string; value: PlatformRole }[] = [
   { label: "Estudiante", value: "student" },
-  { label: "Colaborador de comunidad", value: "community_contributor" },
-  { label: "Presentador", value: "presenter" },
-  { label: "Editor académico", value: "academic_editor" },
-  { label: "Coordinación", value: "coordination" },
-  { label: "Finanzas (lectura)", value: "finance_readonly" },
+  { label: "Creador de contenido", value: "content_creator" },
+  { label: "Coordinador", value: "coordinator" },
   { label: "Administrador", value: "administrator" },
 ];
 
@@ -141,8 +138,6 @@ export function RoleManagementScreen({ initialUser }: Props) {
   return (
     <AppShell
       activeKey="roles"
-      canManageContent
-      canManageRoles
       isAdministrator={initialUser.roles.includes("administrator")}
       viewer={{ email: initialUser.email }}
       headerTitle="Roles y permisos"

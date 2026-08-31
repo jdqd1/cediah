@@ -6,9 +6,11 @@ import {
   PlatformRoleSchema,
   PublishableContentDraftSchema,
   type ContentAsset,
+  type ContentDraft,
   type ContentItem,
   type ContentProvider,
   type ContentStatus,
+  type ContentTopic,
   type ContentTransitionRequest,
   type PlatformRole,
   type RichTextDocument,
@@ -331,6 +333,106 @@ async function subjectIdsExist(database: QueryDatabase, subjectIds: string[]) {
   return Number(result.count) === ids.length;
 }
 
+function normalizeTopic(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLocaleLowerCase("es");
+}
+
+function contentTopics(content: JsonValue, fallback: string) {
+  const regions =
+    content && typeof content === "object" && !Array.isArray(content)
+      ? content.regions
+      : null;
+  const values = Array.isArray(regions) ? regions : [];
+  const topics = values.filter((value): value is string => typeof value === "string");
+  if (fallback.trim()) topics.push(fallback);
+
+  const unique = new Map<string, string>();
+  for (const topic of topics) {
+    const cleaned = topic.trim();
+    const normalized = normalizeTopic(cleaned);
+    if (cleaned && normalized && !unique.has(normalized)) unique.set(normalized, cleaned);
+  }
+  return [...unique.values()];
+}
+
+async function listTopics(database: QueryDatabase): Promise<ContentTopic[]> {
+  const rows = await database
+    .selectFrom("content_items")
+    .select(["content", "id", "topic"])
+    .execute();
+  if (rows.length === 0) return [];
+
+  const links = await database
+    .selectFrom("content_subjects")
+    .select(["content_item_id", "subject_id"])
+    .where("content_item_id", "in", rows.map((row) => row.id))
+    .execute();
+  const subjectsByContent = new Map<string, Set<string>>();
+  for (const link of links) {
+    const subjectIds = subjectsByContent.get(link.content_item_id) ?? new Set<string>();
+    subjectIds.add(link.subject_id);
+    subjectsByContent.set(link.content_item_id, subjectIds);
+  }
+
+  const topics = new Map<string, { name: string; subjectIds: Set<string> }>();
+  for (const row of rows) {
+    for (const name of contentTopics(row.content, row.topic)) {
+      const key = normalizeTopic(name);
+      const current = topics.get(key) ?? { name, subjectIds: new Set<string>() };
+      for (const subjectId of subjectsByContent.get(row.id) ?? []) {
+        current.subjectIds.add(subjectId);
+      }
+      topics.set(key, current);
+    }
+  }
+
+  return [...topics.values()]
+    .map((topic) => ({
+      name: topic.name,
+      subjectIds: [...topic.subjectIds].sort(),
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, "es"));
+}
+
+export function areContentTopicsAllowed(input: {
+  draft: ContentDraft;
+  roles: PlatformRole[];
+  topics: ContentTopic[];
+}) {
+  if (input.roles.includes("administrator")) return true;
+  if (input.draft.kind === "topic") return false;
+
+  const requested = contentTopics(input.draft.content as JsonValue, input.draft.topic);
+  if (requested.length === 0) return true;
+  if (input.draft.subjectIds.length === 0) return false;
+
+  const allowedSubjectsByTopic = new Map(
+    input.topics.map((topic) => [normalizeTopic(topic.name), new Set(topic.subjectIds)]),
+  );
+  return requested.every((topic) => {
+    const allowedSubjects = allowedSubjectsByTopic.get(normalizeTopic(topic));
+    return Boolean(
+      allowedSubjects && input.draft.subjectIds.every((subjectId) => allowedSubjects.has(subjectId)),
+    );
+  });
+}
+
+async function draftUsesExistingTopics(
+  database: QueryDatabase,
+  draft: ContentDraft,
+  roles: PlatformRole[],
+) {
+  return areContentTopicsAllowed({
+    draft,
+    roles,
+    topics: await listTopics(database),
+  });
+}
+
 async function replaceSubjectLinks(
   database: QueryDatabase,
   contentId: string,
@@ -372,10 +474,14 @@ export function createPostgresContentProvider(
     },
 
     async createContent(input) {
+      if (!getContentCapabilities(input.roles).canCreate) return { status: "forbidden" };
       try {
         return await database.transaction().execute(async (transaction) => {
           if (!(await subjectIdsExist(transaction, input.draft.subjectIds))) {
             return { status: "conflict" };
+          }
+          if (!(await draftUsesExistingTopics(transaction, input.draft, input.roles))) {
+            return { status: "forbidden" };
           }
           const row = await transaction
             .insertInto("content_items")
@@ -419,7 +525,7 @@ export function createPostgresContentProvider(
         if (!access) return { status: "not_found" };
         if (
           !["guide", "video"].includes(access.kind) ||
-          !getContentCapabilities(input.roles).canPublish
+          !getContentCapabilities(input.roles).canDeleteContent
         ) {
           return { status: "not_found" };
         }
@@ -572,6 +678,10 @@ export function createPostgresContentProvider(
       return hydrateRows(database, rows);
     },
 
+    listTopics() {
+      return listTopics(database);
+    },
+
     async transitionContent(input) {
       return database.transaction().execute(async (transaction) => {
         const access = await getStoredAccess(transaction, input.contentId, true);
@@ -636,6 +746,12 @@ export function createPostgresContentProvider(
       return database.transaction().execute(async (transaction) => {
         const access = await getStoredAccess(transaction, input.contentId, true);
         if (!access) return { status: "not_found" };
+        const current = await getItemById(transaction, input.contentId);
+        if (!current) return { status: "not_found" };
+        const draft = ContentDraftSchema.parse({ ...current, subjectIds: input.subjectIds });
+        if (!(await draftUsesExistingTopics(transaction, draft, input.roles))) {
+          return { status: "forbidden" };
+        }
         if (!(await replaceSubjectLinks(transaction, input.contentId, input.subjectIds))) {
           return { status: "conflict" };
         }
@@ -655,6 +771,12 @@ export function createPostgresContentProvider(
         return await database.transaction().execute(async (transaction) => {
           const access = await getStoredAccess(transaction, input.contentId, true);
           if (!access) return { status: "not_found" };
+          if (
+            (access.kind === "topic" || input.draft.kind === "topic") &&
+            !input.roles.includes("administrator")
+          ) {
+            return { status: "forbidden" };
+          }
           const canEdit = canEditContent({
             actorUserId: input.actorUserId,
             authorUserId: access.authorUserId,
@@ -664,7 +786,7 @@ export function createPostgresContentProvider(
           const canUpdatePublishedMetadata =
             access.status === "published" && getContentCapabilities(input.roles).canEditAll;
           if (!canEdit && !canUpdatePublishedMetadata) return { status: "not_found" };
-          if (access.status === "published") {
+          if (access.status === "published" && !input.roles.includes("administrator")) {
             const current = await getItemById(transaction, input.contentId);
             if (!current || !isPublishedPermittedUpdate(current, input.draft)) {
               return { status: "not_found" };
@@ -678,6 +800,9 @@ export function createPostgresContentProvider(
           }
           if (!(await subjectIdsExist(transaction, input.draft.subjectIds))) {
             return { status: "conflict" };
+          }
+          if (!(await draftUsesExistingTopics(transaction, input.draft, input.roles))) {
+            return { status: "forbidden" };
           }
           const nextStatus =
             access.status === "in_review" || access.status === "approved"

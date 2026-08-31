@@ -6,12 +6,14 @@ import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regio
 import { StudioNameDialog } from "./studio-name-dialog";
 
 export function TopicSelector({
+  allowCreate = false,
   disabled = false,
   onChange,
   subjectSelected,
   suggestions = [],
   values,
 }: {
+  allowCreate?: boolean;
   disabled?: boolean;
   onChange: (values: string[]) => void;
   subjectSelected: boolean;
@@ -36,7 +38,7 @@ export function TopicSelector({
   }
 
   function addTopic() {
-    if (!interactive || !cleanInput) return;
+    if (!allowCreate || !interactive || !cleanInput) return;
     onChange(uniqueRegions([...values, existingTopic ?? cleanInput]));
     closeDialog();
   }
@@ -82,36 +84,42 @@ export function TopicSelector({
           }) : (
             <p>
               {subjectSelected
-                ? "Aún no hay temas. Añade el primero."
+                ? allowCreate
+                  ? "Aún no hay temas. Añade el primero."
+                  : "Administración aún no ha creado temas para esta materia."
                 : "Selecciona primero una materia."}
             </p>
           )}
         </div>
-        <button
-          className="studio-entity-create-button studio-entity-create-button-primary"
-          disabled={!interactive}
-          type="button"
-          onClick={() => setDialogOpen(true)}
-        >
-          <Plus aria-hidden="true" size={16} />
-          Añadir tema
-        </button>
+        {allowCreate && (
+          <button
+            className="studio-entity-create-button studio-entity-create-button-primary"
+            disabled={!interactive}
+            type="button"
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus aria-hidden="true" size={16} />
+            Añadir tema
+          </button>
+        )}
       </div>
 
-      <StudioNameDialog
-        description="El tema quedará disponible dentro de las materias seleccionadas y se sumará a tu selección actual."
-        icon={<Tag size={21} />}
-        inputLabel="Nombre del tema"
-        maxLength={120}
-        open={dialogOpen}
-        placeholder="Ej. Abdomen"
-        submitLabel={existingTopic ? "Seleccionar tema" : "Crear tema"}
-        title="Añadir tema"
-        value={input}
-        onChange={setInput}
-        onClose={closeDialog}
-        onSubmit={addTopic}
-      />
+      {allowCreate && (
+        <StudioNameDialog
+          description="El tema quedará disponible dentro de las materias seleccionadas y se sumará a tu selección actual."
+          icon={<Tag size={21} />}
+          inputLabel="Nombre del tema"
+          maxLength={120}
+          open={dialogOpen}
+          placeholder="Ej. Abdomen"
+          submitLabel={existingTopic ? "Seleccionar tema" : "Crear tema"}
+          title="Añadir tema"
+          value={input}
+          onChange={setInput}
+          onClose={closeDialog}
+          onSubmit={addTopic}
+        />
+      )}
     </div>
   );
 }

@@ -20,24 +20,28 @@ import type {
 import { buildApp } from "../src/app.js";
 import {
   canEditContent,
+  getContentCapabilities,
   isPublishedPermittedUpdate,
 } from "../src/content-authorization.js";
 import type { ApiEnvironment } from "../src/config.js";
 import {
+  areContentTopicsAllowed,
   isContentReadyForTransition,
   isContentTransitionAllowed,
 } from "../src/providers/postgres-content.js";
 
 const contentId = "7a8a6513-9384-4b5d-a825-439f42355714";
 const subjectId = "19d4f11b-9ff1-45c2-b2b5-50686038fe42";
+const secondSubjectId = "89c55c8a-90e5-44c1-95b5-feb6d301acda";
 const assetId = "86bc79c0-c73b-4aa6-9257-f22f0d89b080";
 const linkedVideoId = "16a730c2-f283-45bc-80fd-8a8fbfe11345";
 const createdAt = "2026-08-10T12:00:00.000Z";
 const publishedAt = "2026-08-10T13:00:00.000Z";
 
 const users = {
+  administrator: { email: "administrator@example.test", id: "f4d9e932-aab8-4f7b-8946-b3ec486c2573" },
   contributor: { email: "contributor@example.test", id: "20402bbc-63e1-437f-ad0d-71d4c73a9d8f" },
-  coordinator: { email: "coordination@example.test", id: "df747a77-f05c-4bec-a2d9-29dd0de7ec33" },
+  coordinator: { email: "coordinator@example.test", id: "df747a77-f05c-4bec-a2d9-29dd0de7ec33" },
   editor: { email: "editor@example.test", id: "466ac8eb-6473-4a9e-a4ee-1ef992671ffa" },
   student: { email: "student@example.test", id: "04761a7d-4c02-48d7-b3a2-94b8baadf021" },
 } satisfies Record<string, ProviderUser>;
@@ -66,6 +70,22 @@ const guideDraft: ContentDraft = {
   subjectIds: [],
   summary: "A concise guide used by the content API tests.",
   title: "Thorax guide",
+  topic: "Thorax",
+};
+
+const taxonomyTopicDraft: ContentDraft = {
+  content: {
+    introduction: "Overview of the thorax study unit.",
+    objectives: [],
+    regions: ["Thorax"],
+  },
+  estimatedMinutes: null,
+  featured: false,
+  kind: "topic",
+  slug: "thorax-topic",
+  subjectIds: [subjectId],
+  summary: "Structural topic used by authorization tests.",
+  title: "Thorax",
   topic: "Thorax",
 };
 
@@ -176,8 +196,9 @@ function itemFromDraft(draft: ContentDraft): ContentItem {
 
 function identityProvider(): IdentityProvider {
   const byToken = new Map<string, ProviderUser>([
+    ["administrator-token", users.administrator],
     ["contributor-token", users.contributor],
-    ["coordination-token", users.coordinator],
+    ["coordinator-token", users.coordinator],
     ["editor-token", users.editor],
     ["student-token", users.student],
   ]);
@@ -222,6 +243,45 @@ function subjectProvider(overrides: Partial<SubjectProvider> = {}): SubjectProvi
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("content API", () => {
+  it("maps the four platform roles to the requested permission matrix", () => {
+    expect(getContentCapabilities(["student"])).toEqual({
+      canCreate: false,
+      canDeleteContent: false,
+      canEditAll: false,
+      canManageTaxonomy: false,
+      canPublish: false,
+      canReview: false,
+      canUpload: false,
+    });
+    expect(getContentCapabilities(["content_creator"])).toEqual({
+      canCreate: true,
+      canDeleteContent: false,
+      canEditAll: false,
+      canManageTaxonomy: false,
+      canPublish: false,
+      canReview: false,
+      canUpload: true,
+    });
+    expect(getContentCapabilities(["coordinator"])).toEqual({
+      canCreate: true,
+      canDeleteContent: false,
+      canEditAll: true,
+      canManageTaxonomy: false,
+      canPublish: true,
+      canReview: true,
+      canUpload: true,
+    });
+    expect(getContentCapabilities(["administrator"])).toEqual({
+      canCreate: true,
+      canDeleteContent: true,
+      canEditAll: true,
+      canManageTaxonomy: true,
+      canPublish: true,
+      canReview: true,
+      canUpload: true,
+    });
+  });
+
   it("hydrates empty companion content when parsing a legacy video draft", () => {
     const draft = ContentDraftSchema.parse({
       content: {
@@ -688,6 +748,26 @@ describe("content API", () => {
     await app.close();
   });
 
+  it("returns the authenticated user's roles for navigation and route guards", async () => {
+    const app = await buildApp(testEnvironment, {
+      contentProvider: contentProvider(["coordinator"]),
+      identityProvider: identityProvider(),
+    });
+
+    const response = await app.inject({
+      headers: auth("coordinator-token"),
+      method: "GET",
+      url: "/v1/auth/me",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      roles: ["coordinator"],
+      user: users.coordinator,
+    });
+    await app.close();
+  });
+
   it("fails closed for anonymous users before resolving roles", async () => {
     let roleLookups = 0;
     let creations = 0;
@@ -741,10 +821,10 @@ describe("content API", () => {
     await app.close();
   });
 
-  it("allows a community contributor to create a draft", async () => {
+  it("allows a content creator to create a draft", async () => {
     const requests: Parameters<ContentProvider["createContent"]>[0][] = [];
     const created = guideItem();
-    const provider = contentProvider(["community_contributor"], {
+    const provider = contentProvider(["content_creator"], {
       createContent: async (input) => {
         requests.push(input);
         return { status: "success", value: created };
@@ -764,14 +844,94 @@ describe("content API", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual(created);
-    expect(requests).toEqual([{ actorUserId: users.contributor.id, draft: guideDraft }]);
+    expect(requests).toEqual([{
+      actorUserId: users.contributor.id,
+      draft: guideDraft,
+      roles: ["content_creator"],
+    }]);
     await app.close();
   });
 
-  it("allows a community contributor to persist an incomplete new guide", async () => {
+  it.each([
+    { label: "content creator", roles: ["content_creator"], token: "contributor-token" },
+    { label: "coordinator", roles: ["coordinator"], token: "coordinator-token" },
+  ] satisfies { label: string; roles: PlatformRole[]; token: string }[])(
+    "does not allow a $label to create or modify a structural topic",
+    async ({ roles, token }) => {
+      let creations = 0;
+      let updates = 0;
+      const provider = contentProvider(roles, {
+        createContent: async () => {
+          creations += 1;
+          return { status: "conflict" };
+        },
+        updateContent: async () => {
+          updates += 1;
+          return { status: "not_found" };
+        },
+      });
+      const app = await buildApp(testEnvironment, {
+        contentProvider: provider,
+        identityProvider: identityProvider(),
+      });
+
+      const response = await app.inject({
+        headers: auth(token),
+        method: "POST",
+        payload: taxonomyTopicDraft,
+        url: "/v1/editor/content",
+      });
+      const updateResponse = await app.inject({
+        headers: auth(token),
+        method: "PATCH",
+        payload: taxonomyTopicDraft,
+        url: `/v1/editor/content/${contentId}`,
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "forbidden" });
+      expect(updateResponse.statusCode).toBe(403);
+      expect(updateResponse.json()).toEqual({ error: "forbidden" });
+      expect(creations).toBe(0);
+      expect(updates).toBe(0);
+      await app.close();
+    },
+  );
+
+  it("allows an administrator to create a structural topic", async () => {
+    const created = itemFromDraft(taxonomyTopicDraft);
+    const requests: Parameters<ContentProvider["createContent"]>[0][] = [];
+    const provider = contentProvider(["administrator"], {
+      createContent: async (input) => {
+        requests.push(input);
+        return { status: "success", value: created };
+      },
+    });
+    const app = await buildApp(testEnvironment, {
+      contentProvider: provider,
+      identityProvider: identityProvider(),
+    });
+
+    const response = await app.inject({
+      headers: auth("administrator-token"),
+      method: "POST",
+      payload: taxonomyTopicDraft,
+      url: "/v1/editor/content",
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(requests).toEqual([{
+      actorUserId: users.administrator.id,
+      draft: taxonomyTopicDraft,
+      roles: ["administrator"],
+    }]);
+    await app.close();
+  });
+
+  it("allows a content creator to persist an incomplete new guide", async () => {
     const requests: Parameters<ContentProvider["createContent"]>[0][] = [];
     const created = guideItem(partialGuideDraft);
-    const provider = contentProvider(["community_contributor"], {
+    const provider = contentProvider(["content_creator"], {
       createContent: async (input) => {
         requests.push(input);
         return { status: "success", value: created };
@@ -792,9 +952,69 @@ describe("content API", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual(created);
     expect(requests).toEqual([
-      { actorUserId: users.contributor.id, draft: partialGuideDraft },
+      { actorUserId: users.contributor.id, draft: partialGuideDraft, roles: ["content_creator"] },
     ]);
     await app.close();
+  });
+
+  it("lets creators select existing topics but reserves new topics for administrators", () => {
+    const classifiedDraft = ContentDraftSchema.parse({
+      ...guideDraft,
+      subjectIds: [subjectId],
+      topic: "Tórax",
+      content: { ...guideDraft.content, regions: ["Tórax"] },
+    });
+    const newTopicDraft = ContentDraftSchema.parse({
+      ...classifiedDraft,
+      topic: "Abdomen",
+      content: { ...classifiedDraft.content, regions: ["Abdomen"] },
+    });
+    const expandedSubjectDraft = ContentDraftSchema.parse({
+      ...classifiedDraft,
+      subjectIds: [subjectId, secondSubjectId],
+    });
+    const topics = [{ name: "Tórax", subjectIds: [subjectId] }];
+
+    expect(areContentTopicsAllowed({
+      draft: classifiedDraft,
+      roles: ["content_creator"],
+      topics,
+    })).toBe(true);
+    expect(areContentTopicsAllowed({
+      draft: newTopicDraft,
+      roles: ["content_creator"],
+      topics,
+    })).toBe(false);
+    expect(areContentTopicsAllowed({
+      draft: newTopicDraft,
+      roles: ["coordinator"],
+      topics,
+    })).toBe(false);
+    expect(areContentTopicsAllowed({
+      draft: expandedSubjectDraft,
+      roles: ["content_creator"],
+      topics,
+    })).toBe(false);
+    expect(areContentTopicsAllowed({
+      draft: expandedSubjectDraft,
+      roles: ["content_creator"],
+      topics: [{ name: "Tórax", subjectIds: [subjectId, secondSubjectId] }],
+    })).toBe(true);
+    expect(areContentTopicsAllowed({
+      draft: newTopicDraft,
+      roles: ["administrator"],
+      topics,
+    })).toBe(true);
+    expect(areContentTopicsAllowed({
+      draft: taxonomyTopicDraft,
+      roles: ["content_creator"],
+      topics,
+    })).toBe(false);
+    expect(areContentTopicsAllowed({
+      draft: taxonomyTopicDraft,
+      roles: ["administrator"],
+      topics,
+    })).toBe(true);
   });
 
   it("keeps published content locked and reserves archived edits for publishers", () => {
@@ -802,16 +1022,16 @@ describe("content API", () => {
       canEditContent({
         actorUserId: users.coordinator.id,
         authorUserId: users.contributor.id,
-        roles: ["coordination"],
+        roles: ["coordinator"],
         status: "published",
       }),
     ).toBe(false);
 
     expect(
       canEditContent({
-        actorUserId: users.editor.id,
+        actorUserId: users.contributor.id,
         authorUserId: users.contributor.id,
-        roles: ["academic_editor"],
+        roles: ["content_creator"],
         status: "archived",
       }),
     ).toBe(false);
@@ -820,7 +1040,7 @@ describe("content API", () => {
       canEditContent({
         actorUserId: users.coordinator.id,
         authorUserId: users.contributor.id,
-        roles: ["coordination"],
+        roles: ["coordinator"],
         status: "archived",
       }),
     ).toBe(true);
@@ -829,7 +1049,7 @@ describe("content API", () => {
       canEditContent({
         actorUserId: users.editor.id,
         authorUserId: users.contributor.id,
-        roles: ["academic_editor"],
+        roles: ["coordinator"],
         status: "in_review",
       }),
     ).toBe(true);
@@ -838,7 +1058,7 @@ describe("content API", () => {
       canEditContent({
         actorUserId: users.contributor.id,
         authorUserId: users.contributor.id,
-        roles: ["community_contributor"],
+        roles: ["content_creator"],
         status: "published",
       }),
     ).toBe(false);
@@ -875,30 +1095,30 @@ describe("content API", () => {
     expect(isPublishedPermittedUpdate(published, contentUpdate)).toBe(false);
   });
 
-  it("allows coordination to restore archived content without broadening editorial permissions", () => {
+  it("allows a coordinator to restore archived content without granting that power to creators", () => {
     expect(
       isContentTransitionAllowed({
         actorUserId: users.coordinator.id,
         authorUserId: users.contributor.id,
         currentStatus: "archived",
-        roles: ["coordination"],
+        roles: ["coordinator"],
         targetStatus: "published",
       }),
     ).toBe(true);
     expect(
       isContentTransitionAllowed({
-        actorUserId: users.editor.id,
+        actorUserId: users.contributor.id,
         authorUserId: users.contributor.id,
         currentStatus: "archived",
-        roles: ["academic_editor"],
+        roles: ["content_creator"],
         targetStatus: "published",
       }),
     ).toBe(false);
   });
 
-  it("allows coordination to delete a guide independently of its status", async () => {
+  it("allows only an administrator to delete a guide independently of its status", async () => {
     const requests: Parameters<ContentProvider["deleteContent"]>[0][] = [];
-    const provider = contentProvider(["coordination"], {
+    const provider = contentProvider(["administrator"], {
       deleteContent: async (input) => {
         requests.push(input);
         return { status: "success", value: { id: input.contentId } };
@@ -910,7 +1130,7 @@ describe("content API", () => {
     });
 
     const response = await app.inject({
-      headers: auth("coordination-token"),
+      headers: auth("administrator-token"),
       method: "DELETE",
       url: `/v1/editor/content/${contentId}`,
     });
@@ -918,14 +1138,14 @@ describe("content API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ id: contentId });
     expect(requests).toEqual([
-      { actorUserId: users.coordinator.id, contentId, roles: ["coordination"] },
+      { actorUserId: users.administrator.id, contentId, roles: ["administrator"] },
     ]);
     await app.close();
   });
 
-  it("rejects guide deletion without publication permission", async () => {
+  it("rejects guide deletion for a coordinator", async () => {
     let deletions = 0;
-    const provider = contentProvider(["academic_editor"], {
+    const provider = contentProvider(["coordinator"], {
       deleteContent: async () => {
         deletions += 1;
         return { status: "success", value: { id: contentId } };
@@ -937,7 +1157,7 @@ describe("content API", () => {
     });
 
     const response = await app.inject({
-      headers: auth("editor-token"),
+      headers: auth("coordinator-token"),
       method: "DELETE",
       url: `/v1/editor/content/${contentId}`,
     });
@@ -948,11 +1168,11 @@ describe("content API", () => {
     await app.close();
   });
 
-  it("allows academic review and coordination publication", async () => {
+  it("allows coordinators to review and publish", async () => {
     const transitions: Parameters<ContentProvider["transitionContent"]>[0][] = [];
     const rolesByUser = new Map<string, PlatformRole[]>([
-      [users.editor.id, ["academic_editor"]],
-      [users.coordinator.id, ["coordination"]],
+      [users.editor.id, ["coordinator"]],
+      [users.coordinator.id, ["coordinator"]],
     ]);
     const provider = contentProvider([], {
       getRoles: async (userId) => rolesByUser.get(userId) ?? [],
@@ -980,7 +1200,7 @@ describe("content API", () => {
       url: `/v1/editor/content/${contentId}/transition`,
     });
     const published = await app.inject({
-      headers: auth("coordination-token"),
+      headers: auth("coordinator-token"),
       method: "POST",
       payload: { status: "published" },
       url: `/v1/editor/content/${contentId}/transition`,
@@ -991,15 +1211,15 @@ describe("content API", () => {
     expect(published.statusCode).toBe(200);
     expect(published.json()).toMatchObject({ publishedAt, status: "published" });
     expect(transitions).toEqual([
-      { actorUserId: users.editor.id, contentId, roles: ["academic_editor"], status: "approved" },
-      { actorUserId: users.coordinator.id, contentId, roles: ["coordination"], status: "published" },
+      { actorUserId: users.editor.id, contentId, roles: ["coordinator"], status: "approved" },
+      { actorUserId: users.coordinator.id, contentId, roles: ["coordinator"], status: "published" },
     ]);
     await app.close();
   });
 
   it("rejects mismatched asset metadata before provisioning an upload", async () => {
     let uploads = 0;
-    const provider = contentProvider(["community_contributor"], {
+    const provider = contentProvider(["content_creator"], {
       createAssetUpload: async () => {
         uploads += 1;
         return { status: "not_found" };
@@ -1054,7 +1274,7 @@ describe("content API", () => {
         url: "https://storage.example.test/upload/signed-token",
       },
     };
-    const provider = contentProvider(["community_contributor"], {
+    const provider = contentProvider(["content_creator"], {
       createAssetUpload: async () => ({ status: "success", value: upload }),
       finalizeAsset: async () => ({
         status: "success",
@@ -1088,7 +1308,7 @@ describe("content API", () => {
   it("removes an attached asset through the authenticated editor API", async () => {
     const removals: Parameters<ContentProvider["deleteAsset"]>[0][] = [];
     const updated = videoItem({ asset: null });
-    const provider = contentProvider(["community_contributor"], {
+    const provider = contentProvider(["content_creator"], {
       deleteAsset: async (input) => {
         removals.push(input);
         return { status: "success", value: updated };
@@ -1108,15 +1328,42 @@ describe("content API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ asset: null, id: contentId });
     expect(removals).toEqual([
-      { actorUserId: users.contributor.id, assetId, roles: ["community_contributor"] },
+      { actorUserId: users.contributor.id, assetId, roles: ["content_creator"] },
     ]);
     await app.close();
   });
 
-  it("allows an academic editor to delete a subject", async () => {
+  it("allows an administrator to create a subject", async () => {
+    const creations: Parameters<SubjectProvider["createSubject"]>[0][] = [];
+    const subject = { contentCount: 0, id: subjectId, name: "Anatomía", slug: "anatomia" };
+    const app = await buildApp(testEnvironment, {
+      contentProvider: contentProvider(["administrator"]),
+      identityProvider: identityProvider(),
+      subjectProvider: subjectProvider({
+        createSubject: async (input) => {
+          creations.push(input);
+          return { status: "success", value: subject };
+        },
+      }),
+    });
+
+    const response = await app.inject({
+      headers: auth("administrator-token"),
+      method: "POST",
+      payload: { name: "Anatomía" },
+      url: "/v1/editor/subjects",
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ subject });
+    expect(creations).toEqual([{ actorUserId: users.administrator.id, name: "Anatomía" }]);
+    await app.close();
+  });
+
+  it("allows an administrator to delete a subject", async () => {
     const deletions: Parameters<SubjectProvider["deleteSubject"]>[0][] = [];
     const app = await buildApp(testEnvironment, {
-      contentProvider: contentProvider(["academic_editor"]),
+      contentProvider: contentProvider(["administrator"]),
       identityProvider: identityProvider(),
       subjectProvider: subjectProvider({
         deleteSubject: async (input) => {
@@ -1127,21 +1374,24 @@ describe("content API", () => {
     });
 
     const response = await app.inject({
-      headers: auth("editor-token"),
+      headers: auth("administrator-token"),
       method: "DELETE",
       url: `/v1/editor/subjects/${subjectId}`,
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ id: subjectId });
-    expect(deletions).toEqual([{ actorUserId: users.editor.id, subjectId }]);
+    expect(deletions).toEqual([{ actorUserId: users.administrator.id, subjectId }]);
     await app.close();
   });
 
-  it("prevents contributors from deleting shared subjects", async () => {
+  it.each([
+    ["content creators", "content_creator", "contributor-token"],
+    ["coordinators", "coordinator", "coordinator-token"],
+  ] as const)("prevents %s from deleting shared subjects", async (_label, role, token) => {
     let deletions = 0;
     const app = await buildApp(testEnvironment, {
-      contentProvider: contentProvider(["community_contributor"]),
+      contentProvider: contentProvider([role]),
       identityProvider: identityProvider(),
       subjectProvider: subjectProvider({
         deleteSubject: async () => {
@@ -1152,7 +1402,7 @@ describe("content API", () => {
     });
 
     const response = await app.inject({
-      headers: auth("contributor-token"),
+      headers: auth(token),
       method: "DELETE",
       url: `/v1/editor/subjects/${subjectId}`,
     });
@@ -1160,6 +1410,35 @@ describe("content API", () => {
     expect(response.statusCode).toBe(403);
     expect(response.json()).toEqual({ error: "forbidden" });
     expect(deletions).toBe(0);
+    await app.close();
+  });
+
+  it.each([
+    ["content creators", "content_creator", "contributor-token"],
+    ["coordinators", "coordinator", "coordinator-token"],
+  ] as const)("prevents %s from creating subjects", async (_label, role, token) => {
+    let creations = 0;
+    const app = await buildApp(testEnvironment, {
+      contentProvider: contentProvider([role]),
+      identityProvider: identityProvider(),
+      subjectProvider: subjectProvider({
+        createSubject: async () => {
+          creations += 1;
+          return { status: "conflict" };
+        },
+      }),
+    });
+
+    const response = await app.inject({
+      headers: auth(token),
+      method: "POST",
+      payload: { name: "Anatomía" },
+      url: "/v1/editor/subjects",
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "forbidden" });
+    expect(creations).toBe(0);
     await app.close();
   });
 });

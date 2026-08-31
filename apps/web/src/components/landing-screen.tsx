@@ -94,22 +94,26 @@ export function LandingScreen() {
     <main className="marketing-page marketing-page-paper">
       <section className="marketing-hero" aria-labelledby="marketing-title">
         <div className="marketing-hero-art" aria-hidden="true">
-          <Image
-            className="marketing-hero-reference marketing-hero-reference-desktop"
-            src="/landing/landing-hero-integrated-desktop.png"
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 700px) 1px, 100vw"
-          />
-          <Image
-            className="marketing-hero-reference marketing-hero-reference-mobile"
-            src="/landing/landing-hero-integrated-mobile.png"
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 700px) 100vw, 1px"
-          />
+          {(["side", "base"] as const).map((layer) => (
+            <div className={`marketing-hero-art-layer marketing-hero-art-${layer}`} key={layer}>
+              <Image
+                className="marketing-hero-reference marketing-hero-reference-desktop"
+                src="/landing/landing-hero-integrated-desktop.png"
+                alt=""
+                fill
+                priority={layer === "side"}
+                sizes="(max-width: 700px) 1px, 100vw"
+              />
+              <Image
+                className="marketing-hero-reference marketing-hero-reference-mobile"
+                src="/landing/landing-hero-integrated-mobile.png"
+                alt=""
+                fill
+                priority={layer === "side"}
+                sizes="(max-width: 700px) 100vw, 1px"
+              />
+            </div>
+          ))}
         </div>
 
         <header className="marketing-header">

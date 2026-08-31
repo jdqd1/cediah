@@ -55,8 +55,28 @@
   z-index: 0;
   inset: 0;
   overflow: hidden;
-  clip-path: polygon(42% 13%, 100% 13%, 100% 100%, 0 100%, 0 64%, 42% 64%);
   pointer-events: none;
+}
+
+.marketing-page-paper .marketing-hero-art-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.marketing-page-paper .marketing-hero-art-side {
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent 34%, #000 50%),
+    linear-gradient(180deg, transparent 9%, #000 16%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent 34%, #000 50%),
+    linear-gradient(180deg, transparent 9%, #000 16%);
+  mask-composite: intersect;
+}
+
+.marketing-page-paper .marketing-hero-art-base {
+  -webkit-mask-image: linear-gradient(180deg, transparent 63%, #000 73%);
+  mask-image: linear-gradient(180deg, transparent 63%, #000 73%);
 }
 
 .marketing-page-paper .marketing-hero-reference {
@@ -872,8 +892,13 @@
 }
 
 @media (max-width: 1100px) and (min-width: 701px) {
-  .marketing-page-paper .marketing-hero-art {
-    clip-path: polygon(54% 13%, 100% 13%, 100% 100%, 0 100%, 0 64%, 54% 64%);
+  .marketing-page-paper .marketing-hero-art-side {
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent 43%, #000 58%),
+      linear-gradient(180deg, transparent 9%, #000 16%);
+    mask-image:
+      linear-gradient(90deg, transparent 43%, #000 58%),
+      linear-gradient(180deg, transparent 9%, #000 16%);
   }
 
   .marketing-page-paper .marketing-header,
@@ -937,8 +962,18 @@
       linear-gradient(180deg, rgb(251 250 247 / 46%) 0%, transparent 21%);
   }
 
-  .marketing-page-paper .marketing-hero-art {
-    clip-path: polygon(70% 31%, 100% 31%, 100% 100%, 0 100%, 0 43%, 70% 43%);
+  .marketing-page-paper .marketing-hero-art-side {
+    -webkit-mask-image:
+      linear-gradient(90deg, transparent 68%, #000 78%),
+      linear-gradient(180deg, transparent 27%, #000 34%);
+    mask-image:
+      linear-gradient(90deg, transparent 68%, #000 78%),
+      linear-gradient(180deg, transparent 27%, #000 34%);
+  }
+
+  .marketing-page-paper .marketing-hero-art-base {
+    -webkit-mask-image: linear-gradient(180deg, transparent 52%, #000 60%);
+    mask-image: linear-gradient(180deg, transparent 52%, #000 60%);
   }
 
   .marketing-page-paper .marketing-hero-reference-desktop {

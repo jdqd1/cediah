@@ -7,18 +7,12 @@ import type {
 } from "@cediah/contracts";
 
 const creatorRoles = new Set<PlatformRole>([
-  "community_contributor",
-  "presenter",
-  "academic_editor",
-  "coordination",
+  "content_creator",
+  "coordinator",
   "administrator",
 ]);
-const reviewerRoles = new Set<PlatformRole>([
-  "academic_editor",
-  "coordination",
-  "administrator",
-]);
-const publisherRoles = new Set<PlatformRole>(["coordination", "administrator"]);
+const reviewerRoles = new Set<PlatformRole>(["coordinator", "administrator"]);
+const publisherRoles = new Set<PlatformRole>(["coordinator", "administrator"]);
 
 function hasAnyRole(roles: PlatformRole[], allowed: Set<PlatformRole>) {
   return roles.some((role) => allowed.has(role));
@@ -31,7 +25,9 @@ export function getContentCapabilities(roles: PlatformRole[]): ContentCapabiliti
 
   return {
     canCreate,
+    canDeleteContent: roles.includes("administrator"),
     canEditAll: canReview,
+    canManageTaxonomy: roles.includes("administrator"),
     canPublish,
     canReview,
     canUpload: canCreate,
@@ -45,6 +41,7 @@ export function canEditContent(input: {
   status: ContentStatus;
 }) {
   const capabilities = getContentCapabilities(input.roles);
+  if (input.roles.includes("administrator")) return true;
   if (input.status === "published") return false;
   if (input.status === "archived") return capabilities.canPublish;
   if (capabilities.canEditAll) return true;

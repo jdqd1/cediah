@@ -408,7 +408,17 @@ export async function buildApp(
     const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
     if (resolution.kind !== "authenticated") return sendUserResolutionError(resolution, reply);
 
-    const response = CurrentUserResponseSchema.parse({ user: resolution.user });
+    let roles: Awaited<ReturnType<ContentProvider["getRoles"]>> = [];
+    const roleReader = contentProvider ?? roleManagementProvider;
+    if (roleReader) {
+      try {
+        roles = await roleReader.getRoles(resolution.user.id);
+      } catch {
+        request.log.error("Current-user role lookup failed");
+      }
+    }
+
+    const response = CurrentUserResponseSchema.parse({ roles, user: resolution.user });
     return reply.header("Cache-Control", "no-store").send(response);
   });
 
@@ -586,12 +596,16 @@ export async function buildApp(
       const subjects = subjectProvider
         ? await subjectProvider.listSubjects({ publishedOnly: false })
         : [];
+      const topics = contentProvider!.listTopics
+        ? await contentProvider!.listTopics()
+        : [];
       return reply.header("Cache-Control", "no-store").send(
         ContentWorkspaceResponseSchema.parse({
           capabilities: { ...editor.capabilities, canUpload: false },
           items,
           roles: editor.roles,
           subjects,
+          topics,
         }),
       );
     } catch {
@@ -610,7 +624,7 @@ export async function buildApp(
       contentProvider,
     );
     if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
-    if (!editor.capabilities.canCreate && !editor.capabilities.canEditAll) {
+    if (!editor.capabilities.canManageTaxonomy) {
       return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
     }
     if (!subjectProvider) {
@@ -646,7 +660,7 @@ export async function buildApp(
         contentProvider,
       );
       if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
-      if (!editor.capabilities.canEditAll) {
+      if (!editor.capabilities.canManageTaxonomy) {
         return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
       }
       if (!subjectProvider) {
@@ -691,11 +705,15 @@ export async function buildApp(
         .header("Cache-Control", "no-store")
         .send({ error: "invalid_content" });
     }
+    if (draft.data.kind === "topic" && !editor.capabilities.canManageTaxonomy) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
 
     try {
       const result = await contentProvider!.createContent({
         actorUserId: editor.user.id,
         draft: draft.data,
+        roles: editor.roles,
       });
       if (result.status !== "success") return sendContentMutationError(result.status, reply);
 
@@ -778,6 +796,9 @@ export async function buildApp(
           .header("Cache-Control", "no-store")
           .send({ error: "invalid_content" });
       }
+      if (draft.data.kind === "topic" && !editor.capabilities.canManageTaxonomy) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
 
       try {
         const result = await contentProvider!.updateContent({
@@ -809,7 +830,7 @@ export async function buildApp(
         contentProvider,
       );
       if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
-      if (!editor.capabilities.canPublish) {
+      if (!editor.capabilities.canDeleteContent) {
         return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
       }
 

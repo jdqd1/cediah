@@ -20,6 +20,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth/client";
+import { useAccessRoles } from "./access-context";
 import { CediahLogo } from "./cediah-logo";
 import { GlobalContentSearch } from "./global-content-search";
 import {
@@ -29,8 +30,6 @@ import {
 
 type AppShellProps = {
   activeKey: string;
-  canManageContent?: boolean;
-  canManageRoles?: boolean;
   isAdministrator?: boolean;
   viewer?: {
     email: string;
@@ -72,6 +71,13 @@ function getProfileInitials(email: string) {
   const localPart = email.split("@", 1)[0]?.replace(/[^a-z0-9]/gi, "") ?? "";
   return (localPart.slice(0, 2) || "US").toUpperCase();
 }
+
+const profileRoleLabels = {
+  administrator: "Administrador",
+  coordinator: "Coordinador",
+  content_creator: "Creador de contenido",
+  student: "Estudiante",
+} as const;
 
 function NavigationItem({
   item,
@@ -154,8 +160,6 @@ function NavigationGroup({
 export function AppShell({
   activeKey,
   breadcrumbs,
-  canManageContent = false,
-  canManageRoles = false,
   isAdministrator = false,
   viewer: initialViewer,
   children,
@@ -175,6 +179,7 @@ export function AppShell({
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const accessRoles = useAccessRoles();
   const sidebarCollapsed = useSidebarCollapsedPreference();
   const session = authClient.useSession();
   const viewer = session.isPending
@@ -188,8 +193,15 @@ export function AppShell({
 
   const closeSidebar = () => setSidebarOpen(false);
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
-  const showContentManagement = canManageContent || isAdministrator;
-  const showRoleManagement = canManageRoles || isAdministrator;
+  const accessIsAdministrator = accessRoles.includes("administrator");
+  const effectiveIsAdministrator = isAdministrator || accessIsAdministrator;
+  const showContentManagement =
+    effectiveIsAdministrator ||
+    accessRoles.includes("coordinator") ||
+    accessRoles.includes("content_creator");
+  const showRoleManagement = effectiveIsAdministrator;
+  const profileRole = (["administrator", "coordinator", "content_creator", "student"] as const)
+    .find((role) => accessRoles.includes(role));
   const administrationItems: NavItem[] = [
     ...(showContentManagement
       ? [{ key: "editor", label: "Publicar contenido", href: "/panel/contenido", icon: PencilSimpleLine }]
@@ -366,7 +378,7 @@ export function AppShell({
       )}
 
       <div className="app-body">
-        <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${isAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
+        <header className={`app-topbar app-topbar-simplified ${welcome ? "app-topbar-welcome" : ""} ${effectiveIsAdministrator ? "app-topbar-admin" : ""}`.trim()} data-active-key={activeKey}>
           <div className="topbar-leading">
             <button
               className="menu-trigger"
@@ -404,10 +416,10 @@ export function AppShell({
                   {profileOpen && (
                     <div className="topbar-popover profile-popover">
                       <strong>{viewer.email}</strong>
-                      {isAdministrator && (
+                      {profileRole && (
                         <span className="dashboard-admin-badge profile-role-badge">
                           <ShieldCheck size={14} weight="fill" />
-                          Administrador
+                          {profileRoleLabels[profileRole]}
                         </span>
                       )}
                       <button

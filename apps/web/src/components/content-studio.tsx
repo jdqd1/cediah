@@ -36,6 +36,7 @@ import {
   type RichTextNode,
   type Subject,
   type ContentStatus,
+  type ContentTopic,
   type ContentWorkspaceResponse,
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
@@ -138,14 +139,28 @@ function normalizeSearch(value: string) {
     .toLocaleLowerCase("es");
 }
 
-function topicsForSubjects(items: ContentItem[], subjectIds: readonly string[]) {
+function topicsForSubjects(
+  items: ContentItem[],
+  taxonomyTopics: ContentTopic[],
+  subjectIds: readonly string[],
+  requireEverySubject: boolean,
+) {
   if (subjectIds.length === 0) return [];
   const selected = new Set(subjectIds);
-  return uniqueRegions(items
-    .filter((current) => current.subjectIds.some((id) => selected.has(id)))
-    .flatMap((current) => current.content.regions.length > 0
-      ? current.content.regions
-      : [current.topic]))
+  const matchesSubjects = (candidateSubjectIds: readonly string[]) =>
+    requireEverySubject
+      ? subjectIds.every((id) => candidateSubjectIds.includes(id))
+      : candidateSubjectIds.some((id) => selected.has(id));
+  return uniqueRegions([
+    ...taxonomyTopics
+      .filter((topic) => matchesSubjects(topic.subjectIds))
+      .map((topic) => topic.name),
+    ...items
+      .filter((current) => matchesSubjects(current.subjectIds))
+      .flatMap((current) => current.content.regions.length > 0
+        ? current.content.regions
+        : [current.topic]),
+  ])
     .sort((left, right) => left.localeCompare(right, "es"));
 }
 
@@ -725,11 +740,17 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const guideChoiceDialogRef = useRef<HTMLElement>(null);
   const guideChoiceTriggerRef = useRef<HTMLElement | null>(null);
   const capabilities = initialWorkspace.capabilities;
+  const isAdministrator = initialWorkspace.roles.includes("administrator");
   const item = editingId ? items.find((current) => current.id === editingId) : undefined;
 
   const topicSuggestions = useMemo(
-    () => topicsForSubjects(items, draft?.subjectIds ?? []),
-    [draft?.subjectIds, items],
+    () => topicsForSubjects(
+      items,
+      initialWorkspace.topics,
+      draft?.subjectIds ?? [],
+      !capabilities.canManageTaxonomy,
+    ),
+    [capabilities.canManageTaxonomy, draft?.subjectIds, initialWorkspace.topics, items],
   );
   const linkableVideos = useMemo(
     () =>
@@ -777,6 +798,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   const editable =
     Boolean(draft) &&
+    (draft?.kind !== "topic" || capabilities.canManageTaxonomy) &&
     (isNew
       ? capabilities.canCreate
       : Boolean(
@@ -979,7 +1001,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   async function createSubject() {
     const name = newSubjectName.trim();
-    if (!name || !editable || busy) return;
+    if (!name || !editable || !capabilities.canManageTaxonomy || busy) return;
     setBusy("subject");
     setNotice(null);
     try {
@@ -1012,7 +1034,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   }
 
   async function removeSubject(subject: Subject) {
-    if (!capabilities.canEditAll || busy) return;
+    if (!capabilities.canManageTaxonomy || busy) return;
     const resourceLabel = subject.contentCount === 1
       ? "1 publicación dejará de estar clasificada en ella"
       : `${subject.contentCount} publicaciones dejarán de estar clasificadas en ella`;
@@ -1056,7 +1078,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       item &&
       !isNew &&
       ((item.status === "published" &&
-        (!capabilities.canEditAll || !publishedPermittedUpdate)) ||
+        (!isAdministrator && (!capabilities.canEditAll || !publishedPermittedUpdate))) ||
         (item.status === "archived" && !capabilities.canPublish)) &&
       !subjectOnlyAssignment
     ) {
@@ -1150,7 +1172,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   }
 
   async function removeContent() {
-    if (!item || !["guide", "video"].includes(item.kind) || !capabilities.canPublish || busy) return;
+    if (!item || !["guide", "video"].includes(item.kind) || !capabilities.canDeleteContent || busy) return;
     const kindLabel = item.kind === "guide" ? "guía" : "video";
     const confirmed = window.confirm(
       `¿Eliminar permanentemente ${kindLabel === "guía" ? "la" : "el"} ${kindLabel} “${item.title}”?\n\nSe borrarán su contenido y sus archivos asociados. Esta acción no se puede deshacer.`,
@@ -1378,8 +1400,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
     return (
       <AppShell
         activeKey="editor"
-        canManageContent
-        canManageRoles={initialWorkspace.roles.includes("administrator")}
         isAdministrator={initialWorkspace.roles.includes("administrator")}
         headerTitle="Editor de guía"
         mainClassName="guide-editor-main"
@@ -1408,8 +1428,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
   return (
     <AppShell
       activeKey="editor"
-      canManageContent
-      canManageRoles={initialWorkspace.roles.includes("administrator")}
       isAdministrator={initialWorkspace.roles.includes("administrator")}
       headerTitle="Contenido"
       mainClassName="studio-main"
@@ -1599,7 +1617,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                         : action.label}
                     </button>
                   ))}
-                  {item && ["guide", "video"].includes(item.kind) && capabilities.canPublish && (
+                  {item && ["guide", "video"].includes(item.kind) && capabilities.canDeleteContent && (
                     <button
                       aria-label={`Eliminar ${item.kind === "guide" ? "guía" : "video"} ${item.title}`}
                       className="studio-button studio-editor-action studio-content-delete"
@@ -1742,8 +1760,18 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                         ? current.content.regions
                                         : [current.topic],
                                     );
-                                    const previousTopics = topicsForSubjects(items, current.subjectIds);
-                                    const nextTopics = topicsForSubjects(items, nextSubjectIds);
+                                    const previousTopics = topicsForSubjects(
+                                      items,
+                                      initialWorkspace.topics,
+                                      current.subjectIds,
+                                      !capabilities.canManageTaxonomy,
+                                    );
+                                    const nextTopics = topicsForSubjects(
+                                      items,
+                                      initialWorkspace.topics,
+                                      nextSubjectIds,
+                                      !capabilities.canManageTaxonomy,
+                                    );
                                     const nextRegions = nextSubjectIds.length > 0
                                       ? currentTopics.filter((currentTopic) => {
                                           const topicWasExisting = previousTopics.some(
@@ -1768,7 +1796,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                   <small>{subject.contentCount} recursos</small>
                                 </span>
                               </label>
-                              {capabilities.canEditAll && (
+                              {capabilities.canManageTaxonomy && (
                                 <button
                                   aria-label={`Eliminar materia ${subject.name}`}
                                   className="studio-subject-delete"
@@ -1782,20 +1810,29 @@ export function ContentStudio({ initialWorkspace }: Props) {
                               )}
                             </div>
                           ))}
-                          {subjects.length === 0 && <p className="studio-subject-empty">Crea la primera materia para organizar el contenido.</p>}
+                          {subjects.length === 0 && (
+                            <p className="studio-subject-empty">
+                              {capabilities.canManageTaxonomy
+                                ? "Crea la primera materia para organizar el contenido."
+                                : "Administración aún no ha creado materias disponibles."}
+                            </p>
+                          )}
                         </div>
-                        <div className="studio-new-subject">
-                          <button
-                            className="studio-entity-create-button studio-entity-create-button-primary"
-                            disabled={!editable || busy !== null}
-                            type="button"
-                            onClick={() => setSubjectCreateOpen(true)}
-                          >
-                            <Plus aria-hidden="true" size={16} /> Nueva materia
-                          </button>
-                        </div>
+                        {capabilities.canManageTaxonomy && (
+                          <div className="studio-new-subject">
+                            <button
+                              className="studio-entity-create-button studio-entity-create-button-primary"
+                              disabled={!editable || busy !== null}
+                              type="button"
+                              onClick={() => setSubjectCreateOpen(true)}
+                            >
+                              <Plus aria-hidden="true" size={16} /> Nueva materia
+                            </button>
+                          </div>
+                        )}
                       </section>
                       <TopicSelector
+                        allowCreate={capabilities.canManageTaxonomy}
                         disabled={!editable || busy !== null}
                         subjectSelected={draft.subjectIds.length > 0}
                         suggestions={topicSuggestions}
