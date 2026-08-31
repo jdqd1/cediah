@@ -20,7 +20,7 @@ import type {
 import { buildApp } from "../src/app.js";
 import {
   canEditContent,
-  isPublishedOrganizationUpdate,
+  isPublishedPermittedUpdate,
 } from "../src/content-authorization.js";
 import type { ApiEnvironment } from "../src/config.js";
 import {
@@ -844,7 +844,7 @@ describe("content API", () => {
     ).toBe(false);
   });
 
-  it("limits published updates to organization and guide video links", () => {
+  it("limits published updates to title, organization and guide video links", () => {
     const published = guideItem({ status: "published" });
     const organizationUpdate = ContentDraftSchema.parse({
       ...published,
@@ -856,13 +856,23 @@ describe("content API", () => {
         regions: ["Cuello", "Cabeza"],
       },
     });
-    const contentUpdate = ContentDraftSchema.parse({
-      ...organizationUpdate,
+    const titleUpdate = ContentDraftSchema.parse({
+      ...published,
       title: "Título modificado después de publicar",
     });
+    const combinedUpdate = ContentDraftSchema.parse({
+      ...organizationUpdate,
+      title: "Título y organización modificados después de publicar",
+    });
+    const contentUpdate = ContentDraftSchema.parse({
+      ...titleUpdate,
+      summary: "Resumen modificado después de publicar",
+    });
 
-    expect(isPublishedOrganizationUpdate(published, organizationUpdate)).toBe(true);
-    expect(isPublishedOrganizationUpdate(published, contentUpdate)).toBe(false);
+    expect(isPublishedPermittedUpdate(published, organizationUpdate)).toBe(true);
+    expect(isPublishedPermittedUpdate(published, titleUpdate)).toBe(true);
+    expect(isPublishedPermittedUpdate(published, combinedUpdate)).toBe(true);
+    expect(isPublishedPermittedUpdate(published, contentUpdate)).toBe(false);
   });
 
   it("allows coordination to restore archived content without broadening editorial permissions", () => {

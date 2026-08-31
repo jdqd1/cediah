@@ -52,18 +52,6 @@ function getSubmitLabel(mode: AuthMode) {
   return "Iniciar sesión";
 }
 
-function getEyebrow(mode: AuthMode) {
-  if (mode === "recover") return "Acceso protegido";
-  if (mode === "sign-up") return "Empieza hoy";
-  return "Bienvenido de nuevo";
-}
-
-function getDescription(mode: AuthMode) {
-  if (mode === "recover") return "Te enviaremos un enlace de recuperación de un solo uso.";
-  if (mode === "sign-up") return "Crea tu espacio de estudio y avanza a tu propio ritmo.";
-  return "Retoma tu aprendizaje justo donde lo dejaste.";
-}
-
 export function AuthForm({
   initialMessage,
   initialMessageTone = "error",
@@ -81,6 +69,7 @@ export function AuthForm({
       ? { message: initialMessage, tone: initialMessageTone }
       : undefined,
   );
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [password, setPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -88,6 +77,14 @@ export function AuthForm({
   const captchaSiteKey = getPublicTurnstileSiteKey();
   const isRecovery = mode === "recover";
   const isSignUp = mode === "sign-up";
+  const showPasswordRequirements =
+    isSignUp &&
+    hasAttemptedSubmit &&
+    passwordRequirementChecks.some((requirement) => !requirement.test(password));
+  const passwordDescriptionIds = [
+    errors.password ? "auth-password-error" : undefined,
+    showPasswordRequirements ? "auth-password-requirements" : undefined,
+  ].filter(Boolean).join(" ") || undefined;
   const targetPath = getSafeNextPath(nextPath);
   const formClassName = variant === "landing" ? "landing-auth-form" : "auth-form";
 
@@ -112,6 +109,7 @@ export function AuthForm({
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSubmitting) return;
+    if (isSignUp) setHasAttemptedSubmit(true);
 
     const validation = validateAuthInput(mode, {
       confirmPassword,
@@ -254,7 +252,7 @@ export function AuthForm({
 
   const passwordInput = (
     <input
-      aria-describedby={errors.password ? "auth-password-error" : undefined}
+      aria-describedby={passwordDescriptionIds}
       aria-invalid={Boolean(errors.password)}
       autoComplete={isSignUp ? "new-password" : "current-password"}
       disabled={isSubmitting}
@@ -277,9 +275,9 @@ export function AuthForm({
     <form className={formClassName} method="post" noValidate onSubmit={onSubmit}>
       {variant === "card" && (
         <div className="auth-form-heading">
-          <span className="auth-form-kicker">{getEyebrow(mode)}</span>
+          {isRecovery ? <span className="auth-form-kicker">Acceso protegido</span> : null}
           <h1>{getHeading(mode)}</h1>
-          <p>{getDescription(mode)}</p>
+          {isRecovery ? <p>Te enviaremos un enlace de recuperación de un solo uso.</p> : null}
         </div>
       )}
 
@@ -343,17 +341,23 @@ export function AuthForm({
 
       {isSignUp && (
         <>
-          <ul className="password-requirements" aria-label="Requisitos de contraseña">
-            {passwordRequirementChecks.map((requirement) => {
-              const passed = requirement.test(password);
-              return (
-                <li className={passed ? "is-valid" : ""} key={requirement.label}>
-                  <span aria-hidden="true">{passed ? <Check size={13} weight="bold" /> : "•"}</span>
-                  {requirement.label}
-                </li>
-              );
-            })}
-          </ul>
+          {showPasswordRequirements ? (
+            <ul
+              className="password-requirements"
+              id="auth-password-requirements"
+              aria-label="Requisitos de contraseña"
+            >
+              {passwordRequirementChecks.map((requirement) => {
+                const passed = requirement.test(password);
+                return (
+                  <li className={passed ? "is-valid" : ""} key={requirement.label}>
+                    <span aria-hidden="true">{passed ? <Check size={13} weight="bold" /> : "•"}</span>
+                    {requirement.label}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
           <label htmlFor="auth-confirmPassword">Confirma la contraseña</label>
           <div className={`auth-input-shell ${errors.confirmPassword ? "is-invalid" : ""}`}>
             <input

@@ -39,6 +39,7 @@ import {
   type ContentWorkspaceResponse,
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
+import { isPublishedPermittedDraftUpdate } from "@/lib/content-editing";
 import { uniqueRegions } from "@/lib/content-regions";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { TopicSelector } from "./topic-selector";
@@ -297,39 +298,6 @@ function onlySubjectAssignmentChanged(current: ContentDraft, baseline: ContentDr
   const currentWithoutSubjects = { ...current, subjectIds: [] };
   const baselineWithoutSubjects = { ...baseline, subjectIds: [] };
   return JSON.stringify(currentWithoutSubjects) === JSON.stringify(baselineWithoutSubjects);
-}
-
-function onlyOrganizationChanged(current: ContentDraft, baseline: ContentDraft) {
-  const currentLinkedVideoId = current.kind === "guide" ? current.content.linkedVideoId : null;
-  const baselineLinkedVideoId = baseline.kind === "guide" ? baseline.content.linkedVideoId : null;
-  const organizationChanged =
-    JSON.stringify(current.subjectIds) !== JSON.stringify(baseline.subjectIds) ||
-    current.topic !== baseline.topic ||
-    JSON.stringify(current.content.regions) !== JSON.stringify(baseline.content.regions) ||
-    currentLinkedVideoId !== baselineLinkedVideoId;
-  if (!organizationChanged) return false;
-
-  const currentWithoutOrganization = {
-    ...current,
-    subjectIds: [],
-    topic: "",
-    content: {
-      ...current.content,
-      regions: [],
-      ...(current.kind === "guide" ? { linkedVideoId: null } : {}),
-    },
-  };
-  const baselineWithoutOrganization = {
-    ...baseline,
-    subjectIds: [],
-    topic: "",
-    content: {
-      ...baseline.content,
-      regions: [],
-      ...(baseline.kind === "guide" ? { linkedVideoId: null } : {}),
-    },
-  };
-  return JSON.stringify(currentWithoutOrganization) === JSON.stringify(baselineWithoutOrganization);
 }
 
 function missingGuideContent(draft: ContentDraft) {
@@ -839,12 +807,12 @@ export function ContentStudio({ initialWorkspace }: Props) {
     (item.status === "published" || item.status === "archived") &&
     onlySubjectAssignmentChanged(draft, draftBaseline),
   );
-  const publishedOrganizationOnly = Boolean(
+  const publishedPermittedUpdate = Boolean(
     !isNew &&
     item?.status === "published" &&
     draft &&
     draftBaseline &&
-    onlyOrganizationChanged(draft, draftBaseline),
+    isPublishedPermittedDraftUpdate(draft, draftBaseline),
   );
   useEffect(() => {
     if (!guideCreateOpen) return;
@@ -1088,14 +1056,14 @@ export function ContentStudio({ initialWorkspace }: Props) {
       item &&
       !isNew &&
       ((item.status === "published" &&
-        (!capabilities.canEditAll || !publishedOrganizationOnly)) ||
+        (!capabilities.canEditAll || !publishedPermittedUpdate)) ||
         (item.status === "archived" && !capabilities.canPublish)) &&
       !subjectOnlyAssignment
     ) {
       setNotice({
         text: item.status === "published"
           ? capabilities.canEditAll
-            ? "El contenido publicado sólo permite actualizar sus materias, tema y video relacionado desde este editor."
+            ? "El contenido publicado sólo permite actualizar su título, materias, tema y video relacionado desde este editor."
             : "No tienes permisos para reorganizar contenido publicado."
           : "Sólo coordinación o administración pueden editar contenido archivado.",
         tone: "error",

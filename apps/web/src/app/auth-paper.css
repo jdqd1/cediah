@@ -514,15 +514,6 @@
   text-underline-offset: 3px;
 }
 
-.auth-privacy-note {
-  max-width: 27rem;
-  justify-self: center;
-  color: #858b94;
-  font-size: 0.62rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
 .auth-page-paper .turnstile-container {
   justify-self: center;
 }

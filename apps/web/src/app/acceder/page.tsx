@@ -102,9 +102,6 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
             mode={mode}
             nextPath={nextPath}
           />
-          <p className="auth-privacy-note">
-            Tus datos se usan únicamente para proteger y gestionar tu cuenta.
-          </p>
         </section>
       </div>
     </main>

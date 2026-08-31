@@ -255,46 +255,55 @@
   height: auto;
   min-height: 0;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  gap: 0;
   margin: -42px auto 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  backdrop-filter: none;
+  overflow: hidden;
+  border: 1px solid rgb(36 45 63 / 11%);
+  border-radius: 22px;
+  background: rgb(255 255 255 / 93%);
+  box-shadow:
+    0 18px 44px rgb(29 36 51 / 9%),
+    inset 0 1px 0 rgb(255 255 255 / 92%);
+  padding: 10px 0;
+  backdrop-filter: blur(14px);
 }
 
 .marketing-page-paper .marketing-feature {
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 92px;
+  min-height: 76px;
   align-items: center;
   justify-content: flex-start;
   gap: 13px;
-  border: 1px solid rgb(36 45 63 / 11%);
-  border-radius: 18px;
-  background: rgb(255 255 255 / 95%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--marketing-ink);
-  box-shadow: 0 12px 30px rgb(29 36 51 / 8%);
-  padding: 15px 16px;
+  box-shadow: none;
+  padding: 12px 18px;
   text-align: left;
   flex-direction: row;
 }
 
 .marketing-page-paper .marketing-feature:not(:last-child)::after {
-  display: none;
+  position: absolute;
+  top: 14px;
+  right: 0;
+  bottom: 14px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgb(36 45 63 / 13%), transparent);
+  content: "";
 }
 
 .marketing-page-paper .marketing-feature svg {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
   margin: 0;
-  border: 1px solid rgb(91 36 238 / 10%);
-  border-radius: 12px;
-  background: #f3efff;
+  border: 1px solid rgb(91 36 238 / 12%);
+  border-radius: 11px;
+  background: linear-gradient(145deg, #f6f3ff, #eee9ff);
   color: var(--marketing-purple);
   padding: 8px;
 }
@@ -354,23 +363,19 @@
 .marketing-page-paper .marketing-platform-copy h2 {
   margin-top: 0;
   color: var(--marketing-ink);
-  font-size: clamp(49px, 4.2vw, 66px);
+  max-width: 570px;
+  font-size: clamp(44px, 4vw, 62px);
   font-weight: 700;
   letter-spacing: -0.052em;
   line-height: 1.02;
 }
 
 .marketing-page-paper .marketing-platform-copy p {
-  margin: 24px 0 34px;
+  max-width: 440px;
+  margin: 24px 0 0;
   color: var(--marketing-muted);
   font-size: 17px;
   line-height: 1.6;
-}
-
-.marketing-page-paper .marketing-platform-copy .marketing-primary-button {
-  min-width: 230px;
-  min-height: 56px;
-  font-size: 15px;
 }
 
 .marketing-page-paper .marketing-devices {
@@ -535,12 +540,26 @@
 }
 
 .marketing-page-paper .marketing-plan-card.is-popular {
-  border: 1px solid rgb(97 37 242 / 58%);
-  background: linear-gradient(180deg, #fbf9ff 0%, rgb(255 255 255 / 98%) 24%);
+  border: 1px solid rgb(97 37 242 / 72%);
+  background:
+    radial-gradient(circle at 100% 0%, rgb(126 64 255 / 16%), transparent 32%),
+    linear-gradient(180deg, #f6f2ff 0%, rgb(255 255 255 / 99%) 31%);
   box-shadow:
-    0 28px 64px rgb(82 38 222 / 15%),
-    0 0 0 4px rgb(97 37 242 / 5%);
-  transform: translateY(-8px);
+    0 32px 72px rgb(82 38 222 / 20%),
+    0 0 0 5px rgb(97 37 242 / 7%),
+    inset 0 1px 0 #fff;
+  transform: translateY(-10px);
+}
+
+.marketing-page-paper .marketing-plan-card.is-popular::before {
+  right: 18px;
+  left: 18px;
+  height: 5px;
+}
+
+.marketing-page-paper .marketing-plan-card.is-popular h3,
+.marketing-page-paper .marketing-plan-card.is-popular .marketing-price strong {
+  color: #4f1bd5;
 }
 
 .marketing-page-paper .marketing-popular-badge {
@@ -645,11 +664,11 @@
 }
 
 .marketing-page-paper .marketing-billing-detail {
-  display: grid;
-  min-height: 67px;
-  align-content: start;
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 10px;
+  flex-direction: column;
 }
 
 .marketing-page-paper .marketing-billing-detail > span {
@@ -896,7 +915,7 @@
   }
 
   .marketing-page-paper .marketing-platform-copy h2 {
-    font-size: 48px;
+    font-size: 44px;
   }
 
   .marketing-page-paper .marketing-devices {
@@ -1073,38 +1092,33 @@
   .marketing-page-paper .marketing-features {
     width: calc(100% - 32px);
     min-height: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: 1fr;
+    gap: 0;
     margin-top: -30px;
-    border-radius: 0;
-    padding: 0;
+    border-radius: 20px;
+    padding: 8px 16px;
   }
 
-  .marketing-page-paper .marketing-feature,
-  .marketing-page-paper .marketing-feature:nth-child(4),
-  .marketing-page-paper .marketing-feature:nth-child(5) {
-    min-height: 78px;
+  .marketing-page-paper .marketing-feature {
+    min-height: 56px;
     grid-column: auto;
     justify-content: flex-start;
     gap: 10px;
-    border: 1px solid rgb(36 45 63 / 11%);
-    border-radius: 15px;
-    padding: 11px 12px;
+    border: 0;
+    border-radius: 0;
+    padding: 9px 2px;
     text-align: left;
     flex-direction: row;
   }
 
-  .marketing-page-paper .marketing-feature:nth-child(even)::after {
-    display: none;
-  }
-
-  .marketing-page-paper .marketing-feature:nth-child(5) {
-    grid-column: 1 / -1;
-    border-bottom: 1px solid rgb(36 45 63 / 11%);
-  }
-
-  .marketing-page-paper .marketing-feature:nth-child(4) {
-    border-bottom: 1px solid rgb(36 45 63 / 11%);
+  .marketing-page-paper .marketing-feature:not(:last-child)::after {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(36 45 63 / 12%) 14%, rgb(36 45 63 / 12%) 86%, transparent);
   }
 
   .marketing-page-paper .marketing-feature svg {
@@ -1144,19 +1158,16 @@
 
   .marketing-page-paper .marketing-platform-copy h2 {
     margin-top: 0;
-    font-size: clamp(43px, 12.4vw, 58px);
+    max-width: 460px;
+    margin-inline: auto;
+    font-size: clamp(36px, 10.4vw, 48px);
+    line-height: 1.06;
   }
 
   .marketing-page-paper .marketing-platform-copy p {
-    margin: 20px 0 27px;
+    max-width: 330px;
+    margin: 20px auto 0;
     font-size: 14px;
-  }
-
-  .marketing-page-paper .marketing-platform-copy .marketing-primary-button {
-    min-width: 205px;
-    min-height: 52px;
-    margin-inline: auto;
-    font-size: 13px;
   }
 
   .marketing-page-paper .marketing-desktop-break {

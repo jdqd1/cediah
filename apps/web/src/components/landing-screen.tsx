@@ -156,11 +156,8 @@ export function LandingScreen() {
       <section className="marketing-platform" id="plataforma" aria-labelledby="platform-title">
         <div className="marketing-platform-inner">
           <div className="marketing-platform-copy">
-            <h2 id="platform-title">Aprende.<br />Practica.<br />Retén.</h2>
-            <p>La forma más visual e<br className="marketing-desktop-break" /> inteligente de estudiar medicina.</p>
-            <Link className="marketing-primary-button" href={registerHref}>
-              Explorar plataforma <ArrowRight aria-hidden="true" size={18} weight="bold" />
-            </Link>
+            <h2 id="platform-title">Estudia desde cualquier lugar y dispositivo</h2>
+            <p>Tus clases y recursos te acompañan estés donde estés.</p>
           </div>
           <div className="marketing-devices">
             <Image
@@ -224,16 +221,12 @@ export function LandingScreen() {
                     </small>
                   ) : null}
                 </div>
-                <div className="marketing-billing-detail">
-                  {billingCycle === "yearly" ? (
-                    <>
-                      <span>Pago único de <strong>${plan.annualPrice.toFixed(2)}</strong> al año</span>
-                      <b><Sparkle aria-hidden="true" size={12} weight="fill" /> Ahorras ${annualSavings.toFixed(2)}</b>
-                    </>
-                  ) : (
-                    <span>Facturación flexible cada mes</span>
-                  )}
-                </div>
+                {billingCycle === "yearly" ? (
+                  <div className="marketing-billing-detail">
+                    <span>Pago único de <strong>${plan.annualPrice.toFixed(2)}</strong> al año</span>
+                    <b><Sparkle aria-hidden="true" size={12} weight="fill" /> Ahorras ${annualSavings.toFixed(2)}</b>
+                  </div>
+                ) : null}
                 <ul>
                   {planFeatures.map((feature, featureIndex) => {
                     const included = featureIndex < plan.includedFeatures;

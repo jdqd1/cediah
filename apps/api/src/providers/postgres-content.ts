@@ -17,7 +17,7 @@ import {
 import {
   canEditContent,
   getContentCapabilities,
-  isPublishedOrganizationUpdate,
+  isPublishedPermittedUpdate,
 } from "../content-authorization.js";
 import type {
   CediahDatabase,
@@ -661,12 +661,12 @@ export function createPostgresContentProvider(
             roles: input.roles,
             status: access.status,
           });
-          const canOrganizePublished =
+          const canUpdatePublishedMetadata =
             access.status === "published" && getContentCapabilities(input.roles).canEditAll;
-          if (!canEdit && !canOrganizePublished) return { status: "not_found" };
+          if (!canEdit && !canUpdatePublishedMetadata) return { status: "not_found" };
           if (access.status === "published") {
             const current = await getItemById(transaction, input.contentId);
-            if (!current || !isPublishedOrganizationUpdate(current, input.draft)) {
+            if (!current || !isPublishedPermittedUpdate(current, input.draft)) {
               return { status: "not_found" };
             }
           }

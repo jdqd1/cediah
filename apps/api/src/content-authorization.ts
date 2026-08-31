@@ -56,14 +56,13 @@ export function canEditContent(input: {
   );
 }
 
-export function isPublishedOrganizationUpdate(
+export function isPublishedPermittedUpdate(
   current: ContentItem,
   next: ContentDraft,
 ) {
   if (
     current.kind !== next.kind ||
     current.slug !== next.slug ||
-    current.title !== next.title ||
     current.summary !== next.summary ||
     current.estimatedMinutes !== next.estimatedMinutes ||
     current.featured !== next.featured
