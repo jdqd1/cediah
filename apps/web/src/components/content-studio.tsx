@@ -2,6 +2,7 @@
 
 import type { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import {
   Archive,
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
   FileVideo,
   FunnelSimple,
   GraduationCap,
+  ImageSquare,
   MagnifyingGlass,
   NotePencil,
   Notebook,
@@ -88,6 +90,9 @@ const primaryKinds = [
 // Non-video editorial assets stay disabled until they have an independent
 // storage provider. The private video test uses its own isolated flow.
 const contentAssetUploadsEnabled = false;
+const defaultVideoCover = "/anatomy/video-cover-default.png";
+const maxCoverSourceBytes = 8_000_000;
+const maxEmbeddedCoverBytes = 340_000;
 
 const kindIcons: Record<ContentKind, typeof PlayCircle> = {
   flashcards: CardsThree,
@@ -107,18 +112,18 @@ const statuses: { label: string; value: ContentStatus }[] = [
 ];
 
 const errors: Record<string, string> = {
-  content_conflict: "El contenido cambió o ya existe otro elemento con el mismo slug.",
-  content_not_publishable: "Completa el contenido o adjunta el archivo requerido antes de publicar.",
-  content_unavailable: "El servicio editorial no está disponible.",
-  forbidden: "Tu cuenta no tiene permiso para realizar esta acción.",
-  identity_unavailable: "No fue posible validar tu sesión.",
-  invalid_content: "Revisa los campos obligatorios y sus límites.",
-  invalid_content_asset: "El archivo no cumple los requisitos permitidos.",
-  invalid_content_transition: "La transición de estado no es válida.",
-  not_found: "El contenido no existe o no tienes acceso.",
-  unauthorized: "Tu sesión terminó. Vuelve a iniciar sesión.",
-  invalid_subject: "Escribe un nombre válido para la materia.",
-  subject_conflict: "Ya existe una materia con ese nombre.",
+  content_conflict: "No se completó la acción porque el contenido cambió o el enlace ya está en uso. Actualiza la página y, si persiste, cambia el título o el slug antes de guardar.",
+  content_not_publishable: "El contenido todavía no cumple los requisitos de publicación. Completa los elementos pendientes indicados en la preparación del contenido y vuelve a intentarlo.",
+  content_unavailable: "El servicio editorial no respondió correctamente. Comprueba tu conexión, actualiza la página y vuelve a intentarlo.",
+  forbidden: "Tu cuenta no tiene permiso para realizar esta acción. Solicita acceso a coordinación o administración.",
+  identity_unavailable: "No pudimos validar tu sesión. Vuelve a iniciar sesión y repite la acción.",
+  invalid_content: "Hay campos obligatorios vacíos o con un formato no válido. Revisa los campos señalados y sus límites antes de guardar.",
+  invalid_content_asset: "El archivo no cumple los requisitos de formato o tamaño. Selecciona un archivo compatible y vuelve a intentarlo.",
+  invalid_content_transition: "No se puede aplicar ese cambio desde el estado actual. Guarda primero y sigue el orden de revisión, aprobación y publicación.",
+  not_found: "El contenido ya no existe o no está disponible para tu cuenta. Actualiza la página o solicita acceso a administración.",
+  unauthorized: "Tu sesión terminó. Inicia sesión de nuevo para continuar.",
+  invalid_subject: "El nombre de la materia está vacío o no es válido. Escribe un nombre más corto y vuelve a intentarlo.",
+  subject_conflict: "Ya existe una materia con ese nombre. Selecciona la existente o utiliza un nombre distinto.",
 };
 
 function labelOf<T extends string>(options: { label: string; value: T }[], value: T) {
@@ -230,6 +235,7 @@ function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
       ...base,
       kind,
       content: {
+        coverImageUrl: null,
         description: "",
         durationSeconds: null,
         externalUrl: null,
@@ -268,6 +274,64 @@ function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
     return { ...base, kind, content: { cards: [{ back: "", front: "" }], regions: [] } };
   }
   return { ...base, kind: "topic", content: { introduction: "", objectives: [], regions: [] } };
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, quality: number) {
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+}
+
+function blobDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen seleccionada."));
+    reader.onload = () => typeof reader.result === "string"
+      ? resolve(reader.result)
+      : reject(new Error("No se pudo preparar la imagen seleccionada."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function prepareVideoCover(file: File) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    throw new Error("La portada debe ser JPG, PNG o WebP. Selecciona una imagen en uno de esos formatos.");
+  }
+  if (file.size > maxCoverSourceBytes) {
+    throw new Error("La portada supera 8 MB. Reduce el tamaño del archivo y vuelve a intentarlo.");
+  }
+
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const source = document.createElement("img");
+    source.decoding = "async";
+    source.src = sourceUrl;
+    try {
+      await source.decode();
+    } catch {
+      throw new Error("No pudimos abrir la portada. Comprueba que sea una imagen JPG, PNG o WebP válida y vuelve a seleccionarla.");
+    }
+
+    const scale = Math.min(1, 1280 / source.naturalWidth, 720 / source.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(source.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(source.naturalHeight * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("El navegador no pudo procesar la portada. Prueba con otra imagen.");
+    context.fillStyle = "#0f172a";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+
+    let blob: Blob | null = null;
+    for (const quality of [0.82, 0.72, 0.62, 0.52]) {
+      blob = await canvasBlob(canvas, quality);
+      if (blob && blob.size <= maxEmbeddedCoverBytes) break;
+    }
+    if (!blob || blob.size > maxEmbeddedCoverBytes) {
+      throw new Error("La portada sigue siendo demasiado pesada. Usa una imagen más sencilla o de menor resolución.");
+    }
+    return blobDataUrl(blob);
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
 }
 
 function itemDraft(item: ContentItem): ContentDraft {
@@ -797,6 +861,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [linkedVideoId, setLinkedVideoId] = useState("");
   const [archiveConfirmationOpen, setArchiveConfirmationOpen] = useState(false);
   const [publicationsCollapsed, setPublicationsCollapsed] = useState(true);
+  const coverFileRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const guideEntryDraftRef = useRef<ContentDraft | null>(null);
   const guideChoiceDialogRef = useRef<HTMLElement>(null);
@@ -1147,9 +1212,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setNotice({
         text: item.status === "published"
           ? capabilities.canEditAll
-            ? "El contenido publicado sólo permite actualizar su título, materias, tema y video relacionado desde este editor."
-            : "No tienes permisos para reorganizar contenido publicado."
-          : "Sólo coordinación o administración pueden editar contenido archivado.",
+            ? "No se guardaron los cambios editoriales porque el contenido está publicado. Archívalo para editar el documento; desde aquí sólo puedes cambiar título, materias, tema y video relacionado."
+            : "No puedes reorganizar contenido publicado con tus permisos actuales. Solicita el cambio a coordinación o administración."
+          : "No puedes editar contenido archivado con tus permisos actuales. Pide a coordinación o administración que lo restaure o realice el cambio.",
         tone: "error",
       });
       return false;
@@ -1179,14 +1244,16 @@ export function ContentStudio({ initialWorkspace }: Props) {
       const missing = missingGuideContent(payload);
       setNotice(missing.length > 0
         ? {
-            text: `Contenido guardado. Para completar la guía faltan: ${missing.join(", ")}.`,
+            text: `Contenido guardado, pero la guía aún está incompleta. Añade ${missing.join(", ")} antes de enviarla a revisión.`,
             tone: "warning",
           }
         : { text: "Contenido guardado.", tone: "success" });
       return true;
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible guardar.",
+        text: error instanceof Error
+          ? error.message
+          : "No se pudo guardar el contenido. Revisa los campos y tu conexión antes de intentarlo de nuevo.",
         tone: "error",
       });
       return false;
@@ -1198,7 +1265,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
   async function transition(status: TargetStatus) {
     if (!item || busy) return;
     if (hasUnsavedChanges) {
-      setNotice({ text: "Guarda los cambios antes de cambiar el estado.", tone: "error" });
+      setNotice({
+        text: "No se cambió el estado porque hay cambios sin guardar. Guarda el contenido y vuelve a intentar la transición.",
+        tone: "error",
+      });
       return;
     }
     if (
@@ -1225,7 +1295,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       });
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible actualizar el estado.",
+        text: error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el estado. Guarda el contenido, actualiza la página y vuelve a intentarlo.",
         tone: "error",
       });
     } finally {
@@ -1264,7 +1336,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setNotice({ text: `${kindLabel === "guía" ? "Guía eliminada" : "Video eliminado"} permanentemente.`, tone: "success" });
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : `No fue posible eliminar ${kindLabel === "guía" ? "la guía" : "el video"}.`,
+        text: error instanceof Error
+          ? error.message
+          : `No se pudo eliminar ${kindLabel === "guía" ? "la guía" : "el video"}. Actualiza la página, confirma tus permisos y vuelve a intentarlo.`,
         tone: "error",
       });
     } finally {
@@ -1302,6 +1376,46 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (selected) void upload(selected);
   }
 
+  async function selectCover(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0];
+    if (!selected || draft?.kind !== "video" || !editable || busy) return;
+
+    setBusy("cover");
+    setNotice(null);
+    try {
+      const coverImageUrl = await prepareVideoCover(selected);
+      setDraft((current) => current?.kind === "video"
+        ? { ...current, content: { ...current.content, coverImageUrl } }
+        : current);
+      setNotice({
+        text: "La portada está lista. Guarda los cambios para publicarla con el video.",
+        tone: "success",
+      });
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error
+          ? error.message
+          : "No se pudo preparar la portada. Selecciona otra imagen JPG, PNG o WebP.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
+      if (coverFileRef.current) coverFileRef.current.value = "";
+    }
+  }
+
+  function removeCover() {
+    if (draft?.kind !== "video" || !editable || busy) return;
+    setDraft({
+      ...draft,
+      content: { ...draft.content, coverImageUrl: null },
+    });
+    setNotice({
+      text: "Se usará la portada genérica. Guarda los cambios para confirmar esta elección.",
+      tone: "warning",
+    });
+  }
+
   async function upload(selectedFile: File) {
     if (!draft || !editable || !capabilities.canUpload || busy) return;
     const isVideo = draft.kind === "video";
@@ -1313,7 +1427,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (!valid) {
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
-      setNotice({ text: "El tipo de archivo no corresponde al contenido.", tone: "error" });
+      setNotice({
+        text: "El archivo no corresponde al tipo de contenido. Para un video usa MP4, MOV o WebM; para una guía usa PDF.",
+        tone: "error",
+      });
       return;
     }
 
@@ -1349,7 +1466,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
       );
       if (selectedFile.size > reservation.constraints.maxFileSizeBytes) {
-        throw new Error("El archivo supera el límite permitido.");
+        throw new Error("El archivo supera el límite permitido. Comprímelo o selecciona uno más pequeño antes de volver a cargarlo.");
       }
       await signedPut(reservation.upload.url, selectedFile, setProgress);
       const asset = await json<Asset>(
@@ -1369,7 +1486,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible cargar el archivo.",
+        text: error instanceof Error
+          ? error.message
+          : "No se pudo cargar el archivo. Comprueba tu conexión y vuelve a seleccionarlo.",
         tone: "error",
       });
     } finally {
@@ -1382,7 +1501,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (!item || !asset || !editable || !capabilities.canUpload || busy) return;
     if (item.status === "published") {
       setNotice({
-        text: "Archiva el video antes de quitar el archivo para no dejar una publicación activa incompleta.",
+        text: "No puedes quitar el archivo de un video publicado. Archiva primero la publicación y vuelve a intentar la eliminación.",
         tone: "warning",
       });
       return;
@@ -1403,7 +1522,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       setNotice({ text: "Video eliminado del contenido.", tone: "success" });
     } catch (error) {
       setNotice({
-        text: error instanceof Error ? error.message : "No fue posible quitar el video.",
+        text: error instanceof Error
+          ? error.message
+          : "No se pudo quitar el video. Actualiza la página, confirma que esté archivado y vuelve a intentarlo.",
         tone: "error",
       });
     } finally {
@@ -1799,6 +1920,56 @@ export function ContentStudio({ initialWorkspace }: Props) {
                           }}
                         />
                       </label>
+                      {draft.kind === "video" && (
+                        <section className="studio-video-cover-field studio-field-wide" aria-labelledby="studio-video-cover-title">
+                          <div className="studio-video-cover-preview">
+                            <Image
+                              alt={draft.content.coverImageUrl ? "Vista previa de la portada del video" : "Portada genérica para videos"}
+                              fill
+                              loading="eager"
+                              sizes="(max-width: 720px) 100vw, 320px"
+                              src={draft.content.coverImageUrl || defaultVideoCover}
+                              unoptimized={Boolean(draft.content.coverImageUrl)}
+                            />
+                            <span aria-hidden="true" className="studio-video-cover-play"><PlayCircle size={38} weight="fill" /></span>
+                          </div>
+                          <div className="studio-video-cover-copy">
+                            <span className="studio-video-cover-icon"><ImageSquare aria-hidden="true" size={21} /></span>
+                            <div>
+                              <h5 id="studio-video-cover-title">Foto de portada</h5>
+                              <p>
+                                {draft.content.coverImageUrl
+                                  ? "Esta imagen aparecerá en las tarjetas del video."
+                                  : "Si no eliges una imagen, se usará la portada genérica de Koraz."}
+                              </p>
+                            </div>
+                            <div className="studio-video-cover-actions">
+                              <label className="studio-video-cover-upload">
+                                <CloudArrowUp aria-hidden="true" size={16} />
+                                <span>{draft.content.coverImageUrl ? "Cambiar" : "Subir imagen"}</span>
+                                <input
+                                  ref={coverFileRef}
+                                  accept="image/jpeg,image/png,image/webp"
+                                  aria-label="Subir foto de portada del video"
+                                  disabled={busy !== null}
+                                  type="file"
+                                  onChange={(event) => void selectCover(event)}
+                                />
+                              </label>
+                              {draft.content.coverImageUrl && (
+                                <button
+                                  className="studio-video-cover-remove"
+                                  disabled={busy !== null}
+                                  type="button"
+                                  onClick={removeCover}
+                                >
+                                  <Trash aria-hidden="true" size={15} /> Usar genérica
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </section>
+                      )}
                       <section className="studio-subject-assignment studio-field-wide" aria-labelledby="studio-subject-title">
                         <div className="studio-subject-heading">
                           <div>

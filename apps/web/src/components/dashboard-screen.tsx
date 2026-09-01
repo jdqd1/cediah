@@ -25,8 +25,14 @@ const kindImages: Record<ContentKind, string> = {
   guide: "/anatomy/back-muscles.png",
   quiz: "/anatomy/heart.png",
   topic: "/anatomy/skull.png",
-  video: "/anatomy/neck-muscles.png",
+  video: "/anatomy/video-cover-default.png",
 };
+
+function contentCover(item: ContentItem) {
+  return item.kind === "video" && item.content.coverImageUrl
+    ? item.content.coverImageUrl
+    : kindImages[item.kind];
+}
 
 const materialDefinitions = [
   {
@@ -79,10 +85,11 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
     <Link className="dashboard-video-card" href={contentHref(item)}>
       <div className="dashboard-video-media">
         <Image
-          src={kindImages.video}
+          src={contentCover(item)}
           alt=""
           fill
           sizes="(max-width: 900px) 80vw, 28vw"
+          unoptimized={Boolean(item.content.coverImageUrl)}
         />
         <span className="dashboard-video-shade" />
         <span className="dashboard-play-button" aria-hidden="true">
@@ -200,7 +207,13 @@ export function DashboardScreen({
                       <span className="most-viewed-rank">{index + 1}</span>
                       <Link href={contentHref(item)} className="most-viewed-link">
                         <span className="most-viewed-image">
-                          <Image src={kindImages[item.kind]} alt="" fill sizes="100px" />
+                          <Image
+                            src={contentCover(item)}
+                            alt=""
+                            fill
+                            sizes="100px"
+                            unoptimized={Boolean(item.kind === "video" && item.content.coverImageUrl)}
+                          />
                         </span>
                         <span className="most-viewed-copy">
                           <strong>{item.title}</strong>

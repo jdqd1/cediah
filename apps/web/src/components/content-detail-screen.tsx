@@ -1122,7 +1122,7 @@ function VideoCompanionPanel({
             <ol className="video-key-points">
               {displayedKeyPoints.map((point, index) => (
                 <li key={`${point}-${index}`}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <span aria-hidden="true"><Lightbulb size={17} weight="fill" /></span>
                   <strong>{point}</strong>
                 </li>
               ))}

@@ -219,6 +219,17 @@ export function AppShell({
       ? "Cerrar menú principal"
       : "Abrir menú principal";
 
+  function toggleNavigationGroup(
+    setOpen: (updater: (current: boolean) => boolean) => void,
+  ) {
+    if (window.matchMedia("(min-width: 961px)").matches && sidebarCollapsed) {
+      setSidebarCollapsedPreference(false);
+      setOpen(() => true);
+      return;
+    }
+    setOpen((current) => !current);
+  }
+
   function togglePrimaryMenu() {
     if (window.matchMedia("(min-width: 961px)").matches) {
       setSidebarCollapsedPreference(!sidebarCollapsed);
@@ -332,7 +343,7 @@ export function AppShell({
               icon={BookOpen}
               label="Material de estudio"
               onNavigate={closeSidebar}
-              onToggle={() => setStudyMenuOpen((open) => !open)}
+              onToggle={() => toggleNavigationGroup(setStudyMenuOpen)}
               open={studyMenuOpen}
             />
 
@@ -352,7 +363,7 @@ export function AppShell({
                 icon={ShieldCheck}
                 label="Administrar"
                 onNavigate={closeSidebar}
-                onToggle={() => setAdminMenuOpen((open) => !open)}
+                onToggle={() => toggleNavigationGroup(setAdminMenuOpen)}
                 open={adminMenuOpen}
               />
             )}
@@ -392,6 +403,9 @@ export function AppShell({
             >
               <List size={28} />
             </button>
+            <Link className="topbar-brand" href="/dashboard" aria-label="Koraz, ir al inicio">
+              <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+            </Link>
           </div>
           <GlobalContentSearch />
           <div className="topbar-page-context sr-only">

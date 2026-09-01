@@ -734,6 +734,18 @@ export const ContentRegionsSchema = z
 
 export type ContentRegions = z.infer<typeof ContentRegionsSchema>;
 
+const VideoCoverImageUrlSchema = z
+  .string()
+  .trim()
+  .max(500_000)
+  .refine(
+    (value) =>
+      /^https:\/\//i.test(value) ||
+      /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(value),
+    { message: "Video cover must be a safe HTTPS or embedded raster image" },
+  )
+  .nullable();
+
 const DraftGuideDocumentSchema = z.object({
   document: RichTextDocumentSchema.nullable().default(null),
   sections: z.array(DraftGuideSectionSchema).max(100).default([]),
@@ -747,6 +759,7 @@ const PublishableGuideDocumentSchema = z.object({
 export const ContentDraftSchema = z.discriminatedUnion("kind", [
   ContentDraftBaseSchema.extend({
     content: z.object({
+      coverImageUrl: VideoCoverImageUrlSchema.optional(),
       description: z.string().trim().max(10_000),
       durationSeconds: z.number().int().min(0).max(86_400).nullable().default(null),
       externalUrl: HttpsUrlSchema.nullable().default(null),
@@ -810,6 +823,7 @@ export type ContentDraft = z.infer<typeof ContentDraftSchema>;
 export const PublishableContentDraftSchema = z.discriminatedUnion("kind", [
   PublishableContentDraftBaseSchema.extend({
     content: z.object({
+      coverImageUrl: VideoCoverImageUrlSchema.optional(),
       description: z.string().trim().min(1).max(10_000),
       durationSeconds: z.number().int().min(0).max(86_400).nullable().default(null),
       externalUrl: HttpsUrlSchema.nullable().default(null),

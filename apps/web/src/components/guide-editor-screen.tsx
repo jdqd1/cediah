@@ -11,8 +11,6 @@ import {
   ArrowUUpLeft,
   BookOpen,
   CaretDown,
-  CaretLeft,
-  CaretRight,
   CaretUp,
   Check,
   CheckCircle,
@@ -69,7 +67,7 @@ import {
   sectionsToRichTextDocument,
   type NumberedGuideOutlineItem,
 } from "@/lib/guide-document";
-import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
+import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { PlatformToast, type PlatformNotice } from "./platform-toast";
 import { RichTextRenderer } from "./rich-text-renderer";
@@ -568,7 +566,6 @@ function KeyPointsPanel({
       </header>
       {!collapsed && (
         <div className="guide-companion-body">
-          <p>Resume lo imprescindible mientras construyes la guía.</p>
           {values.map((value, index) => (
             <div className="guide-key-point-row" key={index}>
               <span>{index + 1}</span>
@@ -624,6 +621,26 @@ function QuizPanel({
     onChange(questions.map((question, position) => position === index ? { ...question, ...patch } : question));
   }
 
+  function updateOption(questionIndex: number, optionIndex: number, value: string) {
+    const question = questions[questionIndex];
+    if (!question) return;
+    update(questionIndex, {
+      options: question.options.map((option, index) => index === optionIndex ? value : option),
+    });
+  }
+
+  function removeOption(questionIndex: number, optionIndex: number) {
+    const question = questions[questionIndex];
+    if (!question || question.options.length <= 2) return;
+    const options = question.options.filter((_, index) => index !== optionIndex);
+    const correctOptionIndex = question.correctOptionIndex === optionIndex
+      ? 0
+      : question.correctOptionIndex > optionIndex
+        ? question.correctOptionIndex - 1
+        : question.correctOptionIndex;
+    update(questionIndex, { correctOptionIndex, options });
+  }
+
   return (
     <section className={`guide-companion-panel ${collapsed ? "is-collapsed" : ""}`}>
       <header>
@@ -634,11 +651,12 @@ function QuizPanel({
       </header>
       {!collapsed && (
         <div className="guide-companion-body guide-quiz-builder">
-          <p>Crea preguntas breves para comprobar la comprensión de la guía.</p>
           {questions.map((question, questionIndex) => {
             const complete = Boolean(
               question.prompt.trim() &&
-              questionAnswer(question).trim(),
+              question.options.length >= 2 &&
+              question.options.every((option) => option.trim()) &&
+              question.correctOptionIndex < question.options.length,
             );
             const open = openQuestion === questionIndex;
             return (
@@ -664,34 +682,74 @@ function QuizPanel({
                 {open && (
                   <div className="guide-quiz-fields guide-question-answer-fields">
                     <label className="guide-question-field">
-                      <span>Pregunta</span>
+                      <span>Enunciado</span>
                       <textarea
+                        aria-label={`Enunciado de la pregunta ${questionIndex + 1}`}
                         disabled={disabled}
                         maxLength={2000}
+                        placeholder="Escribe una pregunta breve y concreta…"
                         rows={2}
                         value={question.prompt}
                         onChange={(event) => update(questionIndex, { prompt: event.target.value })}
                       />
                     </label>
-                    <label className="guide-answer-field">
-                      <span>Respuesta</span>
-                      <textarea
-                        aria-label={`Respuesta ${questionIndex + 1}`}
-                        disabled={disabled}
-                        maxLength={500}
-                        placeholder="Escribe una respuesta clara y directa…"
-                        rows={2}
-                        value={questionAnswer(question)}
-                        onChange={(event) =>
-                          update(questionIndex, withQuestionAnswer(question, event.target.value))
-                        }
-                      />
-                    </label>
+                    <fieldset className="guide-answer-options-field" disabled={disabled}>
+                      <legend>
+                        Opciones de respuesta
+                        <small>Marca una como correcta</small>
+                      </legend>
+                      <div className="guide-answer-options">
+                        {question.options.map((option, optionIndex) => (
+                          <div
+                            className={`guide-quiz-option${question.correctOptionIndex === optionIndex ? " is-correct" : ""}`}
+                            key={optionIndex}
+                          >
+                            <input
+                              aria-label={`Marcar la opción ${optionIndex + 1} como correcta`}
+                              checked={question.correctOptionIndex === optionIndex}
+                              name={`guide-question-${questionIndex}-correct-option`}
+                              type="radio"
+                              onChange={() => update(questionIndex, { correctOptionIndex: optionIndex })}
+                            />
+                            <span aria-hidden="true" className="guide-option-letter">
+                              {String.fromCharCode(65 + optionIndex)}
+                            </span>
+                            <input
+                              aria-label={`Opción ${optionIndex + 1} de la pregunta ${questionIndex + 1}`}
+                              maxLength={500}
+                              placeholder={`Opción ${String.fromCharCode(65 + optionIndex)}`}
+                              type="text"
+                              value={option}
+                              onChange={(event) => updateOption(questionIndex, optionIndex, event.target.value)}
+                            />
+                            <button
+                              aria-label={`Eliminar opción ${optionIndex + 1}`}
+                              disabled={disabled || question.options.length <= 2}
+                              title={question.options.length <= 2 ? "Cada pregunta necesita al menos dos opciones" : "Eliminar opción"}
+                              type="button"
+                              onClick={() => removeOption(questionIndex, optionIndex)}
+                            >
+                              <Trash size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        className="guide-quiz-inline-add"
+                        disabled={disabled || question.options.length >= 8}
+                        type="button"
+                        onClick={() => update(questionIndex, { options: [...question.options, ""] })}
+                      >
+                        <Plus size={14} /> Añadir opción
+                      </button>
+                    </fieldset>
                     <label className="guide-answer-context-field">
-                      <span>Contexto adicional <small>(opcional)</small></span>
+                      <span>Explicación <small>(opcional)</small></span>
                       <textarea
+                        aria-label={`Explicación de la pregunta ${questionIndex + 1}`}
                         disabled={disabled}
                         maxLength={4000}
+                        placeholder="Aclara por qué la respuesta es correcta…"
                         rows={2}
                         value={question.explanation}
                         onChange={(event) => update(questionIndex, { explanation: event.target.value })}
@@ -1518,9 +1576,9 @@ export function GuideEditorScreen({
               onClick={() => {
                 if (!canEditDocument) {
                   setInteractionNotice({
-                    text: status === "published"
-                      ? "Archiva la guía antes de editar su documento."
-                      : "Tu cuenta no tiene permiso para editar esta guía.",
+                      text: status === "published"
+                      ? "No puedes editar el documento mientras la guía está publicada. Para solucionarlo, vuelve al panel, archívala y abre el editor de nuevo."
+                      : "No puedes editar esta guía con los permisos actuales. Para solucionarlo, pide a coordinación o administración que te asigne acceso de edición.",
                     tone: "warning",
                   });
                   return;
@@ -1693,6 +1751,7 @@ export function GuideEditorScreen({
               <button
                 aria-controls="guide-editor-outline-content"
                 aria-expanded={mobileDrawer === "outline" || !outlineCollapsed}
+                aria-label={mobileDrawer === "outline" || !outlineCollapsed ? "Contraer índice de la guía" : "Expandir índice de la guía"}
                 type="button"
                 onClick={() => {
                   if (mobileDrawer === "outline") setMobileDrawer(null);
@@ -1702,7 +1761,6 @@ export function GuideEditorScreen({
                 <ListBullets aria-hidden="true" size={17} />
                 <strong>Índice de la guía</strong>
                 <small>{outline.length}</small>
-                {mobileDrawer === "outline" || !outlineCollapsed ? <CaretLeft size={15} /> : <CaretRight size={15} />}
               </button>
             </header>
             {(!outlineCollapsed || mobileDrawer === "outline") && (
@@ -1870,6 +1928,7 @@ export function GuideEditorScreen({
                 <button
                   aria-controls="guide-editor-companions-content"
                   aria-expanded={mobileDrawer === "companions" || !companionsCollapsed}
+                  aria-label={mobileDrawer === "companions" || !companionsCollapsed ? "Contraer complementos de la guía" : "Expandir complementos de la guía"}
                   type="button"
                   onClick={() => {
                     if (mobileDrawer === "companions") setMobileDrawer(null);
@@ -1878,7 +1937,6 @@ export function GuideEditorScreen({
                 >
                   <HighlighterCircle aria-hidden="true" size={17} />
                   <span>Complementos de la guía</span>
-                  {mobileDrawer === "companions" || !companionsCollapsed ? <CaretRight size={16} /> : <CaretLeft size={16} />}
                 </button>
               </header>
               {(!companionsCollapsed || mobileDrawer === "companions") && (
