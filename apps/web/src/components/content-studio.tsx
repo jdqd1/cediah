@@ -45,6 +45,7 @@ import {
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
 import { isPublishedPermittedDraftUpdate } from "@/lib/content-editing";
+import { findVideoLinkedGuide, getIndependentPublications, getVideoGuideContent } from "@/lib/content-guide-links";
 import { uniqueRegions } from "@/lib/content-regions";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { TopicSelector } from "./topic-selector";
@@ -67,8 +68,16 @@ const GuideEditorScreen = dynamic(
 
 type Props = { initialWorkspace: ContentWorkspaceResponse };
 type Asset = NonNullable<ContentItem["asset"]>;
+type GuideItem = Extract<ContentItem, { kind: "guide" }>;
+type VideoDraft = Extract<ContentDraft, { kind: "video" }>;
 type Mime = ContentAssetUploadResponse["asset"]["mimeType"];
 type TargetStatus = Exclude<ContentStatus, "draft">;
+type GuideEditorReturnContext = {
+  draft: VideoDraft;
+  editingId: string;
+  file: File | null;
+  progress: number;
+};
 type Base = Pick<
   ContentDraft,
   "estimatedMinutes" | "featured" | "slug" | "subjectIds" | "summary" | "title" | "topic"
@@ -649,20 +658,33 @@ function GuideEditorLaunch({
 
 function TypeEditor({
   draft,
+  linkedGuide,
+  onManageLinkedGuide,
   onOpenGuide,
   onChange,
 }: {
   draft: ContentDraft;
+  linkedGuide?: GuideItem;
+  onManageLinkedGuide?: () => void;
   onOpenGuide: () => void;
   onChange: (draft: ContentDraft) => void;
 }) {
   if (draft.kind === "video") {
+    const guide = getVideoGuideContent(draft, linkedGuide);
     return (
-      <GuideEditorLaunch
-        description={`${draft.content.guide.sections.length} secciones · ${draft.content.keyPoints.length} puntos clave · ${draft.content.quiz.questions.length} preguntas`}
-        label="Editar guía y recursos"
-        onOpen={onOpenGuide}
-      />
+      <>
+        <GuideEditorLaunch
+          description={`${guide.sections.length} secciones · ${guide.keyPoints.length} puntos clave · ${guide.quiz.questions.length} preguntas`}
+          label="Editar guía y recursos"
+          onOpen={onOpenGuide}
+        />
+        {linkedGuide && onManageLinkedGuide && (
+          <div className="studio-linked-guide-context">
+            <span>Guía principal: <strong>{linkedGuide.title}</strong></span>
+            <button type="button" onClick={onManageLinkedGuide}>Opciones de la guía</button>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -864,11 +886,19 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const coverFileRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const guideEntryDraftRef = useRef<ContentDraft | null>(null);
+  const guideReturnRef = useRef<GuideEditorReturnContext | null>(null);
   const guideChoiceDialogRef = useRef<HTMLElement>(null);
   const guideChoiceTriggerRef = useRef<HTMLElement | null>(null);
   const capabilities = initialWorkspace.capabilities;
   const isAdministrator = initialWorkspace.roles.includes("administrator");
   const item = editingId ? items.find((current) => current.id === editingId) : undefined;
+  const videoLinkedGuide = useMemo(
+    () => draft?.kind === "video" ? findVideoLinkedGuide(items, editingId) : undefined,
+    [draft?.kind, editingId, items],
+  );
+  const videoGuideResources = draft?.kind === "video"
+    ? getVideoGuideContent(draft, videoLinkedGuide)
+    : null;
 
   const topicSuggestions = useMemo(
     () => topicsForSubjects(
@@ -890,23 +920,29 @@ export function ContentStudio({ initialWorkspace }: Props) {
       ),
     [items],
   );
+  const guideCreationVideos = useMemo(
+    () => linkableVideos.filter((video) => !findVideoLinkedGuide(items, video.id)),
+    [items, linkableVideos],
+  );
   const guideVideoOptions = useMemo(() => {
     if (draft?.kind !== "guide") return linkableVideos;
     const selectedSubjects = new Set(draft.subjectIds);
-    const candidates = linkableVideos.filter((video) =>
-      selectedSubjects.size === 0 || video.subjectIds.some((id) => selectedSubjects.has(id)),
-    );
+    const candidates = linkableVideos.filter((video) => {
+      const linkedGuide = findVideoLinkedGuide(items, video.id);
+      return (!linkedGuide || linkedGuide.id === editingId) &&
+        (selectedSubjects.size === 0 || video.subjectIds.some((id) => selectedSubjects.has(id)));
+    });
     const current = draft.content.linkedVideoId
       ? items.find((value): value is ContentItem & { kind: "video" } =>
           value.kind === "video" && value.id === draft.content.linkedVideoId)
       : undefined;
     if (current && !candidates.some((video) => video.id === current.id)) candidates.push(current);
     return candidates.sort((left, right) => left.title.localeCompare(right.title, "es"));
-  }, [draft, items, linkableVideos]);
+  }, [draft, editingId, items, linkableVideos]);
 
   const visibleItems = useMemo(() => {
     const text = normalizeSearch(query.trim());
-    return [...items]
+    return getIndependentPublications(items)
       .filter((current) => {
         const regions = current.content.regions.length > 0
           ? current.content.regions
@@ -994,6 +1030,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setDraft(itemDraft(current));
     setEditingId(current.id);
     setIsNew(false);
+    guideReturnRef.current = null;
     resetFeedback();
     if (current.kind === "guide") {
       guideEntryDraftRef.current = itemDraft(current);
@@ -1007,6 +1044,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   function create(kind: ContentKind = "video") {
     if (busy) return;
     if (!confirmDiscard()) return;
+    guideReturnRef.current = null;
     if (kind === "guide") {
       guideChoiceTriggerRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -1062,8 +1100,15 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   function beginGuideCreation(videoId: string | null) {
     const linkedVideo = videoId
-      ? linkableVideos.find((current) => current.id === videoId)
+      ? guideCreationVideos.find((current) => current.id === videoId)
       : undefined;
+    if (videoId && !linkedVideo) {
+      setNotice({
+        text: "Este video ya tiene una guía principal o dejó de estar disponible. Abre el video y usa «Editar guía y recursos» para trabajar en su guía actual.",
+        tone: "warning",
+      });
+      return;
+    }
     const created = emptyDraft("guide") as Extract<ContentDraft, { kind: "guide" }>;
     const regions = linkedVideo
       ? linkedVideo.content.regions.length > 0
@@ -1084,6 +1129,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setEditingId(null);
     setIsNew(true);
     setGuideCreateOpen(false);
+    guideReturnRef.current = linkedVideo
+      ? { draft: itemDraft(linkedVideo) as VideoDraft, editingId: linkedVideo.id, file: null, progress: 0 }
+      : null;
     guideEntryDraftRef.current = structuredClone(next);
     setGuideEditing(true);
     resetFeedback();
@@ -1091,12 +1139,36 @@ export function ContentStudio({ initialWorkspace }: Props) {
 
   function openGuideEditor() {
     if (!draft || (draft.kind !== "guide" && draft.kind !== "video")) return;
-    guideEntryDraftRef.current = structuredClone(draft);
+    if (draft.kind === "video" && videoLinkedGuide && editingId) {
+      guideReturnRef.current = { draft: structuredClone(draft), editingId, file, progress };
+      const linkedDraft = itemDraft(videoLinkedGuide);
+      guideEntryDraftRef.current = structuredClone(linkedDraft);
+      setDraft(linkedDraft);
+      setEditingId(videoLinkedGuide.id);
+      setIsNew(false);
+      setFile(null);
+      setProgress(0);
+    } else {
+      guideReturnRef.current = null;
+      guideEntryDraftRef.current = structuredClone(draft);
+    }
     setGuideEditing(true);
     setNotice(null);
   }
 
   function leaveGuideEditor(discard: boolean) {
+    const returnContext = guideReturnRef.current;
+    if (returnContext) {
+      setDraft(structuredClone(returnContext.draft));
+      setEditingId(returnContext.editingId);
+      setIsNew(false);
+      setFile(returnContext.file);
+      setProgress(returnContext.progress);
+      setGuideEditing(false);
+      guideReturnRef.current = null;
+      guideEntryDraftRef.current = null;
+      return;
+    }
     if (discard && isNew && draft?.kind === "guide") {
       setDraft(null);
       setEditingId(null);
@@ -1119,6 +1191,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setEditingId(null);
     setIsNew(false);
     setGuideEditing(false);
+    guideReturnRef.current = null;
     resetFeedback();
   }
 
@@ -1237,17 +1310,33 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
       );
       upsert(current);
-      setDraft(itemDraft(current));
-      setEditingId(current.id);
+      const linkedVideo = current.kind === "guide" && current.content.linkedVideoId
+        ? items.find((candidate): candidate is ContentItem & { kind: "video" } =>
+            candidate.kind === "video" && candidate.id === current.content.linkedVideoId)
+        : undefined;
+      if (guideEditing && linkedVideo && !guideReturnRef.current) {
+        guideReturnRef.current = {
+          draft: itemDraft(linkedVideo) as VideoDraft,
+          editingId: linkedVideo.id,
+          file: null,
+          progress: 0,
+        };
+      }
+      const selectedAfterSave = linkedVideo && !guideEditing ? linkedVideo : current;
+      setDraft(itemDraft(selectedAfterSave));
+      setEditingId(selectedAfterSave.id);
       setIsNew(false);
       guideEntryDraftRef.current = itemDraft(current);
       const missing = missingGuideContent(payload);
+      const savedMessage = linkedVideo && !guideEditing
+        ? `Guía guardada como principal de «${linkedVideo.title}». Ahora puedes abrirla desde «Editar guía y recursos» del video.`
+        : "Contenido guardado.";
       setNotice(missing.length > 0
         ? {
-            text: `Contenido guardado, pero la guía aún está incompleta. Añade ${missing.join(", ")} antes de enviarla a revisión.`,
+            text: `${savedMessage} La guía aún está incompleta: añade ${missing.join(", ")} antes de enviarla a revisión.`,
             tone: "warning",
           }
-        : { text: "Contenido guardado.", tone: "success" });
+        : { text: savedMessage, tone: "success" });
       return true;
     } catch (error) {
       setNotice({
@@ -1323,12 +1412,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
       if (deleted.id !== item.id) throw new Error(errors.content_unavailable);
 
       const remaining = items.filter((current) => current.id !== item.id);
-      const next = remaining[0] ?? null;
+      const next = getIndependentPublications(remaining)[0] ?? null;
       setItems(remaining);
       setDraft(next ? itemDraft(next) : null);
       setEditingId(next?.id ?? null);
       setIsNew(false);
       setGuideEditing(false);
+      guideReturnRef.current = null;
       guideEntryDraftRef.current = null;
       setFile(null);
       setProgress(0);
@@ -1536,7 +1626,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const accepts = draft?.kind === "video"
     ? "video/mp4,video/quicktime,video/webm"
     : undefined;
-  const videoChecklist = draft?.kind === "video"
+  const videoChecklist = draft?.kind === "video" && videoGuideResources
     ? [
         {
           icon: FileVideo,
@@ -1550,24 +1640,24 @@ export function ContentStudio({ initialWorkspace }: Props) {
           icon: CheckCircle,
           label: "Puntos clave",
           ready:
-            draft.content.keyPoints.length > 0 &&
-            draft.content.keyPoints.every((point) => point.trim().length > 0),
+            videoGuideResources.keyPoints.length > 0 &&
+            videoGuideResources.keyPoints.every((point) => point.trim().length > 0),
         },
         {
           icon: Notebook,
           label: "Guía",
           ready:
-            (draft.content.guide.sections.length > 0 &&
-              draft.content.guide.sections.every(
+            (videoGuideResources.sections.length > 0 &&
+              videoGuideResources.sections.every(
                 (section) => section.heading.trim().length > 0 && section.body.trim().length > 0,
-              )) || richTextDocumentHasBody(draft.content.guide.document),
+              )) || richTextDocumentHasBody(videoGuideResources.document),
         },
         {
           icon: Question,
           label: "Cuestionario",
           ready:
-            draft.content.quiz.questions.length > 0 &&
-            draft.content.quiz.questions.every(
+            videoGuideResources.quiz.questions.length > 0 &&
+            videoGuideResources.quiz.questions.every(
               (question) =>
                 question.prompt.trim().length > 0 &&
                 questionAnswer(question).trim().length > 0,
@@ -1589,6 +1679,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
       >
         <GuideEditorScreen
           key={`${editingId ?? "new"}-${draft.kind}`}
+          asset={item?.asset}
           busy={busy !== null}
           draft={draft}
           editable={editable && (item?.status !== "archived" || capabilities.canPublish)}
@@ -2109,7 +2200,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
                     <SupportingMaterialFields key={`${editingId ?? "new"}-supporting-materials`} />
                   )}
 
-                  <TypeEditor draft={draft} onChange={setDraft} onOpenGuide={openGuideEditor} />
+                  <TypeEditor
+                    draft={draft}
+                    linkedGuide={videoLinkedGuide}
+                    onChange={setDraft}
+                    onManageLinkedGuide={videoLinkedGuide ? () => open(videoLinkedGuide) : undefined}
+                    onOpenGuide={openGuideEditor}
+                  />
                 </fieldset>
 
                 {editable && (
@@ -2182,7 +2279,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
               <div>
                 <small>Nueva guía</small>
                 <h3 id="guide-choice-title">¿Dónde se publicará?</h3>
-                <p id="guide-choice-description">Puedes crear una guía independiente o enlazarla como material anexo de un video.</p>
+                <p id="guide-choice-description">Puedes crear una guía independiente o convertirla en la guía principal de un video.</p>
               </div>
               <button aria-label="Cerrar" type="button" onClick={closeGuideCreationChoice}><X size={18} /></button>
             </header>
@@ -2200,17 +2297,17 @@ export function ContentStudio({ initialWorkspace }: Props) {
               </button>
               <div className="studio-guide-choice-card studio-guide-choice-linked">
                 <span><PlayCircle size={22} /></span>
-                <strong>Anexo de un video</strong>
-                <small>La guía aparecerá también dentro del material complementario del video elegido.</small>
+                <strong>Guía principal de un video</strong>
+                <small>Se administrará desde el editor de guía y recursos del video elegido.</small>
                 <label>
                   <span className="sr-only">Video relacionado</span>
                   <select value={linkedVideoId} onChange={(event) => setLinkedVideoId(event.target.value)}>
                     <option value="">
-                      {linkableVideos.length > 0
+                      {guideCreationVideos.length > 0
                         ? "Selecciona un video…"
-                        : "No hay videos disponibles"}
+                        : "No hay videos sin guía enlazada"}
                     </option>
-                    {linkableVideos.map((video) => (
+                    {guideCreationVideos.map((video) => (
                       <option key={video.id} value={video.id}>
                         {video.title} · {labelOf(statuses, video.status)}
                       </option>

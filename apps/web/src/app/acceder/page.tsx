@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, ImagesSquare, MonitorPlay } from "@phosphor-icons/react/dist/ssr";
 import { AuthForm } from "@/components/auth-form";
 import { CediahLogo } from "@/components/cediah-logo";
 import { getSafeNextPath } from "@/lib/auth/validation";
@@ -24,12 +23,6 @@ const authMessages: Record<string, string> = {
   "contrasena-actualizada":
     "Tu contraseña fue actualizada. Inicia sesión con la nueva contraseña.",
 };
-
-const learningResources = [
-  { label: "Materias médicas", icon: BookOpen },
-  { label: "Videos y guías", icon: MonitorPlay },
-  { label: "Flashcards", icon: ImagesSquare },
-] as const;
 
 export default async function AccessPage({ searchParams }: AccessPageProps) {
   const { error, mensaje, modo, next } = await searchParams;
@@ -58,7 +51,6 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
       <div className="auth-content">
         <aside className="auth-showcase" aria-label="Recursos de aprendizaje de Koraz">
           <div className="auth-showcase-copy">
-            <span className="auth-showcase-kicker">Todo en un solo lugar</span>
             <h2>
               Estudia a tu manera.
               <span>Llega más lejos.</span>
@@ -67,15 +59,6 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
               Combina tus apuntes de siempre con herramientas digitales que te ayudan a avanzar.
             </p>
           </div>
-
-          <ul className="auth-resource-list" aria-label="Recursos disponibles">
-            {learningResources.map(({ label, icon: Icon }) => (
-              <li key={label}>
-                <Icon aria-hidden="true" size={20} weight="regular" />
-                <span>{label}</span>
-              </li>
-            ))}
-          </ul>
 
           <div className="auth-showcase-art" aria-hidden="true">
             <Image

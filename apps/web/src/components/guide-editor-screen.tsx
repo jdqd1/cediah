@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   ArrowUDownLeft,
   ArrowUUpLeft,
-  BookOpen,
   CaretDown,
   CaretUp,
   Check,
@@ -54,10 +53,12 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import {
   RichTextDocumentSchema,
+  type ContentAsset,
   type ContentDraft,
   type ContentStatus,
   type RichTextDocument,
 } from "@cediah/contracts";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   extractGuideOutline,
@@ -65,12 +66,18 @@ import {
   richTextDocumentToPlainText,
   richTextDocumentToSections,
   sectionsToRichTextDocument,
-  type NumberedGuideOutlineItem,
 } from "@/lib/guide-document";
-import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { IconBackLink } from "./compact-navigation";
 import { PlatformToast, type PlatformNotice } from "./platform-toast";
-import { RichTextRenderer } from "./rich-text-renderer";
+
+const PublishedGuideReader = dynamic(
+  () => import("./content-detail-screen").then((module) => module.PublishedGuideReader),
+  {
+    loading: () => <div className="guide-editor-module-loading" role="status">Preparando vista previa…</div>,
+    ssr: false,
+  },
+);
 
 type GuideDraft = Extract<ContentDraft, { kind: "guide" }>;
 type VideoDraft = Extract<ContentDraft, { kind: "video" }>;
@@ -694,10 +701,7 @@ function QuizPanel({
                       />
                     </label>
                     <fieldset className="guide-answer-options-field" disabled={disabled}>
-                      <legend>
-                        Opciones de respuesta
-                        <small>Marca una como correcta</small>
-                      </legend>
+                      <legend>Opciones de respuesta</legend>
                       <div className="guide-answer-options">
                         {question.options.map((option, optionIndex) => (
                           <div
@@ -778,158 +782,55 @@ function QuizPanel({
 }
 
 function GuideReaderPreview({
+  asset,
   guideDocument,
   keyPoints,
-  outline,
+  onReturn,
   questions,
   title,
 }: {
+  asset?: ContentAsset | null;
   guideDocument: RichTextDocument;
   keyPoints: string[];
-  outline: NumberedGuideOutlineItem[];
+  onReturn: () => void;
   questions: QuizQuestion[];
   title: string;
 }) {
-  const [outlineExpanded, setOutlineExpanded] = useState(true);
-  const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
-  const drawerActionTimerRef = useRef<number | null>(null);
-  useBodyScrollLock(mobileDrawer !== null);
-
-  useEffect(() => {
-    return () => {
-      if (drawerActionTimerRef.current !== null) window.clearTimeout(drawerActionTimerRef.current);
-    };
-  }, []);
-
-  function runAfterClosingDrawer(action: () => void) {
-    setMobileDrawer(null);
-    if (drawerActionTimerRef.current !== null) window.clearTimeout(drawerActionTimerRef.current);
-    // Let the body-scroll lock restore its saved position before navigating.
-    drawerActionTimerRef.current = window.setTimeout(() => {
-      drawerActionTimerRef.current = null;
-      window.requestAnimationFrame(action);
-    }, 80);
-  }
-
-  function scrollToHeading(id: string) {
-    setOutlineExpanded(false);
-    const scroll = () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (mobileDrawer) {
-      runAfterClosingDrawer(scroll);
-    } else {
-      scroll();
-    }
-  }
-
   return (
-    <section className="guide-editor-reader-preview published-rich-guide-reader" aria-label="Vista previa como lector">
-      <header className="guide-editor-reader-preview-heading">
-        <span>Vista del lector</span>
-        <h1>{title || "Guía sin título"}</h1>
-      </header>
-      <section className="published-reader-mobile-toolbar guide-editor-preview-mobile-toolbar" aria-label="Paneles de la vista previa">
-        <div className="published-reader-mobile-toolbar-row">
-          <button
-            aria-expanded={mobileDrawer === "outline"}
-            aria-label="Abrir índice"
-            className="published-reader-mobile-side-button"
-            type="button"
-            onClick={() => {
-              setOutlineExpanded(true);
-              setMobileDrawer((current) => current === "outline" ? null : "outline");
+    <article className="published-content" aria-label="Vista previa como lector">
+      <header className="published-content-header published-rich-guide-header">
+        <nav aria-label="Volver al editor" className="published-content-context">
+          <IconBackLink
+            className="published-content-back"
+            href="#editor"
+            label="Volver al editor"
+            onClick={(event) => {
+              event.preventDefault();
+              onReturn();
             }}
-          >
-            <ListBullets aria-hidden="true" size={19} />
-          </button>
-          <span className="guide-editor-preview-mobile-label">Vista previa</span>
-          <button
-            aria-expanded={mobileDrawer === "support"}
-            aria-label="Abrir recursos de estudio"
-            className="published-reader-mobile-side-button"
-            type="button"
-            onClick={() => setMobileDrawer((current) => current === "support" ? null : "support")}
-          >
-            <BookOpen aria-hidden="true" size={19} />
-          </button>
-        </div>
-      </section>
-      {mobileDrawer && (
-        <button
-          aria-label="Cerrar panel lateral"
-          className="published-reader-drawer-backdrop"
-          type="button"
-          onClick={() => setMobileDrawer(null)}
-        />
-      )}
-      <div className="published-rich-guide-layout guide-editor-reader-preview-layout">
-        <nav className={`published-rich-guide-outline${mobileDrawer === "outline" ? " is-mobile-open" : ""}`} aria-label="Índice de la guía">
-          <button
-            aria-controls="guide-editor-preview-outline"
-            aria-expanded={outlineExpanded}
-            className="published-rich-guide-outline-heading"
-            type="button"
-            onClick={() => setOutlineExpanded((value) => !value)}
-          >
-            <span><strong>Índice de la guía</strong></span>
-            {outlineExpanded ? <CaretUp size={17} /> : <CaretDown size={17} />}
-          </button>
-          {outlineExpanded && (
-            <div className="published-rich-guide-outline-content" id="guide-editor-preview-outline">
-              <div className="published-rich-guide-outline-links">
-                {outline.map((entry) => (
-                  <button
-                    className={`is-level-${entry.displayLevel}`}
-                    key={entry.id}
-                    type="button"
-                    onClick={() => scrollToHeading(entry.id)}
-                  >
-                    <span>{entry.number}</span>{entry.label}
-                  </button>
-                ))}
-                {outline.length === 0 && <p className="published-rich-guide-outline-empty">La guía no contiene apartados.</p>}
-              </div>
-            </div>
-          )}
+          />
         </nav>
-
-        <article className="published-rich-guide-article guide-editor-reader-preview-article" aria-label="Contenido de la guía">
-          <RichTextRenderer document={guideDocument} />
-        </article>
-
-        <aside className={`published-rich-guide-support guide-editor-reader-preview-support${mobileDrawer === "support" ? " is-mobile-open" : ""}`} aria-label="Recursos de estudio">
-          <div className="published-rich-guide-support-heading">
-            <span><BookOpen aria-hidden="true" size={18} /><strong>Recursos de estudio</strong></span>
-          </div>
-          <section className="guide-editor-reader-preview-resource">
-            <header><HighlighterCircle size={19} /><strong>Puntos clave</strong><small>{keyPoints.length}</small></header>
-            {keyPoints.length > 0 ? (
-              <ul>
-                {keyPoints.map((point) => <li key={point}>{point}</li>)}
-              </ul>
-            ) : <p>No hay puntos clave.</p>}
-          </section>
-          <section className="guide-editor-reader-preview-resource">
-            <header><Question size={19} /><strong>Cuestionario</strong><small>{questions.length}</small></header>
-            {questions.length > 0 ? (
-              <div className="guide-reader-preview-question-list">
-                {questions.slice(0, 3).map((question, index) => (
-                  <article key={`${question.prompt}-${index}`}>
-                    <small>Pregunta {String(index + 1).padStart(2, "0")}</small>
-                    <strong>{question.prompt || `Pregunta ${index + 1}`}</strong>
-                    <span>Respuesta</span>
-                    <p>{questionAnswer(question) || "Respuesta sin completar"}</p>
-                  </article>
-                ))}
-              </div>
-            ) : <p>No hay preguntas en el cuestionario.</p>}
-          </section>
-        </aside>
-      </div>
-    </section>
+        <div className="published-guide-title-row">
+          <h2>{title || "Guía sin título"}</h2>
+        </div>
+      </header>
+      <PublishedGuideReader
+        asset={asset}
+        content={{
+          document: guideDocument,
+          keyPoints,
+          linkedVideoId: null,
+          quiz: { questions },
+          regions: [],
+          sections: [],
+        }}
+      />
+    </article>
   );
 }
 
 export function GuideEditorScreen({
+  asset,
   busy,
   draft,
   editable,
@@ -942,6 +843,7 @@ export function GuideEditorScreen({
   onSave,
   status = "draft",
 }: {
+  asset?: ContentAsset | null;
   busy: boolean;
   draft: EditableGuideDraft;
   editable: boolean;
@@ -1022,6 +924,11 @@ export function GuideEditorScreen({
   useEffect(() => {
     isEditingRef.current = isEditing;
   }, [isEditing]);
+
+  useEffect(() => {
+    // The editor replaces the publication form without a route navigation.
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -1513,7 +1420,7 @@ export function GuideEditorScreen({
 
   return (
     <div className="guide-editor-page">
-      <header className="guide-editor-heading">
+      {!preview && <header className="guide-editor-heading">
         <button aria-label="Volver a publicaciones" className="guide-editor-back" title="Volver a publicaciones" type="button" onClick={requestLeave}>
           <ArrowLeft size={18} />
         </button>
@@ -1619,7 +1526,7 @@ export function GuideEditorScreen({
             <Eye size={17} /> <span>{preview ? "Seguir editando" : "Vista previa"}</span>
           </button>
         </div>
-      </header>
+      </header>}
 
       {!preview && isEditing && <div className="guide-format-toolbar" aria-label="Formato del texto" role="toolbar">
         <div className="guide-toolbar-group">
@@ -1705,8 +1612,9 @@ export function GuideEditorScreen({
 
       {preview ? (
         <GuideReaderPreview
+          asset={asset}
           guideDocument={documentState}
-          outline={numberedOutline}
+          onReturn={() => setPreview(false)}
           questions={guideQuestions(draft)}
           title={draft.title}
           keyPoints={guideKeyPoints(draft)}

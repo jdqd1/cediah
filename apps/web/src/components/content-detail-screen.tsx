@@ -44,6 +44,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
+import { getVideoGuideContent } from "@/lib/content-guide-links";
 import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { contentKindLabel } from "@/lib/content-navigation";
@@ -110,11 +111,11 @@ function ContentBody({
   linkedGuide?: GuideItem;
 }) {
   if (item.kind === "guide") {
-    return <GuideBody item={item} />;
+    return <PublishedGuideReader asset={item.asset} content={item.content} />;
   }
 
   if (item.kind === "video") {
-    if (guideMode) return <GuideBody item={guideItemFromVideo(item)} />;
+    if (guideMode) return <PublishedGuideReader asset={linkedGuide?.asset} content={getVideoGuideContent(item, linkedGuide)} />;
     return <VideoBody item={item} linkedGuide={linkedGuide} />;
   }
 
@@ -164,21 +165,6 @@ function useClientEnvironment() {
   );
 }
 
-function guideItemFromVideo(item: VideoItem): GuideItem {
-  return {
-    ...item,
-    asset: null,
-    content: {
-      ...item.content.guide,
-      keyPoints: item.content.keyPoints,
-      linkedVideoId: item.id,
-      quiz: item.content.quiz,
-      regions: item.content.regions,
-    },
-    kind: "guide",
-  };
-}
-
 function normalizePassageText(value: string) {
   return value
     .normalize("NFD")
@@ -226,10 +212,16 @@ function findGuidePassage(point: string): HTMLElement | null {
   return best && best.score > 0 ? best.element : article;
 }
 
-function GuideBody({ item }: { item: GuideItem }) {
+export function PublishedGuideReader({
+  asset,
+  content,
+}: {
+  asset?: GuideItem["asset"];
+  content: GuideItem["content"];
+}) {
   const guideDocument = useMemo(
-    () => item.content.document ?? sectionsToRichTextDocument(item.content.sections),
-    [item.content.document, item.content.sections],
+    () => content.document ?? sectionsToRichTextDocument(content.sections),
+    [content.document, content.sections],
   );
   const outline = useMemo(() => extractGuideOutline(guideDocument), [guideDocument]);
   const numberedOutline = useMemo(() => numberGuideOutline(outline), [outline]);
@@ -254,7 +246,7 @@ function GuideBody({ item }: { item: GuideItem }) {
   const visibleActiveHeadingId = outline.some(({ id }) => id === activeHeadingId)
     ? activeHeadingId
     : outline[0]?.id;
-  const hasGuideContent = item.content.document !== null || item.content.sections.length > 0;
+  const hasGuideContent = content.document !== null || content.sections.length > 0;
   const readerStyle = {
     "--reader-font-size": `${(0.91 * fontScale / 100).toFixed(3)}rem`,
   } as CSSProperties;
@@ -646,8 +638,8 @@ function GuideBody({ item }: { item: GuideItem }) {
                 <p className="published-rich-guide-outline-empty">La guía no contiene apartados.</p>
               )}
             </div>
-            {item.asset?.downloadUrl && (
-              <a className="published-rich-guide-download" href={item.asset.downloadUrl}>
+            {asset?.downloadUrl && (
+              <a className="published-rich-guide-download" href={asset.downloadUrl}>
                 <DownloadSimple aria-hidden="true" size={18} />
                 <span>Descargar guía</span>
               </a>
@@ -658,12 +650,12 @@ function GuideBody({ item }: { item: GuideItem }) {
         <section className="published-rich-guide-article" aria-label="Contenido de la guía">
         {hasGuideContent ? (
           <RichTextRenderer document={guideDocument} />
-        ) : item.asset?.downloadUrl ? (
+        ) : asset?.downloadUrl ? (
           <div className="published-asset-callout">
             <BookOpen size={38} />
             <h3>Esta guía está disponible como documento.</h3>
-            <a href={item.asset.downloadUrl}>
-              <DownloadSimple size={19} /> Abrir {item.asset.fileName}
+            <a href={asset.downloadUrl}>
+              <DownloadSimple size={19} /> Abrir {asset.fileName}
             </a>
           </div>
         ) : (
@@ -716,15 +708,15 @@ function GuideBody({ item }: { item: GuideItem }) {
           >
             <div className="published-rich-guide-support-grid">
               <ReaderSupportPanel
-                count={item.content.keyPoints.length}
+                count={content.keyPoints.length}
                 icon={<Lightbulb aria-hidden="true" size={20} />}
                 id="published-guide-key-points"
                 title="Puntos clave"
                 tone="key-points"
               >
-                {item.content.keyPoints.length > 0 ? (
+                {content.keyPoints.length > 0 ? (
                   <ul className="published-rich-guide-key-points">
-                    {item.content.keyPoints.map((point, index) => (
+                    {content.keyPoints.map((point, index) => (
                       <li key={`${point}-${index}`}>
                         <Lightbulb aria-hidden="true" size={17} />
                         <span>{point}</span>
@@ -745,14 +737,14 @@ function GuideBody({ item }: { item: GuideItem }) {
               </ReaderSupportPanel>
 
               <ReaderSupportPanel
-                count={item.content.quiz.questions.length}
+                count={content.quiz.questions.length}
                 icon={<ClipboardText aria-hidden="true" size={20} />}
                 id="published-guide-quiz"
                 title="Cuestionario"
                 tone="quiz"
               >
-                {item.content.quiz.questions.length > 0 ? (
-                  <QuestionAnswerCards questions={item.content.quiz.questions} />
+                {content.quiz.questions.length > 0 ? (
+                  <QuestionAnswerCards questions={content.quiz.questions} />
                 ) : (
                   <p className="published-rich-guide-resource-empty">Esta guía no incluye un cuestionario.</p>
                 )}
@@ -820,9 +812,9 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const mobilePanelButtonRef = useRef<HTMLButtonElement>(null);
   const clientMounted = useClientEnvironment();
-  const displayedGuide = linkedGuide?.content ?? item.content.guide;
-  const displayedKeyPoints = linkedGuide?.content.keyPoints ?? item.content.keyPoints;
-  const displayedQuiz = linkedGuide?.content.quiz.questions ?? item.content.quiz.questions;
+  const displayedGuide = getVideoGuideContent(item, linkedGuide);
+  const displayedKeyPoints = displayedGuide.keyPoints;
+  const displayedQuiz = displayedGuide.quiz.questions;
   const guideHref = `/guias/${linkedGuide?.slug ?? item.slug}`;
   const tabs: VideoResourceTab[] = [
     { count: displayedKeyPoints.length, icon: Lightbulb, id: "key-points", label: "Puntos clave" },

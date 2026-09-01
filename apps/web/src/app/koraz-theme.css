@@ -519,7 +519,7 @@ textarea:focus-visible {
 .sidebar-topline {
   min-height: 76px;
   gap: 0.75rem;
-  border-bottom: 1px solid var(--koraz-line);
+  border-bottom: 0;
   padding: 0.8rem 0.85rem;
 }
 
@@ -3137,6 +3137,10 @@ a.icon-back-link:hover,
     gap: 0.4rem;
   }
 
+  .topbar-leading .topbar-brand {
+    display: none;
+  }
+
   .topbar-leading .topbar-brand .koraz-logo-wordmark {
     display: none;
   }
@@ -4967,6 +4971,35 @@ a.icon-back-link:hover,
   color: #b91c1c;
 }
 
+.studio-linked-guide-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 0.65rem;
+  color: var(--koraz-slate);
+  font-size: 0.66rem;
+}
+
+.studio-linked-guide-context strong {
+  color: var(--koraz-ink);
+  font-weight: 600;
+}
+
+.studio-linked-guide-context button {
+  min-height: 32px;
+  color: var(--koraz-blue);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.studio-linked-guide-context button:hover {
+  color: var(--koraz-blue-deep);
+}
+
 @media (min-width: 1181px) {
   .guide-editor-companions {
     min-height: 0;
@@ -4994,12 +5027,16 @@ a.icon-back-link:hover,
 }
 
 @media (min-width: 761px) {
-  .guide-editor-outline.is-collapsed,
-  .guide-editor-companions.is-collapsed {
+  .guide-editor-workspace > .guide-editor-outline.is-collapsed,
+  .guide-editor-workspace > .guide-editor-companions.is-collapsed {
     align-self: start;
-    height: auto;
+    height: fit-content;
     min-height: 0;
     max-height: none;
+  }
+
+  .guide-editor-companions.is-collapsed .guide-companions-container {
+    height: auto;
   }
 
   .guide-editor-outline.is-collapsed > header,
