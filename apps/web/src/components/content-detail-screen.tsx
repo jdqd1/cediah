@@ -1095,7 +1095,7 @@ function VideoCompanionPanel({
               aria-controls={`${idPrefix}-panel-${tab.id}`}
               aria-label={`${tab.label}, ${tab.count}`}
               aria-selected={resource === tab.id}
-              className={resource === tab.id ? "is-active" : ""}
+              className={`video-resource-tab video-resource-tab-${tab.id}${resource === tab.id ? " is-active" : ""}`}
               id={`${idPrefix}-tab-${tab.id}`}
               key={tab.id}
               onClick={() => onResourceChange(tab.id)}
@@ -1113,7 +1113,7 @@ function VideoCompanionPanel({
       </div>
       <section
         aria-labelledby={`${idPrefix}-tab-${resource}`}
-        className="video-resource-panel"
+        className={`video-resource-panel video-resource-panel-${resource}`}
         id={`${idPrefix}-panel-${resource}`}
         role="tabpanel"
       >
@@ -1191,10 +1191,11 @@ function VideoQuizModal({
     setSubmitted(false);
   }
 
-  function submitAnswer() {
-    if (selectedOption === null || submitted) return;
+  function selectAnswer(optionIndex: number) {
+    if (submitted) return;
+    setSelectedOption(optionIndex);
     setSubmitted(true);
-    if (selectedOption === correctOptionIndex) setScore((current) => current + 1);
+    if (optionIndex === correctOptionIndex) setScore((current) => current + 1);
   }
 
   function continueQuiz() {
@@ -1256,7 +1257,7 @@ function VideoQuizModal({
                       disabled={submitted}
                       key={`${option}-${optionIndex}`}
                       type="button"
-                      onClick={() => setSelectedOption(optionIndex)}
+                      onClick={() => selectAnswer(optionIndex)}
                     >
                       <span>{String.fromCharCode(65 + optionIndex)}</span>
                       <strong>{option}</strong>
@@ -1278,18 +1279,14 @@ function VideoQuizModal({
                 </div>
               )}
             </div>
-            <footer className="video-study-modal-actions">
-              {!submitted ? (
-                <button className="is-primary" disabled={selectedOption === null} type="button" onClick={submitAnswer}>
-                  Comprobar <Check aria-hidden="true" size={17} weight="bold" />
-                </button>
-              ) : (
+            {submitted && (
+              <footer className="video-study-modal-actions">
                 <button className="is-primary" type="button" onClick={continueQuiz}>
                   {questionIndex === questions.length - 1 ? "Ver resultado" : "Siguiente"}
                   <ArrowRight aria-hidden="true" size={17} />
                 </button>
-              )}
-            </footer>
+              </footer>
+            )}
           </>
         ) : (
           <div className="video-study-complete">
