@@ -22,7 +22,7 @@ const kindLabels: Record<ContentKind, string> = {
 
 const kindImages: Record<ContentKind, string> = {
   flashcards: "/anatomy/thigh.png",
-  guide: "/anatomy/back-muscles.png",
+  guide: "/anatomy/guide-cover-default.png",
   quiz: "/anatomy/heart.png",
   topic: "/anatomy/skull.png",
   video: "/anatomy/video-cover-default.png",
