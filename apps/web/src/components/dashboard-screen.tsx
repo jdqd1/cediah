@@ -11,16 +11,9 @@ import type { ContentItem, ContentKind } from "@cediah/contracts";
 import { publishedContentHref, subjectDirectoryHref } from "@/lib/content-navigation";
 import { getGuideCatalog } from "@/lib/content-guide-links";
 import { mostViewedFirst, newestContentFirst } from "@/lib/content-order";
+import { formatVideoViews } from "@/lib/video-views";
 import { AppShell } from "./app-shell";
 import { BrandFooter } from "./brand-footer";
-
-const kindLabels: Record<ContentKind, string> = {
-  flashcards: "Flashcards",
-  guide: "Guía",
-  quiz: "Cuestionario",
-  topic: "Tema",
-  video: "Video",
-};
 
 const kindImages: Record<ContentKind, string> = {
   flashcards: "/anatomy/thigh.png",
@@ -80,7 +73,7 @@ function formatDuration(item: ContentItem) {
   return null;
 }
 
-function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
+function VideoCard({ item, eager = false }: { item: ContentItem & { kind: "video" }; eager?: boolean }) {
   const duration = formatDuration(item);
 
   return (
@@ -90,7 +83,8 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
           src={contentCover(item)}
           alt=""
           fill
-          sizes="(max-width: 900px) 80vw, 28vw"
+          loading={eager ? "eager" : "lazy"}
+          sizes="(max-width: 600px) 216px, (max-width: 1000px) 25vw, 20vw"
           unoptimized={Boolean(item.content.coverImageUrl)}
         />
         <span className="dashboard-video-shade" />
@@ -100,8 +94,8 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
         {duration && <span className="dashboard-video-duration">{duration}</span>}
       </div>
       <div className="dashboard-video-copy">
-        <h3>{item.title}</h3>
-        <span className="dynamic-content-summary">{item.summary}</span>
+        <h3 title={item.title}>{item.title}</h3>
+        <span className="dashboard-video-views">{formatVideoViews(item.viewCount)}</span>
       </div>
     </Link>
   );
@@ -126,7 +120,10 @@ export function DashboardScreen({
     .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
     .sort(newestContentFirst)
     .slice(0, 4);
-  const highlighted = [...highlightedItems].sort(mostViewedFirst).slice(0, 8);
+  const highlighted = highlightedItems
+    .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
+    .sort(mostViewedFirst)
+    .slice(0, 8);
   const guideCount = getGuideCatalog(items).length;
 
   return (
@@ -137,6 +134,22 @@ export function DashboardScreen({
       headerTitle=""
       mainClassName="dashboard-main"
     >
+      <nav className="study-material-grid dashboard-shortcuts" aria-label="Accesos directos de estudio">
+        {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
+          const count = kind === "guide" ? guideCount : items.filter((item) => item.kind === kind).length;
+          return (
+            <Link className="study-material-card" href={href} key={kind}>
+              <span className="study-material-icon" aria-hidden="true">
+                <Icon size={22} weight="regular" />
+              </span>
+              <span className="study-material-copy">
+                <strong>{title}</strong>
+                <small>{count > 0 ? `${count} ${count === 1 ? "disponible" : "disponibles"}` : description}</small>
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
       <div className="dashboard-layout">
         <div className="dashboard-primary">
           <section className="dashboard-section dashboard-recent" aria-labelledby="recent-title">
@@ -148,7 +161,7 @@ export function DashboardScreen({
             </div>
             {videos.length > 0 ? (
               <div className="dashboard-video-grid">
-                {videos.map((item) => <VideoCard key={item.id} item={item} />)}
+                {videos.map((item, index) => <VideoCard key={item.id} item={item} eager={index === 0} />)}
               </div>
             ) : (
               <div className="dynamic-empty-state" role="status">
@@ -166,38 +179,12 @@ export function DashboardScreen({
               </div>
             )}
           </section>
-
-          <section className="dashboard-section dashboard-materials" aria-labelledby="materials-title">
-            <div className="section-heading-row">
-              <h2 id="materials-title">Material de estudio</h2>
-              <Link href="/asignaturas">
-                Explorar materias <ArrowRight size={17} />
-              </Link>
-            </div>
-            <div className="study-material-grid">
-              {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
-                const count = kind === "guide" ? guideCount : items.filter((item) => item.kind === kind).length;
-                return (
-                  <Link className="study-material-card" href={href} key={kind}>
-                    <span className="study-material-icon">
-                      <Icon size={24} weight="regular" />
-                    </span>
-                    <span className="study-material-copy">
-                      <strong>{title}</strong>
-                      <small>{count > 0 ? `${count} ${count === 1 ? "disponible" : "disponibles"}` : description}</small>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-
         </div>
 
         <aside className="dashboard-most-viewed" aria-labelledby="featured-content-title">
           <div className="section-heading-row">
             <h2 id="featured-content-title">Destacados</h2>
-            <Link href="/asignaturas">
+            <Link href={subjectDirectoryHref("video")}>
               Ver todo <ArrowRight size={17} />
             </Link>
           </div>
@@ -205,7 +192,6 @@ export function DashboardScreen({
             {highlighted.length > 0 ? (
               <ol className="most-viewed-list">
                 {highlighted.map((item, index) => {
-                  const duration = formatDuration(item);
                   return (
                     <li key={item.id}>
                       <span className="most-viewed-rank">{index + 1}</span>
@@ -215,17 +201,13 @@ export function DashboardScreen({
                             src={contentCover(item)}
                             alt=""
                             fill
-                            sizes="100px"
+                            sizes="64px"
                             unoptimized={Boolean(item.kind === "video" && item.content.coverImageUrl)}
                           />
                         </span>
                         <span className="most-viewed-copy">
-                          <strong>{item.title}</strong>
-                          <small>{item.topic}</small>
-                          <small>
-                            {kindLabels[item.kind]}
-                            {duration ? ` · ${duration}` : ""}
-                          </small>
+                          <strong title={item.title}>{item.title}</strong>
+                          <small className="most-viewed-views">{formatVideoViews(item.viewCount)}</small>
                         </span>
                       </Link>
                     </li>
@@ -234,7 +216,7 @@ export function DashboardScreen({
               </ol>
             ) : (
               <p className="dynamic-aside-empty">
-                Aquí aparecerá el contenido más visto.
+                Aquí aparecerán los videos más vistos.
               </p>
             )}
           </div>

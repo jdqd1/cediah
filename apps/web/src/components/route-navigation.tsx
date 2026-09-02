@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 
 let navigationDirection: "forward" | "back" = "forward";
 
@@ -22,9 +22,12 @@ export function useNavigationIntent() {
   const trail = useRef<string[]>([]);
   const position = useRef(-1);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const known = trail.current.lastIndexOf(routeKey);
-    if (known >= 0) position.current = known;
+    if (known >= 0) {
+      if (known !== position.current) navigationDirection = known < position.current ? "back" : "forward";
+      position.current = known;
+    }
     else {
       trail.current = trail.current.slice(0, position.current + 1).concat(routeKey);
       position.current = trail.current.length - 1;
@@ -68,13 +71,14 @@ export function useNavigationIntent() {
     document.addEventListener("pointerover", onHover, { passive: true });
     document.addEventListener("focusin", onFocus);
     document.addEventListener("click", onClick, true);
-    window.addEventListener("popstate", onPopState);
+    // Set direction before Next's history listener renders the destination.
+    window.addEventListener("popstate", onPopState, true);
     return () => {
       window.clearTimeout(timer);
       document.removeEventListener("pointerover", onHover);
       document.removeEventListener("focusin", onFocus);
       document.removeEventListener("click", onClick, true);
-      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("popstate", onPopState, true);
     };
   }, [router]);
 }
@@ -94,8 +98,13 @@ export function RouteMain({ children, className }: { children: ReactNode; classN
     const frames = hasFixedControls
       ? [{ opacity: 0.75 }, { opacity: 1 }]
       : [{ opacity: 0.65, transform: `translateX(${offset})` }, { opacity: 1, transform: "translateX(0)" }];
-    const animation = main.animate(frames, { duration: 180, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" });
-    return () => animation.cancel();
+    // Keep the grid item stationary. Moving main itself expands the document's
+    // scrollable area; its children move inside a clipped, full-width viewport.
+    const targets = hasFixedControls ? [main] : Array.from(main.children);
+    const animations = targets.map((target) => target.animate(frames, {
+      duration: 180, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)",
+    }));
+    return () => animations.forEach((animation) => animation.cancel());
   }, [routeKey]);
 
   return <main className={`app-main ${className}`.trim()} data-pathname={pathname} ref={mainRef}>{children}</main>;

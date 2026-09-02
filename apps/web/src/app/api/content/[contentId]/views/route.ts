@@ -18,7 +18,8 @@ export async function POST(request: Request, context: { params: Promise<{ conten
   const response = await requestContentApi({
     cookie: session.cookie, method: "POST", path: `/v1/content/${params.data.contentId}/views`,
   });
-  return NextResponse.json(response.status === 200 ? { recorded: true } : { error: "views_unavailable" }, {
-    headers, status: response.status === 200 ? 200 : safeContentApiStatus(response.status),
+  const result = response.status === 200 ? z.object({ counted: z.boolean() }).safeParse(response.body) : null;
+  return NextResponse.json(result?.success ? { recorded: true, counted: result.data.counted } : { error: "views_unavailable" }, {
+    headers, status: result?.success ? 200 : response.status === 200 ? 503 : safeContentApiStatus(response.status),
   });
 }

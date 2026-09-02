@@ -19,6 +19,8 @@ import {
   ContentDraftSchema,
   ContentItemSchema,
   ContentKindSchema,
+  ContentReactionRequestSchema,
+  ContentReactionResponseSchema,
   ContentTransitionRequestSchema,
   ContentWorkspaceResponseSchema,
   DeletedSubjectSchema,
@@ -602,6 +604,39 @@ export async function buildApp(
       return reply.status(503).send({ error: "views_unavailable" });
     }
   });
+
+  for (const method of ["GET", "PATCH"] as const) {
+    app.route<{ Params: { contentId: string } }>({
+      method,
+      url: "/v1/content/:contentId/reaction",
+      handler: async (request, reply) => {
+        reply.header("Cache-Control", "private, no-store");
+        const params = ContentIdParamsSchema.safeParse(request.params);
+        if (!params.success) return reply.status(400).send({ error: "invalid_content_id" });
+        const viewer = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
+        if (viewer.kind !== "authenticated") return sendUserResolutionError(viewer, reply);
+        if (!contentProvider?.getReaction || !contentProvider.setReaction || !environment.auth?.secret) {
+          return reply.status(503).send({ error: "reactions_unavailable" });
+        }
+        const payload = method === "PATCH" ? ContentReactionRequestSchema.safeParse(request.body) : null;
+        if (payload && !payload.success) return reply.status(400).send({ error: "invalid_reaction" });
+        try {
+          const viewerKey = createHmac("sha256", environment.auth.secret)
+            .update(`content-reaction:${params.data.contentId}:${viewer.user.id}`)
+            .digest("hex");
+          const input = { contentId: params.data.contentId, viewerKey };
+          const result = payload?.success
+            ? await contentProvider.setReaction({ ...input, reaction: payload.data.reaction })
+            : await contentProvider.getReaction(input);
+          if (result.status !== "success") return reply.status(404).send({ error: "not_found" });
+          return reply.send(ContentReactionResponseSchema.parse(result.value));
+        } catch {
+          request.log.error("Content-reaction request failed");
+          return reply.status(503).send({ error: "reactions_unavailable" });
+        }
+      },
+    });
+  }
 
   app.get("/v1/editor/content", async (request, reply) => {
     const editor = await resolveEditorUser(

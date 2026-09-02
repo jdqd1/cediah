@@ -919,6 +919,18 @@ const ContentRecordSchema = z.object({
 export const ContentItemSchema = z.intersection(ContentDraftSchema, ContentRecordSchema);
 export type ContentItem = z.infer<typeof ContentItemSchema>;
 
+export const ContentReactionSchema = z.enum(["liked", "disliked"]);
+export type ContentReaction = z.infer<typeof ContentReactionSchema>;
+
+// Public clients may read/write their own choice, never aggregated totals.
+export const ContentReactionRequestSchema = z.object({
+  reaction: ContentReactionSchema.nullable(),
+}).strict();
+export const ContentReactionResponseSchema = z.object({
+  reaction: ContentReactionSchema.nullable(),
+});
+export type ContentReactionResponse = z.infer<typeof ContentReactionResponseSchema>;
+
 export const ContentCatalogResponseSchema = z.object({
   items: z.array(ContentItemSchema),
 });
@@ -1143,6 +1155,15 @@ export interface ContentProvider {
     contentId: string;
     viewerKey: string;
   }): Promise<ContentMutationResult<{ counted: boolean }>>;
+  getReaction?(input: {
+    contentId: string;
+    viewerKey: string;
+  }): Promise<ContentMutationResult<ContentReactionResponse>>;
+  setReaction?(input: {
+    contentId: string;
+    viewerKey: string;
+    reaction: ContentReaction | null;
+  }): Promise<ContentMutationResult<ContentReactionResponse>>;
   listTopics?(): Promise<ContentTopic[]>;
   transitionContent(input: {
     actorUserId: string;

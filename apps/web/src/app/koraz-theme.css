@@ -509,6 +509,12 @@ textarea:focus-visible {
   background: var(--koraz-canvas);
 }
 
+/* Route children animate inside a stationary viewport. `clip` preserves the
+   document scroll parent for sticky controls and nested horizontal carousels. */
+.app-main[data-pathname] {
+  overflow-x: clip;
+}
+
 .app-sidebar {
   border-right: 1px solid var(--koraz-line);
   background: #ffffff;
@@ -2523,12 +2529,13 @@ a.icon-back-link:hover,
 
 .dashboard-video-card {
   display: grid;
-  min-height: 8rem;
-  grid-template-columns: minmax(7.2rem, 42%) minmax(0, 1fr);
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 6.25rem auto;
   align-items: stretch;
-  gap: 0.7rem;
-  border-radius: 15px;
-  padding: 0.42rem;
+  gap: 0.15rem;
+  border-radius: 13px;
+  padding: 0.35rem;
   box-shadow: none;
 }
 
@@ -2539,7 +2546,7 @@ a.icon-back-link:hover,
 }
 
 .dashboard-video-media {
-  min-height: 7.15rem;
+  min-height: 0;
   aspect-ratio: auto;
   border-radius: 11px;
 }
@@ -2564,24 +2571,28 @@ a.icon-back-link:hover,
 .dashboard-video-copy {
   display: grid;
   min-width: 0;
-  align-content: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.45rem 0.5rem 0;
+  align-content: start;
+  gap: 0.35rem;
+  padding: 0.55rem 0.35rem;
 }
 
 .dashboard-video-copy h3 {
-  font-size: 0.9rem;
-  line-height: 1.25;
-}
-
-.dashboard-video-copy .dynamic-content-summary {
   display: -webkit-box;
   overflow: hidden;
-  color: #64748b;
-  font-size: 0.69rem;
-  line-height: 1.45;
+  min-height: 2.7em;
+  font-size: 0.79rem;
+  line-height: 1.35;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
+}
+
+.dashboard-video-views {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.65rem;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .study-material-grid .study-material-card {
@@ -2619,7 +2630,119 @@ a.icon-back-link:hover,
 }
 
 .dashboard-main .dashboard-video-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(10.5rem, 1fr);
+  grid-template-columns: none;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  margin-inline: 0;
+  padding: 0.25rem 0.15rem 0.6rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d2fe transparent;
+}
+
+.dashboard-main .dashboard-shortcuts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(10rem, 1fr);
+  grid-template-columns: none;
+  gap: 0.7rem;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  margin: 1rem 0 0.2rem;
+  padding: 0.2rem 0.15rem 0.55rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: #c7d2fe transparent;
+}
+
+.dashboard-shortcuts .study-material-card {
+  min-height: 3.75rem;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  scroll-snap-align: start;
+}
+
+.dashboard-shortcuts .study-material-icon {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  border-radius: 10px;
+}
+
+.dashboard-shortcuts .study-material-copy {
+  min-width: 0;
+  gap: 0.15rem;
+  margin-left: 0;
+}
+
+.dashboard-shortcuts .study-material-copy strong {
+  font-size: 0.78rem;
+}
+
+.dashboard-shortcuts .study-material-copy small {
+  overflow: hidden;
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-featured-content {
+  padding: 0.75rem;
+  border-radius: 15px;
+}
+
+.dashboard-featured-content .most-viewed-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.3rem;
+}
+
+.dashboard-featured-content .most-viewed-list li {
+  grid-template-columns: 1rem minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.dashboard-featured-content .most-viewed-rank {
+  font-size: 0.85rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-featured-content .most-viewed-link {
+  min-height: 4rem;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  gap: 0.65rem;
+  border-radius: 10px;
+  padding: 0.35rem 0.15rem;
+}
+
+.dashboard-featured-content .most-viewed-link:hover {
+  background: #f8fafc;
+}
+
+.dashboard-featured-content .most-viewed-image {
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+}
+
+.dashboard-featured-content .most-viewed-copy strong {
+  display: -webkit-box;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.dashboard-featured-content .most-viewed-views {
+  color: var(--koraz-slate);
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .app-main .subject-directory-item {
@@ -3205,15 +3328,6 @@ a.icon-back-link:hover,
     width: 28px !important;
     height: 28px !important;
     flex-basis: 28px;
-  }
-
-  .dashboard-video-card {
-    flex-basis: min(80vw, 19rem);
-    grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
-  }
-
-  .dashboard-video-media {
-    min-height: 7.4rem;
   }
 
   .dashboard-main > .brand-footer {
@@ -4767,9 +4881,42 @@ a.icon-back-link:hover,
   }
 }
 
-.study-quiz-launch {
+.study-quiz-launch,
+.study-flashcard-launch {
   min-height: 14rem;
   padding: 1rem;
+}
+
+.published-rich-guide-resource-flashcards .published-rich-guide-resource-icon,
+.study-flashcard-launch .video-companion-launch-icon {
+  background: #ede9fe;
+  color: var(--koraz-violet-deep);
+}
+
+.study-flashcard-launch > button:not(.is-secondary) {
+  border-color: var(--koraz-violet-deep);
+  background: var(--koraz-violet-deep);
+  color: #fff;
+}
+
+.video-view-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--koraz-slate);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.video-engagement-bar .video-slides-action {
+  margin-left: auto;
+}
+
+.video-reaction-feedback {
+  margin: 0.4rem 0 0;
+  color: var(--koraz-slate);
+  font-size: 0.7rem;
 }
 
 .study-quiz-launch .video-companion-launch-icon {
@@ -4849,7 +4996,15 @@ a.icon-back-link:hover,
 
 @media (max-width: 600px) {
   .dashboard-main .dashboard-video-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-auto-columns: min(72vw, 13.5rem);
+  }
+
+  .dashboard-main .dashboard-shortcuts {
+    grid-auto-columns: 10rem;
+  }
+
+  .video-view-count {
+    font-size: 0.65rem;
   }
 }
 

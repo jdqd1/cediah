@@ -50,6 +50,8 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import { quizPerformance, studyProgress } from "@/lib/study-progress";
 import { useContentView } from "@/lib/use-content-view";
+import { useContentReaction } from "@/lib/use-content-reaction";
+import { formatVideoViews } from "@/lib/video-views";
 import { contentKindLabel } from "@/lib/content-navigation";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
@@ -70,7 +72,8 @@ export function ContentDetailScreen({
   returnHref?: string;
   returnLabel?: string;
 }) {
-  useContentView(item.status === "published" ? item.id : null);
+  // Opening a video's associated guide must not increment its playback count.
+  useContentView(item.status === "published" && item.kind !== "video" ? item.id : null);
   const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
   const sectionLabel = isGuideView ? "Guías" : contentKindLabel(item.kind);
   const defaultBackHref = guideMode && item.kind === "video"
@@ -120,7 +123,7 @@ function ContentBody({
 
   if (item.kind === "video") {
     if (guideMode) return <PublishedGuideReader asset={linkedGuide?.asset} content={getVideoGuideContent(item, linkedGuide)} title={linkedGuide?.title ?? item.title} />;
-    return <VideoBody item={item} linkedGuide={linkedGuide} />;
+    return <VideoBody item={item} key={item.id} linkedGuide={linkedGuide} />;
   }
 
   if (item.kind === "quiz") return <QuizBody item={item} />;
@@ -240,10 +243,11 @@ export function PublishedGuideReader({
   const [favorite, setFavorite] = useState(false);
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
-  const [quizOpen, setQuizOpen] = useState(false);
+  const [studyModal, setStudyModal] = useState<"quiz" | "flashcards" | null>(null);
   const outlineLinksRef = useRef<HTMLDivElement | null>(null);
+  const mobileSupportButtonRef = useRef<HTMLButtonElement>(null);
   const drawerActionTimerRef = useRef<number | null>(null);
-  useBodyScrollLock(mobileDrawer !== null || quizOpen);
+  useBodyScrollLock(mobileDrawer !== null || studyModal !== null);
   const manualNavigationRef = useRef(false);
   const navigationFrameRef = useRef<number | null>(null);
   const headingHighlightTimerRef = useRef<number | null>(null);
@@ -257,6 +261,13 @@ export function PublishedGuideReader({
   const readerStyle = {
     "--reader-font-size": `${(0.91 * fontScale / 100).toFixed(3)}rem`,
   } as CSSProperties;
+
+  function launchStudy(mode: "quiz" | "flashcards") {
+    // The drawer closes when practice starts; return focus to its visible trigger.
+    if (mobileDrawer === "support") mobileSupportButtonRef.current?.focus({ preventScroll: true });
+    setMobileDrawer(null);
+    setStudyModal(mode);
+  }
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined" || outline.length === 0) return;
@@ -568,6 +579,7 @@ export function PublishedGuideReader({
             aria-expanded={mobileDrawer === "support"}
             aria-label="Abrir recursos de estudio"
             className="published-reader-mobile-side-button"
+            ref={mobileSupportButtonRef}
             type="button"
             onClick={() => {
               setSupportExpanded(true);
@@ -750,17 +762,27 @@ export function PublishedGuideReader({
                 title="Cuestionario"
                 tone="quiz"
               >
-                <QuizLauncher count={content.quiz.questions.length} onStart={() => {
-                  setMobileDrawer(null);
-                  setQuizOpen(true);
-                }} />
+                <QuizLauncher count={content.quiz.questions.length} onStart={() => launchStudy("quiz")} />
+              </ReaderSupportPanel>
+              <ReaderSupportPanel
+                count={content.quiz.questions.length}
+                icon={<CardsThree aria-hidden="true" size={20} />}
+                id="published-guide-flashcards"
+                title="Flashcards"
+                tone="flashcards"
+              >
+                <FlashcardLauncher count={content.quiz.questions.length} onStart={() => launchStudy("flashcards")} />
               </ReaderSupportPanel>
             </div>
           </div>
         </aside>
       </div>
-      {quizOpen && createPortal(
-        <VideoQuizModal onClose={() => setQuizOpen(false)} questions={content.quiz.questions} returnLabel="Volver a la guía" title={title} />,
+      {studyModal && createPortal(
+        studyModal === "quiz" ? (
+          <VideoQuizModal onClose={() => setStudyModal(null)} questions={content.quiz.questions} returnLabel="Volver a la guía" title={title} />
+        ) : (
+          <VideoFlashcardModal onClose={() => setStudyModal(null)} questions={content.quiz.questions} returnLabel="Volver a la guía" title={title} />
+        ),
         document.body,
       )}
     </div>
@@ -782,7 +804,7 @@ function ReaderSupportPanel({
   icon: ReactNode;
   id: string;
   title: string;
-  tone?: "key-points" | "quiz";
+  tone?: "key-points" | "quiz" | "flashcards";
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -804,6 +826,7 @@ function ReaderSupportPanel({
       </button>
       <div
         aria-hidden={!expanded}
+        inert={!expanded}
         className={"published-rich-guide-resource-content" + (expanded ? " is-expanded" : "")}
         id={id}
       >
@@ -816,7 +839,9 @@ function ReaderSupportPanel({
 }
 
 function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: GuideItem }) {
-  const [reaction, setReaction] = useState<"liked" | "disliked" | null>(null);
+  const { reaction, pending: reactionPending, error: reactionError, chooseReaction } = useContentReaction(item.status === "published" ? item.id : null);
+  const [viewCount, setViewCount] = useState(item.viewCount ?? 0);
+  const recordView = useContentView(item.status === "published" ? item.id : null, { automatic: false });
   const [resource, setResource] = useState<VideoResource>("key-points");
   const [studyModal, setStudyModal] = useState<"quiz" | "flashcards" | null>(null);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -857,8 +882,13 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
   }
 
   function launchMobileStudy(mode: "quiz" | "flashcards") {
+    mobilePanelButtonRef.current?.focus({ preventScroll: true });
     setMobilePanelOpen(false);
     setStudyModal(mode);
+  }
+
+  async function recordPlayback() {
+    if (await recordView()) setViewCount((current) => current + 1);
   }
 
   return (
@@ -867,14 +897,14 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
         <div className="video-learning-primary">
           <div className="published-video-stage">
             {item.asset?.downloadUrl ? (
-              <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl}>
+              <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl} onPlaying={recordPlayback}>
                 Tu navegador no puede reproducir este video.
               </video>
             ) : item.content.externalUrl ? (
               <div className="published-external-video">
                 <PlayCircle size={58} />
                 <h3>Video</h3>
-                <a href={item.content.externalUrl} target="_blank" rel="noreferrer">
+                <a href={item.content.externalUrl} target="_blank" rel="noreferrer" onClick={recordPlayback}>
                   Abrir video <ArrowRight size={18} />
                 </a>
               </div>
@@ -887,13 +917,18 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
           </div>
 
           <div className="video-engagement-bar" aria-label="Acciones del video">
-            <div className="video-reaction-actions" role="group" aria-label="Valorar el video">
+            <span className="video-view-count">
+              <PlayCircle aria-hidden="true" size={17} />
+              {formatVideoViews(Math.max(viewCount, item.viewCount ?? 0))}
+            </span>
+            <div className="video-reaction-actions" role="group" aria-label="Valorar el video" aria-busy={reactionPending}>
               <button
                 aria-label="Me gusta"
                 aria-pressed={reaction === "liked"}
                 className={reaction === "liked" ? "is-active" : ""}
+                disabled={reactionPending}
                 type="button"
-                onClick={() => setReaction((current) => current === "liked" ? null : "liked")}
+                onClick={() => { void chooseReaction("liked"); }}
               >
                 <ThumbsUp aria-hidden="true" size={18} weight={reaction === "liked" ? "fill" : "regular"} />
                 <span>Me gusta</span>
@@ -902,8 +937,9 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
                 aria-label="No me gusta"
                 aria-pressed={reaction === "disliked"}
                 className={reaction === "disliked" ? "is-active" : ""}
+                disabled={reactionPending}
                 type="button"
-                onClick={() => setReaction((current) => current === "disliked" ? null : "disliked")}
+                onClick={() => { void chooseReaction("disliked"); }}
               >
                 <ThumbsDown aria-hidden="true" size={18} weight={reaction === "disliked" ? "fill" : "regular"} />
                 <span>No me gusta</span>
@@ -920,6 +956,8 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
               <span>Diapositivas</span>
             </button>
           </div>
+
+          {reactionError && <p className="video-reaction-feedback" role="status">{reactionError}</p>}
 
           <section className="video-guide-section" id="video-resource-guide" aria-labelledby="video-guide-title">
             <div className="video-guide-resource">
@@ -1137,20 +1175,26 @@ function VideoCompanionPanel({
           <QuizLauncher count={displayedQuiz.length} onStart={onStartQuiz} />
         )}
         {resource === "flashcards" && (
-          <div className="video-companion-launch">
-            <span className="video-companion-launch-icon"><CardsThree aria-hidden="true" size={30} /></span>
-            <strong>Flashcards</strong>
-            <small>{displayedQuiz.length} {displayedQuiz.length === 1 ? "tarjeta" : "tarjetas"}</small>
-            <button disabled={displayedQuiz.length === 0} type="button" onClick={onStartFlashcards}>
-              <PlayCircle aria-hidden="true" size={18} weight="fill" /> Practicar
-            </button>
-            <button className="is-secondary" disabled title="Descarga disponible próximamente" type="button">
-              <DownloadSimple aria-hidden="true" size={17} /> Descargar mazo
-            </button>
-          </div>
+          <FlashcardLauncher count={displayedQuiz.length} onStart={onStartFlashcards} />
         )}
       </section>
     </aside>
+  );
+}
+
+function FlashcardLauncher({ count, onStart }: { count: number; onStart: () => void }) {
+  return (
+    <div className="video-companion-launch study-flashcard-launch">
+      <span className="video-companion-launch-icon"><CardsThree aria-hidden="true" size={30} /></span>
+      <strong>Flashcards</strong>
+      <small>{count} {count === 1 ? "tarjeta" : "tarjetas"}</small>
+      <button disabled={count === 0} type="button" onClick={onStart}>
+        <PlayCircle aria-hidden="true" size={18} weight="fill" /> Practicar
+      </button>
+      <button className="is-secondary" disabled title="Descarga disponible próximamente" type="button">
+        <DownloadSimple aria-hidden="true" size={17} /> Descargar mazo
+      </button>
+    </div>
   );
 }
 
@@ -1304,7 +1348,6 @@ function VideoQuizModal({
             <h3>{performance.percentage}%</h3>
             <h4>{performance.title}</h4>
             <strong>{score} de {questions.length} respuestas correctas</strong>
-            <p>{performance.message}</p>
             <div>
               <button type="button" onClick={restart}><ArrowCounterClockwise aria-hidden="true" size={17} /> Repetir</button>
               <button className="is-primary" type="button" onClick={onClose}>{returnLabel}</button>
@@ -1319,10 +1362,12 @@ function VideoQuizModal({
 function VideoFlashcardModal({
   onClose,
   questions,
+  returnLabel = "Volver al video",
   title,
 }: {
   onClose: () => void;
   questions: QuizQuestion[];
+  returnLabel?: string;
   title: string;
 }) {
   const [finished, setFinished] = useState(false);
@@ -1418,7 +1463,7 @@ function VideoFlashcardModal({
             <p>{mastered} recordadas · {questions.length - mastered} para repasar</p>
             <div>
               <button type="button" onClick={restart}><ArrowCounterClockwise aria-hidden="true" size={17} /> Repetir</button>
-              <button className="is-primary" type="button" onClick={onClose}>Volver al video</button>
+              <button className="is-primary" type="button" onClick={onClose}>{returnLabel}</button>
             </div>
           </div>
         )}

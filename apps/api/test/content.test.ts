@@ -12,6 +12,7 @@ import type {
   ContentDraft,
   ContentItem,
   ContentProvider,
+  ContentReaction,
   IdentityProvider,
   PlatformRole,
   ProviderUser,
@@ -277,9 +278,79 @@ describe("content API", () => {
       listPublished: async (query) => { input = query; return []; },
     }) });
     try {
-      expect((await app.inject({ url: "/v1/content?sort=views&limit=8" })).statusCode).toBe(200);
-      expect(input).toEqual({ sort: "views", limit: 8 });
+      expect((await app.inject({ url: "/v1/content?kind=video&sort=views&limit=8" })).statusCode).toBe(200);
+      expect(input).toEqual({ kind: "video", sort: "views", limit: 8 });
       expect((await app.inject({ url: "/v1/content?sort=untrusted" })).statusCode).toBe(400);
+    } finally { await app.close(); }
+  });
+
+  it("authenticates reaction reads/writes, isolates viewers, and never returns totals", async () => {
+    const calls: Array<{ contentId: string; viewerKey: string; reaction?: ContentReaction | null }> = [];
+    const saved = new Map<string, ContentReaction | null>();
+    const app = await buildApp({ ...testEnvironment, auth: {
+      databaseUrl: "postgres://unused.test/test", publicUrl: "http://localhost:4000",
+      requireEmailVerification: false, secret: "test-only-reaction-secret-at-least-32-characters", trustedOrigins: [],
+    } }, { identityProvider: identityProvider(), contentProvider: contentProvider([], {
+      getReaction: async (input) => {
+        calls.push(input);
+        return { status: "success", value: { reaction: saved.get(input.viewerKey) ?? null, likeCount: 99, dislikeCount: 44 } };
+      },
+      setReaction: async (input) => {
+        calls.push(input);
+        saved.set(input.viewerKey, input.reaction);
+        return { status: "success", value: { reaction: input.reaction, likeCount: 99 } };
+      },
+    }) });
+    try {
+      const url = `/v1/content/${contentId}/reaction`;
+      expect((await app.inject({ url })).statusCode).toBe(401);
+      expect((await app.inject({ method: "PATCH", url, payload: { reaction: "liked" } })).statusCode).toBe(401);
+      expect(calls).toHaveLength(0);
+      for (const reaction of ["liked", "disliked", null] as const) {
+        const response = await app.inject({ method: "PATCH", url, headers: auth("student-token"), payload: { reaction } });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["cache-control"]).toBe("private, no-store");
+        expect(response.json()).toEqual({ reaction });
+        expect((await app.inject({ url, headers: auth("student-token") })).json()).toEqual({ reaction });
+      }
+      expect(calls[0]?.viewerKey).toMatch(/^[a-f0-9]{64}$/);
+      expect(calls[0]?.viewerKey).toBe(calls[1]?.viewerKey);
+      await app.inject({ url, headers: auth("editor-token") });
+      expect(calls.at(-1)?.viewerKey).not.toBe(calls[0]?.viewerKey);
+      await app.inject({ url: `/v1/content/${linkedVideoId}/reaction`, headers: auth("student-token") });
+      expect(calls.at(-1)?.viewerKey).not.toBe(calls[0]?.viewerKey);
+    } finally { await app.close(); }
+  });
+
+  it("rejects malformed or caller-supplied reaction identities and totals", async () => {
+    let writes = 0;
+    const app = await buildApp({ ...testEnvironment, auth: {
+      databaseUrl: "postgres://unused.test/test", publicUrl: "http://localhost:4000",
+      requireEmailVerification: false, secret: "test-only-reaction-secret-at-least-32-characters", trustedOrigins: [],
+    } }, { identityProvider: identityProvider(), contentProvider: contentProvider([], {
+      getReaction: async () => ({ status: "not_found" }),
+      setReaction: async () => { writes += 1; return { status: "not_found" }; },
+    }) });
+    try {
+      const url = `/v1/content/${contentId}/reaction`;
+      for (const payload of [{}, { reaction: "up" }, { reaction: "liked", viewerKey: "another-user" }, { reaction: "liked", likeCount: 100 }]) {
+        expect((await app.inject({ method: "PATCH", url, headers: auth("student-token"), payload })).statusCode).toBe(400);
+      }
+      expect(writes).toBe(0);
+      expect((await app.inject({ url: "/v1/content/invalid/reaction", headers: auth("student-token") })).statusCode).toBe(400);
+      expect((await app.inject({ url, headers: auth("student-token") })).statusCode).toBe(404);
+      expect((await app.inject({ method: "PATCH", url, headers: auth("student-token"), payload: { reaction: "liked" } })).statusCode).toBe(404);
+    } finally { await app.close(); }
+  });
+
+  it("returns an unavailable reaction response when persistence is not configured", async () => {
+    const app = await buildApp(testEnvironment, { identityProvider: identityProvider(), contentProvider: contentProvider() });
+    try {
+      for (const method of ["GET", "PATCH"] as const) {
+        const response = await app.inject({ method, url: `/v1/content/${contentId}/reaction`, headers: auth("student-token") });
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({ error: "reactions_unavailable" });
+      }
     } finally { await app.close(); }
   });
 

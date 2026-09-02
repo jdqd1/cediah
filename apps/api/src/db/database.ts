@@ -238,6 +238,17 @@ export interface ContentSubjectTable {
 }
 
 export interface CediahDatabase {
+  content_reaction_counts: {
+    content_item_id: string;
+    like_count: ColumnType<string, number | string, number | string>;
+    dislike_count: ColumnType<string, number | string, number | string>;
+  };
+  content_reactions: {
+    content_item_id: string;
+    viewer_key: string;
+    reaction: "liked" | "disliked";
+    updated_at: GeneratedTimestamp;
+  };
   content_view_counts: {
     content_item_id: string;
     view_count: ColumnType<string, number | string, number | string>;

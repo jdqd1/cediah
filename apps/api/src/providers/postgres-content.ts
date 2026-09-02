@@ -720,6 +720,80 @@ export function createPostgresContentProvider(
       });
     },
 
+    async getReaction(input) {
+      const item = await database.selectFrom("content_items")
+        .leftJoin("content_reactions", (join) => join
+          .onRef("content_reactions.content_item_id", "=", "content_items.id")
+          .on("content_reactions.viewer_key", "=", input.viewerKey))
+        .select("content_reactions.reaction")
+        .where("content_items.id", "=", input.contentId)
+        .where("content_items.kind", "=", "video")
+        .where("content_items.status", "=", "published")
+        .executeTakeFirst();
+      return item
+        ? { status: "success", value: { reaction: item.reaction } }
+        : { status: "not_found" };
+    },
+
+    async setReaction(input) {
+      return database.transaction().execute(async (transaction) => {
+        const item = await transaction.selectFrom("content_items")
+          .select("id")
+          .where("id", "=", input.contentId)
+          .where("kind", "=", "video")
+          .where("status", "=", "published")
+          .forShare()
+          .executeTakeFirst();
+        if (!item) return { status: "not_found" };
+
+        await transaction.insertInto("content_reaction_counts")
+          .values({ content_item_id: item.id, like_count: 0, dislike_count: 0 })
+          .onConflict((conflict) => conflict.column("content_item_id").doNothing())
+          .execute();
+
+        // All writers acquire this row before reading a viewer's old choice.
+        // Retrying, switching tabs or concurrent clicks cannot double-count.
+        await transaction.selectFrom("content_reaction_counts")
+          .select("content_item_id")
+          .where("content_item_id", "=", item.id)
+          .forUpdate()
+          .executeTakeFirstOrThrow();
+        const previous = await transaction.selectFrom("content_reactions")
+          .select("reaction")
+          .where("content_item_id", "=", item.id)
+          .where("viewer_key", "=", input.viewerKey)
+          .executeTakeFirst();
+        const oldReaction = previous?.reaction ?? null;
+        if (oldReaction === input.reaction) {
+          return { status: "success", value: { reaction: oldReaction } };
+        }
+
+        if (input.reaction === null) {
+          await transaction.deleteFrom("content_reactions")
+            .where("content_item_id", "=", item.id)
+            .where("viewer_key", "=", input.viewerKey)
+            .execute();
+        } else {
+          await transaction.insertInto("content_reactions")
+            .values({ content_item_id: item.id, viewer_key: input.viewerKey, reaction: input.reaction })
+            .onConflict((conflict) => conflict.columns(["content_item_id", "viewer_key"])
+              .doUpdateSet({ reaction: input.reaction!, updated_at: sql<Date>`now()` }))
+            .execute();
+        }
+
+        const likesDelta = Number(input.reaction === "liked") - Number(oldReaction === "liked");
+        const dislikesDelta = Number(input.reaction === "disliked") - Number(oldReaction === "disliked");
+        await transaction.updateTable("content_reaction_counts")
+          .set({
+            like_count: sql<string>`like_count + ${likesDelta}`,
+            dislike_count: sql<string>`dislike_count + ${dislikesDelta}`,
+          })
+          .where("content_item_id", "=", item.id)
+          .execute();
+        return { status: "success", value: { reaction: input.reaction } };
+      });
+    },
+
     listTopics() {
       return listTopics(database);
     },

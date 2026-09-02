@@ -27,6 +27,7 @@ En la producción actual de CEDIAH, Render usa el Transaction Pooler de Supabase
 5. 0005_restore_legacy_content.sql restaura el contenido del catálogo anterior.
 6. 0006_simplify_platform_roles.sql simplifica los roles de la plataforma.
 7. 0007_content_views.sql añade contadores agregados y deduplicación de visitas.
+8. 0008_content_reactions.sql guarda likes/dislikes privados y sus totales agregados.
 
 Las claves foráneas de identidad apuntan a public.auth_users. No dependen de auth.users ni de otros esquemas administrados por Supabase.
 
@@ -52,11 +53,21 @@ La aplicación no expone estas credenciales al navegador. Fastify es el límite 
 
 La migración 0007 debe aplicarse y verificarse **antes de desplegar la API** que consulta las nuevas tablas. En producción, con migraciones automáticas desactivadas, conserva el procedimiento transaccional y de checksum descrito arriba.
 
-`content_view_counts` guarda un total por publicación; `content_view_receipts` guarda solo la última visita por pareja lector/contenido para no sumar recargas durante 30 minutos. La identidad se transforma en un HMAC específico de cada contenido: no se guardan correos, IP ni identificadores directos de usuarios. No hay un registro por evento. El contador empieza en cero; no reconstruye visitas históricas. Las guías integradas y su video comparten la publicación y el contador, sin duplicar documentos ni archivos.
+`content_view_counts` guarda un total por publicación; `content_view_receipts` guarda solo la última visita por pareja lector/contenido para no sumar recargas durante 30 minutos. La identidad se transforma en un HMAC específico de cada contenido: no se guardan correos, IP ni identificadores directos de usuarios. No hay un registro por evento. El contador empieza en cero; no reconstruye visitas históricas. Las guías integradas reutilizan la publicación, sin duplicar documentos ni archivos; abrirlas no incrementa las reproducciones de su video.
 
-La web registra una visita únicamente tras cuatro segundos de lectura visible y autenticada. Las vistas previas y la precarga de rutas no cuentan. La API comprueba el estado publicado y realiza la deduplicación y el incremento en una misma transacción. La consulta de destacados se ordena por vistas antes de aplicar el límite; los empates usan la fecha de publicación. El catálogo público tiene una caché de hasta 30 segundos.
+La web registra las lecturas tras cuatro segundos visibles y autenticados. Los videos se registran al comenzar la reproducción (evento `playing`), o al abrir un video externo. No basta con abrir su página. Los contadores conservan los valores previos a este cambio de criterio; no se modifican ni se reconstruyen estadísticas antiguas. Las vistas previas y la precarga de rutas no cuentan. La API comprueba el estado publicado y realiza la deduplicación y el incremento en una misma transacción. Destacados filtra solo videos y se ordena por vistas antes de aplicar el límite; los empates usan la fecha de publicación. El catálogo público tiene una caché de hasta 30 segundos.
 
 Ambas tablas tienen RLS y no conceden acceso a la Data API. La migración concede los permisos y políticas necesarios al rol `cediah_runtime`, si existe. En instalaciones con otra cuenta de ejecución distinta del propietario, el operador debe conceder a esa cuenta los permisos y políticas equivalentes, nunca a `anon` o `authenticated`.
+
+## Likes y dislikes
+
+Aplica `0008_content_reactions.sql` **antes de desplegar** la API de valoraciones. Es aditiva: no modifica publicaciones, archivos ni los contadores de vistas.
+
+`content_reactions` conserva una única elección (`liked` o `disliked`) por video/lector; retirarla elimina esa fila. `content_reaction_counts` conserva `like_count` y `dislike_count` para futuros informes administrativos. Una transacción bloquea primero el contador, consulta la elección anterior y aplica sus diferencias: repetir una petición no aumenta los totales y cambiar de valoración no deja dos votos activos.
+
+Los endpoints `GET/PATCH /v1/content/:contentId/reaction` exigen autenticación, aceptan solo videos publicados y devuelven únicamente la elección del usuario. La identidad se obtiene de la sesión y se convierte en un HMAC específico del video y separado del de vistas; el cliente no puede elegir el usuario ni los totales. No hay correo, IP ni historial por clic. Los datos son privados, sin caché compartida y sin acceso desde la Data API. El panel administrativo y sus endpoints de estadísticas todavía no forman parte de esta entrega.
+
+`pnpm --filter @cediah/api test` verifica la migración, las consultas reales, los permisos y las transacciones con PostgreSQL/WASM en memoria (PGlite), sin usar datos ni credenciales de producción.
 
 ## Backups
 

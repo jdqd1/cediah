@@ -9,7 +9,7 @@ export default async function DashboardPage() {
     getPublishedContent({ limit: 100 }),
     getCurrentUser(),
     getPublishedContent({ kind: "video", limit: 4 }),
-    getPublishedContent({ sort: "views", limit: 8 }),
+    getPublishedContent({ kind: "video", sort: "views", limit: 8 }),
   ]);
   let isAdministrator = false;
   if (current.status === "authenticated") {
