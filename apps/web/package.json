@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@cediah/contracts": "workspace:*",
-    "@phosphor-icons/react": "2.1.7",
+    "@phosphor-icons/react": "2.1.10",
     "@tiptap/extension-highlight": "3.29.2",
     "@tiptap/extension-image": "3.29.2",
     "@tiptap/extension-link": "3.29.2",
