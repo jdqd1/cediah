@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/current-user";
 import { getPublishedContent } from "@/lib/server/content-api";
 import { searchPublishedContent } from "@/lib/content-search";
+import { getGuideCatalog } from "@/lib/content-guide-links";
 
 export const dynamic = "force-dynamic";
 const noStoreHeaders = { "Cache-Control": "private, no-store" };
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
   }
 
   const response = searchPublishedContent(
-    [...videosResult.catalog.items, ...guidesResult.catalog.items],
+    [...videosResult.catalog.items, ...getGuideCatalog([...videosResult.catalog.items, ...guidesResult.catalog.items])],
     query,
   );
   return NextResponse.json(response, {

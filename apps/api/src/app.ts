@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import Fastify, {
@@ -106,6 +107,7 @@ const ContentListQuerySchema = z.object({
   linkedVideoId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(40),
   subjectId: z.string().uuid().optional(),
+  sort: z.enum(["recent", "views"]).optional(),
 });
 
 const directUploadLifetimeMilliseconds = 15 * 60 * 1_000;
@@ -574,6 +576,30 @@ export async function buildApp(
         .status(503)
         .header("Cache-Control", "no-store")
         .send({ error: "content_unavailable" });
+    }
+  });
+
+  app.post<{ Params: { contentId: string } }>("/v1/content/:contentId/views", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const params = ContentIdParamsSchema.safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ error: "invalid_content_id" });
+    const viewer = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
+    if (viewer.kind !== "authenticated") {
+      return reply.status(viewer.kind === "unauthorized" ? 401 : 503).send({ error: viewer.kind });
+    }
+    if (!contentProvider?.recordView || !environment.auth?.secret) {
+      return reply.status(503).send({ error: "views_unavailable" });
+    }
+    try {
+      const viewerKey = createHmac("sha256", environment.auth.secret)
+        .update(`content-view:${params.data.contentId}:${viewer.user.id}`)
+        .digest("hex");
+      const result = await contentProvider.recordView({ contentId: params.data.contentId, viewerKey });
+      if (result.status !== "success") return reply.status(404).send({ error: "not_found" });
+      return reply.send(result.value);
+    } catch {
+      request.log.error("Content-view recording failed");
+      return reply.status(503).send({ error: "views_unavailable" });
     }
   });
 

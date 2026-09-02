@@ -12071,7 +12071,7 @@ button.studio-guide-choice-card > svg { position: absolute; right: 0.9rem; botto
 
 .subject-directory-search {
   display: flex;
-  width: min(100%, 32rem);
+  width: 100%;
   min-height: 2.85rem;
   align-items: center;
   gap: 0.55rem;

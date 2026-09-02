@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getApiRequestCookie } from "./api-session";
 import {
   getContentApiError,
@@ -48,6 +49,8 @@ export async function forwardEditorContentRequest(input: {
       safeContentApiStatus(response.status),
     );
   }
+
+  if (input.method !== "GET") revalidateTag("published-content", { expire: 0 });
 
   if (input.responseSchema) {
     const parsed = input.responseSchema.safeParse(response.body);

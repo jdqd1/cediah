@@ -1,4 +1,4 @@
-import type { Selectable, Transaction, Updateable } from "kysely";
+import { sql, type Selectable, type Transaction, type Updateable } from "kysely";
 import {
   ContentAssetSchema,
   ContentDraftSchema,
@@ -233,7 +233,7 @@ async function hydrateRows(
 ) {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
-  const [assets, subjects] = await Promise.all([
+  const [assets, subjects, views] = await Promise.all([
     database
       .selectFrom("content_assets")
       .selectAll()
@@ -242,6 +242,11 @@ async function hydrateRows(
     database
       .selectFrom("content_subjects")
       .select(["content_item_id", "subject_id"])
+      .where("content_item_id", "in", ids)
+      .execute(),
+    database
+      .selectFrom("content_view_counts")
+      .select(["content_item_id", "view_count"])
       .where("content_item_id", "in", ids)
       .execute(),
   ]);
@@ -259,15 +264,17 @@ async function hydrateRows(
       subject.subject_id,
     ]);
   }
-  return Promise.all(rows.map((row) =>
-    parseContentItem(
+  const viewsByContent = new Map(views.map((view) => [view.content_item_id, Number(view.view_count)]));
+  return Promise.all(rows.map(async (row) => ({
+    ...await parseContentItem(
       row,
       assetsByContent.get(row.id) ?? [],
       subjectsByContent.get(row.id) ?? [],
       configuration,
       includeDownloadUrls,
     ),
-  ));
+    viewCount: viewsByContent.get(row.id) ?? 0,
+  })));
 }
 
 async function getItemById(database: QueryDatabase, contentId: string) {
@@ -657,6 +664,10 @@ export function createPostgresContentProvider(
             .where("content_subjects.subject_id", "=", input.subjectId ?? ""),
         )
         .selectAll("content_items")
+        .$if(input.sort === "views", (query) => query
+          .leftJoin("content_view_counts", "content_view_counts.content_item_id", "content_items.id")
+          .orderBy(sql<number>`coalesce(content_view_counts.view_count, 0)`, "desc"),
+        )
         .where("content_items.status", "=", "published")
         .$if(Boolean(input.kind), (query) =>
           query.where("content_items.kind", "=", input.kind ?? "topic"),
@@ -673,9 +684,40 @@ export function createPostgresContentProvider(
           ),
         )
         .orderBy("content_items.published_at", "desc")
+        .orderBy("content_items.id", "asc")
         .limit(Math.min(Math.max(input.limit, 1), 100))
         .execute();
       return hydrateRows(database, rows);
+    },
+
+    async recordView(input) {
+      return database.transaction().execute(async (transaction) => {
+        const item = await transaction.selectFrom("content_items")
+          .select("id")
+          .where("id", "=", input.contentId)
+          .where("status", "=", "published")
+          .forShare()
+          .executeTakeFirst();
+        if (!item) return { status: "not_found" };
+
+        const receipt = await transaction.insertInto("content_view_receipts")
+          .values({ content_item_id: item.id, viewer_key: input.viewerKey })
+          .onConflict((conflict) => conflict.columns(["content_item_id", "viewer_key"])
+            .doUpdateSet({ last_viewed_at: sql<Date>`now()` })
+            .where("content_view_receipts.last_viewed_at", "<=", sql<Date>`now() - interval '30 minutes'`),
+          )
+          .returning("content_item_id")
+          .executeTakeFirst();
+        if (!receipt) return { status: "success", value: { counted: false } };
+
+        await transaction.insertInto("content_view_counts")
+          .values({ content_item_id: item.id, view_count: 1 })
+          .onConflict((conflict) => conflict.column("content_item_id")
+            .doUpdateSet({ view_count: sql<string>`content_view_counts.view_count + 1` }),
+          )
+          .execute();
+        return { status: "success", value: { counted: true } };
+      });
     },
 
     listTopics() {

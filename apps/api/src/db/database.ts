@@ -238,6 +238,15 @@ export interface ContentSubjectTable {
 }
 
 export interface CediahDatabase {
+  content_view_counts: {
+    content_item_id: string;
+    view_count: ColumnType<string, number | string, number | string>;
+  };
+  content_view_receipts: {
+    content_item_id: string;
+    viewer_key: string;
+    last_viewed_at: GeneratedTimestamp;
+  };
   audit_log: AuditLogTable;
   auth_accounts: AuthAccountTable;
   auth_rate_limits: AuthRateLimitTable;

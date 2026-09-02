@@ -1,4 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
+import { PlatformFrame } from "@/components/platform-frame";
+import { RouteLoadingScreen } from "@/components/route-loading-screen";
 import "./globals.css";
 import "./koraz-theme.css";
 import "./landing-paper.css";
@@ -24,7 +27,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body><Suspense fallback={<RouteLoadingScreen />}><PlatformFrame>{children}</PlatformFrame></Suspense></body>
     </html>
   );
 }

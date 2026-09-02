@@ -913,6 +913,7 @@ const ContentRecordSchema = z.object({
   publishedAt: z.string().datetime({ offset: true }).nullable(),
   status: ContentStatusSchema,
   updatedAt: z.string().datetime({ offset: true }),
+  viewCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
 });
 
 export const ContentItemSchema = z.intersection(ContentDraftSchema, ContentRecordSchema);
@@ -1136,7 +1137,12 @@ export interface ContentProvider {
     linkedVideoId?: string;
     limit: number;
     subjectId?: string;
+    sort?: "recent" | "views";
   }): Promise<ContentItem[]>;
+  recordView?(input: {
+    contentId: string;
+    viewerKey: string;
+  }): Promise<ContentMutationResult<{ counted: boolean }>>;
   listTopics?(): Promise<ContentTopic[]>;
   transitionContent(input: {
     actorUserId: string;

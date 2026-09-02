@@ -47,6 +47,9 @@ import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } f
 import { getVideoGuideContent } from "@/lib/content-guide-links";
 import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
+import { quizPerformance, studyProgress } from "@/lib/study-progress";
+import { useContentView } from "@/lib/use-content-view";
 import { contentKindLabel } from "@/lib/content-navigation";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
@@ -67,6 +70,7 @@ export function ContentDetailScreen({
   returnHref?: string;
   returnLabel?: string;
 }) {
+  useContentView(item.status === "published" ? item.id : null);
   const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
   const sectionLabel = isGuideView ? "Guías" : contentKindLabel(item.kind);
   const defaultBackHref = guideMode && item.kind === "video"
@@ -111,11 +115,11 @@ function ContentBody({
   linkedGuide?: GuideItem;
 }) {
   if (item.kind === "guide") {
-    return <PublishedGuideReader asset={item.asset} content={item.content} />;
+    return <PublishedGuideReader asset={item.asset} content={item.content} title={item.title} />;
   }
 
   if (item.kind === "video") {
-    if (guideMode) return <PublishedGuideReader asset={linkedGuide?.asset} content={getVideoGuideContent(item, linkedGuide)} />;
+    if (guideMode) return <PublishedGuideReader asset={linkedGuide?.asset} content={getVideoGuideContent(item, linkedGuide)} title={linkedGuide?.title ?? item.title} />;
     return <VideoBody item={item} linkedGuide={linkedGuide} />;
   }
 
@@ -215,9 +219,11 @@ function findGuidePassage(point: string): HTMLElement | null {
 export function PublishedGuideReader({
   asset,
   content,
+  title,
 }: {
   asset?: GuideItem["asset"];
   content: GuideItem["content"];
+  title: string;
 }) {
   const guideDocument = useMemo(
     () => content.document ?? sectionsToRichTextDocument(content.sections),
@@ -234,9 +240,10 @@ export function PublishedGuideReader({
   const [favorite, setFavorite] = useState(false);
   const [fontMenuOpen, setFontMenuOpen] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<"outline" | "support" | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
   const outlineLinksRef = useRef<HTMLDivElement | null>(null);
   const drawerActionTimerRef = useRef<number | null>(null);
-  useBodyScrollLock(mobileDrawer !== null);
+  useBodyScrollLock(mobileDrawer !== null || quizOpen);
   const manualNavigationRef = useRef(false);
   const navigationFrameRef = useRef<number | null>(null);
   const headingHighlightTimerRef = useRef<number | null>(null);
@@ -606,7 +613,7 @@ export function PublishedGuideReader({
             {outlineExpanded ? (
               <CaretLeft aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
             ) : (
-              <CaretRight aria-hidden="true" className="published-rich-guide-outline-caret" size={17} />
+              <ListBullets aria-hidden="true" size={19} />
             )}
             </button>
           </div>
@@ -697,7 +704,7 @@ export function PublishedGuideReader({
             {supportExpanded ? (
               <CaretRight aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
             ) : (
-              <CaretLeft aria-hidden="true" className="published-rich-guide-support-caret" size={17} />
+              <BookOpen aria-hidden="true" size={19} />
             )}
             </button>
           </div>
@@ -743,16 +750,19 @@ export function PublishedGuideReader({
                 title="Cuestionario"
                 tone="quiz"
               >
-                {content.quiz.questions.length > 0 ? (
-                  <QuestionAnswerCards questions={content.quiz.questions} />
-                ) : (
-                  <p className="published-rich-guide-resource-empty">Esta guía no incluye un cuestionario.</p>
-                )}
+                <QuizLauncher count={content.quiz.questions.length} onStart={() => {
+                  setMobileDrawer(null);
+                  setQuizOpen(true);
+                }} />
               </ReaderSupportPanel>
             </div>
           </div>
         </aside>
       </div>
+      {quizOpen && createPortal(
+        <VideoQuizModal onClose={() => setQuizOpen(false)} questions={content.quiz.questions} returnLabel="Volver a la guía" title={title} />,
+        document.body,
+      )}
     </div>
   );
 }
@@ -1124,14 +1134,7 @@ function VideoCompanionPanel({
           )
         )}
         {resource === "quiz" && (
-          <div className="video-companion-launch">
-            <span className="video-companion-launch-icon"><ClipboardText aria-hidden="true" size={30} /></span>
-            <strong>Cuestionario</strong>
-            <small>{displayedQuiz.length} {displayedQuiz.length === 1 ? "pregunta" : "preguntas"}</small>
-            <button disabled={displayedQuiz.length === 0} type="button" onClick={onStartQuiz}>
-              <PlayCircle aria-hidden="true" size={18} weight="fill" /> Empezar
-            </button>
-          </div>
+          <QuizLauncher count={displayedQuiz.length} onStart={onStartQuiz} />
         )}
         {resource === "flashcards" && (
           <div className="video-companion-launch">
@@ -1151,13 +1154,28 @@ function VideoCompanionPanel({
   );
 }
 
+function QuizLauncher({ count, onStart }: { count: number; onStart: () => void }) {
+  return (
+    <div className="video-companion-launch study-quiz-launch">
+      <span className="video-companion-launch-icon"><ClipboardText aria-hidden="true" size={30} /></span>
+      <strong>Cuestionario</strong>
+      <small>{count} {count === 1 ? "pregunta" : "preguntas"}</small>
+      <button disabled={count === 0} type="button" onClick={onStart}>
+        <PlayCircle aria-hidden="true" size={18} weight="fill" /> Empezar
+      </button>
+    </div>
+  );
+}
+
 function VideoQuizModal({
   onClose,
   questions,
+  returnLabel = "Volver al video",
   title,
 }: {
   onClose: () => void;
   questions: QuizQuestion[];
+  returnLabel?: string;
   title: string;
 }) {
   const [finished, setFinished] = useState(false);
@@ -1165,12 +1183,8 @@ function VideoQuizModal({
   const [score, setScore] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const dialogRef = useRef<HTMLElement>(null);
+  const dialogRef = useDialogFocus();
   const question = questions[questionIndex];
-
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, []);
 
   if (!question) return null;
   const correctOptionIndex = question.correctOptionIndex;
@@ -1201,7 +1215,8 @@ function VideoQuizModal({
     setSubmitted(false);
   }
 
-  const scorePercentage = Math.round((score / questions.length) * 100);
+  const performance = quizPerformance(score, questions.length);
+  const progress = studyProgress(questionIndex + Number(submitted), questions.length);
 
   return (
     <div className="video-study-modal-backdrop" role="presentation" onMouseDown={(event) => {
@@ -1221,21 +1236,20 @@ function VideoQuizModal({
         <header className="video-study-modal-heading">
           <span className="video-study-modal-mark"><ClipboardText aria-hidden="true" size={22} /></span>
           <div>
-            <small>{title}</small>
-            <h2 id="video-quiz-modal-title">Cuestionario</h2>
+            <small>Cuestionario</small>
+            <h2 id="video-quiz-modal-title">{title}</h2>
           </div>
           <button aria-label="Cerrar cuestionario" type="button" onClick={onClose}><X aria-hidden="true" size={19} /></button>
         </header>
 
         {!finished ? (
           <>
-            <div className="video-study-progress">
+            <div className="video-study-progress" data-tone={progress.tone}>
               <span>Pregunta {questionIndex + 1} de {questions.length}</span>
-              <progress aria-label="Progreso del cuestionario" max={questions.length} value={questionIndex + 1} />
-              <strong>{score} pts</strong>
+              <progress aria-label="Preguntas completadas" max={questions.length} value={progress.value} />
+              <strong>{score} {score === 1 ? "acierto" : "aciertos"}</strong>
             </div>
             <div className="video-quiz-question">
-              <span className="video-quiz-question-number">{String(questionIndex + 1).padStart(2, "0")}</span>
               <h3>{question.prompt}</h3>
               <div className="video-quiz-options" role="group" aria-label="Opciones de respuesta">
                 {question.options.map((option, optionIndex) => {
@@ -1281,14 +1295,19 @@ function VideoQuizModal({
             )}
           </>
         ) : (
-          <div className="video-study-complete">
-            <span><Trophy aria-hidden="true" size={42} weight="fill" /></span>
-            <small>Sesión completada</small>
-            <h3>{scorePercentage}%</h3>
+          <div className={`video-study-complete is-${performance.tone}`} role="status">
+            <span>{performance.tone === "excellent"
+              ? <Trophy aria-hidden="true" size={38} weight="fill" />
+              : performance.tone === "developing"
+                ? <Lightbulb aria-hidden="true" size={38} />
+                : <BookOpen aria-hidden="true" size={38} />}</span>
+            <h3>{performance.percentage}%</h3>
+            <h4>{performance.title}</h4>
             <strong>{score} de {questions.length} respuestas correctas</strong>
+            <p>{performance.message}</p>
             <div>
               <button type="button" onClick={restart}><ArrowCounterClockwise aria-hidden="true" size={17} /> Repetir</button>
-              <button className="is-primary" type="button" onClick={onClose}>Volver al video</button>
+              <button className="is-primary" type="button" onClick={onClose}>{returnLabel}</button>
             </div>
           </div>
         )}
@@ -1310,12 +1329,9 @@ function VideoFlashcardModal({
   const [flipped, setFlipped] = useState(false);
   const [index, setIndex] = useState(0);
   const [mastered, setMastered] = useState(0);
-  const dialogRef = useRef<HTMLElement>(null);
+  const dialogRef = useDialogFocus();
   const question = questions[index];
-
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, []);
+  const progress = studyProgress(finished ? questions.length : index, questions.length);
 
   if (!question) return null;
 
@@ -1354,18 +1370,18 @@ function VideoFlashcardModal({
         <header className="video-study-modal-heading">
           <span className="video-study-modal-mark"><CardsThree aria-hidden="true" size={22} /></span>
           <div>
-            <small>{title}</small>
-            <h2 id="video-flashcard-modal-title">Flashcards</h2>
+            <small>Flashcards</small>
+            <h2 id="video-flashcard-modal-title">{title}</h2>
           </div>
           <button aria-label="Cerrar flashcards" type="button" onClick={onClose}><X aria-hidden="true" size={19} /></button>
         </header>
 
         {!finished ? (
           <>
-            <div className="video-study-progress">
+            <div className="video-study-progress" data-tone={progress.tone}>
               <span>Tarjeta {index + 1} de {questions.length}</span>
-              <progress aria-label="Progreso de flashcards" max={questions.length} value={index + 1} />
-              <strong>{mastered} dominadas</strong>
+              <progress aria-label="Tarjetas completadas" max={questions.length} value={progress.value} />
+              <strong>{progress.value} completadas</strong>
             </div>
             <div className="video-flashcard-stage-wrap">
               <button
@@ -1394,11 +1410,12 @@ function VideoFlashcardModal({
             </footer>
           </>
         ) : (
-          <div className="video-study-complete">
+          <div className="video-study-complete is-excellent" role="status">
             <span><Sparkle aria-hidden="true" size={42} weight="fill" /></span>
             <small>Práctica completada</small>
-            <h3>{mastered}/{questions.length}</h3>
-            <strong>tarjetas dominadas</strong>
+            <h3>{questions.length}/{questions.length}</h3>
+            <strong>tarjetas completadas</strong>
+            <p>{mastered} recordadas · {questions.length - mastered} para repasar</p>
             <div>
               <button type="button" onClick={restart}><ArrowCounterClockwise aria-hidden="true" size={17} /> Repetir</button>
               <button className="is-primary" type="button" onClick={onClose}>Volver al video</button>

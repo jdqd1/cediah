@@ -11,6 +11,7 @@ export function IconBackLink({ className = "", label, title, ...props }: IconBac
     <Link
       {...props}
       aria-label={label}
+      data-navigation-direction="back"
       className={`icon-back-link ${className}`.trim()}
       title={title ?? label}
     >

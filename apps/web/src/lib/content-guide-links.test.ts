@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentItem } from "@cediah/contracts";
-import { findVideoLinkedGuide, getIndependentPublications, getVideoGuideContent } from "./content-guide-links";
+import { findVideoLinkedGuide, getGuideCatalog, getIndependentPublications, getVideoGuideContent } from "./content-guide-links";
 
 const video: Extract<ContentItem, { kind: "video" }> = {
   asset: null,
@@ -48,6 +48,22 @@ const guide: Extract<ContentItem, { kind: "guide" }> = {
 };
 
 describe("video-linked guides", () => {
+  it("lists an embedded guide without copying its body or video asset", () => {
+    const [entry] = getGuideCatalog([video]);
+    expect(entry?.kind).toBe("guide");
+    expect(entry?.id).toBe(video.id);
+    expect(entry?.slug).toBe(video.slug);
+    expect(entry?.content.sections).toBe(video.content.guide.sections);
+    expect(entry?.asset).toBeNull();
+    expect(video.kind).toBe("video");
+  });
+
+  it("lists a linked guide only once, and excludes empty video guides", () => {
+    expect(getGuideCatalog([video, guide])).toEqual([guide]);
+    const empty = { ...video, content: { ...video.content, guide: { document: null, sections: [] } } };
+    expect(getGuideCatalog([empty])).toEqual([]);
+  });
+
   it("uses the linked guide as the source for the document and every companion resource", () => {
     expect(getVideoGuideContent(video, guide)).toBe(guide.content);
     expect(getVideoGuideContent(video, guide).sections[0]?.heading).toBe("Principal");

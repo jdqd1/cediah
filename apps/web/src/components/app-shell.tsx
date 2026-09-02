@@ -17,12 +17,13 @@ import {
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth/client";
 import { useAccessRoles } from "./access-context";
 import { CediahLogo } from "./cediah-logo";
 import { GlobalContentSearch } from "./global-content-search";
+import { RouteMain, useNavigationIntent } from "./route-navigation";
 import {
   setSidebarCollapsedPreference,
   useSidebarCollapsedPreference,
@@ -41,9 +42,39 @@ type AppShellProps = {
   mainClassName?: string;
   breadcrumbs?: string[];
   welcome?: boolean;
+  profilePending?: boolean;
 };
 
 type NavIcon = typeof House;
+const PersistentShellContext = createContext(false);
+
+export function PersistentAppShell({ children, viewer, profilePending }: { children: ReactNode; viewer?: { email: string }; profilePending?: boolean }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const kind = searchParams.get("tipo");
+  const activeKey = pathname.startsWith("/panel/administracion") ? "roles"
+    : pathname.startsWith("/panel") ? "editor"
+      : pathname.startsWith("/guias") ? "guides"
+        : pathname.startsWith("/contenido") ? kind === "guide" ? "guides" : kind ?? "video"
+          : pathname.startsWith("/asignaturas") ? kind === "guide" ? "guides" : kind ?? "subjects"
+            : pathname.startsWith("/clases") ? "video"
+              : pathname.startsWith("/cursos") ? "courses"
+              : "dashboard";
+  const title = [...mainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koraz";
+  return (
+    <PersistentShellContext.Provider value={true}>
+      <ShellChrome activeKey={activeKey} headerTitle={title} includeCourses={activeKey === "courses"} viewer={viewer} profilePending={profilePending}>
+        {children}
+      </ShellChrome>
+    </PersistentShellContext.Provider>
+  );
+}
+
+export function AppShell(props: AppShellProps) {
+  const persistent = useContext(PersistentShellContext);
+  const content = <RouteMain className={props.mainClassName ?? ""}>{props.children}</RouteMain>;
+  return persistent ? content : <ShellChrome {...props}>{content}</ShellChrome>;
+}
 
 type NavItem = {
   key: string;
@@ -157,7 +188,7 @@ function NavigationGroup({
   );
 }
 
-export function AppShell({
+function ShellChrome({
   activeKey,
   breadcrumbs,
   isAdministrator = false,
@@ -166,7 +197,7 @@ export function AppShell({
   headerSubtitle,
   headerTitle,
   includeCourses = false,
-  mainClassName = "",
+  profilePending = false,
   welcome = false,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -189,7 +220,7 @@ export function AppShell({
       : null;
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
-  const pathname = usePathname();
+  useNavigationIntent();
 
   const closeSidebar = () => setSidebarOpen(false);
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
@@ -266,10 +297,6 @@ export function AppShell({
     desktopMedia.addEventListener("change", synchronizeViewport);
     return () => desktopMedia.removeEventListener("change", synchronizeViewport);
   }, []);
-
-  useEffect(() => {
-    setSidebarCollapsedPreference(true);
-  }, [pathname]);
 
   useEffect(() => {
     if (!sidebarOpen || !window.matchMedia("(max-width: 960px)").matches) return;
@@ -447,6 +474,8 @@ export function AppShell({
                     </div>
                   )}
                 </>
+              ) : profilePending ? (
+                <span className="profile-avatar" aria-label="Cargando perfil"><UserCircle size={20} /></span>
               ) : (
                 <Link className="profile-trigger profile-sign-in" href="/acceder">
                   <span className="profile-avatar" aria-hidden="true">
@@ -458,9 +487,7 @@ export function AppShell({
             </div>
           </div>
         </header>
-        <main className={`app-main ${mainClassName}`.trim()} data-pathname={pathname}>
-          {children}
-        </main>
+        {children}
       </div>
     </div>
   );

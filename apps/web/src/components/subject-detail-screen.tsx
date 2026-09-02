@@ -23,6 +23,7 @@ import {
 } from "@/lib/content-navigation";
 import { contentItemSearchText } from "@/lib/content-search";
 import { uniqueRegions } from "@/lib/content-regions";
+import { getGuideCatalog } from "@/lib/content-guide-links";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
@@ -97,9 +98,10 @@ export function SubjectDetailScreen({
   const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
   const searching = Boolean(search.trim());
+  const guides = useMemo(() => getGuideCatalog(items), [items]);
   const kindItems = useMemo(
-    () => kind ? items.filter((item) => item.kind === kind) : [],
-    [items, kind],
+    () => kind === "guide" ? guides : kind ? items.filter((item) => item.kind === kind) : [],
+    [guides, items, kind],
   );
   const filteredItems = useMemo(() => {
     const query = normalize(search.trim());
@@ -134,7 +136,7 @@ export function SubjectDetailScreen({
 
   const sections = sectionDefinitions.map((definition) => ({
     ...definition,
-    count: items.filter((item) => item.kind === definition.kind).length,
+    count: definition.kind === "guide" ? guides.length : items.filter((item) => item.kind === definition.kind).length,
   }));
   const KindIcon = kind ? sectionDefinitions.find((section) => section.kind === kind)?.icon ?? Compass : Compass;
   const label = kind ? studyContentKindLabels[kind] : "";

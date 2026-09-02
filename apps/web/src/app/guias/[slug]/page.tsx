@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
 import { subjectContentHref } from "@/lib/content-navigation";
-import { getPublishedContentItem, getSubjects } from "@/lib/server/content-api";
+import { getPublishedContent, getPublishedContentItem, getSubjects } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
@@ -36,18 +36,25 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
     const guideMode = result.item.kind === "video";
     const guideParams = new URLSearchParams();
     if (subject) guideParams.set("asignatura", subject.slug);
-    const returnHref = guideMode
-      ? `/contenido/${result.item.slug}`
-      : origin === "asignatura" && subject
+    const returnHref = origin === "asignatura" && subject
         ? subjectContentHref(subject.slug, "guide", topic || undefined)
-        : `/guias${guideParams.size > 0 ? `?${guideParams.toString()}` : ""}`;
+        : guideMode && origin !== "guias"
+          ? `/contenido/${result.item.slug}`
+          : `/guias${guideParams.size > 0 ? `?${guideParams.toString()}` : ""}`;
+    const linkedResult = guideMode
+      ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 1 })
+      : null;
+    const linkedGuide = linkedResult?.status === "ready"
+      ? linkedResult.catalog.items.find((item) => item.kind === "guide")
+      : undefined;
     return (
       <ContentDetailScreen
         guideMode={guideMode}
         item={result.item}
         isAdministrator={isAdministrator}
+        linkedGuide={linkedGuide}
         returnHref={returnHref}
-        returnLabel={guideMode ? "Volver al video" : topic ? `Volver a ${topic}` : "Volver a guías"}
+        returnLabel={returnHref.startsWith("/contenido/") ? "Volver al video" : origin === "asignatura" && topic ? `Volver a ${topic}` : "Volver a guías"}
       />
     );
   }

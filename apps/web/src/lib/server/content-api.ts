@@ -20,6 +20,7 @@ type ContentApiRequest = {
   cookie?: string;
   method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
+  cachePublic?: boolean;
 };
 
 type ContentApiResponse = {
@@ -77,9 +78,11 @@ export async function requestContentApi(
     if (input.cookie) headers.set("Cookie", input.cookie);
     if (input.body !== undefined) headers.set("Content-Type", "application/json");
 
+    const publicCache = input.cachePublic === true && input.method === "GET" && !input.cookie;
     const response = await fetch(new URL(input.path, environment.API_BASE_URL), {
       body: input.body === undefined ? undefined : JSON.stringify(input.body),
-      cache: "no-store",
+      cache: publicCache ? "force-cache" : "no-store",
+      ...(publicCache ? { next: { revalidate: 30, tags: ["published-content"] } } : {}),
       headers,
       method: input.method,
       signal: controller.signal,
@@ -100,15 +103,18 @@ export async function getPublishedContent(input: {
   linkedVideoId?: string;
   limit?: number;
   subjectId?: string;
+  sort?: "recent" | "views";
 } = {}): Promise<PublishedContentResult> {
   const query = new URLSearchParams();
   if (input.kind) query.set("kind", input.kind);
   if (input.linkedVideoId) query.set("linkedVideoId", input.linkedVideoId);
   if (input.subjectId) query.set("subjectId", input.subjectId);
+  if (input.sort) query.set("sort", input.sort);
   query.set("limit", String(input.limit ?? 40));
   const response = await requestContentApi({
     method: "GET",
     path: "/v1/content?" + query.toString(),
+    cachePublic: true,
   });
   if (response.status !== 200) return { status: "unavailable" };
 
@@ -118,7 +124,7 @@ export async function getPublishedContent(input: {
     : { status: "unavailable" };
 }
 export async function getSubjects(): Promise<SubjectsResult> {
-  const response = await requestContentApi({ method: "GET", path: "/v1/subjects" });
+  const response = await requestContentApi({ method: "GET", path: "/v1/subjects", cachePublic: true });
   if (response.status !== 200) return { status: "unavailable" };
   const parsed = SubjectCatalogResponseSchema.safeParse(response.body);
   return parsed.success ? { status: "ready", subjects: parsed.data.subjects } : { status: "unavailable" };
@@ -128,6 +134,7 @@ export async function getSubjectContent(slug: string): Promise<SubjectDetailResu
   const response = await requestContentApi({
     method: "GET",
     path: "/v1/subjects/" + encodeURIComponent(slug),
+    cachePublic: true,
   });
   if (response.status === 404) return { status: "not_found" };
   if (response.status !== 200) return { status: "unavailable" };
@@ -140,6 +147,7 @@ export async function getPublishedContentItem(
   const response = await requestContentApi({
     method: "GET",
     path: "/v1/content/" + encodeURIComponent(slug),
+    cachePublic: true,
   });
   if (response.status === 404) return { status: "not_found" };
   if (response.status !== 200) return { status: "unavailable" };

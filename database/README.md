@@ -24,6 +24,9 @@ En la producción actual de CEDIAH, Render usa el Transaction Pooler de Supabase
 2. 0002_platform.sql crea perfiles, roles y el dominio académico.
 3. 0003_content.sql crea el catálogo y workflow editorial.
 4. 0004_subjects.sql crea las asignaturas y sus relaciones.
+5. 0005_restore_legacy_content.sql restaura el contenido del catálogo anterior.
+6. 0006_simplify_platform_roles.sql simplifica los roles de la plataforma.
+7. 0007_content_views.sql añade contadores agregados y deduplicación de visitas.
 
 Las claves foráneas de identidad apuntan a public.auth_users. No dependen de auth.users ni de otros esquemas administrados por Supabase.
 
@@ -44,6 +47,16 @@ No reutilices el mismo número y no renombres un archivo aplicado: el nombre for
 La cuenta usada durante el arranque necesita permisos para crear y alterar objetos del esquema public. No necesita ser superusuario. Si el proveedor separa una cuenta de migración de la cuenta de ejecución, aplica el esquema con la primera y concede a la segunda únicamente SELECT, INSERT, UPDATE y DELETE sobre las tablas, uso de secuencias si se incorporan y ejecución de las funciones necesarias.
 
 La aplicación no expone estas credenciales al navegador. Fastify es el límite de autorización y todas las consultas del producto pasan por sus proveedores Kysely.
+
+## Vistas del contenido
+
+La migración 0007 debe aplicarse y verificarse **antes de desplegar la API** que consulta las nuevas tablas. En producción, con migraciones automáticas desactivadas, conserva el procedimiento transaccional y de checksum descrito arriba.
+
+`content_view_counts` guarda un total por publicación; `content_view_receipts` guarda solo la última visita por pareja lector/contenido para no sumar recargas durante 30 minutos. La identidad se transforma en un HMAC específico de cada contenido: no se guardan correos, IP ni identificadores directos de usuarios. No hay un registro por evento. El contador empieza en cero; no reconstruye visitas históricas. Las guías integradas y su video comparten la publicación y el contador, sin duplicar documentos ni archivos.
+
+La web registra una visita únicamente tras cuatro segundos de lectura visible y autenticada. Las vistas previas y la precarga de rutas no cuentan. La API comprueba el estado publicado y realiza la deduplicación y el incremento en una misma transacción. La consulta de destacados se ordena por vistas antes de aplicar el límite; los empates usan la fecha de publicación. El catálogo público tiene una caché de hasta 30 segundos.
+
+Ambas tablas tienen RLS y no conceden acceso a la Data API. La migración concede los permisos y políticas necesarios al rol `cediah_runtime`, si existe. En instalaciones con otra cuenta de ejecución distinta del propietario, el operador debe conceder a esa cuenta los permisos y políticas equivalentes, nunca a `anon` o `authenticated`.
 
 ## Backups
 

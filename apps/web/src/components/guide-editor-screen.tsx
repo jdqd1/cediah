@@ -672,7 +672,6 @@ function QuizPanel({
                   <button type="button" onClick={() => setOpenQuestion(open ? -1 : questionIndex)}>
                     {complete ? <CheckCircle size={16} weight="fill" /> : <span>{questionIndex + 1}</span>}
                     <span className="guide-question-answer-title">
-                      <small>Pregunta</small>
                       <strong>{question.prompt || `Pregunta ${questionIndex + 1}`}</strong>
                     </span>
                     {open ? <CaretUp size={14} /> : <CaretDown size={14} />}
@@ -816,6 +815,7 @@ function GuideReaderPreview({
       </header>
       <PublishedGuideReader
         asset={asset}
+        title={title || "Guía sin título"}
         content={{
           document: guideDocument,
           keyPoints,

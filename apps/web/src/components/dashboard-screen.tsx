@@ -9,6 +9,8 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import type { ContentItem, ContentKind } from "@cediah/contracts";
 import { publishedContentHref, subjectDirectoryHref } from "@/lib/content-navigation";
+import { getGuideCatalog } from "@/lib/content-guide-links";
+import { mostViewedFirst, newestContentFirst } from "@/lib/content-order";
 import { AppShell } from "./app-shell";
 import { BrandFooter } from "./brand-footer";
 
@@ -108,21 +110,24 @@ function VideoCard({ item }: { item: ContentItem & { kind: "video" } }) {
 export function DashboardScreen({
   available,
   items,
+  highlightedItems = items,
+  recentItems = items,
   isAdministrator = false,
   viewer,
 }: {
   available: boolean;
   items: ContentItem[];
+  highlightedItems?: ContentItem[];
+  recentItems?: ContentItem[];
   isAdministrator?: boolean;
   viewer?: { email: string };
 }) {
-  const videos = items
+  const videos = recentItems
     .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
-    .slice(0, 3);
-  const highlighted = [
-    ...items.filter((item) => item.featured),
-    ...items.filter((item) => !item.featured),
-  ].slice(0, 8);
+    .sort(newestContentFirst)
+    .slice(0, 4);
+  const highlighted = [...highlightedItems].sort(mostViewedFirst).slice(0, 8);
+  const guideCount = getGuideCatalog(items).length;
 
   return (
     <AppShell
@@ -171,16 +176,15 @@ export function DashboardScreen({
             </div>
             <div className="study-material-grid">
               {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
-                const count = items.filter((item) => item.kind === kind).length;
+                const count = kind === "guide" ? guideCount : items.filter((item) => item.kind === kind).length;
                 return (
                   <Link className="study-material-card" href={href} key={kind}>
-                    <span className="study-material-wash" />
                     <span className="study-material-icon">
-                      <Icon size={31} weight="regular" />
+                      <Icon size={24} weight="regular" />
                     </span>
                     <span className="study-material-copy">
                       <strong>{title}</strong>
-                      <small>{count > 0 ? count + " publicados" : description}</small>
+                      <small>{count > 0 ? `${count} ${count === 1 ? "disponible" : "disponibles"}` : description}</small>
                     </span>
                   </Link>
                 );
@@ -230,7 +234,7 @@ export function DashboardScreen({
               </ol>
             ) : (
               <p className="dynamic-aside-empty">
-                La selección destacada se llenará desde el panel editorial.
+                Aquí aparecerá el contenido más visto.
               </p>
             )}
           </div>

@@ -1,4 +1,4 @@
-import type { ContentDraft, ContentItem } from "@cediah/contracts";
+import type { ContentDraft, ContentItem, RichTextNode } from "@cediah/contracts";
 
 type GuideItem = Extract<ContentItem, { kind: "guide" }>;
 type GuideContent = Extract<ContentDraft, { kind: "guide" }>["content"];
@@ -35,4 +35,28 @@ export function getVideoGuideContent(
     quiz: video.content.quiz,
     regions: video.content.regions,
   };
+}
+
+function nodeHasContent(node: RichTextNode): boolean {
+  if (node.type === "text") return Boolean(node.text.trim());
+  if (node.type === "image") return true;
+  return "content" in node && Boolean(node.content?.some(nodeHasContent));
+}
+
+/** Read-only projections: the video remains the only stored document/asset. */
+export function getGuideCatalog(items: readonly ContentItem[]): GuideItem[] {
+  const guides = items.filter((item): item is GuideItem => item.kind === "guide");
+  const linkedVideoIds = new Set(guides.map((guide) => guide.content.linkedVideoId).filter(Boolean));
+  for (const item of items) {
+    if (item.kind !== "video" || linkedVideoIds.has(item.id)) continue;
+    const guide = item.content.guide;
+    if (!guide.document?.content.some(nodeHasContent) && !guide.sections.some((section) => section.body.trim())) continue;
+    guides.push({
+      ...item,
+      asset: null,
+      content: getVideoGuideContent(item),
+      kind: "guide",
+    });
+  }
+  return guides;
 }

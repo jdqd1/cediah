@@ -243,6 +243,46 @@ function subjectProvider(overrides: Partial<SubjectProvider> = {}): SubjectProvi
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
 describe("content API", () => {
+  it("records authenticated views using content-scoped opaque keys, never caller-supplied counts", async () => {
+    const calls: Array<{ contentId: string; viewerKey: string }> = [];
+    const app = await buildApp({ ...testEnvironment, auth: {
+      databaseUrl: "postgres://unused.test/test", publicUrl: "http://localhost:4000",
+      requireEmailVerification: false, secret: "test-only-content-view-secret-at-least-32-characters", trustedOrigins: [],
+    } }, {
+      identityProvider: identityProvider(),
+      contentProvider: contentProvider([], {
+        recordView: async (input) => { calls.push(input); return { status: "success", value: { counted: true } }; },
+      }),
+    });
+    try {
+      const url = `/v1/content/${contentId}/views`;
+      expect((await app.inject({ method: "POST", url })).statusCode).toBe(401);
+      expect(calls).toHaveLength(0);
+      const response = await app.inject({ method: "POST", url, headers: auth("student-token"), payload: { viewCount: 9000 } });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.json()).toEqual({ counted: true });
+      await app.inject({ method: "POST", url, headers: auth("student-token") });
+      await app.inject({ method: "POST", url: `/v1/content/${linkedVideoId}/views`, headers: auth("student-token") });
+      expect(calls[0]?.viewerKey).toMatch(/^[a-f0-9]{64}$/);
+      expect(calls[0]).toEqual(calls[1]);
+      expect(calls[2]?.viewerKey).not.toBe(calls[0]?.viewerKey);
+      expect(calls[0]).not.toHaveProperty("viewCount");
+    } finally { await app.close(); }
+  });
+
+  it("passes view ranking to the provider before applying the catalog limit", async () => {
+    let input: Parameters<ContentProvider["listPublished"]>[0] | undefined;
+    const app = await buildApp(testEnvironment, { contentProvider: contentProvider([], {
+      listPublished: async (query) => { input = query; return []; },
+    }) });
+    try {
+      expect((await app.inject({ url: "/v1/content?sort=views&limit=8" })).statusCode).toBe(200);
+      expect(input).toEqual({ sort: "views", limit: 8 });
+      expect((await app.inject({ url: "/v1/content?sort=untrusted" })).statusCode).toBe(400);
+    } finally { await app.close(); }
+  });
+
   it("maps the four platform roles to the requested permission matrix", () => {
     expect(getContentCapabilities(["student"])).toEqual({
       canCreate: false,
