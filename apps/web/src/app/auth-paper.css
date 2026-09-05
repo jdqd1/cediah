@@ -435,15 +435,11 @@
   color: #fff;
   font-size: 0.78rem;
   font-weight: 600;
-  box-shadow:
-    0 14px 28px rgb(80 30 236 / 20%),
-    inset 0 1px 0 rgb(255 255 255 / 20%);
+  box-shadow: none;
 }
 
 .auth-page-paper .auth-form .button-primary:hover:not(:disabled) {
-  box-shadow:
-    0 18px 34px rgb(80 30 236 / 27%),
-    inset 0 1px 0 rgb(255 255 255 / 24%);
+  box-shadow: none;
   transform: translateY(-2px);
 }
 

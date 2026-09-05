@@ -9,7 +9,6 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import type { ContentItem, ContentKind } from "@cediah/contracts";
 import { publishedContentHref, subjectDirectoryHref } from "@/lib/content-navigation";
-import { getGuideCatalog } from "@/lib/content-guide-links";
 import { mostViewedFirst, newestContentFirst } from "@/lib/content-order";
 import { formatVideoViews } from "@/lib/video-views";
 import { AppShell } from "./app-shell";
@@ -124,7 +123,6 @@ export function DashboardScreen({
     .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
     .sort(mostViewedFirst)
     .slice(0, 8);
-  const guideCount = getGuideCatalog(items).length;
 
   return (
     <AppShell
@@ -136,15 +134,14 @@ export function DashboardScreen({
     >
       <nav className="study-material-grid dashboard-shortcuts" aria-label="Accesos directos de estudio">
         {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
-          const count = kind === "guide" ? guideCount : items.filter((item) => item.kind === kind).length;
           return (
-            <Link className="study-material-card" href={href} key={kind}>
+            <Link className="study-material-card" data-kind={kind} href={href} key={kind}>
               <span className="study-material-icon" aria-hidden="true">
                 <Icon size={22} weight="regular" />
               </span>
               <span className="study-material-copy">
                 <strong>{title}</strong>
-                <small>{count > 0 ? `${count} ${count === 1 ? "disponible" : "disponibles"}` : description}</small>
+                <small>{description}</small>
               </span>
             </Link>
           );

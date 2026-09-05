@@ -87,10 +87,10 @@ export function SubjectDirectoryScreen({
     const query = normalize(search.trim());
     return subjects.filter((subject) => {
       const matchesSearch = !query || normalize(subject.name).includes(query);
-      const hasRequestedContent = !initialKind || (subjectCounts.get(subject.id) ?? 0) > 0;
-      return matchesSearch && hasRequestedContent;
+      const hasContent = (subjectCounts.get(subject.id) ?? 0) > 0;
+      return matchesSearch && hasContent;
     });
-  }, [initialKind, search, subjectCounts, subjects]);
+  }, [search, subjectCounts, subjects]);
   const resourceSearchResults = useMemo(() => {
     const query = normalize(search.trim());
     if (!initialKind || !query) return [];

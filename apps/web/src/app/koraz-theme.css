@@ -882,8 +882,8 @@ textarea:focus-visible {
 }
 
 .study-material-icon {
-  background: #e0f2fe;
-  color: #0891b2;
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 .study-material-card:nth-child(2) .study-material-icon {
@@ -897,6 +897,35 @@ textarea:focus-visible {
 }
 
 .study-material-card:nth-child(4) .study-material-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+/* Keep material icons consistent across dashboard shortcuts and subject detail. */
+.study-material-card[data-kind="video"] .study-material-icon,
+.subject-topic-list-video .subject-topic-icon,
+.app-main .subject-destination-video .subject-destination-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.study-material-card[data-kind="guide"] .study-material-icon,
+.subject-topic-list-guide .subject-topic-icon,
+.app-main .subject-destination-guide .subject-destination-icon {
+  background: #e0e7ff;
+  color: var(--koraz-blue);
+}
+
+.study-material-card[data-kind="flashcards"] .study-material-icon,
+.subject-topic-list-flashcards .subject-topic-icon,
+.app-main .subject-destination-flashcards .subject-destination-icon {
+  background: #ede9fe;
+  color: var(--koraz-violet-deep);
+}
+
+.study-material-card[data-kind="quiz"] .study-material-icon,
+.subject-topic-list-quiz .subject-topic-icon,
+.app-main .subject-destination-quiz .subject-destination-icon {
   background: #dcfce7;
   color: #16a34a;
 }

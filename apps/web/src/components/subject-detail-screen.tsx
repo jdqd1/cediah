@@ -6,7 +6,7 @@ import {
   ArrowRight,
   BookOpen,
   CardsThree,
-  ClipboardText,
+  CheckSquareOffset,
   Compass,
   MagnifyingGlass,
   PlayCircle,
@@ -35,7 +35,7 @@ const sectionDefinitions: Array<{
   { icon: PlayCircle, kind: "video" },
   { icon: BookOpen, kind: "guide" },
   { icon: CardsThree, kind: "flashcards" },
-  { icon: ClipboardText, kind: "quiz" },
+  { icon: CheckSquareOffset, kind: "quiz" },
 ];
 
 const kindSearchLabels: Record<StudyContentKind, string> = {
@@ -167,7 +167,7 @@ export function SubjectDetailScreen({
                 const content = (
                   <>
                     <span className="subject-destination-icon" aria-hidden="true">
-                      <Icon size={22} weight={section.kind === "video" ? "fill" : "regular"} />
+                      <Icon size={22} weight="regular" />
                     </span>
                     <span className="subject-destination-copy">
                       <strong>{studyContentKindLabels[section.kind]}</strong>
