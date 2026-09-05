@@ -4,6 +4,7 @@ import { PlatformFrame } from "@/components/platform-frame";
 import { RouteLoadingScreen } from "@/components/route-loading-screen";
 import "./globals.css";
 import "./koraz-theme.css";
+import "./platform-chrome.css";
 import "./landing-paper.css";
 import "./auth-paper.css";
 

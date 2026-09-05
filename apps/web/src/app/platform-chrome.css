@@ -1,0 +1,175 @@
+/* Floating navigation shares one surface treatment across screen sizes. */
+.app-shell,
+.app-shell.dashboard-shell,
+.app-shell:has(.published-rich-guide-reader) {
+  --topbar-height: 76px;
+  --floating-surface: #ffffff;
+  --floating-shadow: 0 4px 18px rgb(30 48 100 / 7%), 0 1px 3px rgb(30 48 100 / 4%);
+}
+
+.app-shell .app-topbar.app-topbar-simplified,
+.app-shell.dashboard-shell .app-topbar.app-topbar-simplified {
+  height: var(--topbar-height);
+  min-height: var(--topbar-height);
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 16px;
+  border: 0;
+  background: transparent;
+  padding: 12px 20px;
+  color: var(--koraz-ink);
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.app-topbar-simplified > :not(.sr-only) { pointer-events: auto; }
+
+.app-topbar.app-topbar-simplified .menu-trigger,
+.app-topbar.app-topbar-simplified .profile-trigger {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  place-items: center;
+  border: 1px solid var(--koraz-line);
+  border-radius: 50%;
+  background: var(--floating-surface);
+  padding: 0;
+  color: var(--koraz-blue);
+  box-shadow: var(--floating-shadow);
+}
+
+.app-topbar.app-topbar-simplified .menu-trigger:hover,
+.app-topbar.app-topbar-simplified .profile-trigger:hover {
+  border-color: #b8c5fc;
+  background: #eef2ff;
+  color: var(--koraz-blue-deep);
+}
+
+.app-topbar-simplified .profile-trigger > svg,
+.app-topbar-simplified .profile-sign-in > span:not(.profile-avatar) { display: none; }
+.app-topbar-simplified .profile-avatar { width: 36px; height: 36px; box-shadow: none; }
+.app-topbar-simplified .topbar-actions { grid-column: 3; }
+.app-topbar-simplified .profile-popover { top: calc(100% + 12px); }
+
+.app-topbar-simplified .global-content-search-form {
+  min-height: 44px;
+  margin: 0;
+  border: 1px solid var(--koraz-line);
+  background: var(--floating-surface);
+  color: var(--koraz-blue);
+  box-shadow: var(--floating-shadow);
+}
+
+.app-topbar-simplified .global-content-search-form:focus-within {
+  border-color: #a5b4fc;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgb(67 97 238 / 12%), var(--floating-shadow);
+}
+
+.app-topbar-simplified .global-content-search-form input { color: var(--koraz-ink); }
+.app-topbar-simplified .global-content-search-form input::placeholder { color: #72809b; }
+.app-topbar-simplified .global-content-search-clear { background: #eef2ff; color: var(--koraz-blue); }
+.app-topbar-simplified .global-content-search-panel { top: calc(100% + 12px); }
+.app-topbar-simplified :is(.menu-trigger, .profile-trigger):focus-visible { outline: 3px solid #a5b4fc; outline-offset: 3px; }
+
+.app-shell .app-sidebar {
+  position: fixed;
+  z-index: 180;
+  top: 0;
+  left: 0;
+  height: 100svh;
+  height: 100dvh;
+}
+
+.app-shell .sidebar-backdrop {
+  position: fixed;
+  z-index: 170;
+  inset: 0;
+  display: block;
+  border: 0;
+  background: rgb(15 23 42 / 36%);
+  backdrop-filter: blur(3px);
+}
+
+.app-shell .sidebar-topline { justify-content: space-between; }
+.app-shell .sidebar-brand { display: inline-flex; }
+.app-shell.sidebar-open::after { display: none; }
+
+@media (min-width: 961px) {
+  .app-shell,
+  .app-shell.dashboard-shell { grid-template-columns: 72px minmax(0, 1fr); }
+  .app-shell .app-topbar.app-topbar-simplified,
+  .app-shell.dashboard-shell .app-topbar.app-topbar-simplified { padding-left: 92px; }
+  .app-shell.sidebar-collapsed .app-sidebar { top: var(--topbar-height); height: calc(100dvh - var(--topbar-height)); }
+  .app-shell.sidebar-collapsed .sidebar-topline { display: none; }
+}
+
+@media (max-width: 960px) {
+  .app-shell,
+  .app-shell.dashboard-shell,
+  .app-shell:has(.published-rich-guide-reader) { --topbar-height: 72px; }
+  .app-shell .app-topbar.app-topbar-simplified,
+  .app-shell.dashboard-shell .app-topbar.app-topbar-simplified { gap: 10px; padding: 12px; }
+  .app-shell .app-sidebar { width: min(288px, calc(100vw - 48px)); }
+  .dashboard-main :is(.dashboard-shortcuts, .dashboard-video-grid) { scrollbar-width: none; }
+  .dashboard-main :is(.dashboard-shortcuts, .dashboard-video-grid)::-webkit-scrollbar { display: none; width: 0; height: 0; }
+}
+
+@media (max-width: 760px) {
+  .video-mobile-navbar {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+  .video-mobile-navbar > button { pointer-events: auto; box-shadow: 0 6px 24px rgb(24 42 70 / 14%); }
+}
+
+/* The list uses the same soft icon treatment as its resource tab. */
+.video-key-points li > span,
+.video-key-points li:nth-child(3n + 2) > span,
+.video-key-points li:nth-child(3n + 3) > span {
+  border-color: transparent;
+  background: #fff1d7;
+  color: #a86618;
+}
+
+/* A quiet study loop, with a static alternative for reduced motion. */
+.route-loading-lockup { width: auto; gap: 20px; }
+.route-loading-orbit { position: relative; display: grid; width: 100px; height: 100px; place-items: center; }
+.route-loading-ring { position: absolute; inset: 0; border: 1px solid #dce3fa; border-radius: 50%; }
+.route-loading-ring::before {
+  position: absolute;
+  inset: -1px;
+  border: 2px solid transparent;
+  border-top-color: var(--koraz-blue);
+  border-radius: inherit;
+  content: "";
+  animation: loading-orbit 2.4s linear infinite;
+}
+.route-loading-glyph {
+  position: absolute;
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  border-radius: 23px;
+  background: #eef2ff;
+  color: var(--koraz-blue);
+  opacity: 0;
+  animation: loading-glyph 4.8s ease-in-out infinite;
+}
+.route-loading-glyph:nth-of-type(3) { animation-delay: 1.6s; }
+.route-loading-glyph:nth-of-type(4) { animation-delay: 3.2s; }
+.route-loading-label { color: #72809b; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.04em; }
+@keyframes loading-orbit { to { transform: rotate(360deg); } }
+@keyframes loading-glyph {
+  0%, 33%, 100% { opacity: 0; transform: translateY(5px) scale(0.92); }
+  7%, 26% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-loading-ring::before, .route-loading-glyph { animation: none; }
+  .route-loading-glyph:nth-of-type(2) { opacity: 1; transform: none; }
+}

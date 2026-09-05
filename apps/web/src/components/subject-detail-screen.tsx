@@ -23,7 +23,7 @@ import {
 } from "@/lib/content-navigation";
 import { contentItemSearchText } from "@/lib/content-search";
 import { uniqueRegions } from "@/lib/content-regions";
-import { getGuideCatalog } from "@/lib/content-guide-links";
+import { getSubjectStudyCatalog } from "@/lib/content-practice-links";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
@@ -98,10 +98,12 @@ export function SubjectDetailScreen({
   const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
   const searching = Boolean(search.trim());
-  const guides = useMemo(() => getGuideCatalog(items), [items]);
+  const catalogs = useMemo(() => Object.fromEntries(
+    sectionDefinitions.map(({ kind }) => [kind, getSubjectStudyCatalog(items, kind, subject.id)]),
+  ) as Record<StudyContentKind, ContentItem[]>, [items, subject.id]);
   const kindItems = useMemo(
-    () => kind === "guide" ? guides : kind ? items.filter((item) => item.kind === kind) : [],
-    [guides, items, kind],
+    () => kind ? catalogs[kind] : [],
+    [catalogs, kind],
   );
   const filteredItems = useMemo(() => {
     const query = normalize(search.trim());
@@ -136,7 +138,7 @@ export function SubjectDetailScreen({
 
   const sections = sectionDefinitions.map((definition) => ({
     ...definition,
-    count: definition.kind === "guide" ? guides.length : items.filter((item) => item.kind === definition.kind).length,
+    count: catalogs[definition.kind].length,
   }));
   const KindIcon = kind ? sectionDefinitions.find((section) => section.kind === kind)?.icon ?? Compass : Compass;
   const label = kind ? studyContentKindLabels[kind] : "";

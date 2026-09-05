@@ -20,6 +20,7 @@ import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth/client";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useAccessRoles } from "./access-context";
 import { CediahLogo } from "./cediah-logo";
 import { GlobalContentSearch } from "./global-content-search";
@@ -222,7 +223,12 @@ function ShellChrome({
   const sidebarRef = useRef<HTMLElement>(null);
   useNavigationIntent();
 
-  const closeSidebar = () => setSidebarOpen(false);
+  const drawerOpen = isDesktopSidebar ? !sidebarCollapsed : sidebarOpen;
+  useBodyScrollLock(drawerOpen);
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+    if (isDesktopSidebar) setSidebarCollapsedPreference(true);
+  };
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
   const accessIsAdministrator = accessRoles.includes("administrator");
   const effectiveIsAdministrator = isAdministrator || accessIsAdministrator;
@@ -262,8 +268,10 @@ function ShellChrome({
   }
 
   function togglePrimaryMenu() {
+    setProfileOpen(false);
     if (window.matchMedia("(min-width: 961px)").matches) {
       setSidebarCollapsedPreference(!sidebarCollapsed);
+      if (!sidebarCollapsed) window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
     } else {
       if (sidebarOpen) {
         setSidebarOpen(false);
@@ -299,7 +307,7 @@ function ShellChrome({
   }, []);
 
   useEffect(() => {
-    if (!sidebarOpen || !window.matchMedia("(max-width: 960px)").matches) return;
+    if (!drawerOpen) return;
 
     const focusable = Array.from(
       sidebarRef.current?.querySelectorAll<HTMLElement>(
@@ -314,7 +322,8 @@ function ShellChrome({
       if (event.key === "Escape") {
         event.preventDefault();
         setSidebarOpen(false);
-        menuTriggerRef.current?.focus();
+        if (isDesktopSidebar) setSidebarCollapsedPreference(true);
+        window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
         return;
       }
 
@@ -330,12 +339,12 @@ function ShellChrome({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [sidebarOpen]);
+  }, [drawerOpen, isDesktopSidebar]);
   return (
     <div
       className={`app-shell ${activeKey === "dashboard" ? "dashboard-shell" : ""} ${sidebarOpen ? "sidebar-open" : ""} ${sidebarCollapsed ? "sidebar-collapsed" : ""}`.trim()}
     >
-      <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" ref={sidebarRef}>
+      <aside className="app-sidebar" id="app-sidebar" aria-label="Navegación principal" aria-modal={drawerOpen || undefined} role={drawerOpen ? "dialog" : undefined} inert={!isDesktopSidebar && !sidebarOpen} ref={sidebarRef}>
         <div className="sidebar-topline">
           <Link
             className="sidebar-brand"
@@ -402,13 +411,13 @@ function ShellChrome({
         </div>
       </aside>
 
-      {sidebarOpen && (
+      {drawerOpen && (
         <button
           aria-label="Cerrar menú"
           className="sidebar-backdrop"
           onClick={() => {
             closeSidebar();
-            menuTriggerRef.current?.focus();
+            window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
           }}
           tabIndex={-1}
           type="button"
@@ -430,9 +439,6 @@ function ShellChrome({
             >
               <List size={28} />
             </button>
-            <Link className="topbar-brand" href="/dashboard" aria-label="Koraz, ir al inicio">
-              <CediahLogo variant="light" priority={activeKey === "dashboard"} />
-            </Link>
           </div>
           <GlobalContentSearch />
           <div className="topbar-page-context sr-only">

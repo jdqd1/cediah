@@ -159,3 +159,9 @@ Quedan tres dependencias operativas, no estructurales:
 - un servicio de objetos S3 compatible para videos.
 
 Supabase aloja los servicios PostgreSQL y S3 actuales, pero no define el modelo de identidad ni el acceso del producto. Registro, login y sesiones pertenecen a Better Auth; roles, auditoría y contenido pertenecen al esquema SQL portable y solo se exponen mediante Fastify.
+
+## Recursos de práctica compartidos
+
+Los cuestionarios y flashcards anexos a un video o una guía no generan publicaciones ni filas adicionales. La web proyecta ambos recursos, en tiempo de lectura, desde el único arreglo de preguntas almacenado en el documento editorial. La guía enlazada más reciente es la fuente canónica del paquete; el video, la guía, el cuestionario y las flashcards muestran esa misma versión. Las proyecciones conservan el identificador y el slug de la fuente, combinan sus materias para el catálogo y nunca incrementan la reproducción del video al abrir una práctica.
+
+Las publicaciones independientes de tipo `quiz` y `flashcards` mantienen su modelo actual. Esta separación permite reutilizar una práctica anexa en las secciones de Materias sin duplicar texto, respuestas, metadatos ni assets en PostgreSQL.

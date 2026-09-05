@@ -64,6 +64,7 @@ export function ContentDetailScreen({
   linkedGuide,
   returnHref,
   returnLabel,
+  trackView = true,
 }: {
   guideMode?: boolean;
   item: ContentItem;
@@ -71,9 +72,10 @@ export function ContentDetailScreen({
   linkedGuide?: Extract<ContentItem, { kind: "guide" }>;
   returnHref?: string;
   returnLabel?: string;
+  trackView?: boolean;
 }) {
   // Opening a video's associated guide must not increment its playback count.
-  useContentView(item.status === "published" && item.kind !== "video" ? item.id : null);
+  useContentView(trackView && item.status === "published" && item.kind !== "video" ? item.id : null);
   const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
   const sectionLabel = isGuideView ? "Guías" : contentKindLabel(item.kind);
   const defaultBackHref = guideMode && item.kind === "video"
@@ -841,7 +843,11 @@ function ReaderSupportPanel({
 function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: GuideItem }) {
   const { reaction, pending: reactionPending, error: reactionError, chooseReaction } = useContentReaction(item.status === "published" ? item.id : null);
   const [viewCount, setViewCount] = useState(item.viewCount ?? 0);
-  const recordView = useContentView(item.status === "published" ? item.id : null, { automatic: false });
+  const recordView = useContentView(item.status === "published" ? item.id : null, {
+    automatic: false,
+    onRecorded: (result) => setViewCount(result.viewCount),
+  });
+  const playbackStarted = useRef(false);
   const [resource, setResource] = useState<VideoResource>("key-points");
   const [studyModal, setStudyModal] = useState<"quiz" | "flashcards" | null>(null);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -887,8 +893,9 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
     setStudyModal(mode);
   }
 
-  async function recordPlayback() {
-    if (await recordView()) setViewCount((current) => current + 1);
+  function recordPlayback() {
+    playbackStarted.current = true;
+    recordView();
   }
 
   return (
@@ -897,7 +904,10 @@ function VideoBody({ item, linkedGuide }: { item: VideoItem; linkedGuide?: Guide
         <div className="video-learning-primary">
           <div className="published-video-stage">
             {item.asset?.downloadUrl ? (
-              <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl} onPlaying={recordPlayback}>
+              <video aria-label={`Reproducir ${item.title}`} controls controlsList="nodownload noplaybackrate" disablePictureInPicture playsInline preload="metadata" src={item.asset.downloadUrl} onPlaying={recordPlayback}
+                onTimeUpdate={({ currentTarget }) => {
+                  if (!playbackStarted.current && !currentTarget.paused && !currentTarget.seeking && currentTarget.currentTime > 0) recordPlayback();
+                }}>
                 Tu navegador no puede reproducir este video.
               </video>
             ) : item.content.externalUrl ? (

@@ -708,15 +708,28 @@ export function createPostgresContentProvider(
           )
           .returning("content_item_id")
           .executeTakeFirst();
-        if (!receipt) return { status: "success", value: { counted: false } };
-
-        await transaction.insertInto("content_view_counts")
+        if (receipt) await transaction.insertInto("content_view_counts")
           .values({ content_item_id: item.id, view_count: 1 })
           .onConflict((conflict) => conflict.column("content_item_id")
             .doUpdateSet({ view_count: sql<string>`content_view_counts.view_count + 1` }),
           )
           .execute();
-        return { status: "success", value: { counted: true } };
+        // Return the authoritative total even when this viewer was deduplicated.
+        // The remaining window comes from the original receipt, not each retry.
+        const snapshot = await transaction.selectFrom("content_view_receipts")
+          .leftJoin("content_view_counts", "content_view_counts.content_item_id", "content_view_receipts.content_item_id")
+          .select([
+            "content_view_counts.view_count",
+            sql<number>`greatest(0, ceil(extract(epoch from (last_viewed_at + interval '30 minutes' - clock_timestamp())) * 1000))::integer`.as("retry_after_ms"),
+          ])
+          .where("content_view_receipts.content_item_id", "=", item.id)
+          .where("content_view_receipts.viewer_key", "=", input.viewerKey)
+          .executeTakeFirstOrThrow();
+        return { status: "success", value: {
+          counted: Boolean(receipt),
+          viewCount: Number(snapshot.view_count ?? 0),
+          retryAfterMs: Number(snapshot.retry_after_ms),
+        } };
       });
     },
 

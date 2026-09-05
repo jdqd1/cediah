@@ -252,7 +252,7 @@ describe("content API", () => {
     } }, {
       identityProvider: identityProvider(),
       contentProvider: contentProvider([], {
-        recordView: async (input) => { calls.push(input); return { status: "success", value: { counted: true } }; },
+        recordView: async (input) => { calls.push(input); return { status: "success", value: { counted: true, viewCount: 7, retryAfterMs: 1_800_000 } }; },
       }),
     });
     try {
@@ -262,7 +262,7 @@ describe("content API", () => {
       const response = await app.inject({ method: "POST", url, headers: auth("student-token"), payload: { viewCount: 9000 } });
       expect(response.statusCode).toBe(200);
       expect(response.headers["cache-control"]).toBe("no-store");
-      expect(response.json()).toEqual({ counted: true });
+      expect(response.json()).toEqual({ counted: true, viewCount: 7, retryAfterMs: 1_800_000 });
       await app.inject({ method: "POST", url, headers: auth("student-token") });
       await app.inject({ method: "POST", url: `/v1/content/${linkedVideoId}/views`, headers: auth("student-token") });
       expect(calls[0]?.viewerKey).toMatch(/^[a-f0-9]{64}$/);

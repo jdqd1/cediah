@@ -10,11 +10,13 @@ function LoadingContent() {
   return (
     <section className="route-loading route-loading-screen" aria-busy="true" aria-live="polite" role="status">
       <div className="route-loading-lockup">
-        <div className="route-loading-symbols" aria-hidden="true">
-          <PlayCircle size={22} /><BookOpen size={25} /><CardsThree size={22} />
+        <div className="route-loading-orbit" aria-hidden="true">
+          <span className="route-loading-ring" />
+          <span className="route-loading-glyph"><BookOpen size={32} weight="duotone" /></span>
+          <span className="route-loading-glyph"><PlayCircle size={32} weight="duotone" /></span>
+          <span className="route-loading-glyph"><CardsThree size={32} weight="duotone" /></span>
         </div>
-        <div><strong>Un momento, seguimos contigo</strong><p>Preparando tu espacio de estudio</p></div>
-        <span className="route-loading-progress" aria-hidden="true"><span /></span>
+        <span className="route-loading-label">Cargando<span aria-hidden="true">…</span></span>
       </div>
     </section>
   );

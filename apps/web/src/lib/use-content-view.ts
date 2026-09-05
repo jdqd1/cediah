@@ -1,55 +1,55 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import type { ContentViewResponse } from "@cediah/contracts";
+import { createContentViewTracker } from "./content-view-tracker";
 
-const inFlight = new Set<string>();
-const recentViews = new Map<string, number>();
-const repeatWindow = 30 * 60 * 1000;
+/** Readers count after four visible seconds; videos activate only on playback. */
+export function useContentView(contentId: string | null, {
+  automatic = true,
+  onRecorded,
+}: { automatic?: boolean; onRecorded?: (result: ContentViewResponse) => void } = {}) {
+  const trackerRef = useRef<ReturnType<typeof createContentViewTracker> | null>(null);
+  const trackerContentIdRef = useRef<string | null>(null);
+  const pendingContentIdRef = useRef<string | null>(null);
+  const onRecordedRef = useRef(onRecorded);
+  useEffect(() => { onRecordedRef.current = onRecorded; }, [onRecorded]);
 
-function wasRecentlyViewed(id: string) {
-  let previous = recentViews.get(id) ?? 0;
-  try { previous = Math.max(previous, Number(sessionStorage.getItem(`koraz:view:${id}`)) || 0); } catch { /* Storage can be blocked. */ }
-  return Date.now() - previous < repeatWindow;
-}
-
-async function recordContentView(id: string) {
-  if (document.visibilityState !== "visible" || inFlight.has(id) || wasRecentlyViewed(id)) return false;
-  inFlight.add(id);
-  try {
-    const response = await fetch(`/api/content/${encodeURIComponent(id)}/views`, {
-      method: "POST", credentials: "same-origin", keepalive: true,
-    });
-    if (!response.ok) return false;
-    const result: unknown = await response.json();
-    if (!result || typeof result !== "object" || !("counted" in result) || typeof result.counted !== "boolean") return false;
-    const now = Date.now();
-    recentViews.set(id, now);
-    try { sessionStorage.setItem(`koraz:view:${id}`, String(now)); } catch { /* Server also deduplicates. */ }
-    return result.counted;
-  } catch { return false; /* Analytics must never interrupt reading or playback. */ }
-  finally { inFlight.delete(id); }
-}
-
-/** Readers count after four visible seconds; videos explicitly count on playback. */
-export function useContentView(contentId: string | null, { automatic = true } = {}) {
-  const recordView = useCallback(() => contentId ? recordContentView(contentId) : Promise.resolve(false), [contentId]);
   useEffect(() => {
-    if (!contentId || !automatic) return;
-    const id = contentId;
-    let timer: number | undefined;
-
-    function schedule() {
-      window.clearTimeout(timer);
-      if (document.visibilityState !== "visible" || inFlight.has(id) || wasRecentlyViewed(id)) return;
-      timer = window.setTimeout(() => { void recordView(); }, 4_000);
+    if (!contentId) {
+      pendingContentIdRef.current = null;
+      return;
     }
-
+    const tracker = createContentViewTracker(contentId, (result) => onRecordedRef.current?.(result));
+    trackerRef.current = tracker;
+    trackerContentIdRef.current = contentId;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function schedule() {
+      clearTimeout(timer);
+      tracker.resume();
+      if (automatic && document.visibilityState === "visible") timer = setTimeout(tracker.record, 4_000);
+    }
     schedule();
+    if (pendingContentIdRef.current === contentId) {
+      pendingContentIdRef.current = null;
+      tracker.record();
+    }
     document.addEventListener("visibilitychange", schedule);
+    window.addEventListener("online", schedule);
     return () => {
-      window.clearTimeout(timer);
+      clearTimeout(timer);
+      tracker.dispose();
+      if (trackerRef.current === tracker) {
+        trackerRef.current = null;
+        trackerContentIdRef.current = null;
+      }
       document.removeEventListener("visibilitychange", schedule);
+      window.removeEventListener("online", schedule);
     };
-  }, [contentId, automatic, recordView]);
-  return recordView;
+  }, [contentId, automatic]);
+  return useCallback(() => {
+    if (!contentId) return;
+    if (trackerContentIdRef.current === contentId) trackerRef.current?.record();
+    else pendingContentIdRef.current = contentId;
+  }, [contentId]);
 }

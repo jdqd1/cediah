@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { SubjectDetailScreen } from "@/components/subject-detail-screen";
-import { getSubjectContent } from "@/lib/server/content-api";
+import { findVideoLinkedGuide } from "@/lib/content-guide-links";
+import { getPublishedContent, getSubjectContent } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
@@ -11,16 +12,27 @@ type SubjectPageProps = {
 
 export default async function SubjectPage({ params }: SubjectPageProps) {
   const { slug } = await params;
-  const [result, isAdministrator] = await Promise.all([
+  const [result, catalog, isAdministrator] = await Promise.all([
     getSubjectContent(slug),
+    getPublishedContent({ kind: "guide", limit: 100 }),
     currentUserIsAdministrator(),
   ]);
 
   if (result.status === "ready") {
+    const itemsById = new Map(result.detail.items.map((item) => [item.id, item]));
+    if (catalog.status === "ready") {
+      for (const item of result.detail.items) {
+        if (item.kind !== "video") continue;
+        const linkedGuide = findVideoLinkedGuide(catalog.catalog.items, item.id);
+        if (linkedGuide && !itemsById.has(linkedGuide.id)) {
+          itemsById.set(linkedGuide.id, linkedGuide);
+        }
+      }
+    }
     return (
       <SubjectDetailScreen
         isAdministrator={isAdministrator}
-        items={result.detail.items}
+        items={[...itemsById.values()]}
         subject={result.detail.subject}
       />
     );

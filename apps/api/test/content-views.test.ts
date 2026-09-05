@@ -10,7 +10,8 @@ function recordingDatabase({ duplicate = false, published = true } = {}) {
       statements.push(query);
       const rows = query.sql.startsWith('select "id" from "content_items"')
         ? published ? [{ id: "content-id" }] : []
-        : query.sql.startsWith('insert into "content_view_receipts"') && !duplicate ? [{ content_item_id: "content-id" }] : [];
+        : query.sql.startsWith('insert into "content_view_receipts"') && !duplicate ? [{ content_item_id: "content-id" }]
+          : query.sql.startsWith('select "content_view_counts"') ? [{ view_count: "7", retry_after_ms: 1_500_000 }] : [];
       return { rows: rows as R[] };
     },
     async *streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> { yield { rows: [] }; },
@@ -32,7 +33,7 @@ describe("aggregated content view persistence", () => {
   it("deduplicates atomically and increments only a counter, not editorial timestamps", async () => {
     const { database, statements } = recordingDatabase();
     const provider = createPostgresContentProvider(database);
-    expect(await provider.recordView?.({ contentId: "content-id", viewerKey: "opaque" })).toEqual({ status: "success", value: { counted: true } });
+    expect(await provider.recordView?.({ contentId: "content-id", viewerKey: "opaque" })).toEqual({ status: "success", value: { counted: true, viewCount: 7, retryAfterMs: 1_500_000 } });
     expect(statements[1]?.sql).toContain('on conflict ("content_item_id", "viewer_key")');
     expect(statements[1]?.sql).toContain("interval '30 minutes'");
     expect(statements[2]?.sql).toContain("content_view_counts.view_count + 1");
@@ -43,7 +44,7 @@ describe("aggregated content view persistence", () => {
     for (const options of [{ duplicate: true }, { published: false }]) {
       const { database, statements } = recordingDatabase(options);
       const result = await createPostgresContentProvider(database).recordView?.({ contentId: "content-id", viewerKey: "opaque" });
-      expect(result).toEqual(options.duplicate ? { status: "success", value: { counted: false } } : { status: "not_found" });
+      expect(result).toEqual(options.duplicate ? { status: "success", value: { counted: false, viewCount: 7, retryAfterMs: 1_500_000 } } : { status: "not_found" });
       expect(statements.some((query) => query.sql.startsWith('insert into "content_view_counts"'))).toBe(false);
       await database.destroy();
     }

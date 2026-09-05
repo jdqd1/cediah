@@ -919,6 +919,13 @@ const ContentRecordSchema = z.object({
 export const ContentItemSchema = z.intersection(ContentDraftSchema, ContentRecordSchema);
 export type ContentItem = z.infer<typeof ContentItemSchema>;
 
+export const ContentViewResponseSchema = z.object({
+  counted: z.boolean(),
+  viewCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  retryAfterMs: z.number().int().min(0).max(30 * 60 * 1000),
+});
+export type ContentViewResponse = z.infer<typeof ContentViewResponseSchema>;
+
 export const ContentReactionSchema = z.enum(["liked", "disliked"]);
 export type ContentReaction = z.infer<typeof ContentReactionSchema>;
 
@@ -1154,7 +1161,7 @@ export interface ContentProvider {
   recordView?(input: {
     contentId: string;
     viewerKey: string;
-  }): Promise<ContentMutationResult<{ counted: boolean }>>;
+  }): Promise<ContentMutationResult<ContentViewResponse>>;
   getReaction?(input: {
     contentId: string;
     viewerKey: string;

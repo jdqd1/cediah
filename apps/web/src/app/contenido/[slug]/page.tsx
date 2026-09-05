@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
+import { findVideoLinkedGuide } from "@/lib/content-guide-links";
+import { projectPracticeContent } from "@/lib/content-practice-links";
 import { isStudyContentKind, subjectContentHref } from "@/lib/content-navigation";
 import {
   getPublishedContent,
@@ -50,15 +52,19 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
         ? `Volver a ${subject.name}`
         : "Volver a materias";
     const linkedGuideResult = result.item.kind === "video"
-      ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 1 })
+      ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 100 })
       : null;
     const linkedGuide = linkedGuideResult?.status === "ready"
-      ? linkedGuideResult.catalog.items.find((item) => item.kind === "guide")
+      ? findVideoLinkedGuide(linkedGuideResult.catalog.items, result.item.id)
       : undefined;
+    const practiceKind = kind === "quiz" || kind === "flashcards" ? kind : undefined;
+    const item = practiceKind ? projectPracticeContent(result.item, practiceKind, linkedGuide) : result.item;
+    if (!item) notFound();
 
     return (
       <ContentDetailScreen
-        item={result.item}
+        item={item}
+        trackView={item.kind === result.item.kind}
         isAdministrator={isAdministrator}
         linkedGuide={linkedGuide}
         returnHref={returnHref}

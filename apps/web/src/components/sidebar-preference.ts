@@ -5,11 +5,11 @@ import { useSyncExternalStore } from "react";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "cediah:sidebar-collapsed";
 const SIDEBAR_PREFERENCE_EVENT = "cediah:sidebar-preference-change";
 
-let inMemoryPreference = false;
+let inMemoryPreference = true;
 
 function getSidebarPreferenceSnapshot() {
   try {
-    inMemoryPreference = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+    inMemoryPreference = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) !== "false";
   } catch {
     // Fall back to the current-session preference when storage is unavailable.
   }
@@ -35,7 +35,7 @@ export function useSidebarCollapsedPreference() {
   return useSyncExternalStore(
     subscribeToSidebarPreference,
     getSidebarPreferenceSnapshot,
-    () => false,
+    () => true,
   );
 }
 
@@ -43,11 +43,7 @@ export function setSidebarCollapsedPreference(collapsed: boolean) {
   inMemoryPreference = collapsed;
 
   try {
-    if (collapsed) {
-      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
-    } else {
-      localStorage.removeItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
-    }
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(collapsed));
   } catch {
     // The custom event still updates this tab through the in-memory fallback.
   }
