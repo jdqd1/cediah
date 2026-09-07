@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { PlatformFrame } from "@/components/platform-frame";
 import { RouteLoadingScreen } from "@/components/route-loading-screen";
 import "./globals.css";
@@ -10,9 +10,14 @@ import "./landing-paper.css";
 import "./auth-paper.css";
 import "./learning.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+const plusJakartaSans = localFont({
+  src: [
+    { path: "../../public/fonts/PlusJakartaSans-Light.ttf", weight: "300", style: "normal" },
+    { path: "../../public/fonts/PlusJakartaSans-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../../public/fonts/PlusJakartaSans-Medium.ttf", weight: "500", style: "normal" },
+    { path: "../../public/fonts/PlusJakartaSans-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "../../public/fonts/PlusJakartaSans-Bold.ttf", weight: "700", style: "normal" },
+  ],
   variable: "--font-plus-jakarta",
   display: "swap",
 });

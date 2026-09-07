@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BookOpen } from "@phosphor-icons/react/dist/ssr";
 import { CediahLogo } from "@/components/cediah-logo";
 import { demoCourses, getDemoLesson } from "@/data/demo-courses";
 
