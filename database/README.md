@@ -33,6 +33,8 @@ En la producción actual de CEDIAH, Render usa el Transaction Pooler de Supabase
 11. 0011_guided_learning_attempts.sql añade intentos persistentes, respuestas inmutables, progreso real, recibos idempotentes y eventos deduplicados.
 12. 0012_guided_learning_evidence.sql añade memoria espaciada global, evidencia por objetivo, preferencias y overrides de recomendación sin alterar el vencimiento científico.
 13. 0013_guided_learning_rewards.sql añade puntos de aprendizaje e hitos idempotentes vinculados a eventos aceptados por el servidor.
+14. 0014_guided_learning_observability.sql añade contadores de replay y última fecha de reintento a los recibos idempotentes, bajo su misma retención.
+15. 0015_guided_learning_foreign_key_indexes.sql cubre las claves foráneas del dominio guiado para mantener acotados joins y cascadas.
 
 Las claves foráneas de identidad apuntan a public.auth_users. No dependen de auth.users ni de otros esquemas administrados por Supabase.
 

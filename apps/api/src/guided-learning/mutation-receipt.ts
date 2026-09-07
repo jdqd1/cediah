@@ -1,4 +1,4 @@
-import type { Transaction } from "kysely";
+import { sql, type Transaction } from "kysely";
 import type { ZodType } from "zod";
 import type {
   GuidedLearningFailure,
@@ -59,12 +59,17 @@ export async function withLearningReceipt<T>(
     .returning("idempotency_key")
     .executeTakeFirst();
   if (!inserted) {
-    const receipt = await transaction.selectFrom("learning_mutation_receipts")
-      .select(["request_hash", "response_json"])
+    const receipt = await transaction.updateTable("learning_mutation_receipts")
+      .set({
+        last_replayed_at: sql<Date>`now()`,
+        replay_count: sql<number>`replay_count + 1`,
+      })
       .where("user_id", "=", input.userId)
       .where("idempotency_key", "=", input.idempotencyKey)
-      .executeTakeFirstOrThrow();
-    if (receipt.request_hash !== requestHash) return { status: "idempotency_conflict" };
+      .where("request_hash", "=", requestHash)
+      .returning(["request_hash", "response_json"])
+      .executeTakeFirst();
+    if (!receipt) return { status: "idempotency_conflict" };
     return parseStoredResult(receipt.response_json, input.responseSchema);
   }
 

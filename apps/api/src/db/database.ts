@@ -423,6 +423,8 @@ export interface LearningMutationReceiptTable {
   expires_at: GeneratedTimestamp;
   http_status: number | null;
   idempotency_key: string;
+  last_replayed_at: NullableTimestamp;
+  replay_count: Generated<number>;
   request_hash: string;
   response_json: ColumnType<JsonValue | null, JsonValue | null | undefined, JsonValue | null>;
   user_id: string;

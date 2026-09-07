@@ -653,6 +653,21 @@ export function createPostgresLearningInsightMethods(
             snoozed_until: snoozedUntil,
           })).execute();
         }
+        await transaction.insertInto("learning_events").values({
+          attempt_id: null,
+          enrollment_id: null,
+          event_type: "task_override_updated",
+          local_date: now.toISOString().slice(0, 10),
+          occurred_at: now,
+          payload_json: {
+            action: input.request.action,
+            taskCount: input.request.taskKeys.length,
+          },
+          semantic_key: `task_override_updated:${input.idempotencyKey}`,
+          timezone: "UTC",
+          user_id: input.userId,
+        }).onConflict((conflict) => conflict.columns(["user_id", "semantic_key"]).doNothing())
+          .execute();
         return { status: "success", value: { saved: true as const } };
       }));
     },

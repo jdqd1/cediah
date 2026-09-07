@@ -230,6 +230,8 @@ beforeAll(async () => {
   await applyMigration("0011_guided_learning_attempts.sql");
   await applyMigration("0012_guided_learning_evidence.sql");
   await applyMigration("0013_guided_learning_rewards.sql");
+  await applyMigration("0014_guided_learning_observability.sql");
+  await applyMigration("0015_guided_learning_foreign_key_indexes.sql");
   const normalized = await pg.query<{ content: { quiz: { questions: Array<{ id: string }> } } }>(
     "select content from content_items where id = $1",
     [videoId],
@@ -243,6 +245,40 @@ afterAll(async () => {
 });
 
 describe("guided-learning catalog and versioning", () => {
+  it("covers every guided-learning foreign key reported by the database advisor", async () => {
+    const result = await pg.query<{ indexname: string }>(
+      `select indexname
+       from pg_indexes
+       where schemaname = 'public'
+         and indexname like 'learning\\_%\\_fk\\_index' escape '\\'
+       order by indexname`,
+    );
+
+    expect(result.rows.map(({ indexname }) => indexname)).toEqual([
+      "learning_attempts_enrollment_version_fk_index",
+      "learning_attempts_option_version_fk_index",
+      "learning_attempts_step_version_fk_index",
+      "learning_enrollment_versions_enrollment_path_fk_index",
+      "learning_enrollment_versions_previous_path_fk_index",
+      "learning_enrollment_versions_version_path_fk_index",
+      "learning_enrollments_version_path_fk_index",
+      "learning_events_attempt_fk_index",
+      "learning_events_enrollment_fk_index",
+      "learning_path_steps_unit_version_fk_index",
+      "learning_path_versions_publisher_fk_index",
+      "learning_paths_cover_asset_fk_index",
+      "learning_paths_creator_fk_index",
+      "learning_paths_published_version_path_fk_index",
+      "learning_preferences_pinned_enrollment_fk_index",
+      "learning_review_states_item_fk_index",
+      "learning_step_options_source_content_fk_index",
+      "learning_step_options_step_version_fk_index",
+      "learning_step_progress_evidence_attempt_fk_index",
+      "learning_step_progress_step_version_fk_index",
+      "learning_task_overrides_enrollment_fk_index",
+    ]);
+  });
+
   it("creates, validates and publishes a real relational route with four projections", async () => {
     const created = await provider.createPath({ actorUserId: creatorId, draft: routeDraft("ruta-completa") });
     expect(created.status).toBe("success");
@@ -350,6 +386,14 @@ describe("guided-learning catalog and versioning", () => {
           userId: studentId,
         });
         expect(conflict.status).toBe("idempotency_conflict");
+        const receipt = await pg.query<{ last_replayed_at: string | null; replay_count: number }>(
+          `select last_replayed_at, replay_count
+           from learning_mutation_receipts
+           where user_id = $1 and idempotency_key = $2`,
+          [studentId, idempotencyKey],
+        );
+        expect(receipt.rows[0]?.replay_count).toBe(1);
+        expect(receipt.rows[0]?.last_replayed_at).not.toBeNull();
       }
       current = answered.value.attempt;
       if (index === 1) {
@@ -726,6 +770,16 @@ describe("guided-learning catalog and versioning", () => {
       userId: studentId,
     });
     expect(snoozed).toEqual({ status: "success", value: { saved: true } });
+    const overrideEvent = await pg.query<{ event_type: string; payload_json: { action: string; taskCount: number } }>(
+      `select event_type, payload_json
+       from learning_events
+       where user_id = $1 and semantic_key = $2`,
+      [studentId, "task_override_updated:6a000000-0000-4000-8000-000000000001"],
+    );
+    expect(overrideEvent.rows[0]).toEqual({
+      event_type: "task_override_updated",
+      payload_json: { action: "snooze", taskCount: review.taskKeys.length },
+    });
     expect((await provider.getHome({ minutes: 5, userId: studentId })).counts.dueReviews).toBe(0);
     const after = await pg.query<{ item_id: string; next_due_at: Date }>(
       "select item_id, next_due_at from learning_review_states where user_id = $1 order by item_id",

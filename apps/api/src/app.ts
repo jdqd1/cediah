@@ -64,11 +64,16 @@ import { createS3ObjectStorage } from "./providers/s3-object-storage.js";
 import { createS3VideoProvider } from "./providers/s3-video.js";
 import { registerGuidedLearningEditorRoutes } from "./guided-learning/editor-routes.js";
 import { registerGuidedLearningRoutes } from "./guided-learning/routes.js";
+import {
+  registerGuidedLearningObservability,
+  type GuidedLearningObserver,
+} from "./guided-learning/observability.js";
 
 type AppDependencies = {
   authService?: AuthService;
   contentProvider?: ContentProvider;
   guidedLearningProvider?: GuidedLearningProvider;
+  guidedLearningObserver?: GuidedLearningObserver;
   subjectProvider?: SubjectProvider;
   roleManagementProvider?: RoleManagementProvider;
   identityProvider?: IdentityProvider;
@@ -440,6 +445,7 @@ export async function buildApp(
   });
 
   if (environment.guidedLearningEnabled) {
+    registerGuidedLearningObservability(app, dependencies.guidedLearningObserver);
     await registerGuidedLearningRoutes(app, {
       identityProvider,
       provider: guidedLearningProvider,

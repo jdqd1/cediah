@@ -1,6 +1,6 @@
 # Estado de implementación de Aprendizaje guiado
 
-Última actualización: 6 de septiembre de 2026.
+Última actualización: 7 de septiembre de 2026.
 
 ## Resumen
 
@@ -13,7 +13,7 @@
 | 4. Evidencia y recomendaciones | Completa en desarrollo local | Migración `0012`; evidencia, scheduler, repaso mixto e Inicio explicable; API 144/144, web 77/77 | — |
 | 5. Experiencia visual | Completa en desarrollo local | Migración `0013`; Inicio, Hoy, progreso, mapa vertical, cierre, XP/hitos y fixtures visuales; API 145/145, web 79/79 | — |
 | 6. Actualizaciones editoriales | Completa en desarrollo local | Preview/upgrade explícito, historial y mappings; catálogo editorial paginado, retiro seguro y adaptador extensible; API 151/151, web 79/79 | — |
-| 7. Validación y lanzamiento | Bloqueada para lanzamiento | Falta inventario real, ambiente preview y revisión académica | Continuar trabajo local independiente |
+| 7. Validación y lanzamiento | Esquema de producción listo; activación bloqueada | `0014`–`0015`, telemetría privada, 15 checksums, RLS/grants y advisors verificados en PostgreSQL 17.6 | Desplegar con bandera apagada y completar smoke/concurrencia/piloto |
 
 ## Fase 0 — Verificación y preparación
 
@@ -237,6 +237,39 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 - Safari iOS, Chrome Android físico, lector de pantalla, zoom de texto 200 %, orientación horizontal, red lenta, reapertura real de IndexedDB, firma del bucket y métricas p95 requieren el ambiente y dispositivos de fase 7.
 - El lanzamiento sigue condicionado a backup/restore, rollback, observabilidad, privacidad, seguridad, soporte y aprobación formal descritos en el plan.
 
+## Fase 7 — Validación y lanzamiento controlado (en progreso)
+
+### Primera porción local implementada
+
+- Fastify registra para cada endpoint guiado una observación estructurada con superficie, operación estable, método, estado, resultado, código público de error, duración monotónica y presencia de idempotencia. La señal usa la plantilla de ruta y excluye usuario, parámetros, query, cuerpo, respuestas, soluciones, claves y URLs firmadas.
+- Un hook común fuerza `Cache-Control: private, no-store` también en errores de estudiante y editor, cerrando el riesgo de que respuestas fallidas privadas dependieran de que cada handler recordara la cabecera.
+- `0014_guided_learning_observability.sql` añade `replay_count` y `last_replayed_at` a los recibos idempotentes. El incremento es atómico y ocurre solo para la misma cuenta, clave y hash; un payload distinto conserva el contador y falla con conflicto.
+- Los intentos y el resto de mutaciones usan ahora una sola implementación de recibos, evitando que los replays de actividades quedaran fuera de la nueva métrica.
+- Posponer/omitir una recomendación crea el evento deduplicado `task_override_updated` con acción y cantidad, sin guardar claves de tarea en el payload analítico.
+- `OPERACION.md` fija orden de preview, smoke tests, tablero mínimo, consultas agregadas, presupuestos iniciales y desactivación segura. `VALIDACION.md` separa evidencia local de las pruebas que todavía requieren ambiente, dispositivo o coordinación.
+
+### Evidencia de esta continuación
+
+- `guided-learning-routes.test.ts`: 11/11; comprueba observaciones de éxito/error, código estable, duración, presencia de idempotencia, ausencia de UUID/clave y caché privada en errores.
+- `guided-learning-catalog.test.ts` integra ahora `0015` y comprueba los 21 índices de claves foráneas guiadas.
+- 7 de septiembre de 2026: suite completa API — 21 archivos/153 pruebas; suite completa web — 17 archivos/79 pruebas; contratos, lint, typecheck y build completo correctos. Next.js generó 20 páginas.
+- La primera ejecución completa lanzada a la vez que typecheck produjo timeouts de hooks PGlite y fallos encadenados por estado incompleto. Las suites afectadas pasaron aisladas y la repetición completa de API, ya sin competencia, terminó 152/152.
+- `pnpm audit --audit-level high` confirmó inicialmente 8 vulnerabilidades altas y 3 moderadas en `fast-uri`. Los overrides compatibles a 3.1.6/4.1.3 eliminaron todas las altas; el resultado final conserva 3 moderadas.
+
+### PostgreSQL de producción preparado con la bandera apagada
+
+- `Koraz database`, PostgreSQL 17.6, coincidía con los checksums locales `0001`–`0008`, tenía 12 MB, cuatro publicaciones revisadas y el rol `cediah_runtime` sin superusuario ni bypass de RLS.
+- `0009`–`0014` se ejecutaron primero en una transacción terminada con `ROLLBACK`. Después se aplicaron atómicamente, registrando los seis checksums y un respaldo privado de los cuatro contenidos normalizados.
+- El advisor detectó 21 claves foráneas guiadas sin índice. `0015_guided_learning_foreign_key_indexes.sql` las cubre; pasó 153/153 pruebas de API, ensayo remoto con rollback y aplicación real.
+- Verificación posterior: 15 migraciones sin discrepancias, 20 tablas guiadas con propietario correcto y RLS activa, cero grants Data API, cero constraints sin validar y cero preguntas sin identidad estable.
+- Advisors posteriores: cero avisos de seguridad y cero claves foráneas guiadas sin índice. Los índices recién creados permanecen naturalmente sin uso mientras la bandera está apagada.
+
+### Dependencias externas aún abiertas
+
+- La base de producción ya está migrada, pero API/web aún no incluyen esta revisión desplegada y `GUIDED_LEARNING_ENABLED` continúa apagada.
+- Continúan pendientes T09/T25 con concurrencia real contra el pool, prueba de restore completa, bucket privado, p95 representativo y dispositivos/navegadores de la matriz.
+- Falta inventario actual, ruta piloto académicamente revisada, prueba de uso y aprobación formal. La bandera permanece desactivada por defecto y el producto no se declara listo para lanzamiento.
+
 ## Registro de pruebas posteriores
 
 - Fase 0: `pnpm --filter @cediah/api test` — 14 archivos, 100 pruebas correctas.
@@ -260,3 +293,9 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 - Fase 6: `pnpm --filter @cediah/web test` — 17 archivos, 79 pruebas correctas.
 - Fase 6: contratos, lint, typecheck y build optimizado de Next.js — correctos.
 - Fase 6: QA Chromium de actualización normal/bloqueada en escritorio y móvil — sin errores, overlays ni scroll horizontal; acciones móviles de 46 px.
+- Fase 7 local: `guided-learning-routes.test.ts` — 11 pruebas correctas.
+- Fase 7 local: `guided-learning-catalog.test.ts` — 18 pruebas correctas con migraciones `0001`–`0014`.
+- Fase 7 local: `pnpm --filter @cediah/api test` — 21 archivos, 152 pruebas correctas.
+- Fase 7 local: `pnpm --filter @cediah/web test` — 17 archivos, 79 pruebas correctas.
+- Fase 7 local: contratos, `pnpm lint`, `pnpm typecheck` y `pnpm build` — correctos; Next.js generó 20 páginas.
+- Fase 7 local: audit remoto bloqueado por política del sandbox; no hubo cambios de manifiesto o lockfile y no se reescribió el baseline previo.

@@ -28,6 +28,10 @@ services:
         # The free Supabase IPv4 endpoint uses transaction pooling. Apply SQL
         # migrations separately because the migrator takes a session lock.
         value: "false"
+      - key: GUIDED_LEARNING_ENABLED
+        # Enable only after migrations, permissions and production smoke tests
+        # have passed. Turning this off is the first application rollback step.
+        value: "false"
       - key: BETTER_AUTH_URL
         value: https://koraz-app.vercel.app
       - key: BETTER_AUTH_SECRET

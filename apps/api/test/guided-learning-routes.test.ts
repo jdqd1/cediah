@@ -7,6 +7,7 @@ import type {
 } from "@cediah/contracts";
 import { buildApp } from "../src/app.js";
 import type { ApiEnvironment } from "../src/config.js";
+import type { GuidedLearningObservation } from "../src/guided-learning/observability.js";
 
 const userId = "60000000-0000-4000-8000-000000000001";
 const otherStudentId = "70000000-0000-4000-8000-000000000001";
@@ -141,13 +142,16 @@ const identityProvider: IdentityProvider = {
 describe("guided-learning route registration", () => {
   it("does not register or call guided modules while the feature is disabled", async () => {
     const provider = fakeProvider();
+    const observer = vi.fn();
     const app = await buildApp({ ...environment, guidedLearningEnabled: false }, {
+      guidedLearningObserver: observer,
       guidedLearningProvider: provider,
       identityProvider,
     });
     const response = await app.inject({ headers: { authorization: "Bearer valid" }, method: "GET", url: "/v1/guided-learning/paths" });
     expect(response.statusCode).toBe(404);
     expect(provider.listPublishedPaths).not.toHaveBeenCalled();
+    expect(observer).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -160,6 +164,77 @@ describe("guided-learning route registration", () => {
     expect(response.headers["cache-control"]).toContain("private");
     expect(response.json().items[0]).not.toHaveProperty("version");
     expect(provider.listPublishedPaths).toHaveBeenCalledWith({ limit: 10, userId });
+    await app.close();
+  });
+
+  it("emits privacy-safe operation observations and protects error responses from caching", async () => {
+    const provider = fakeProvider();
+    const observations: GuidedLearningObservation[] = [];
+    const app = await buildApp(environment, {
+      guidedLearningObserver: (observation) => {
+        observations.push(observation);
+      },
+      guidedLearningProvider: provider,
+      identityProvider,
+    });
+
+    const catalog = await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "GET",
+      url: "/v1/guided-learning/paths?limit=10",
+    });
+    const missingAttempt = await app.inject({
+      headers: {
+        authorization: "Bearer valid",
+        "idempotency-key": idempotencyKey,
+      },
+      method: "POST",
+      payload: { clientAttemptId, stepOptionId: optionId },
+      url: "/v1/guided-learning/attempts",
+    });
+    const unavailableHome = await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "GET",
+      url: "/v1/guided-learning/home",
+    });
+
+    expect(catalog.statusCode).toBe(200);
+    expect(missingAttempt.statusCode).toBe(404);
+    expect(missingAttempt.headers["cache-control"]).toBe("private, no-store");
+    expect(unavailableHome.statusCode).toBe(503);
+    expect(unavailableHome.headers["cache-control"]).toBe("private, no-store");
+    expect(observations).toHaveLength(3);
+    expect(observations[0]).toMatchObject({
+      errorCode: null,
+      idempotencyKeyPresent: false,
+      method: "GET",
+      operation: "path.list",
+      outcome: "success",
+      statusCode: 200,
+      surface: "student",
+    });
+    expect(observations[2]).toMatchObject({
+      errorCode: "learning_unavailable",
+      idempotencyKeyPresent: false,
+      method: "GET",
+      operation: "home.read",
+      outcome: "server_error",
+      statusCode: 503,
+      surface: "student",
+    });
+    expect(observations[1]).toMatchObject({
+      errorCode: "not_found",
+      idempotencyKeyPresent: true,
+      method: "POST",
+      operation: "attempt.create",
+      outcome: "client_error",
+      statusCode: 404,
+      surface: "student",
+    });
+    expect(observations.every((observation) => observation.durationMs >= 0)).toBe(true);
+    expect(JSON.stringify(observations)).not.toContain(userId);
+    expect(JSON.stringify(observations)).not.toContain(attemptId);
+    expect(JSON.stringify(observations)).not.toContain(idempotencyKey);
     await app.close();
   });
 

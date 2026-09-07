@@ -39,6 +39,7 @@ import {
 } from "../guided-learning/attempt-manifest.js";
 import { gradeQuizOption } from "../guided-learning/adapters/quiz.js";
 import { recomputeObjectiveEvidence } from "../guided-learning/learning-evidence.js";
+import { withLearningReceipt } from "../guided-learning/mutation-receipt.js";
 import { hashLearningSnapshot } from "../guided-learning/snapshot-hash.js";
 import {
   filterReviewCandidateOverrides,
@@ -90,16 +91,6 @@ const ObjectiveEvidenceJsonSchema = z.strictObject({
   lastReviewAt: z.string().datetime({ offset: true }).nullable(),
   reviewRecommended: z.boolean(),
 });
-const failureStatuses = new Set([
-  "conflict",
-  "forbidden",
-  "idempotency_conflict",
-  "invalid_state",
-  "not_found",
-  "resource_changed",
-  "version_conflict",
-]);
-
 function toIso(value: Date | string) {
   return (value instanceof Date ? value : new Date(value)).toISOString();
 }
@@ -131,56 +122,15 @@ function reviewStateSummary(row: {
   };
 }
 
-function parseReceipt(value: JsonValue | null): GuidedLearningResult<LearningAttemptMutationResponse> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { status: "conflict" };
-  const record = value as Record<string, unknown>;
-  if (record.status === "success") {
-    const parsed = LearningAttemptMutationResponseSchema.safeParse(record.value);
-    return parsed.success ? { status: "success", value: parsed.data } : { status: "conflict" };
-  }
-  return typeof record.status === "string" && failureStatuses.has(record.status)
-    ? { status: record.status as Exclude<GuidedLearningResult<never>["status"], "success" | "not_ready"> }
-    : { status: "conflict" };
-}
-
-function resultHttpStatus(result: GuidedLearningResult<LearningAttemptMutationResponse>) {
-  if (result.status === "success") return 200;
-  if (result.status === "not_found") return 404;
-  if (result.status === "forbidden") return 403;
-  return result.status === "not_ready" ? 422 : 409;
-}
-
 async function withReceipt(
   transaction: Transaction<CediahDatabase>,
   input: { idempotencyKey: string; request: unknown; userId: string },
   mutate: () => Promise<GuidedLearningResult<LearningAttemptMutationResponse>>,
 ) {
-  const requestHash = hashLearningSnapshot(input.request);
-  const inserted = await transaction.insertInto("learning_mutation_receipts").values({
-    http_status: null,
-    idempotency_key: input.idempotencyKey,
-    request_hash: requestHash,
-    response_json: null,
-    user_id: input.userId,
-  }).onConflict((conflict) => conflict.columns(["user_id", "idempotency_key"]).doNothing())
-    .returning("idempotency_key").executeTakeFirst();
-  if (!inserted) {
-    const receipt = await transaction.selectFrom("learning_mutation_receipts")
-      .select(["request_hash", "response_json"])
-      .where("user_id", "=", input.userId)
-      .where("idempotency_key", "=", input.idempotencyKey)
-      .executeTakeFirstOrThrow();
-    if (receipt.request_hash !== requestHash) return { status: "idempotency_conflict" } as const;
-    return parseReceipt(receipt.response_json);
-  }
-
-  const result = await mutate();
-  await transaction.updateTable("learning_mutation_receipts").set({
-    http_status: resultHttpStatus(result),
-    response_json: result as unknown as JsonValue,
-  }).where("user_id", "=", input.userId)
-    .where("idempotency_key", "=", input.idempotencyKey).executeTakeFirstOrThrow();
-  return result;
+  return withLearningReceipt(transaction, {
+    ...input,
+    responseSchema: LearningAttemptMutationResponseSchema,
+  }, mutate);
 }
 
 async function readAttempt(
