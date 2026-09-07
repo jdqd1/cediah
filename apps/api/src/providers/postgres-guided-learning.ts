@@ -57,6 +57,12 @@ type PathRow = Selectable<LearningPathTable>;
 type VersionRow = Selectable<LearningPathVersionTable>;
 type EnrollmentRow = Selectable<LearningEnrollmentTable>;
 
+function jsonbArray(value: readonly unknown[]): JsonValue {
+  // node-postgres serializes JavaScript arrays as PostgreSQL arrays. JSON text lets
+  // the jsonb column parse the intended top-level JSON array instead.
+  return JSON.stringify(value) as unknown as JsonValue;
+}
+
 type ResolvedOption = LearningPathOptionDraft & {
   completionRule: ReturnType<typeof defaultCompletionRule>;
   itemIds: string[];
@@ -167,7 +173,7 @@ async function insertDefinition(
     const unit = definition.units[unitPosition]!;
     const storedUnit = await transaction.insertInto("learning_path_units").values({
       ...(unit.id ? { id: unit.id } : {}),
-      objectives_json: unit.objectives as unknown as JsonValue,
+      objectives_json: jsonbArray(unit.objectives),
       path_version_id: pathVersionId,
       pedagogy_version: unit.pedagogyVersion,
       position: unitPosition,
@@ -180,12 +186,12 @@ async function insertDefinition(
       const storedStep = await transaction.insertInto("learning_path_steps").values({
         ...(step.id ? { id: step.id } : {}),
         is_essential: step.isEssential,
-        objective_ids_json: step.objectiveIds as unknown as JsonValue,
+        objective_ids_json: jsonbArray(step.objectiveIds),
         path_version_id: pathVersionId,
         pedagogy_version: step.pedagogyVersion,
         position: stepPosition,
         purpose: step.purpose,
-        recommended_after_json: step.recommendedAfter as unknown as JsonValue,
+        recommended_after_json: jsonbArray(step.recommendedAfter),
         stable_key: step.stableKey,
         title: step.title,
         unit_id: storedUnit.id,

@@ -31,6 +31,12 @@ const videoId = "30000000-0000-4000-8000-000000000002";
 
 const connection: DatabaseConnection = {
   async executeQuery<R>(query: CompiledQuery): Promise<QueryResult<R>> {
+    if (
+      query.sql.startsWith('insert into "learning_path_units"') ||
+      query.sql.startsWith('insert into "learning_path_steps"')
+    ) {
+      definitionInsertParameters.push(...query.parameters);
+    }
     const result = await pg.query<R>(query.sql, [...query.parameters]);
     return { rows: result.rows, numAffectedRows: BigInt(result.affectedRows ?? 0) };
   },
@@ -38,6 +44,8 @@ const connection: DatabaseConnection = {
     yield { rows: [] };
   },
 };
+
+const definitionInsertParameters: unknown[] = [];
 
 const database = new Kysely<CediahDatabase>({
   dialect: {
@@ -280,8 +288,13 @@ describe("guided-learning catalog and versioning", () => {
   });
 
   it("creates, validates and publishes a real relational route with four projections", async () => {
+    definitionInsertParameters.length = 0;
     const created = await provider.createPath({ actorUserId: creatorId, draft: routeDraft("ruta-completa") });
     expect(created.status).toBe("success");
+    expect(definitionInsertParameters.some(Array.isArray)).toBe(false);
+    expect(definitionInsertParameters.some((value) => (
+      typeof value === "string" && value.startsWith("[")
+    ))).toBe(true);
     if (created.status !== "success") throw new Error("Expected path creation");
     publishedPathId = created.value.id;
     expect(created.value.version.units).toHaveLength(2);
