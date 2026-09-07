@@ -98,6 +98,7 @@ const kinds: { label: string; value: ContentKind }[] = [
 const primaryKinds = [
   { label: "Video", value: "video" },
   { label: "Guía", value: "guide" },
+  { label: "Tema", value: "topic" },
 ] satisfies { label: string; value: ContentKind }[];
 
 // Non-video editorial assets stay disabled until they have an independent
@@ -1775,6 +1776,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
               { label: "Todo", value: "all" },
               { label: "Videos", value: "video" },
               { label: "Guías", value: "guide" },
+              { label: "Temas", value: "topic" },
             ] as const).map((option) => (
               <button
                 aria-pressed={kindFilter === option.value}
@@ -1798,6 +1800,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
             <option value="all">Todos los tipos</option>
             <option value="video">Videos</option>
             <option value="guide">Guías</option>
+            <option value="topic">Temas</option>
           </select>
         </label>
         <label className="studio-status-filter">
