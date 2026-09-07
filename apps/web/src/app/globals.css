@@ -3799,6 +3799,58 @@ img {
   background: var(--cream);
 }
 
+.guided-library-options {
+  display: grid;
+  gap: 0.9rem;
+  margin: 1rem clamp(1rem, 6vw, 6rem) 0;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--blue) 25%, var(--line-strong));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--blue) 5%, white);
+}
+
+.guided-library-options > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.guided-library-options > div strong {
+  color: var(--ink);
+  font-size: 0.94rem;
+}
+
+.guided-library-options > div span,
+.guided-library-options nav a small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.guided-library-options nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 0.65rem;
+}
+
+.guided-library-options nav a {
+  display: grid;
+  min-height: 52px;
+  align-content: center;
+  gap: 0.15rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: white;
+  color: var(--blue);
+  font-size: 0.84rem;
+  font-weight: 760;
+}
+
+.guided-library-options nav a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blue) 35%, transparent);
+  outline-offset: 2px;
+}
+
 .published-content-context {
   display: flex;
   flex-wrap: wrap;

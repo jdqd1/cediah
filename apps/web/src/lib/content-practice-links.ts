@@ -33,7 +33,12 @@ export function projectPracticeContent(
       ...record,
       kind,
       content: {
-        cards: questions.map((question) => ({ front: question.prompt, back: questionAnswer(question) })),
+        cards: questions.map((question) => ({
+          back: questionAnswer(question),
+          front: question.prompt,
+          id: question.id,
+          memoryVersion: question.memoryVersion,
+        })),
         regions: content.regions,
       },
     };

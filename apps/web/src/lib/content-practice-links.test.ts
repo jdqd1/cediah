@@ -8,7 +8,18 @@ import {
 } from "./content-practice-links";
 import { publishedContentHref } from "./content-navigation";
 
-const question = { prompt: "Pregunta del video", options: ["Distractor", "Respuesta"], correctOptionIndex: 1, explanation: "Explicación" };
+const question = {
+  correctOptionIndex: 1,
+  explanation: "Explicación",
+  id: "10000000-0000-4000-8000-000000000010",
+  memoryVersion: 1,
+  optionIds: [
+    "10000000-0000-4000-8000-000000000011",
+    "10000000-0000-4000-8000-000000000012",
+  ],
+  options: ["Distractor", "Respuesta"],
+  prompt: "Pregunta del video",
+};
 const video: Extract<ContentItem, { kind: "video" }> = {
   id: "video", kind: "video", title: "Peritoneo", slug: "peritoneo", summary: "Resumen", topic: "Abdomen",
   subjectIds: ["anatomia"], status: "published", asset: null, authorUserId: "author", featured: false,
@@ -34,6 +45,10 @@ describe("shared practice catalogs", () => {
     expect(quiz).toMatchObject({ id: video.id, slug: video.slug, kind: "quiz", asset: null });
     expect(quiz?.kind === "quiz" && quiz.content.questions).toBe(video.content.quiz.questions);
     expect(cards).toMatchObject({ id: video.id, kind: "flashcards", content: { cards: [{ front: question.prompt, back: "Respuesta" }] } });
+    expect(cards?.kind === "flashcards" && cards.content.cards[0]).toMatchObject({
+      id: question.id,
+      memoryVersion: question.memoryVersion,
+    });
     expect(JSON.stringify(video)).toBe(before);
   });
 

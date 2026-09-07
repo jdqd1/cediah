@@ -35,6 +35,7 @@ import {
   type SubjectMutationFailure,
   type SubjectProvider,
   type ContentProvider,
+  type GuidedLearningProvider,
   type IdentityProvider,
   type RoleManagementProvider,
   HealthResponseSchema,
@@ -58,12 +59,16 @@ import { createPostgresLearningProvider } from "./providers/postgres-learning.js
 import { createPostgresContentProvider } from "./providers/postgres-content.js";
 import { createPostgresRoleManagementProvider } from "./providers/postgres-role-management.js";
 import { createPostgresSubjectProvider } from "./providers/postgres-subjects.js";
+import { createPostgresGuidedLearningProvider } from "./providers/postgres-guided-learning.js";
 import { createS3ObjectStorage } from "./providers/s3-object-storage.js";
 import { createS3VideoProvider } from "./providers/s3-video.js";
+import { registerGuidedLearningEditorRoutes } from "./guided-learning/editor-routes.js";
+import { registerGuidedLearningRoutes } from "./guided-learning/routes.js";
 
 type AppDependencies = {
   authService?: AuthService;
   contentProvider?: ContentProvider;
+  guidedLearningProvider?: GuidedLearningProvider;
   subjectProvider?: SubjectProvider;
   roleManagementProvider?: RoleManagementProvider;
   identityProvider?: IdentityProvider;
@@ -316,7 +321,11 @@ export async function buildApp(
             environment.cloudflareStream,
             [...environment.webOrigins].map((origin) => new URL(origin).host),
           )
-        : undefined);
+      : undefined);
+  const guidedLearningProvider = environment.guidedLearningEnabled
+    ? dependencies.guidedLearningProvider ??
+      (database ? createPostgresGuidedLearningProvider(database, { assetStorage: contentAssetStorage }) : undefined)
+    : undefined;
   const app = Fastify({
     bodyLimit: 1_048_576,
     logger:
@@ -422,9 +431,25 @@ export async function buildApp(
       }
     }
 
-    const response = CurrentUserResponseSchema.parse({ roles, user: resolution.user });
+    const response = CurrentUserResponseSchema.parse({
+      features: { guidedLearning: environment.guidedLearningEnabled === true },
+      roles,
+      user: resolution.user,
+    });
     return reply.header("Cache-Control", "no-store").send(response);
   });
+
+  if (environment.guidedLearningEnabled) {
+    await registerGuidedLearningRoutes(app, {
+      identityProvider,
+      provider: guidedLearningProvider,
+    });
+    await registerGuidedLearningEditorRoutes(app, {
+      contentProvider,
+      identityProvider,
+      provider: guidedLearningProvider,
+    });
+  }
 
   app.get("/v1/learning/dashboard", async (request, reply) => {
     const resolution = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);

@@ -3,7 +3,7 @@ import { isPlatformPath } from "./platform-routes";
 
 describe("persistent platform frame", () => {
   it("keeps the frame on shared-shell screens", () => {
-    for (const path of ["/dashboard", "/asignaturas", "/asignaturas/anatomia", "/contenido/abdomen", "/guias/abdomen", "/panel/contenido", "/cursos", "/clases/reproductor"]) {
+    for (const path of ["/dashboard", "/aprendizaje", "/aprendizaje/rutas/torax", "/asignaturas", "/asignaturas/anatomia", "/contenido/abdomen", "/guias/abdomen", "/panel/contenido", "/cursos", "/clases/reproductor"]) {
       expect(isPlatformPath(path)).toBe(true);
     }
   });

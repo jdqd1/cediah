@@ -7,6 +7,7 @@ import "./koraz-theme.css";
 import "./platform-chrome.css";
 import "./landing-paper.css";
 import "./auth-paper.css";
+import "./learning.css";
 
 export const metadata: Metadata = {
   title: "Koraz | Aprende, explora y crece",

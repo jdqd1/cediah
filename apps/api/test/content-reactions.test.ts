@@ -69,6 +69,7 @@ beforeAll(async () => {
     [id, kind, `test-${kind}-${status}`, authorId, status]);
   }
   await pg.exec(`begin;\n${await readFile(migration, "utf8")}\ncommit;`);
+  await pg.exec(`begin;\n${await readFile(new URL("../../../database/migrations/0009_learning_content_identity.sql", import.meta.url), "utf8")}\ncommit;`);
   await pg.exec("grant select, update on content_items to cediah_runtime; set role cediah_runtime;");
 }, 30_000);
 

@@ -52,6 +52,7 @@ import {
 } from "@tiptap/pm/tables";
 import StarterKit from "@tiptap/starter-kit";
 import {
+  ensureQuestionIdentity,
   RichTextDocumentSchema,
   type ContentAsset,
   type ContentDraft,
@@ -617,12 +618,10 @@ function QuizPanel({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [openQuestion, setOpenQuestion] = useState(0);
-  const emptyQuestion: QuizQuestion = {
-    correctOptionIndex: 0,
-    explanation: "",
-    options: ["", ""],
-    prompt: "",
-  };
+  const emptyQuestion = () => ensureQuestionIdentity(
+    { correctOptionIndex: 0, explanation: "", options: ["", ""], prompt: "" },
+    () => crypto.randomUUID(),
+  ).value as QuizQuestion;
 
   function update(index: number, patch: Partial<QuizQuestion>) {
     onChange(questions.map((question, position) => position === index ? { ...question, ...patch } : question));
@@ -640,12 +639,13 @@ function QuizPanel({
     const question = questions[questionIndex];
     if (!question || question.options.length <= 2) return;
     const options = question.options.filter((_, index) => index !== optionIndex);
+    const optionIds = question.optionIds?.filter((_, index) => index !== optionIndex);
     const correctOptionIndex = question.correctOptionIndex === optionIndex
       ? 0
       : question.correctOptionIndex > optionIndex
         ? question.correctOptionIndex - 1
         : question.correctOptionIndex;
-    update(questionIndex, { correctOptionIndex, options });
+    update(questionIndex, { correctOptionIndex, optionIds, options });
   }
 
   return (
@@ -667,7 +667,7 @@ function QuizPanel({
             );
             const open = openQuestion === questionIndex;
             return (
-              <article className={`guide-question-answer-card${open ? " is-open" : ""}`} key={questionIndex}>
+              <article className={`guide-question-answer-card${open ? " is-open" : ""}`} key={question.id ?? questionIndex}>
                 <header>
                   <button type="button" onClick={() => setOpenQuestion(open ? -1 : questionIndex)}>
                     {complete ? <CheckCircle size={16} weight="fill" /> : <span>{questionIndex + 1}</span>}
@@ -705,7 +705,7 @@ function QuizPanel({
                         {question.options.map((option, optionIndex) => (
                           <div
                             className={`guide-quiz-option${question.correctOptionIndex === optionIndex ? " is-correct" : ""}`}
-                            key={optionIndex}
+                            key={question.optionIds?.[optionIndex] ?? optionIndex}
                           >
                             <input
                               aria-label={`Marcar la opción ${optionIndex + 1} como correcta`}
@@ -741,7 +741,13 @@ function QuizPanel({
                         className="guide-quiz-inline-add"
                         disabled={disabled || question.options.length >= 8}
                         type="button"
-                        onClick={() => update(questionIndex, { options: [...question.options, ""] })}
+                        onClick={() => update(questionIndex, {
+                          optionIds: [
+                            ...(question.optionIds ?? question.options.map(() => crypto.randomUUID())),
+                            crypto.randomUUID(),
+                          ],
+                          options: [...question.options, ""],
+                        })}
                       >
                         <Plus size={14} /> Añadir opción
                       </button>
@@ -768,7 +774,7 @@ function QuizPanel({
             disabled={disabled || questions.length >= 100}
             type="button"
             onClick={() => {
-              onChange([...questions, emptyQuestion]);
+              onChange([...questions, emptyQuestion()]);
               setOpenQuestion(questions.length);
             }}
           >

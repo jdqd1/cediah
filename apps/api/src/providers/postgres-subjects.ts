@@ -41,6 +41,7 @@ async function selectSubjects(
       );
       return input.publishedOnly
         ? contentJoin.on("content_items.status", "=", "published")
+            .on("content_items.catalog_visibility", "=", "catalog")
         : contentJoin;
     })
     .select([

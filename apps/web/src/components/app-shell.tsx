@@ -7,6 +7,7 @@ import {
   ClipboardText,
   House,
   GraduationCap,
+  Path,
   List,
   Notebook,
   PlayCircle,
@@ -44,27 +45,31 @@ type AppShellProps = {
   breadcrumbs?: string[];
   welcome?: boolean;
   profilePending?: boolean;
+  guidedLearningEnabled?: boolean;
 };
 
 type NavIcon = typeof House;
 const PersistentShellContext = createContext(false);
 
-export function PersistentAppShell({ children, viewer, profilePending }: { children: ReactNode; viewer?: { email: string }; profilePending?: boolean }) {
+export function PersistentAppShell({ children, guidedLearningEnabled = false, viewer, profilePending }: { children: ReactNode; guidedLearningEnabled?: boolean; viewer?: { email: string }; profilePending?: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const kind = searchParams.get("tipo");
   const activeKey = pathname.startsWith("/panel/administracion") ? "roles"
+    : pathname.startsWith("/panel/rutas") ? "learning-editor"
     : pathname.startsWith("/panel") ? "editor"
+      : pathname.startsWith("/aprendizaje") ? "learning"
       : pathname.startsWith("/guias") ? "guides"
         : pathname.startsWith("/contenido") ? kind === "guide" ? "guides" : kind ?? "video"
           : pathname.startsWith("/asignaturas") ? kind === "guide" ? "guides" : kind ?? "subjects"
             : pathname.startsWith("/clases") ? "video"
               : pathname.startsWith("/cursos") ? "courses"
               : "dashboard";
-  const title = [...mainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koraz";
+  const visibleMainNavigation = getMainNavigation(guidedLearningEnabled);
+  const title = [...visibleMainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koraz";
   return (
     <PersistentShellContext.Provider value={true}>
-      <ShellChrome activeKey={activeKey} headerTitle={title} includeCourses={activeKey === "courses"} viewer={viewer} profilePending={profilePending}>
+      <ShellChrome activeKey={activeKey} guidedLearningEnabled={guidedLearningEnabled} headerTitle={title} includeCourses={activeKey === "courses"} viewer={viewer} profilePending={profilePending}>
         {children}
       </ShellChrome>
     </PersistentShellContext.Provider>
@@ -84,10 +89,15 @@ type NavItem = {
   icon: NavIcon;
 };
 
-const mainNavigation: NavItem[] = [
-  { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
-  { key: "subjects", label: "Materias", href: "/asignaturas", icon: GraduationCap },
-];
+function getMainNavigation(guidedLearningEnabled: boolean): NavItem[] {
+  return [
+    { key: "dashboard", label: "Inicio", href: "/dashboard", icon: House },
+    ...(guidedLearningEnabled
+      ? [{ key: "learning", label: "Aprendizaje guiado", href: "/aprendizaje", icon: Path }]
+      : []),
+    { key: "subjects", label: "Materias", href: "/asignaturas", icon: GraduationCap },
+  ];
+}
 
 const studyNavigation: NavItem[] = [
   { key: "video", label: "Videos", href: "/asignaturas?tipo=video", icon: PlayCircle },
@@ -197,6 +207,7 @@ function ShellChrome({
   children,
   headerSubtitle,
   headerTitle,
+  guidedLearningEnabled = false,
   includeCourses = false,
   profilePending = false,
   welcome = false,
@@ -240,6 +251,9 @@ function ShellChrome({
   const profileRole = (["administrator", "coordinator", "content_creator", "student"] as const)
     .find((role) => accessRoles.includes(role));
   const administrationItems: NavItem[] = [
+    ...(guidedLearningEnabled && (effectiveIsAdministrator || accessRoles.includes("coordinator") || accessRoles.includes("content_creator"))
+      ? [{ key: "learning-editor", label: "Rutas de aprendizaje", href: "/panel/rutas", icon: Path }]
+      : []),
     ...(showContentManagement
       ? [{ key: "editor", label: "Publicar contenido", href: "/panel/contenido", icon: PencilSimpleLine }]
       : []),
@@ -369,7 +383,7 @@ function ShellChrome({
         </div>
         <nav className="sidebar-nav">
           <div className="sidebar-nav-group">
-            {mainNavigation.map((item) => (
+            {getMainNavigation(guidedLearningEnabled).map((item) => (
               <NavigationItem key={item.key} item={item} activeKey={activeKey} onNavigate={closeSidebar} />
             ))}
             <NavigationGroup

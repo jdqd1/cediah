@@ -1,4 +1,34 @@
 import { z } from "zod";
+import {
+  CatalogVisibilitySchema,
+  DraftFlashcardSchema,
+  FlashcardSchema,
+  GuideQuizQuestionSchema,
+  QuizQuestionSchema,
+} from "./learning-content.js";
+
+export {
+  CatalogVisibilitySchema,
+  DraftFlashcardSchema,
+  FlashcardSchema,
+  GuideQuizQuestionSchema,
+  QuizQuestionSchema,
+  ensureFlashcardIdentity,
+  ensureQuestionIdentity,
+  normalizeContentLearningIdentity,
+  reconcileContentLearningIdentity,
+  type CatalogVisibility,
+  LearningProjectionSchema,
+  LearningResourceRefSchema,
+  PublicLearningQuestionSchema,
+  type LearningProjection,
+  type LearningResourceRef,
+  type LearningIdentityNormalization,
+  type LearningIdentityReconciliation,
+  type PublicLearningQuestion,
+} from "./learning-content.js";
+
+export * from "./guided-learning.js";
 
 export const HealthResponseSchema = z.object({
   checkedAt: z.string().datetime(),
@@ -25,6 +55,9 @@ export const CurrentUserSchema = z.object({
 });
 
 export const CurrentUserResponseSchema = z.object({
+  features: z.object({
+    guidedLearning: z.boolean().default(false),
+  }).default({ guidedLearning: false }),
   roles: z.array(PlatformRoleSchema).default([]),
   user: CurrentUserSchema,
 });
@@ -653,6 +686,7 @@ export const RichTextDocumentSchema = z
 export type RichTextDocument = z.infer<typeof RichTextDocumentSchema>;
 
 const ContentDraftBaseSchema = z.object({
+  catalogVisibility: CatalogVisibilitySchema.optional(),
   estimatedMinutes: z.number().int().min(0).max(100_000).nullable().default(null),
   featured: z.boolean().default(false),
   slug: z.string().trim().min(1).max(200).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
@@ -680,52 +714,9 @@ const DraftGuideSectionSchema = z.object({
   heading: z.string().trim().max(200),
 });
 
-export const QuizQuestionSchema = z
-  .object({
-    correctOptionIndex: z.number().int().min(0),
-    explanation: z.string().trim().max(4_000).default(""),
-    options: z.array(z.string().trim().min(1).max(500)).min(2).max(8),
-    prompt: z.string().trim().min(1).max(2_000),
-  })
-  .superRefine((question, context) => {
-    if (question.correctOptionIndex >= question.options.length) {
-      context.addIssue({
-        code: "custom",
-        message: "correctOptionIndex must reference an existing option",
-        path: ["correctOptionIndex"],
-      });
-    }
-  });
-
 // Guide companions are authored incrementally. Empty fields are valid while a
 // publication is still a draft; the API readiness check prevents incomplete
 // questions from entering review or being published.
-export const GuideQuizQuestionSchema = z
-  .object({
-    correctOptionIndex: z.number().int().min(0),
-    explanation: z.string().trim().max(4_000).default(""),
-    options: z.array(z.string().trim().max(500)).min(2).max(8),
-    prompt: z.string().trim().max(2_000),
-  })
-  .superRefine((question, context) => {
-    if (question.correctOptionIndex >= question.options.length) {
-      context.addIssue({
-        code: "custom",
-        message: "correctOptionIndex must reference an existing option",
-        path: ["correctOptionIndex"],
-      });
-    }
-  });
-
-export const FlashcardSchema = z.object({
-  back: z.string().trim().min(1).max(4_000),
-  front: z.string().trim().min(1).max(2_000),
-});
-
-const DraftFlashcardSchema = z.object({
-  back: z.string().trim().max(4_000),
-  front: z.string().trim().max(2_000),
-});
 
 export const ContentRegionsSchema = z
   .array(z.string().trim().min(1).max(120))
@@ -913,6 +904,7 @@ const ContentRecordSchema = z.object({
   publishedAt: z.string().datetime({ offset: true }).nullable(),
   status: ContentStatusSchema,
   updatedAt: z.string().datetime({ offset: true }),
+  version: z.number().int().positive().optional(),
   viewCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
 });
 

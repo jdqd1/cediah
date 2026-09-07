@@ -18,6 +18,7 @@ import { getApiRequestCookie } from "./api-session";
 type ContentApiRequest = {
   body?: unknown;
   cookie?: string;
+  headers?: Record<string, string>;
   method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
   cachePublic?: boolean;
@@ -77,6 +78,7 @@ export async function requestContentApi(
     const headers = new Headers({ Accept: "application/json" });
     if (input.cookie) headers.set("Cookie", input.cookie);
     if (input.body !== undefined) headers.set("Content-Type", "application/json");
+    for (const [name, value] of Object.entries(input.headers ?? {})) headers.set(name, value);
 
     const publicCache = input.cachePublic === true && input.method === "GET" && !input.cookie;
     const response = await fetch(new URL(input.path, environment.API_BASE_URL), {

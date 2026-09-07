@@ -57,12 +57,36 @@ describe("GET /health", () => {
     expect(allowed.statusCode).toBe(200);
     expect(allowed.headers["cache-control"]).toBe("no-store");
     expect(allowed.json()).toEqual({
+      features: { guidedLearning: false },
       roles: [],
       user: { email: "estudiante@example.test", id: "04761a7d-4c02-48d7-b3a2-94b8baadf021" },
     });
     expect(denied.statusCode).toBe(401);
     expect(denied.json()).toEqual({ error: "unauthorized" });
 
+    await app.close();
+  });
+
+  it("exposes the guided-learning UI capability only from server configuration", async () => {
+    const identityProvider: IdentityProvider = {
+      getUser: async () => ({
+        email: "estudiante@example.test",
+        id: "04761a7d-4c02-48d7-b3a2-94b8baadf021",
+      }),
+      revokeSessions: async () => undefined,
+    };
+    const app = await buildApp(
+      { ...testEnvironment, guidedLearningEnabled: true },
+      { identityProvider },
+    );
+
+    const response = await app.inject({
+      headers: { authorization: "Bearer valid-access-token" },
+      method: "GET",
+      url: "/v1/auth/me",
+    });
+
+    expect(response.json()).toMatchObject({ features: { guidedLearning: true } });
     await app.close();
   });
 

@@ -23,7 +23,11 @@ export async function AuthenticatedAppLayout({
 
   return (
     <AccessProvider roles={current.roles}>
-      <AuthenticatedShellSession roles={current.roles} viewer={{ email: current.user.email }} />
+      <AuthenticatedShellSession
+        features={current.features}
+        roles={current.roles}
+        viewer={{ email: current.user.email }}
+      />
       {children}
     </AccessProvider>
   );

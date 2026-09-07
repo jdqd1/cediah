@@ -62,7 +62,8 @@ export function isPublishedPermittedUpdate(
     current.slug !== next.slug ||
     current.summary !== next.summary ||
     current.estimatedMinutes !== next.estimatedMinutes ||
-    current.featured !== next.featured
+    current.featured !== next.featured ||
+    (current.catalogVisibility ?? "catalog") !== (next.catalogVisibility ?? "catalog")
   ) {
     return false;
   }

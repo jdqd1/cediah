@@ -28,6 +28,11 @@ En la producción actual de CEDIAH, Render usa el Transaction Pooler de Supabase
 6. 0006_simplify_platform_roles.sql simplifica los roles de la plataforma.
 7. 0007_content_views.sql añade contadores agregados y deduplicación de visitas.
 8. 0008_content_reactions.sql guarda likes/dislikes privados y sus totales agregados.
+9. 0009_learning_content_identity.sql añade identidad canónica, visibilidad de catálogo y snapshots privados de ejecución.
+10. 0010_guided_learning_catalog.sql añade rutas versionadas, opciones fijadas e inscripciones separadas de cursos.
+11. 0011_guided_learning_attempts.sql añade intentos persistentes, respuestas inmutables, progreso real, recibos idempotentes y eventos deduplicados.
+12. 0012_guided_learning_evidence.sql añade memoria espaciada global, evidencia por objetivo, preferencias y overrides de recomendación sin alterar el vencimiento científico.
+13. 0013_guided_learning_rewards.sql añade puntos de aprendizaje e hitos idempotentes vinculados a eventos aceptados por el servidor.
 
 Las claves foráneas de identidad apuntan a public.auth_users. No dependen de auth.users ni de otros esquemas administrados por Supabase.
 

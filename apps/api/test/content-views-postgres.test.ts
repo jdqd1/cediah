@@ -33,7 +33,7 @@ const record = (key = viewerKey) => provider.recordView!({ contentId: video, vie
 
 beforeAll(async () => {
   await pg.exec("create role cediah_runtime;");
-  for (const file of ["0001_auth.sql", "0002_platform.sql", "0003_content.sql", "0004_subjects.sql", "0006_simplify_platform_roles.sql", "0007_content_views.sql"]) {
+  for (const file of ["0001_auth.sql", "0002_platform.sql", "0003_content.sql", "0004_subjects.sql", "0006_simplify_platform_roles.sql", "0007_content_views.sql", "0009_learning_content_identity.sql"]) {
     await pg.exec(`begin;\n${await readFile(new URL(`../../../database/migrations/${file}`, import.meta.url), "utf8")}\ncommit;`);
   }
   await pg.query("insert into auth_users (id, name, email) values ($1, 'Test', 'views@example.test')", [author]);

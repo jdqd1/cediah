@@ -9,7 +9,12 @@ import { getApiRequestCookie } from "./api-session";
 import { requestContentApi } from "./content-api";
 
 export type CurrentUserResult =
-  | { roles: PlatformRole[]; status: "authenticated"; user: CurrentUser }
+  | {
+      features: { guidedLearning: boolean };
+      roles: PlatformRole[];
+      status: "authenticated";
+      user: CurrentUser;
+    }
   | { status: "anonymous" }
   | { status: "unavailable" };
 
@@ -27,7 +32,12 @@ async function resolveCurrentUser(): Promise<CurrentUserResult> {
 
   const parsed = CurrentUserResponseSchema.safeParse(response.body);
   return parsed.success
-    ? { roles: parsed.data.roles, status: "authenticated", user: parsed.data.user }
+    ? {
+        features: parsed.data.features,
+        roles: parsed.data.roles,
+        status: "authenticated",
+        user: parsed.data.user,
+      }
     : { status: "unavailable" };
 }
 

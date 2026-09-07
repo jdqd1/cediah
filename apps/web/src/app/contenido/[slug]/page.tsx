@@ -9,6 +9,7 @@ import {
   getSubjects,
 } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
+import { getLearningLibraryOptions } from "@/lib/server/guided-learning-api";
 
 export const dynamic = "force-dynamic";
 
@@ -60,9 +61,18 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
     const practiceKind = kind === "quiz" || kind === "flashcards" ? kind : undefined;
     const item = practiceKind ? projectPracticeContent(result.item, practiceKind, linkedGuide) : result.item;
     if (!item) notFound();
+    const guidedSources = [...new Set([result.item.id, item.id])];
+    const guidedResults = item.kind === "topic" ? [] : await Promise.all(
+      guidedSources.map((sourceContentId) => getLearningLibraryOptions(sourceContentId, item.kind)),
+    );
+    const guidedActivities = [...new Map(
+      guidedResults.flatMap((guided) => guided.status === "ready" ? guided.items : [])
+        .map((activity) => [activity.optionId, activity]),
+    ).values()];
 
     return (
       <ContentDetailScreen
+        guidedActivities={guidedActivities}
         item={item}
         trackView={item.kind === result.item.kind}
         isAdministrator={isAdministrator}

@@ -7,12 +7,13 @@ import {
   CheckSquareOffset,
   PlayCircle,
 } from "@phosphor-icons/react/dist/ssr";
-import type { ContentItem, ContentKind } from "@cediah/contracts";
+import type { ContentItem, ContentKind, LearningHome } from "@cediah/contracts";
 import { publishedContentHref, subjectDirectoryHref } from "@/lib/content-navigation";
 import { mostViewedFirst, newestContentFirst } from "@/lib/content-order";
 import { formatVideoViews } from "@/lib/video-views";
 import { AppShell } from "./app-shell";
 import { BrandFooter } from "./brand-footer";
+import { LearningDashboardSummary } from "./learning/learning-dashboard-summary";
 
 const kindImages: Record<ContentKind, string> = {
   flashcards: "/anatomy/thigh.png",
@@ -106,6 +107,9 @@ export function DashboardScreen({
   highlightedItems = items,
   recentItems = items,
   isAdministrator = false,
+  guidedLearningEnabled = false,
+  learningHome = null,
+  learningHomeAvailable = false,
   viewer,
 }: {
   available: boolean;
@@ -113,6 +117,9 @@ export function DashboardScreen({
   highlightedItems?: ContentItem[];
   recentItems?: ContentItem[];
   isAdministrator?: boolean;
+  guidedLearningEnabled?: boolean;
+  learningHome?: LearningHome | null;
+  learningHomeAvailable?: boolean;
   viewer?: { email: string };
 }) {
   const videos = recentItems
@@ -130,8 +137,14 @@ export function DashboardScreen({
       isAdministrator={isAdministrator}
       viewer={viewer}
       headerTitle=""
+      guidedLearningEnabled={guidedLearningEnabled}
       mainClassName="dashboard-main"
     >
+      <LearningDashboardSummary
+        available={learningHomeAvailable}
+        enabled={guidedLearningEnabled}
+        home={learningHome}
+      />
       <nav className="study-material-grid dashboard-shortcuts" aria-label="Accesos directos de estudio">
         {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
           return (

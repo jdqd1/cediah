@@ -873,6 +873,7 @@ describe("content API", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
+      features: { guidedLearning: false },
       roles: ["coordinator"],
       user: users.coordinator,
     });

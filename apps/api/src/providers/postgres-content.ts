@@ -1,10 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { sql, type Selectable, type Transaction, type Updateable } from "kysely";
 import {
   ContentAssetSchema,
   ContentDraftSchema,
   ContentItemSchema,
+  normalizeContentLearningIdentity,
   PlatformRoleSchema,
   PublishableContentDraftSchema,
+  reconcileContentLearningIdentity,
   type ContentAsset,
   type ContentDraft,
   type ContentItem,
@@ -202,6 +205,7 @@ async function parseContentItem(
       )
     : null;
   const draft = ContentDraftSchema.parse({
+    catalogVisibility: row.catalog_visibility,
     content: row.content,
     estimatedMinutes: row.estimated_minutes,
     featured: row.is_featured,
@@ -490,32 +494,36 @@ export function createPostgresContentProvider(
           if (!(await draftUsesExistingTopics(transaction, input.draft, input.roles))) {
             return { status: "forbidden" };
           }
+          const normalizedDraft = ContentDraftSchema.parse(
+            normalizeContentLearningIdentity(input.draft, randomUUID).value,
+          );
           const row = await transaction
             .insertInto("content_items")
             .values({
               author_user_id: input.actorUserId,
-              content: input.draft.content as JsonValue,
-              estimated_minutes: input.draft.estimatedMinutes,
-              is_featured: input.draft.featured,
-              kind: input.draft.kind,
+              catalog_visibility: normalizedDraft.catalogVisibility ?? "catalog",
+              content: normalizedDraft.content as JsonValue,
+              estimated_minutes: normalizedDraft.estimatedMinutes,
+              is_featured: normalizedDraft.featured,
+              kind: normalizedDraft.kind,
               published_at: null,
               published_by: null,
               reviewed_at: null,
               reviewed_by: null,
-              slug: input.draft.slug,
+              slug: normalizedDraft.slug,
               status: "draft",
-              summary: input.draft.summary,
-              title: input.draft.title,
-              topic: input.draft.topic,
+              summary: normalizedDraft.summary,
+              title: normalizedDraft.title,
+              topic: normalizedDraft.topic,
             })
             .returningAll()
             .executeTakeFirstOrThrow();
-          await replaceSubjectLinks(transaction, row.id, input.draft.subjectIds);
+          await replaceSubjectLinks(transaction, row.id, normalizedDraft.subjectIds);
           await writeAudit(transaction, {
             action: "content_created",
             actorUserId: input.actorUserId,
             contentId: row.id,
-            metadata: { kind: row.kind, subjectIds: input.draft.subjectIds },
+            metadata: { kind: row.kind, subjectIds: normalizedDraft.subjectIds },
           });
           const item = await getItemById(transaction, row.id);
           return item ? { status: "success", value: item } : { status: "not_found" };
@@ -616,6 +624,7 @@ export function createPostgresContentProvider(
         .selectAll()
         .where("slug", "=", slug)
         .where("status", "=", "published")
+        .where("catalog_visibility", "=", "catalog")
         .executeTakeFirst();
       return row
         ? (await hydrateRows(database, [row], configuration, true))[0] ?? null
@@ -669,6 +678,7 @@ export function createPostgresContentProvider(
           .orderBy(sql<number>`coalesce(content_view_counts.view_count, 0)`, "desc"),
         )
         .where("content_items.status", "=", "published")
+        .where("content_items.catalog_visibility", "=", "catalog")
         .$if(Boolean(input.kind), (query) =>
           query.where("content_items.kind", "=", input.kind ?? "topic"),
         )
@@ -696,6 +706,7 @@ export function createPostgresContentProvider(
           .select("id")
           .where("id", "=", input.contentId)
           .where("status", "=", "published")
+          .where("catalog_visibility", "=", "catalog")
           .forShare()
           .executeTakeFirst();
         if (!item) return { status: "not_found" };
@@ -742,6 +753,7 @@ export function createPostgresContentProvider(
         .where("content_items.id", "=", input.contentId)
         .where("content_items.kind", "=", "video")
         .where("content_items.status", "=", "published")
+        .where("content_items.catalog_visibility", "=", "catalog")
         .executeTakeFirst();
       return item
         ? { status: "success", value: { reaction: item.reaction } }
@@ -755,6 +767,7 @@ export function createPostgresContentProvider(
           .where("id", "=", input.contentId)
           .where("kind", "=", "video")
           .where("status", "=", "published")
+          .where("catalog_visibility", "=", "catalog")
           .forShare()
           .executeTakeFirst();
         if (!item) return { status: "not_found" };
@@ -915,22 +928,26 @@ export function createPostgresContentProvider(
           const canUpdatePublishedMetadata =
             access.status === "published" && getContentCapabilities(input.roles).canEditAll;
           if (!canEdit && !canUpdatePublishedMetadata) return { status: "not_found" };
+          const current = await getItemById(transaction, input.contentId);
+          if (!current) return { status: "not_found" };
+          const identity = reconcileContentLearningIdentity(current, input.draft);
+          if (identity.status === "unsafe_identity") return { status: "conflict" };
+          const normalizedDraft = ContentDraftSchema.parse(identity.value);
           if (access.status === "published" && !input.roles.includes("administrator")) {
-            const current = await getItemById(transaction, input.contentId);
-            if (!current || !isPublishedPermittedUpdate(current, input.draft)) {
+            if (!isPublishedPermittedUpdate(current, normalizedDraft)) {
               return { status: "not_found" };
             }
           }
           if (
             (access.status === "published" || access.status === "archived") &&
-            !PublishableContentDraftSchema.safeParse(input.draft).success
+            !PublishableContentDraftSchema.safeParse(normalizedDraft).success
           ) {
             return { status: "not_publishable" };
           }
-          if (!(await subjectIdsExist(transaction, input.draft.subjectIds))) {
+          if (!(await subjectIdsExist(transaction, normalizedDraft.subjectIds))) {
             return { status: "conflict" };
           }
-          if (!(await draftUsesExistingTopics(transaction, input.draft, input.roles))) {
+          if (!(await draftUsesExistingTopics(transaction, normalizedDraft, input.roles))) {
             return { status: "forbidden" };
           }
           const nextStatus =
@@ -940,17 +957,18 @@ export function createPostgresContentProvider(
           const row = await transaction
             .updateTable("content_items")
             .set({
-              content: input.draft.content as JsonValue,
-              estimated_minutes: input.draft.estimatedMinutes,
-              is_featured: input.draft.featured,
-              kind: input.draft.kind,
+              catalog_visibility: normalizedDraft.catalogVisibility ?? "catalog",
+              content: normalizedDraft.content as JsonValue,
+              estimated_minutes: normalizedDraft.estimatedMinutes,
+              is_featured: normalizedDraft.featured,
+              kind: normalizedDraft.kind,
               reviewed_at: nextStatus === "draft" ? null : undefined,
               reviewed_by: nextStatus === "draft" ? null : undefined,
-              slug: input.draft.slug,
+              slug: normalizedDraft.slug,
               status: nextStatus,
-              summary: input.draft.summary,
-              title: input.draft.title,
-              topic: input.draft.topic,
+              summary: normalizedDraft.summary,
+              title: normalizedDraft.title,
+              topic: normalizedDraft.topic,
               version: access.version + 1,
             })
             .where("id", "=", input.contentId)
@@ -958,12 +976,12 @@ export function createPostgresContentProvider(
             .returning("id")
             .executeTakeFirst();
           if (!row) return { status: "conflict" };
-          await replaceSubjectLinks(transaction, input.contentId, input.draft.subjectIds);
+          await replaceSubjectLinks(transaction, input.contentId, normalizedDraft.subjectIds);
           await writeAudit(transaction, {
             action: "content_updated",
             actorUserId: input.actorUserId,
             contentId: input.contentId,
-            metadata: { kind: input.draft.kind, subjectIds: input.draft.subjectIds },
+            metadata: { kind: normalizedDraft.kind, subjectIds: normalizedDraft.subjectIds },
           });
           const item = await getItemById(transaction, input.contentId);
           return item ? { status: "success", value: item } : { status: "not_found" };

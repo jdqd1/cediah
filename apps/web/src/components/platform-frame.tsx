@@ -7,7 +7,11 @@ import { isPlatformPath } from "@/lib/platform-routes";
 import { AccessProvider } from "./access-context";
 import { PersistentAppShell } from "./app-shell";
 
-type ShellSession = { roles: PlatformRole[]; viewer: { email: string } };
+type ShellSession = {
+  features: { guidedLearning: boolean };
+  roles: PlatformRole[];
+  viewer: { email: string };
+};
 const SessionBridge = createContext<Dispatch<SetStateAction<ShellSession | null>> | null>(null);
 
 function AuthenticatedFrame({ children }: { children: ReactNode }) {
@@ -15,7 +19,13 @@ function AuthenticatedFrame({ children }: { children: ReactNode }) {
   return (
     <SessionBridge.Provider value={setSession}>
       <AccessProvider roles={session?.roles ?? []}>
-        <PersistentAppShell viewer={session?.viewer} profilePending={!session}>{children}</PersistentAppShell>
+        <PersistentAppShell
+          guidedLearningEnabled={session?.features.guidedLearning ?? false}
+          viewer={session?.viewer}
+          profilePending={!session}
+        >
+          {children}
+        </PersistentAppShell>
       </AccessProvider>
     </SessionBridge.Provider>
   );
@@ -29,11 +39,16 @@ export function PlatformFrame({ children }: { children: ReactNode }) {
 }
 
 /** Verified server session data, never user-supplied roles or an authorization gate. */
-export function AuthenticatedShellSession({ roles, viewer }: ShellSession) {
+export function AuthenticatedShellSession({ features, roles, viewer }: ShellSession) {
   const setSession = useContext(SessionBridge);
   useLayoutEffect(() => {
-    setSession?.((previous) => previous?.viewer.email === viewer.email && previous.roles.join() === roles.join()
-      ? previous : { roles, viewer });
-  }, [roles, setSession, viewer]);
+    setSession?.((previous) =>
+      previous?.viewer.email === viewer.email &&
+      previous.roles.join() === roles.join() &&
+      previous.features.guidedLearning === features.guidedLearning
+        ? previous
+        : { features, roles, viewer },
+    );
+  }, [features, roles, setSession, viewer]);
   return null;
 }

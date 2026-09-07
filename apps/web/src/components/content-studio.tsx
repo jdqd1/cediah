@@ -31,6 +31,9 @@ import {
 import dynamic from "next/dynamic";
 import {
   ContentItemSchema,
+  ensureFlashcardIdentity,
+  ensureQuestionIdentity,
+  normalizeContentLearningIdentity,
   SubjectSchema,
   type ContentAssetUploadResponse,
   type ContentDraft,
@@ -81,6 +84,7 @@ type GuideEditorReturnContext = {
 type Base = Pick<
   ContentDraft,
   "estimatedMinutes" | "featured" | "slug" | "subjectIds" | "summary" | "title" | "topic"
+  | "catalogVisibility"
 >;
 
 const kinds: { label: string; value: ContentKind }[] = [
@@ -229,6 +233,7 @@ function prepareDraft(draft: ContentDraft): ContentDraft {
 
 function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
   const base: Base = {
+    catalogVisibility: "catalog",
     estimatedMinutes: null,
     featured: false,
     slug: "",
@@ -270,17 +275,25 @@ function emptyDraft(kind: ContentKind, seed: Partial<Base> = {}): ContentDraft {
     };
   }
   if (kind === "quiz") {
+    const question = ensureQuestionIdentity(
+      { correctOptionIndex: 0, explanation: "", options: ["", ""], prompt: "" },
+      () => crypto.randomUUID(),
+    ).value;
     return {
       ...base,
       kind,
       content: {
-        questions: [{ correctOptionIndex: 0, explanation: "", options: ["", ""], prompt: "" }],
+        questions: [question],
         regions: [],
       },
     };
   }
   if (kind === "flashcards") {
-    return { ...base, kind, content: { cards: [{ back: "", front: "" }], regions: [] } };
+    const card = ensureFlashcardIdentity(
+      { back: "", front: "" },
+      () => crypto.randomUUID(),
+    ).value;
+    return { ...base, kind, content: { cards: [card], regions: [] } };
   }
   return { ...base, kind: "topic", content: { introduction: "", objectives: [], regions: [] } };
 }
@@ -356,7 +369,10 @@ function itemDraft(item: ContentItem): ContentDraft {
   ]) {
     delete draft[key];
   }
-  return draft as ContentDraft;
+  return normalizeContentLearningIdentity(
+    draft as ContentDraft,
+    () => crypto.randomUUID(),
+  ).value;
 }
 
 async function json<T>(url: string, init: RequestInit = {}) {
@@ -514,12 +530,10 @@ function QuizQuestionsEditor({
   onChange: (questions: QuizQuestion[]) => void;
   title: string;
 }) {
-  const emptyQuestion: QuizQuestion = {
-    correctOptionIndex: 0,
-    explanation: "",
-    options: ["", ""],
-    prompt: "",
-  };
+  const emptyQuestion = () => ensureQuestionIdentity(
+    { correctOptionIndex: 0, explanation: "", options: ["", ""], prompt: "" },
+    () => crypto.randomUUID(),
+  ).value as QuizQuestion;
   const updateQuestion = (index: number, patch: Partial<QuizQuestion>) =>
     onChange(
       questions.map((question, position) =>
@@ -589,7 +603,7 @@ function QuizQuestionsEditor({
         <button
           className="studio-builder-empty"
           type="button"
-          onClick={() => onChange([emptyQuestion])}
+          onClick={() => onChange([emptyQuestion()])}
         >
           <Plus size={19} />
           <span>Añadir la primera pregunta</span>
@@ -600,7 +614,7 @@ function QuizQuestionsEditor({
           className="studio-add"
           disabled={questions.length >= 100}
           type="button"
-          onClick={() => onChange([...questions, emptyQuestion])}
+          onClick={() => onChange([...questions, emptyQuestion()])}
         >
           <Plus size={16} /> Añadir pregunta
         </button>
@@ -763,7 +777,16 @@ function TypeEditor({
           onClick={() =>
             onChange({
               ...draft,
-              content: { ...draft.content, cards: [...draft.content.cards, { back: "", front: "" }] },
+              content: {
+                ...draft.content,
+                cards: [
+                  ...draft.content.cards,
+                  ensureFlashcardIdentity(
+                    { back: "", front: "" },
+                    () => crypto.randomUUID(),
+                  ).value,
+                ],
+              },
             })
           }
         >

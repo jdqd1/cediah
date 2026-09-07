@@ -31,7 +31,7 @@ import {
   Trophy,
   X,
 } from "@phosphor-icons/react";
-import type { ContentItem } from "@cediah/contracts";
+import type { ContentItem, LearningLibraryOption } from "@cediah/contracts";
 import { createPortal } from "react-dom";
 import {
   type CSSProperties,
@@ -59,6 +59,7 @@ import { RichTextRenderer } from "./rich-text-renderer";
 
 export function ContentDetailScreen({
   guideMode = false,
+  guidedActivities = [],
   item,
   isAdministrator = false,
   linkedGuide,
@@ -67,6 +68,7 @@ export function ContentDetailScreen({
   trackView = true,
 }: {
   guideMode?: boolean;
+  guidedActivities?: LearningLibraryOption[];
   item: ContentItem;
   isAdministrator?: boolean;
   linkedGuide?: Extract<ContentItem, { kind: "guide" }>;
@@ -104,6 +106,22 @@ export function ContentDetailScreen({
             <h2>{item.title}</h2>
           </div>
         </header>
+        {guidedActivities.length > 0 ? (
+          <aside aria-label="Práctica con seguimiento" className="guided-library-options">
+            <div>
+              <strong>Esta actividad está en tu ruta</strong>
+              <span>Si la haces desde allí, el servidor guardará respuestas y avance. También puedes seguir usando este material libremente.</span>
+            </div>
+            <nav aria-label="Rutas que incluyen esta actividad">
+              {guidedActivities.map((activity) => (
+                <Link href={activity.href} key={activity.optionId}>
+                  <span>{activity.label}</span>
+                  <small>{activity.pathTitle} · {activity.stepTitle}</small>
+                </Link>
+              ))}
+            </nav>
+          </aside>
+        ) : null}
         <ContentBody guideMode={guideMode} item={item} linkedGuide={linkedGuide} />
       </article>
     </AppShell>
