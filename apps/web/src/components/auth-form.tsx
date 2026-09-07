@@ -43,7 +43,7 @@ type Feedback = {
 function getHeading(mode: AuthMode) {
   if (mode === "recover") return "Recupera tu acceso";
   if (mode === "sign-up") return "Crea tu cuenta";
-  return "Accede a Koraz";
+  return "Accede a Koras";
 }
 
 function getSubmitLabel(mode: AuthMode) {

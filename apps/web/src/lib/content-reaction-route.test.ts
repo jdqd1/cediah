@@ -9,9 +9,9 @@ vi.mock("@/lib/server/content-api", () => ({
 import { GET, PATCH } from "../app/api/content/[contentId]/reaction/route";
 
 const contentId = "10000000-0000-4000-8000-000000000001";
-const url = `https://koraz.example/api/content/${contentId}/reaction`;
+const url = `https://koras.example/api/content/${contentId}/reaction`;
 const context = () => ({ params: Promise.resolve({ contentId }) });
-const request = (body: unknown, origin = "https://koraz.example") => new Request(url, {
+const request = (body: unknown, origin = "https://koras.example") => new Request(url, {
   method: "PATCH", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body),
 });
 
@@ -48,7 +48,7 @@ describe("private browser reaction endpoint", () => {
     for (const body of [{ reaction: "up" }, { reaction: "liked", viewerKey: "wrong" }, { reaction: "liked", likeCount: 50 }, {}]) {
       expect((await PATCH(request(body), context())).status).toBe(400);
     }
-    expect((await PATCH(new Request(url, { method: "PATCH", body: "invalid", headers: { origin: "https://koraz.example" } }), context())).status).toBe(400);
+    expect((await PATCH(new Request(url, { method: "PATCH", body: "invalid", headers: { origin: "https://koras.example" } }), context())).status).toBe(400);
     expect(api.request).not.toHaveBeenCalled();
   });
   it("fails closed for invalid upstream data and unavailable persistence", async () => {

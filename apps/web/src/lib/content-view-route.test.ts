@@ -11,7 +11,7 @@ import { POST } from "../app/api/content/[contentId]/views/route";
 
 const contentId = "10000000-0000-4000-8000-000000000001";
 const context = { params: Promise.resolve({ contentId }) };
-const request = (origin = "https://koraz.example") => new Request(`https://koraz.example/api/content/${contentId}/views`, {
+const request = (origin = "https://koras.example") => new Request(`https://koras.example/api/content/${contentId}/views`, {
   method: "POST", headers: { origin },
 });
 const receipt = { counted: true, viewCount: 8, retryAfterMs: 1_800_000 };

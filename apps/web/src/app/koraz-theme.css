@@ -1,71 +1,31 @@
-/* Koraz visual identity
+/* KORAS visual identity
    Presentation-only cascade layered after the legacy application styles. */
 
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/Poppins-Regular.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("/fonts/Poppins-Medium.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("/fonts/Poppins-SemiBold.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("/fonts/Poppins-Bold.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Poppins";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("/fonts/Poppins-ExtraBold.ttf") format("truetype");
-}
-
 :root {
-  --koraz-cyan: #4cc9f0;
-  --koraz-blue: #4361ee;
-  --koraz-blue-deep: #3151d8;
-  --koraz-violet: #a78bfa;
-  --koraz-violet-deep: #6d28d9;
+  --koraz-cyan: #C75A3A;
+  --koraz-blue: #0F3D32;
+  --koraz-blue-deep: #0B2D25;
+  --koraz-violet: #F4B996;
+  --koraz-violet-deep: #D9DDF7;
   --koraz-green: #22c55e;
-  --koraz-mint: #a7f3d0;
-  --koraz-ink: #0f172a;
-  --koraz-slate: #64748b;
-  --koraz-surface: #f1f5f9;
-  --koraz-canvas: #f8fafc;
-  --koraz-line: #e2e8f0;
-  --koraz-line-strong: #cbd5e1;
-  --koraz-primary-gradient: linear-gradient(135deg, #4cc9f0 0%, #4361ee 52%, #7c3aed 100%);
-  --koraz-violet-gradient: linear-gradient(135deg, #a78bfa 0%, #6d28d9 100%);
-  --koraz-green-gradient: linear-gradient(135deg, #22c55e 0%, #0f9f7a 100%);
+  --koraz-mint: #A7C7A0;
+  --koraz-ink: #1F2937;
+  --koraz-slate: #4B5563;
+  --koraz-surface: #ffffff;
+  --koraz-canvas: #FAF7F2;
+  --koraz-line: #E5E7EB;
+  --koraz-line-strong: #D1D5DB;
+  --koraz-primary-gradient: linear-gradient(135deg, #0F3D32 0%, #0B2D25 100%);
+  --koraz-violet-gradient: linear-gradient(135deg, #F4B996 0%, #D9DDF7 100%);
+  --koraz-green-gradient: linear-gradient(135deg, #22C55E 0%, #0F9F7A 100%);
   --koraz-shadow-sm: 0 1px 2px rgb(15 23 42 / 4%), 0 4px 14px rgb(15 23 42 / 4%);
-  --koraz-shadow-md: 0 12px 34px rgb(67 97 238 / 10%), 0 2px 8px rgb(15 23 42 / 5%);
+  --koraz-shadow-md: 0 12px 34px rgb(15 61 50 / 10%), 0 2px 8px rgb(15 23 42 / 5%);
 
   /* Compatibility aliases keep every existing surface on one brand system. */
   --wine: var(--koraz-blue);
   --wine-deep: var(--koraz-ink);
   --wine-soft: var(--koraz-blue-deep);
-  --wine-pale: #eef2ff;
+  --wine-pale: #F4B99622;
   --cream: var(--koraz-canvas);
   --cream-deep: var(--koraz-surface);
   --paper: #ffffff;
@@ -75,7 +35,7 @@
   --line: var(--koraz-line);
   --line-strong: var(--koraz-line-strong);
   --gold: var(--koraz-violet);
-  --gold-pale: #f5f3ff;
+  --gold-pale: #F4B99622;
   --green: var(--koraz-green);
   --blue: var(--koraz-blue);
   --purple: var(--koraz-violet-deep);
@@ -92,7 +52,7 @@ button,
 input,
 select,
 textarea {
-  font-family: "Poppins", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-plus-jakarta), "Plus Jakarta Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body {
@@ -294,7 +254,7 @@ textarea:focus-visible {
 .landing-submit:hover,
 .button-primary:hover,
 .studio-button-primary:hover {
-  background: linear-gradient(135deg, #3abce6 0%, #3156e4 55%, #6d28d9 100%);
+  background: linear-gradient(135deg, #3abce6 0%, #3156e4 55%, var(--koraz-violet-deep) 100%);
   box-shadow: 0 12px 28px rgb(67 97 238 / 28%);
 }
 
@@ -352,7 +312,7 @@ textarea:focus-visible {
   background:
     radial-gradient(circle at 78% 18%, rgb(76 201 240 / 24%), transparent 24%),
     radial-gradient(circle at 35% 78%, rgb(167 139 250 / 24%), transparent 33%),
-    linear-gradient(135deg, #0f172a 0%, #18234f 45%, #263ca3 100%);
+    linear-gradient(135deg, var(--koraz-ink) 0%, #18234f 45%, #263ca3 100%);
 }
 
 .landing-visual-backdrop::after {
@@ -1343,7 +1303,7 @@ a.icon-back-link:hover,
   background:
     radial-gradient(circle at 82% 12%, rgb(76 201 240 / 24%), transparent 27%),
     radial-gradient(circle at 18% 92%, rgb(167 139 250 / 22%), transparent 30%),
-    linear-gradient(135deg, #0f172a 0%, #243a9c 68%, #4361ee 100%);
+    linear-gradient(135deg, var(--koraz-ink) 0%, #243a9c 68%, var(--koraz-blue) 100%);
   color: #ffffff;
 }
 
@@ -2822,7 +2782,7 @@ a.icon-back-link:hover,
 
 .published-rich-guide-outline-heading > span:first-child svg,
 .published-rich-guide-support-heading > span svg {
-  color: #4361ee;
+  color: var(--koraz-blue);
 }
 
 .published-rich-guide-outline-toggle,
@@ -2895,14 +2855,14 @@ a.icon-back-link:hover,
 .published-rich-guide-outline-links a.is-level-1.is-active,
 .published-rich-guide-outline-links a.is-level-2.is-active,
 .published-rich-guide-outline-links a.is-level-3.is-active {
-  border-left-color: #4361ee;
+  border-left-color: var(--koraz-blue);
   background: #eef2ff;
   color: #1c35a6;
   font-weight: 760;
 }
 
 .published-rich-guide-outline-links a.is-active > span {
-  color: #4361ee;
+  color: var(--koraz-blue);
 }
 
 .published-rich-guide-outline-links a.is-level-2 {
@@ -2959,7 +2919,7 @@ a.icon-back-link:hover,
 .published-rich-guide-resource-icon {
   border-radius: 9px;
   background: #eef2ff;
-  color: #4361ee;
+  color: var(--koraz-blue);
 }
 
 .published-rich-guide-resource-key-points .published-rich-guide-resource-icon {
@@ -2993,7 +2953,7 @@ a.icon-back-link:hover,
   right: 0.58rem;
   border-color: #dbe3f5;
   background: #f8faff;
-  color: #4361ee;
+  color: var(--koraz-blue);
   transform: translateY(-50%);
 }
 
@@ -3030,7 +2990,7 @@ a.icon-back-link:hover,
 
 .published-rich-guide-support .published-question-answer-card > header > span {
   border-radius: 8px;
-  background: #4361ee;
+  background: var(--koraz-blue);
 }
 
 .published-rich-guide-support .published-question-answer-response {
@@ -3124,7 +3084,7 @@ a.icon-back-link:hover,
 }
 
 .studio-subject-option input {
-  accent-color: #4361ee;
+  accent-color: var(--koraz-blue);
 }
 
 .studio-subject-delete {
@@ -3192,8 +3152,8 @@ a.icon-back-link:hover,
 }
 
 .topic-selector-options > button.is-selected .topic-selector-check {
-  border-color: #4361ee;
-  background: #4361ee;
+  border-color: var(--koraz-blue);
+  background: var(--koraz-blue);
 }
 
 .topic-selector-options > p {
@@ -3274,7 +3234,7 @@ a.icon-back-link:hover,
 
 @keyframes route-loading-breathe {
   0%, 100% { color: #a5b4fc; transform: translateY(0); }
-  50% { color: #4361ee; transform: translateY(-3px); }
+  50% { color: var(--koraz-blue); transform: translateY(-3px); }
 }
 
 .route-loading-progress {
@@ -3648,7 +3608,7 @@ a.icon-back-link:hover,
 
 .marketing-page a:focus-visible,
 .marketing-page button:focus-visible {
-  outline: 2px solid #a78bfa;
+  outline: 2px solid var(--koraz-violet);
   outline-offset: 3px;
 }
 
@@ -5236,7 +5196,7 @@ a.icon-back-link:hover,
   overflow: hidden;
   aspect-ratio: 16 / 9;
   border-radius: 11px;
-  background: #0f172a;
+  background: var(--koraz-ink);
 }
 
 .studio-video-cover-preview img {

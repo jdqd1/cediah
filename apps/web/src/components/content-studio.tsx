@@ -2057,7 +2057,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                               <p>
                                 {draft.content.coverImageUrl
                                   ? "Esta imagen aparecerá en las tarjetas del video."
-                                  : "Si no eliges una imagen, se usará la portada genérica de Koraz."}
+                                  : "Si no eliges una imagen, se usará la portada genérica de Koras."}
                               </p>
                             </div>
                             <div className="studio-video-cover-actions">

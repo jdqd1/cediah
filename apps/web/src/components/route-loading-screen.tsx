@@ -28,7 +28,7 @@ export function RouteLoadingScreen() {
   if (!inPlatform) return <LoadingContent />;
   return (
     <Suspense fallback={<LoadingContent />}>
-      <AppShell activeKey="" headerTitle="Koraz" mainClassName="route-loading-main"><LoadingContent /></AppShell>
+      <AppShell activeKey="" headerTitle="Koras" mainClassName="route-loading-main"><LoadingContent /></AppShell>
     </Suspense>
   );
 }

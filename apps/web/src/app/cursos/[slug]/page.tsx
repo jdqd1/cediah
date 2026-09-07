@@ -9,7 +9,7 @@ const plannedJourney = [
   {
     number: "01",
     title: "Definición académica",
-    description: "Programa, objetivos, docentes y autorización de uso aportados y aprobados por Koraz.",
+    description: "Programa, objetivos, docentes y autorización de uso aportados y aprobados por Koras.",
   },
   {
     number: "02",
@@ -36,12 +36,12 @@ export async function generateMetadata({ params }: CoursePageProps): Promise<Met
   const course = getDemoCourse(slug);
 
   if (!course) {
-    return { title: "Curso no encontrado | Koraz" };
+    return { title: "Curso no encontrado | Koras" };
   }
 
   return {
-    title: `${course.title} - Catálogo demo | Koraz`,
-    description: `Ficha de demostración del recorrido de ${course.title} en Koraz.`,
+    title: `${course.title} - Catálogo demo | Koras`,
+    description: `Ficha de demostración del recorrido de ${course.title} en Koras.`,
   };
 }
 
@@ -57,7 +57,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
     <main className="course-page">
       <div className="course-top">
         <header className="site-header course-header">
-          <Link className="brand" href="/#inicio" aria-label="Koraz, inicio">
+          <Link className="brand" href="/#inicio" aria-label="Koras, inicio">
             <CediahLogo variant="light" />
           </Link>
           <nav aria-label="Navegación del curso">
@@ -99,7 +99,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
         <div className="course-overview-body">
           <p>
             Esta página valida la navegación y la jerarquía del futuro curso. Las cifras son datos de interfaz para la
-            demostración; Koraz todavía debe confirmar el programa, docentes, duración y materiales definitivos.
+            demostración; Koras todavía debe confirmar el programa, docentes, duración y materiales definitivos.
           </p>
           <dl aria-label="Datos de demostración del curso">
             <div><dt>Región</dt><dd>{course.region}</dd></div>
@@ -145,7 +145,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
       </section>
 
       <footer>
-        <span>KORAZ</span>
+        <span>KORAS</span>
         <p>Ficha de curso demostrativa - Fase 1 en desarrollo</p>
         <p>Caracas, Venezuela</p>
       </footer>

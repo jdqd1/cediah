@@ -19,10 +19,10 @@ export async function generateMetadata({ params }: LessonPageProps): Promise<Met
   const { lessonSlug, slug } = await params;
   const lesson = getDemoLesson(slug, lessonSlug);
 
-  if (!lesson) return { title: "Lección no encontrada | Koraz" };
+  if (!lesson) return { title: "Lección no encontrada | Koras" };
 
   return {
-    title: `${lesson.title} - Demo | Koraz`,
+    title: `${lesson.title} - Demo | Koras`,
     description: lesson.summary,
   };
 }
@@ -37,7 +37,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
     <main className="lesson-page">
       <div className="lesson-top">
         <header className="site-header course-header">
-          <Link className="brand" href="/#inicio" aria-label="Koraz, inicio">
+          <Link className="brand" href="/#inicio" aria-label="Koras, inicio">
             <CediahLogo variant="light" />
           </Link>
           <nav aria-label="Navegación de la lección">
@@ -127,7 +127,10 @@ export default async function LessonPage({ params }: LessonPageProps) {
       </section>
 
       <footer>
-        <span>KORAZ</span>
+        <div className="flex items-center gap-[0.38rem] text-[0.62rem] font-bold text-ink uppercase tracking-wider mb-2 opacity-80">
+          <BookOpen weight="bold" />
+          <span>KORAS</span>
+        </div>
         <p>Lección demostrativa - Fase 1 en desarrollo</p>
         <p>Caracas, Venezuela</p>
       </footer>

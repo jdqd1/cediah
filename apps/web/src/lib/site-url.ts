@@ -1,4 +1,4 @@
-const DEFAULT_PRODUCTION_SITE_ORIGIN = "https://koraz-app.vercel.app";
+const DEFAULT_PRODUCTION_SITE_ORIGIN = "https://koras-app.vercel.app";
 
 export const LEGACY_SITE_HOSTS = [
   "cediah.vercel.app",

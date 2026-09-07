@@ -10,20 +10,20 @@ describe("same-origin view requests", () => {
 
   it("accepts HTTPS behind the deployment proxy", () => {
     expect(isSameOriginRequest(new Request("http://internal/api/content/id/views", {
-      headers: { host: "koraz.example", origin: "https://koraz.example", "x-forwarded-proto": "https" },
+      headers: { host: "koras.example", origin: "https://koras.example", "x-forwarded-proto": "https" },
     }))).toBe(true);
   });
 
   it("rejects foreign, sibling, null, or malformed origins", () => {
-    for (const origin of ["https://other.example", "https://sub.koraz.example", "null", "not-a-url"]) {
-      expect(isSameOriginRequest(new Request("https://koraz.example/api/content/id/views", {
-        headers: { host: "koraz.example", origin },
+    for (const origin of ["https://other.example", "https://sub.koras.example", "null", "not-a-url"]) {
+      expect(isSameOriginRequest(new Request("https://koras.example/api/content/id/views", {
+        headers: { host: "koras.example", origin },
       }))).toBe(false);
     }
   });
 
   it("rejects cross-site fetch metadata even without an origin", () => {
-    expect(isSameOriginRequest(new Request("https://koraz.example/api/content/id/views", {
+    expect(isSameOriginRequest(new Request("https://koras.example/api/content/id/views", {
       headers: { "sec-fetch-site": "cross-site" },
     }))).toBe(false);
   });

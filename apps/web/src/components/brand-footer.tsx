@@ -7,7 +7,7 @@ export function BrandFooter() {
       <div className="brand-footer-lockup">
         <CediahLogo variant="dark" />
         <div>
-          <p>Koraz — Conocimiento que conecta y transforma</p>
+          <p>Koras — Conocimiento que conecta y transforma</p>
           <span>Aprende. Explora. Crece.</span>
         </div>
       </div>

@@ -66,7 +66,7 @@ export function PersistentAppShell({ children, guidedLearningEnabled = false, vi
               : pathname.startsWith("/cursos") ? "courses"
               : "dashboard";
   const visibleMainNavigation = getMainNavigation(guidedLearningEnabled);
-  const title = [...visibleMainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koraz";
+  const title = [...visibleMainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koras";
   return (
     <PersistentShellContext.Provider value={true}>
       <ShellChrome activeKey={activeKey} guidedLearningEnabled={guidedLearningEnabled} headerTitle={title} includeCourses={activeKey === "courses"} viewer={viewer} profilePending={profilePending}>
@@ -363,7 +363,7 @@ function ShellChrome({
           <Link
             className="sidebar-brand"
             href="/dashboard"
-            aria-label="Koraz, inicio"
+            aria-label="Koras, inicio"
             onClick={closeSidebar}
             title="Ir al inicio"
           >
@@ -456,7 +456,7 @@ function ShellChrome({
           </div>
           <GlobalContentSearch />
           <div className="topbar-page-context sr-only">
-            <h1>{headerTitle || "Koraz"}</h1>
+            <h1>{headerTitle || "Koras"}</h1>
             {headerSubtitle && <p>{headerSubtitle}</p>}
             {showBreadcrumbs && <p>Ruta actual: {breadcrumbs?.join(" / ")}</p>}
           </div>

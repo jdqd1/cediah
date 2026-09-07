@@ -36,7 +36,7 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
   return (
     <main className={`auth-page auth-page-paper auth-page-${mode}`}>
       <header className="auth-header">
-        <Link className="brand" href="/" aria-label="Koraz, inicio">
+        <Link className="brand" href="/" aria-label="Koras, inicio">
           <CediahLogo variant="dark" priority />
         </Link>
         <div className="auth-header-actions">
@@ -49,7 +49,7 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
         </div>
       </header>
       <div className="auth-content">
-        <aside className="auth-showcase" aria-label="Recursos de aprendizaje de Koraz">
+        <aside className="auth-showcase" aria-label="Recursos de aprendizaje de Koras">
           <div className="auth-showcase-copy">
             <h2>
               Estudia a tu manera.

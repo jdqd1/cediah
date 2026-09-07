@@ -25,7 +25,7 @@ export default async function UpdatePasswordPage({
   return (
     <main className="auth-page">
       <header className="auth-header">
-        <Link className="brand" href="/" aria-label="Koraz, inicio">
+        <Link className="brand" href="/" aria-label="Koras, inicio">
           <CediahLogo variant="dark" />
         </Link>
       </header>

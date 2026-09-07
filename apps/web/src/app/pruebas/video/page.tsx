@@ -14,7 +14,7 @@ export default async function VideoTestPage() {
     return (
       <main className="auth-page">
         <header className="auth-header">
-          <Link className="brand" href="/" aria-label="Koraz, inicio">
+          <Link className="brand" href="/" aria-label="Koras, inicio">
             <CediahLogo variant="dark" />
           </Link>
         </header>
@@ -39,7 +39,7 @@ export default async function VideoTestPage() {
     <main className="video-test-page">
       <div className="video-test-top">
         <header className="site-header course-header">
-          <Link className="brand" href="/" aria-label="Koraz, inicio">
+          <Link className="brand" href="/" aria-label="Koras, inicio">
             <CediahLogo variant="light" />
           </Link>
           <nav aria-label="Navegación del laboratorio de video">
@@ -88,7 +88,7 @@ export default async function VideoTestPage() {
       </section>
 
       <footer>
-        <span>KORAZ</span>
+        <span>Koras</span>
         <p>Prueba privada del reproductor - no publica contenido académico</p>
         <p>Caracas, Venezuela</p>
       </footer>

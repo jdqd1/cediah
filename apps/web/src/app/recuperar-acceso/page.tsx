@@ -8,7 +8,7 @@ export default function RecoverAccessPage() {
   return (
     <main className="auth-page">
       <header className="auth-header">
-        <Link className="brand" href="/" aria-label="Koraz, inicio">
+        <Link className="brand" href="/" aria-label="Koras, inicio">
           <CediahLogo variant="dark" />
         </Link>
         <Link href="/acceder">Volver a acceder</Link>

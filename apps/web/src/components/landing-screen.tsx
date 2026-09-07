@@ -117,7 +117,7 @@ export function LandingScreen() {
         </div>
 
         <header className="marketing-header">
-          <Link className="marketing-brand" href="/" aria-label="Koraz, inicio">
+          <Link className="marketing-brand" href="/" aria-label="Koras, inicio">
             <CediahLogo variant="dark" priority />
           </Link>
 
@@ -166,7 +166,7 @@ export function LandingScreen() {
           <div className="marketing-devices">
             <Image
               src="/landing/platform-devices.png"
-              alt="Vista de Koraz en tablet y teléfono con distintas materias médicas"
+              alt="Vista de Koras en tablet y teléfono con distintas materias médicas"
               width={1536}
               height={1024}
               sizes="(max-width: 700px) 100vw, 64vw"
@@ -263,7 +263,7 @@ export function LandingScreen() {
       <footer className="marketing-footer" id="instituciones">
         <div className="marketing-footer-inner">
           <div className="marketing-footer-brand">
-            <Link href="/" aria-label="Koraz, inicio"><CediahLogo variant="dark" /></Link>
+            <Link href="/" aria-label="Koras, inicio"><CediahLogo variant="dark" /></Link>
             <p>Aprendizaje que se ve,<br />conocimiento que se queda.</p>
             <div className="marketing-socials" aria-label="Redes sociales" role="group">
               <a href="#instagram" aria-label="Instagram"><InstagramLogo size={16} /></a>
@@ -279,7 +279,7 @@ export function LandingScreen() {
               </div>
             ))}
           </div>
-          <p className="marketing-copyright">© 2026 Koraz. Todos los derechos reservados.</p>
+          <p className="marketing-copyright">© 2026 Koras. Todos los derechos reservados.</p>
         </div>
       </footer>
     </main>
