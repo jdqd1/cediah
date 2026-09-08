@@ -9,7 +9,12 @@ import {
   type LearningAttempt,
 } from "@cediah/contracts";
 import type { ActivityMutation } from "./types";
-import { compactVideoObservedRanges, takeVideoObservedBatch, type VideoObservedRange } from "./video-observation";
+import {
+  compactVideoObservedRanges,
+  normalizeVideoDurationSeconds,
+  takeVideoObservedBatch,
+  type VideoObservedRange,
+} from "./video-observation";
 
 export function VideoActivity({ attempt, mutate }: {
   attempt: LearningAttempt & { manifest: Extract<LearningAttempt["manifest"], { projection: "video" }> };
@@ -22,14 +27,18 @@ export function VideoActivity({ attempt, mutate }: {
   const lastTime = useRef<number | null>(null);
   const observed = useRef<VideoObservedRange[]>([]);
   const pendingSavePosition = useRef<number | null>(null);
+  const saveBlocked = useRef(false);
   const saving = useRef(false);
+  const videoDuration = useRef(attempt.resume.videoDurationSeconds ?? attempt.manifest.durationSeconds);
   const coveragePercent = attempt.manifest.completionRule.type === "video"
     ? attempt.manifest.completionRule.minimumCoveragePercent
     : 90;
 
   useEffect(() => {
     attemptVersion.current = attempt.rowVersion;
-  }, [attempt.rowVersion]);
+    saveBlocked.current = false;
+    videoDuration.current = attempt.resume.videoDurationSeconds ?? attempt.manifest.durationSeconds ?? videoDuration.current;
+  }, [attempt.manifest.durationSeconds, attempt.resume.videoDurationSeconds, attempt.rowVersion]);
 
   useEffect(() => {
     if (attempt.manifest.externalUrl) return;
@@ -47,6 +56,7 @@ export function VideoActivity({ attempt, mutate }: {
   }, [attempt.id, attempt.manifest.externalUrl]);
 
   async function saveVideo(positionSeconds: number) {
+    if (saveBlocked.current || videoDuration.current === null) return;
     pendingSavePosition.current = positionSeconds;
     if (saving.current) return;
     saving.current = true;
@@ -60,6 +70,7 @@ export function VideoActivity({ attempt, mutate }: {
         const hasQueuedRemainder = remaining.length > 0;
         observed.current = remaining;
         const result = await mutate(`/api/guided-learning/attempts/${attempt.id}/resume`, "PATCH", {
+          durationSeconds: videoDuration.current,
           expectedVersion: attemptVersion.current,
           kind: "video",
           observedRanges: batch,
@@ -68,6 +79,7 @@ export function VideoActivity({ attempt, mutate }: {
         if (!result) {
           observed.current = compactVideoObservedRanges([...batch, ...observed.current]);
           pendingSavePosition.current = null;
+          saveBlocked.current = true;
           break;
         }
         attemptVersion.current = result.attempt.rowVersion;
@@ -112,6 +124,18 @@ export function VideoActivity({ attempt, mutate }: {
           <video
             aria-label={`Reproducir ${attempt.manifest.title}`}
             controls
+            onEnded={(event) => void saveVideo(event.currentTarget.currentTime)}
+            onLoadedMetadata={(event) => {
+              videoDuration.current = normalizeVideoDurationSeconds(event.currentTarget.duration)
+                ?? attempt.resume.videoDurationSeconds
+                ?? attempt.manifest.durationSeconds;
+              if (attempt.resume.videoPositionSeconds !== null) {
+                event.currentTarget.currentTime = Math.min(
+                  attempt.resume.videoPositionSeconds,
+                  event.currentTarget.duration,
+                );
+              }
+            }}
             onPause={(event) => void saveVideo(event.currentTarget.currentTime)}
             onTimeUpdate={(event) => {
               const current = event.currentTarget.currentTime;
@@ -119,7 +143,10 @@ export function VideoActivity({ attempt, mutate }: {
                 observed.current.push({ startSeconds: lastTime.current, endSeconds: current });
               }
               lastTime.current = current;
-              if (observed.current.reduce((sum, range) => sum + range.endSeconds - range.startSeconds, 0) >= 15) void saveVideo(current);
+              if (observed.current.length > 200) observed.current = compactVideoObservedRanges(observed.current);
+              if (!saveBlocked.current && observed.current.reduce((sum, range) => sum + range.endSeconds - range.startSeconds, 0) >= 15) {
+                void saveVideo(current);
+              }
             }}
             playsInline
             preload="metadata"
@@ -129,7 +156,7 @@ export function VideoActivity({ attempt, mutate }: {
           <aside className="learning-video-skip">
             <div>
               <strong>¿Ya lo viste o no lo necesitas?</strong>
-              <p>Puedes completar la lección sin reproducirlo. Recibirás {LEARNING_VIDEO_SKIPPED_XP} XP; al ver {coveragePercent}% del video recibirías {LEARNING_VIDEO_OBSERVED_XP} XP.</p>
+              <p>Puedes completar la lección sin reproducirlo. Recibirás {LEARNING_VIDEO_SKIPPED_XP} XP; al reproducir al menos {coveragePercent}% en este reproductor recibirás {LEARNING_VIDEO_OBSERVED_XP} XP.</p>
             </div>
             <button className="learning-secondary-button" disabled={busy} onClick={() => void completeWithoutWatching()} type="button">
               <SkipForward size={18} />{busy ? "Completando…" : "Omitir video y completar"}

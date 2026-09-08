@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { compactVideoObservedRanges, takeVideoObservedBatch } from "./video-observation";
+import {
+  compactVideoObservedRanges,
+  normalizeVideoDurationSeconds,
+  takeVideoObservedBatch,
+} from "./video-observation";
 
 describe("video observation batching", () => {
   it("compacts frequent contiguous time updates into a valid range", () => {
@@ -22,5 +26,12 @@ describe("video observation batching", () => {
       { startSeconds: 45, endSeconds: 60 },
       { startSeconds: 60, endSeconds: 80 },
     ]);
+  });
+
+  it("rounds browser media duration up so the final playback position remains valid", () => {
+    expect(normalizeVideoDurationSeconds(69.3)).toBe(70);
+    expect(normalizeVideoDurationSeconds(Number.NaN)).toBeNull();
+    expect(normalizeVideoDurationSeconds(0)).toBeNull();
+    expect(normalizeVideoDurationSeconds(86_400.1)).toBeNull();
   });
 });

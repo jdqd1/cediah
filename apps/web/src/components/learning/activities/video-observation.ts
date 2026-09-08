@@ -6,6 +6,13 @@ export type VideoObservedRange = {
 const maximumBatchRanges = 8;
 const maximumBatchSeconds = 45;
 const maximumRangeSeconds = 30;
+const maximumVideoSeconds = 86_400;
+
+export function normalizeVideoDurationSeconds(durationSeconds: number) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return null;
+  const normalized = Math.ceil(durationSeconds);
+  return normalized <= maximumVideoSeconds ? normalized : null;
+}
 
 function splitRange(range: VideoObservedRange) {
   const pieces: VideoObservedRange[] = [];
