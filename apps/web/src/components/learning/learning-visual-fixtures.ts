@@ -442,7 +442,7 @@ export const learningVisualAttempt: LearningAttempt = {
   pathSlug: "bases-de-la-fisiologia-respiratoria",
   pathVersionId: enrollment.pathVersionId,
   responses: [],
-  resume: { answeredItemIds: [uuid(910)], currentIndex: 1, guidePosition: null, observedRanges: [], ratedItemIds: [], revealedItemIds: [], videoPositionSeconds: null },
+  resume: { answeredItemIds: [uuid(910)], currentIndex: 1, guidePosition: null, observedRanges: [], ratedItemIds: [], revealedItemIds: [], videoDurationSeconds: null, videoPositionSeconds: null },
   revealedCards: [],
   rowVersion: 3,
   score: { answered: 1, correct: 1, percent: 100, total: 1 },

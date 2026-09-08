@@ -448,6 +448,7 @@ export const LearningAttemptResumeSchema = z.strictObject({
   observedRanges: z.array(LearningObservedRangeSchema).max(500),
   ratedItemIds: z.array(z.string().uuid()).max(500),
   revealedItemIds: z.array(z.string().uuid()).max(500),
+  videoDurationSeconds: z.number().int().positive().max(86_400).nullable().default(null),
   videoPositionSeconds: z.number().nonnegative().nullable(),
 });
 
@@ -546,6 +547,7 @@ export const LearningAttemptCreateRequestSchema = z.strictObject({
 });
 export const LearningAttemptResumeRequestSchema = z.discriminatedUnion("kind", [
   z.strictObject({
+    durationSeconds: z.number().int().positive().max(86_400).optional(),
     expectedVersion: z.number().int().positive(),
     kind: z.literal("video"),
     observedRanges: z.array(LearningObservedRangeSchema).max(8),

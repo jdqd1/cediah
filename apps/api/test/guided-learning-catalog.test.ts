@@ -227,7 +227,7 @@ beforeAll(async () => {
      values ($1, 'video', 'video-ruta-prueba', 'Video de prueba', 'Material ficticio', 'Tórax', $2, 10, $3, 'published', $3, now())`,
     [videoId, {
       description: "Material ficticio para pruebas.",
-      durationSeconds: 300,
+      durationSeconds: null,
       externalUrl: null,
       guide: { document: null, sections: [{ body: "Contenido de prueba", heading: "Sección" }] },
       keyPoints: ["Punto de prueba"],
@@ -405,6 +405,7 @@ describe("guided-learning catalog and versioning", () => {
         attemptId: current.id,
         idempotencyKey: `75000000-0000-4000-8002-${String(segment + 1).padStart(12, "0")}`,
         request: {
+          durationSeconds: 300,
           expectedVersion: current.rowVersion,
           kind: "video",
           observedRanges: [{ endSeconds: startSeconds + 30, startSeconds }],
@@ -417,6 +418,7 @@ describe("guided-learning catalog and versioning", () => {
       finalAwards = saved.value.awards;
     }
     expect(current.status).toBe("completed");
+    expect(current.resume.videoDurationSeconds).toBe(300);
     expect(finalAwards.find((award) => award.kind === "activity_understand")?.xp).toBe(10);
 
     const methods = await pg.query<{ completion_method: string; step_id: string }>(
@@ -595,7 +597,7 @@ describe("guided-learning catalog and versioning", () => {
     const jumped = await provider.updateAttemptResume({
       attemptId: video.value.attempt.id,
       idempotencyKey: "67000000-0000-4000-8000-000000000002",
-      request: { expectedVersion: video.value.attempt.rowVersion, kind: "video", observedRanges: [{ startSeconds: 299, endSeconds: 300 }], positionSeconds: 300 },
+      request: { durationSeconds: 300, expectedVersion: video.value.attempt.rowVersion, kind: "video", observedRanges: [{ startSeconds: 299, endSeconds: 300 }], positionSeconds: 300 },
       userId: studentId,
     });
     if (jumped.status !== "success") throw new Error("Expected video position");

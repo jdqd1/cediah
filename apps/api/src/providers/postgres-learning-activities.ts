@@ -383,15 +383,17 @@ function mergeRanges(
   return merged;
 }
 
-function videoBounds(manifest: StoredAttemptManifest) {
+function videoBounds(manifest: StoredAttemptManifest, resume?: LearningAttemptResume) {
   if (manifest.projection !== "video") return null;
   const publicManifest = toPublicAttemptManifest(manifest);
-  if (publicManifest.projection !== "video" || !publicManifest.durationSeconds) return null;
-  return publicManifest.range ?? { endSeconds: publicManifest.durationSeconds, startSeconds: 0 };
+  if (publicManifest.projection !== "video") return null;
+  if (publicManifest.range) return publicManifest.range;
+  const durationSeconds = publicManifest.durationSeconds ?? resume?.videoDurationSeconds;
+  return durationSeconds ? { endSeconds: durationSeconds, startSeconds: 0 } : null;
 }
 
 function videoCoverage(manifest: StoredAttemptManifest, resume: LearningAttemptResume) {
-  const bounds = videoBounds(manifest);
+  const bounds = videoBounds(manifest, resume);
   if (!bounds) return 0;
   const covered = mergeRanges([], resume.observedRanges, bounds)
     .reduce((sum, range) => sum + range.endSeconds - range.startSeconds, 0);
@@ -903,15 +905,20 @@ export function createPostgresLearningActivityMethods(
           };
         } else {
           if (manifest.projection !== "video") return { status: "invalid_state" };
-          const bounds = videoBounds(manifest);
           const publicManifest = toPublicAttemptManifest(manifest);
-          if (!bounds || publicManifest.projection !== "video" ||
-            input.request.positionSeconds > (publicManifest.durationSeconds ?? 0) ||
+          if (publicManifest.projection !== "video") return { status: "invalid_state" };
+          if (publicManifest.durationSeconds === null && resume.videoDurationSeconds === null &&
+            input.request.durationSeconds !== undefined) {
+            resume.videoDurationSeconds = input.request.durationSeconds;
+          }
+          const bounds = videoBounds(manifest, resume);
+          const maximumPosition = publicManifest.durationSeconds ?? resume.videoDurationSeconds ?? bounds?.endSeconds ?? 0;
+          if (!bounds || input.request.positionSeconds > maximumPosition + 1 ||
             input.request.observedRanges.some((range) => range.endSeconds - range.startSeconds > 30) ||
             input.request.observedRanges.reduce((sum, range) => sum + range.endSeconds - range.startSeconds, 0) > 45) {
             return { status: "invalid_state" };
           }
-          resume.videoPositionSeconds = input.request.positionSeconds;
+          resume.videoPositionSeconds = Math.min(input.request.positionSeconds, maximumPosition);
           resume.observedRanges = mergeRanges(resume.observedRanges, input.request.observedRanges, bounds);
           const rule = manifest.completionRule;
           if (rule.type === "video" && publicManifest.projection === "video" &&
@@ -1196,7 +1203,7 @@ export function createPostgresLearningActivityMethods(
           const publicManifest = toPublicAttemptManifest(manifest);
           const rule = manifest.completionRule;
           if (publicManifest.projection !== "video" || rule.type !== "video") return { status: "invalid_state" };
-          const coverageObserved = publicManifest.externalUrl === null && publicManifest.durationSeconds !== null &&
+          const coverageObserved = publicManifest.externalUrl === null && videoBounds(manifest, resume) !== null &&
             videoCoverage(manifest, resume) >= rule.minimumCoveragePercent / 100;
           if (coverageObserved) {
             method = "observed";

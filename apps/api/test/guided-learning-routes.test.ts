@@ -360,6 +360,32 @@ describe("guided-learning route registration", () => {
     });
     expect(resume.statusCode).toBe(400);
     expect(provider.updateAttemptResume).not.toHaveBeenCalled();
+
+    const videoResume = await app.inject({
+      headers: { authorization: "Bearer valid", "idempotency-key": idempotencyKey },
+      method: "PATCH",
+      payload: {
+        durationSeconds: 70,
+        expectedVersion: 1,
+        kind: "video",
+        observedRanges: [{ endSeconds: 15, startSeconds: 0 }],
+        positionSeconds: 15,
+      },
+      url: `/v1/guided-learning/attempts/${attemptId}/resume`,
+    });
+    expect(videoResume.statusCode).toBe(404);
+    expect(provider.updateAttemptResume).toHaveBeenCalledWith({
+      attemptId,
+      idempotencyKey,
+      request: {
+        durationSeconds: 70,
+        expectedVersion: 1,
+        kind: "video",
+        observedRanges: [{ endSeconds: 15, startSeconds: 0 }],
+        positionSeconds: 15,
+      },
+      userId,
+    });
     await app.close();
   });
 

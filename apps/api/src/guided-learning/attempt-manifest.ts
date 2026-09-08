@@ -218,6 +218,7 @@ export function initialAttemptResume(): LearningAttemptResume {
     observedRanges: [],
     ratedItemIds: [],
     revealedItemIds: [],
+    videoDurationSeconds: null,
     videoPositionSeconds: null,
   });
 }
