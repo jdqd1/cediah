@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowSquareOut, Check } from "@phosphor-icons/react";
-import { LearningAttemptMediaResponseSchema, type LearningAttempt } from "@cediah/contracts";
+import { ArrowSquareOut, Check, SkipForward } from "@phosphor-icons/react";
+import {
+  LEARNING_VIDEO_OBSERVED_XP,
+  LEARNING_VIDEO_SKIPPED_XP,
+  LearningAttemptMediaResponseSchema,
+  type LearningAttempt,
+} from "@cediah/contracts";
 import type { ActivityMutation } from "./types";
+import { compactVideoObservedRanges, takeVideoObservedBatch, type VideoObservedRange } from "./video-observation";
 
 export function VideoActivity({ attempt, mutate }: {
   attempt: LearningAttempt & { manifest: Extract<LearningAttempt["manifest"], { projection: "video" }> };
@@ -12,9 +18,18 @@ export function VideoActivity({ attempt, mutate }: {
   const [busy, setBusy] = useState(false);
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaError, setMediaError] = useState("");
+  const attemptVersion = useRef(attempt.rowVersion);
   const lastTime = useRef<number | null>(null);
-  const observed = useRef<Array<{ endSeconds: number; startSeconds: number }>>([]);
+  const observed = useRef<VideoObservedRange[]>([]);
+  const pendingSavePosition = useRef<number | null>(null);
   const saving = useRef(false);
+  const coveragePercent = attempt.manifest.completionRule.type === "video"
+    ? attempt.manifest.completionRule.minimumCoveragePercent
+    : 90;
+
+  useEffect(() => {
+    attemptVersion.current = attempt.rowVersion;
+  }, [attempt.rowVersion]);
 
   useEffect(() => {
     if (attempt.manifest.externalUrl) return;
@@ -32,42 +47,65 @@ export function VideoActivity({ attempt, mutate }: {
   }, [attempt.id, attempt.manifest.externalUrl]);
 
   async function saveVideo(positionSeconds: number) {
+    pendingSavePosition.current = positionSeconds;
     if (saving.current) return;
-    const ranges = observed.current;
-    if (ranges.length === 0) return;
     saving.current = true;
-    observed.current = [];
     setBusy(true);
     try {
-      await mutate(`/api/guided-learning/attempts/${attempt.id}/resume`, "PATCH", {
-        expectedVersion: attempt.rowVersion,
-        kind: "video",
-        observedRanges: ranges,
-        positionSeconds,
-      });
+      while (pendingSavePosition.current !== null) {
+        const pendingPosition: number = pendingSavePosition.current;
+        pendingSavePosition.current = null;
+        const { batch, remaining } = takeVideoObservedBatch(observed.current);
+        if (batch.length === 0) continue;
+        const hasQueuedRemainder = remaining.length > 0;
+        observed.current = remaining;
+        const result = await mutate(`/api/guided-learning/attempts/${attempt.id}/resume`, "PATCH", {
+          expectedVersion: attemptVersion.current,
+          kind: "video",
+          observedRanges: batch,
+          positionSeconds: pendingPosition,
+        });
+        if (!result) {
+          observed.current = compactVideoObservedRanges([...batch, ...observed.current]);
+          pendingSavePosition.current = null;
+          break;
+        }
+        attemptVersion.current = result.attempt.rowVersion;
+        if (result.attempt.status === "completed") {
+          observed.current = [];
+          pendingSavePosition.current = null;
+          break;
+        }
+        if (hasQueuedRemainder && pendingSavePosition.current === null) {
+          pendingSavePosition.current = pendingPosition;
+        }
+      }
     } finally {
       setBusy(false);
       saving.current = false;
     }
   }
-  async function completeExternal() {
+  async function completeWithoutWatching() {
     setBusy(true);
-    await mutate(`/api/guided-learning/attempts/${attempt.id}/complete`, "POST", {
-      confirmation: true,
-      expectedVersion: attempt.rowVersion,
-    });
-    setBusy(false);
+    try {
+      await mutate(`/api/guided-learning/attempts/${attempt.id}/complete`, "POST", {
+        confirmation: true,
+        expectedVersion: attemptVersion.current,
+      });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <section className="learning-video-activity">
-      <div className="learning-activity-counter">Video · abrir no equivale a completar</div>
+      <div className="learning-activity-counter">Video · puedes verlo u omitirlo</div>
       {attempt.manifest.externalUrl ? (
         <div className="learning-external-video">
           <h2>Estudia el video en su fuente</h2>
-          <p>Regresa después y confirma de forma explícita. No usamos un temporizador para fingir avance.</p>
+          <p>Regresa después y confirma, o completa la actividad si ya conoces este contenido. Al no poder verificar la cobertura, recibirás {LEARNING_VIDEO_SKIPPED_XP} XP.</p>
           <a href={attempt.manifest.externalUrl} rel="noreferrer" target="_blank">Abrir video<ArrowSquareOut size={18} /></a>
-          <button className="learning-primary-button" disabled={busy} onClick={() => void completeExternal()} type="button"><Check size={18} />{busy ? "Guardando…" : "Ya lo estudié"}</button>
+          <button className="learning-primary-button" disabled={busy} onClick={() => void completeWithoutWatching()} type="button"><Check size={18} />{busy ? "Guardando…" : `Completar video (+${LEARNING_VIDEO_SKIPPED_XP} XP)`}</button>
         </div>
       ) : (
         <div className="learning-native-video">
@@ -88,6 +126,15 @@ export function VideoActivity({ attempt, mutate }: {
             src={mediaUrl || undefined}
           />
           <p>{mediaError || (mediaUrl ? "La cobertura se guarda por segmentos reproducidos; saltar al final no completa la actividad." : "Solicitando reproducción segura…")}</p>
+          <aside className="learning-video-skip">
+            <div>
+              <strong>¿Ya lo viste o no lo necesitas?</strong>
+              <p>Puedes completar la lección sin reproducirlo. Recibirás {LEARNING_VIDEO_SKIPPED_XP} XP; al ver {coveragePercent}% del video recibirías {LEARNING_VIDEO_OBSERVED_XP} XP.</p>
+            </div>
+            <button className="learning-secondary-button" disabled={busy} onClick={() => void completeWithoutWatching()} type="button">
+              <SkipForward size={18} />{busy ? "Completando…" : "Omitir video y completar"}
+            </button>
+          </aside>
         </div>
       )}
     </section>

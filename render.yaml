@@ -29,9 +29,9 @@ services:
         # migrations separately because the migrator takes a session lock.
         value: "false"
       - key: GUIDED_LEARNING_ENABLED
-        # Enable only after migrations, permissions and production smoke tests
-        # have passed. Turning this off is the first application rollback step.
-        value: "false"
+        # Production rollout passed migrations, permissions and guided-learning
+        # smoke tests on 2026-09-07. Turning this off remains the first rollback step.
+        value: "true"
       - key: BETTER_AUTH_URL
         value: https://koraz-app.vercel.app
       - key: BETTER_AUTH_SECRET

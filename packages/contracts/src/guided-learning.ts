@@ -319,6 +319,8 @@ export const LearningStepProgressStateSchema = z.enum([
 ]);
 export const LearningRecallGradeSchema = z.enum(["again", "hard", "good", "easy"]);
 export const LearningIdempotencyKeySchema = z.string().uuid();
+export const LEARNING_VIDEO_OBSERVED_XP = 10;
+export const LEARNING_VIDEO_SKIPPED_XP = 2;
 export const LearningRewardKindSchema = z.enum([
   "activity_understand",
   "activity_recall",

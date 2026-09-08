@@ -496,6 +496,7 @@ async function finishAttempt(
   if (stepNewlyCompleted && stepEvent) {
     awards.push(...await awardCompletedStep(transaction, {
       acceptedAt,
+      completionMethod: method,
       eventId: stepEvent.id,
       isEssential: completionContext.is_essential,
       projection: manifest.projection,
@@ -1195,15 +1196,13 @@ export function createPostgresLearningActivityMethods(
           const publicManifest = toPublicAttemptManifest(manifest);
           const rule = manifest.completionRule;
           if (publicManifest.projection !== "video" || rule.type !== "video") return { status: "invalid_state" };
-          const requiresDeclaration = publicManifest.externalUrl !== null || publicManifest.durationSeconds === null;
-          if (requiresDeclaration) {
+          const coverageObserved = publicManifest.externalUrl === null && publicManifest.durationSeconds !== null &&
+            videoCoverage(manifest, resume) >= rule.minimumCoveragePercent / 100;
+          if (coverageObserved) {
+            method = "observed";
+          } else {
             if (input.request.confirmation !== true) return { status: "invalid_state" };
             method = "self_reported";
-          } else {
-            if (videoCoverage(manifest, resume) < rule.minimumCoveragePercent / 100) {
-              return { status: "invalid_state" };
-            }
-            method = "observed";
           }
         }
         const completed = await finishAttempt(transaction, row, manifest, resume, method, acceptedAt);

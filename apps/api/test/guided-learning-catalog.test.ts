@@ -26,6 +26,7 @@ const creatorId = "20000000-0000-4000-8000-000000000001";
 const coordinatorId = "20000000-0000-4000-8000-000000000002";
 const studentId = "20000000-0000-4000-8000-000000000003";
 const otherStudentId = "20000000-0000-4000-8000-000000000004";
+const videoStudentId = "20000000-0000-4000-8000-000000000005";
 const topicId = "30000000-0000-4000-8000-000000000001";
 const videoId = "30000000-0000-4000-8000-000000000002";
 
@@ -204,6 +205,7 @@ beforeAll(async () => {
     [coordinatorId, "coordinator@example.test"],
     [studentId, "student@example.test"],
     [otherStudentId, "other@example.test"],
+    [videoStudentId, "video.student@example.test"],
   ]) {
     await pg.query("insert into auth_users (id, name, email) values ($1, 'Test', $2)", [id, email]);
   }
@@ -226,7 +228,7 @@ beforeAll(async () => {
     [videoId, {
       description: "Material ficticio para pruebas.",
       durationSeconds: 300,
-      externalUrl: "https://example.test/video",
+      externalUrl: null,
       guide: { document: null, sections: [{ body: "Contenido de prueba", heading: "Sección" }] },
       keyPoints: ["Punto de prueba"],
       quiz: { questions },
@@ -354,6 +356,79 @@ describe("guided-learning catalog and versioning", () => {
     expect(tracked[0]?.href).toContain("/aprendizaje/rutas/ruta-completa/actividades/");
     expect(await provider.listLibraryOptions({ projection: "quiz", sourceContentId: videoId, userId: otherStudentId }))
       .toEqual([]);
+  });
+
+  it("allows a native video to be skipped for reduced XP while observed coverage earns full XP", async () => {
+    const enrollment = await provider.createEnrollment({ pathId: publishedPathId, userId: videoStudentId });
+    expect(enrollment.status).toBe("success");
+    const detail = await provider.getPathBySlug({ slug: "ruta-completa", userId: videoStudentId });
+    const skippedOption = detail?.version.units[0]?.steps[0]?.options
+      .find((entry) => entry.projection === "video");
+    const observedOption = detail?.version.units[1]?.steps[0]?.options
+      .find((entry) => entry.projection === "video");
+    if (!skippedOption || !observedOption) throw new Error("Expected native video options");
+
+    const skippedAttempt = await provider.createAttempt({
+      idempotencyKey: "74000000-0000-4000-8000-000000000001",
+      request: {
+        clientAttemptId: "74000000-0000-4000-8001-000000000001",
+        stepOptionId: skippedOption.id,
+      },
+      userId: videoStudentId,
+    });
+    if (skippedAttempt.status !== "success") throw new Error("Expected skipped video attempt");
+    const skipped = await provider.completeAttempt({
+      attemptId: skippedAttempt.value.attempt.id,
+      idempotencyKey: "74000000-0000-4000-8000-000000000002",
+      request: { confirmation: true, expectedVersion: skippedAttempt.value.attempt.rowVersion },
+      userId: videoStudentId,
+    });
+    expect(skipped.status).toBe("success");
+    if (skipped.status !== "success") throw new Error("Expected skipped video completion");
+    expect(skipped.value.attempt.status).toBe("completed");
+    expect(skipped.value.awards.find((award) => award.kind === "activity_understand")?.xp).toBe(2);
+
+    const observedAttempt = await provider.createAttempt({
+      idempotencyKey: "75000000-0000-4000-8000-000000000001",
+      request: {
+        clientAttemptId: "75000000-0000-4000-8001-000000000001",
+        stepOptionId: observedOption.id,
+      },
+      userId: videoStudentId,
+    });
+    if (observedAttempt.status !== "success") throw new Error("Expected observed video attempt");
+    let current = observedAttempt.value.attempt;
+    let finalAwards = observedAttempt.value.awards;
+    for (let segment = 0; segment < 9; segment += 1) {
+      const startSeconds = segment * 30;
+      const saved = await provider.updateAttemptResume({
+        attemptId: current.id,
+        idempotencyKey: `75000000-0000-4000-8002-${String(segment + 1).padStart(12, "0")}`,
+        request: {
+          expectedVersion: current.rowVersion,
+          kind: "video",
+          observedRanges: [{ endSeconds: startSeconds + 30, startSeconds }],
+          positionSeconds: startSeconds + 30,
+        },
+        userId: videoStudentId,
+      });
+      if (saved.status !== "success") throw new Error("Expected observed video progress");
+      current = saved.value.attempt;
+      finalAwards = saved.value.awards;
+    }
+    expect(current.status).toBe("completed");
+    expect(finalAwards.find((award) => award.kind === "activity_understand")?.xp).toBe(10);
+
+    const methods = await pg.query<{ completion_method: string; step_id: string }>(
+      `select completion_method, step_id
+       from learning_step_progress
+       where enrollment_id = $1 and step_id in ($2, $3)`,
+      [enrollment.status === "success" ? enrollment.value.enrollment.id : "", skippedAttempt.value.attempt.stepId, current.stepId],
+    );
+    expect(methods.rows).toEqual(expect.arrayContaining([
+      { completion_method: "self_reported", step_id: skippedAttempt.value.attempt.stepId },
+      { completion_method: "observed", step_id: current.stepId },
+    ]));
   });
 
   it("persists and resumes a server-graded quiz without leaking future solutions", async () => {

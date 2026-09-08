@@ -350,7 +350,8 @@ Para no inflar evidencia: la misma pregunta convertida a flashcard y cuestionari
 
 | Acción | XP inicial | Clave de unicidad |
 | --- | --- | --- |
-| Primer paso esencial de comprensión completado | 10 | Usuario + reward_identity + versión pedagógica de la recompensa |
+| Primer paso esencial de comprensión completado con cobertura verificable o lectura | 10 | Usuario + reward_identity + versión pedagógica de la recompensa |
+| Video completado por declaración, sin cobertura verificable | 2 | Usuario + reward_identity + versión pedagógica de la recompensa |
 | Primer paso esencial de flashcards completado | 10 | Usuario + reward_identity + versión pedagógica de la recompensa |
 | Primer paso esencial de cuestionario completado | 15 | Usuario + reward_identity + versión pedagógica de la recompensa |
 | Repaso que aplica realmente al estado de memoria | 2 por ítem, máximo 20 XP de repaso por día del usuario | Usuario + ítem canónico + versión previa del estado de repaso |
@@ -359,7 +360,7 @@ Para no inflar evidencia: la misma pregunta convertida a flashcard y cuestionari
 
 No otorgar puntos por abrir pantallas, tiempo pasivo, cada repetición o perfección de notas. El objetivo es reconocer actividad útil y reanudación. La biblioteca no entrega puntos de pasos de ruta si el usuario no tiene una inscripción a la que se puedan aplicar; sí puede aportar evidencia reutilizable.
 
-Si un mismo evento completa pasos equivalentes en varias rutas, entregar una sola recompensa de actividad con clave canónica de logro, no una por ruta. Los hitos de unidad/ruta sí son específicos. Mantener una clave `rewardIdentity` estable para opciones equivalentes y conservarla en revisiones cosméticas. El editor hereda esa identidad al reutilizar un paso y no puede asignar premios nuevos por copiarlo. Para opciones del mismo paso la identidad y el importe son iguales; si cambia la selección/cobertura, el validador exige una decisión explícita de equivalencia. Cuando un evento coincide con varias identidades de premio que no fueron unificadas, conceder como máximo un premio de actividad —el de mayor importe, con desempate por clave— y registrar las demás como satisfechas con XP 0 para impedir cobrarlas después. La sección 13 detalla su persistencia.
+Si un mismo evento completa pasos equivalentes en varias rutas, entregar una sola recompensa de actividad con clave canónica de logro, no una por ruta. Los hitos de unidad/ruta sí son específicos. Mantener una clave `rewardIdentity` estable para opciones equivalentes y conservarla en revisiones cosméticas. El editor hereda esa identidad al reutilizar un paso y no puede asignar premios nuevos por copiarlo. Para opciones del mismo paso la identidad es igual; el importe puede reducirse por el método de finalización, como un video declarado sin cobertura. La primera recompensa aceptada consume esa identidad y no se completa la diferencia en una repetición posterior. Si cambia la selección/cobertura, el validador exige una decisión explícita de equivalencia. Cuando un evento coincide con varias identidades de premio que no fueron unificadas, conceder como máximo un premio de actividad —el de mayor importe, con desempate por clave— y registrar las demás como satisfechas con XP 0 para impedir cobrarlas después. La sección 13 detalla su persistencia.
 
 Mostrar XP como métrica secundaria con etiqueta «Puntos de aprendizaje». No añadir niveles en V1: tener avance, objetivos, XP y meta semanal ya ofrece suficientes señales. Hitos visuales iniciales: «Primera actividad», «Primera unidad», «Ruta completada» y «Volví a repasar». Se guardan una vez y sobreviven a pausas.
 
@@ -527,7 +528,7 @@ Guardar por intento posición de reanudación y cobertura de segmentos vistos. L
 
 Completar automáticamente cuando la cobertura del rango asignado alcanza 90 %. El rango puede ser todo el video o un segmento editorial. Conocer duración y rangos no demuestra atención: registrar `completion_method = observed`, como señal de consumo. El aprendizaje lo comprueban preguntas.
 
-Para videos externos sin eventos fiables, permitir «Ya lo estudié» con `completion_method = self_reported`. Abrir el enlace o esperar un temporizador no completa el paso. Un video sin duración conocida también usa finalización declarada mientras no exista otra señal soportada. No exigir al usuario fingir reproducción para continuar.
+Permitir también «Omitir video y completar» en videos nativos, y «Ya lo estudié» en videos externos, con `completion_method = self_reported`. Esta decisión completa el paso para no obligar a repetir material conocido, pero concede 2 XP en lugar de los 10 XP de cobertura observada. Abrir un enlace, mover el control al final o esperar un temporizador nunca completa por sí solo. Un video sin duración conocida usa la misma finalización declarada. «Omitir por ahora» sigue siendo una preferencia distinta: deja el paso pendiente y puede restaurarse.
 
 ### Guías
 
@@ -658,7 +659,7 @@ El navegador consume rutas del BFF de mismo origen bajo `/api/guided-learning`. 
 | `PATCH /v1/guided-learning/attempts/:id/resume` | Posición/cobertura permitida, expectedVersion | Posición y cobertura guardadas |
 | `POST /v1/guided-learning/attempts/:id/items/:itemId/reveal` | Ítem del manifest, solo flashcards | Reverso y revelado guardado; sin XP |
 | `POST /v1/guided-learning/attempts/:id/responses` | itemId, optionId o recallGrade, round, expectedReviewVersion | Feedback, estado de guardado y versión actual; sin score cliente |
-| `POST /v1/guided-learning/attempts/:id/complete` | Declaración de lectura/video externo cuando aplica | Resultado persistido, avance y recompensas nuevas |
+| `POST /v1/guided-learning/attempts/:id/complete` | Declaración de lectura o video completado sin cobertura verificable | Resultado persistido, avance y recompensas nuevas; video declarado recibe XP reducido |
 | `POST /v1/guided-learning/review-sessions` | Tiempo y ámbito opcional de ruta, clientAttemptId | Intento de repaso con manifest congelado |
 | `PATCH /v1/guided-learning/tasks/override` | taskKey, acción, fecha opcional | Override confirmado y cola actualizada |
 | `PATCH /v1/guided-learning/steps/:stepId/preference` | enrollmentId, skip/unskip | Estado propio actualizado, sin fingir completitud |
@@ -1081,7 +1082,7 @@ Las pruebas deben verificar comportamiento e invariantes reales, no duplicar fun
 | T08 | Misma clave, otro payload | Conflicto, sin segunda mutación |
 | T09 | Dos dispositivos contestan el mismo ítem de repaso | Una actualización de calendario; respuesta obsoleta no genera XP ni avance extra |
 | T10 | Saltar al último segundo de video | No satisface cobertura automáticamente |
-| T11 | Abrir video externo | Solo apertura; completar requiere declaración explícita |
+| T11 | Abrir video externo u omitir un video nativo | Solo la declaración explícita completa; concede XP reducido y no finge cobertura observada |
 | T12 | Llegar al final de una guía | Scroll guarda posición; completar exige confirmación |
 | T13 | Realizar práctica desde biblioteca | Se guarda evidencia y aplica solo a equivalencias verificadas de rutas propias |
 | T14 | Convertir pregunta a flashcard | Mismo ítem canónico; no evidencia duplicada de conocimiento |

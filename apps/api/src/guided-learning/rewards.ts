@@ -1,5 +1,7 @@
 import { sql, type Selectable, type Transaction } from "kysely";
 import {
+  LEARNING_VIDEO_OBSERVED_XP,
+  LEARNING_VIDEO_SKIPPED_XP,
   LearningMilestoneSchema,
   LearningRewardSchema,
   type LearningMilestone,
@@ -102,10 +104,17 @@ async function insertReward(
 function activityReward(
   purpose: LearningStepPurpose,
   projection: LearningProjection,
+  completionMethod: "graded" | "observed" | "rated" | "self_reported",
 ) {
   if (purpose === "diagnostic") return null;
   if (projection === "quiz") {
     return { kind: "activity_check" as const, xp: 15 };
+  }
+  if (projection === "video") {
+    return {
+      kind: "activity_understand" as const,
+      xp: completionMethod === "observed" ? LEARNING_VIDEO_OBSERVED_XP : LEARNING_VIDEO_SKIPPED_XP,
+    };
   }
   return projection === "flashcards"
     ? { kind: "activity_recall" as const, xp: 10 }
@@ -116,6 +125,7 @@ export async function awardCompletedStep(
   transaction: Transaction<CediahDatabase>,
   input: {
     acceptedAt: Date;
+    completionMethod: "graded" | "observed" | "rated" | "self_reported";
     eventId: string;
     isEssential: boolean;
     projection: LearningProjection;
@@ -126,7 +136,7 @@ export async function awardCompletedStep(
   },
 ) {
   if (!input.isEssential) return [];
-  const definition = activityReward(input.purpose, input.projection);
+  const definition = activityReward(input.purpose, input.projection, input.completionMethod);
   if (!definition) return [];
   const awards: LearningReward[] = [];
   const activity = await insertReward(transaction, {

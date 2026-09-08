@@ -577,6 +577,10 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
 .learning-external-video > :is(a, button) { justify-self: start; }
 .learning-native-video { display: grid; gap: 14px; }
 .learning-native-video video { width: 100%; min-height: 240px; border-radius: 16px; background: #101828; }
+.learning-video-skip { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; border: 1px solid var(--koraz-line); border-radius: 14px; background: var(--koraz-canvas); padding: 16px; }
+.learning-video-skip strong { display: block; color: var(--learning-text); }
+.learning-video-skip p { margin-top: 4px; font-size: .86rem; }
+.learning-video-skip .learning-secondary-button { white-space: nowrap; }
 
 .learning-completion-panel { justify-items: center; text-align: center; }
 .learning-completion-panel > svg { color: #1f9254; }
@@ -599,6 +603,8 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
   .learning-recall-grades { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .learning-guide-activity nav button { flex: 1; }
   .learning-external-video > :is(a, button) { width: 100%; }
+  .learning-video-skip { grid-template-columns: minmax(0, 1fr); }
+  .learning-video-skip .learning-secondary-button { width: 100%; white-space: normal; }
 }
 
 /* Guided learning experience */
