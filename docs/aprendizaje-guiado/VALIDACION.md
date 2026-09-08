@@ -17,7 +17,7 @@ Una persona autenticada entra desde Inicio o Aprendizaje guiado, pasa por el BFF
 | BFF → Fastify | Confirmado por pruebas | Sesión Better Auth revalidada, errores estables y caché privada |
 | Fastify → datos | Confirmado local y en PostgreSQL administrado | PGlite ejecuta 0001–0015; producción verificó 0009–0015, RLS, propietarios, grants, checksums y conflicto optimista concurrente |
 | Datos → respuesta | Confirmado por contratos | DTOs sin soluciones futuras, progreso/XP de servidor y reanudación persistida |
-| Runtime desplegado | Confirmado en producción | Vercel `d162ff8`/`dpl_Dj8Tf3NszGZevzcUZ7rPtQpBoAxk`; Render `38b6a9f`/`dep-dafnh03bc2fs73df97g0`; bandera activa y smoke autenticado correcto |
+| Runtime desplegado | Confirmado en producción | Web incorporada en `d162ff8`/`dpl_Dj8Tf3NszGZevzcUZ7rPtQpBoAxk`; API incorporada en `38b6a9f`/`dep-dafnh03bc2fs73df97g0` y heredada por los autodespliegues posteriores de `main`; bandera activa y smoke autenticado correcto |
 
 ## Matriz T01–T30
 
@@ -60,7 +60,7 @@ Una persona autenticada entra desde Inicio o Aprendizaje guiado, pasa por el BFF
 | Integridad del esquema remoto | 15 checksums correctos; 20 tablas `learning_*`; 0 propietarios incorrectos, RLS desactivadas, grants Data API, constraints sin validar o preguntas sin identidad |
 | Supabase advisors | 0 avisos de seguridad y 0 claves foráneas guiadas sin índice; índices nuevos aún figuran sin uso por no existir tráfico |
 | Vercel producción | `d162ff8`, despliegue `READY`; flujo autenticado completo y 0 errores runtime agrupados tras el smoke |
-| Render producción | `38b6a9f`, despliegue `live`; `/health` 200 y 0 respuestas 5xx durante el smoke final |
+| Render producción | Lógica de `38b6a9f` presente en el despliegue actual; `/health` 200 y 0 respuestas 5xx durante el smoke final |
 | Video nativo histórico | Duración detectada/fijada en 70 s, cobertura persistida y `activity_completed` con `completionMethod=observed` |
 
 Una ejecución completa inicial en paralelo produjo timeouts de hooks PGlite por contención de recursos y, en consecuencia, fallos encadenados de estado en la suite relacional. No se considera un fallo funcional: las suites relevantes pasaron aisladas. La verificación final debe ejecutar PGlite sin competir con otro proceso pesado.

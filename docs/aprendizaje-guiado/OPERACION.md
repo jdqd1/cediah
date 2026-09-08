@@ -37,7 +37,7 @@ No se activa producción hasta que todos los P0 estén cerrados y exista una dec
 
 - Ruta piloto: `peritoneo-fundamentos-anatomicos`; la inscripción usada para smoke quedó fijada a la versión 1 de tres pasos.
 - Activación base: `c303227` desplegado por Vercel (`dpl_fYqR4dPKSiu9xE6fFqePpovSVX3J`) y Render (`dep-dafmqm3bc2fs73deoh70`).
-- Compatibilidad de videos sin duración editorial: API `38b6a9f`, Render `dep-dafnh03bc2fs73df97g0` en estado `live`.
+- Compatibilidad de videos sin duración editorial: API `38b6a9f`, validada inicialmente en Render como `dep-dafnh03bc2fs73df97g0` y heredada por los despliegues automáticos posteriores de `main`.
 - Reproductor final: web `d162ff8`, Vercel `dpl_Dj8Tf3NszGZevzcUZ7rPtQpBoAxk` en estado `READY`.
 - El botón **Omitir video y completar** termina el paso con método `self_reported` y 2 XP de actividad. La cobertura mínima observada conserva método `observed` y 10 XP cuando esa identidad de recompensa aún no fue concedida. Repetir o cambiar de método no duplica XP.
 - El smoke de un activo histórico de 69,252 s fijó 70 s en el intento, persistió la cobertura y terminó `observed`. No hubo 5xx de Render ni errores runtime agrupados en Vercel tras el recorrido.
