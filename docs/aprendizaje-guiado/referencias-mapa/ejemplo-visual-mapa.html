@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>KORAS · Referencia visual del mapa de aprendizaje</title>
+  <style>
+    @font-face{font-family:Jakarta;src:url(assets/PlusJakartaSans-Regular.ttf) format("truetype");font-weight:400;font-display:swap}
+    @font-face{font-family:Jakarta;src:url(assets/PlusJakartaSans-SemiBold.ttf) format("truetype");font-weight:600 800;font-display:swap}
+    :root{--canvas:#faf7f2;--paper:#fff;--ink:#17382f;--muted:#52665f;--green:#0f3d32;--line:#dfe5e0;--accent:#c75a3a;--soft:#f0f6f2;--ok:#116b50;--okbg:#e8f5ee;--progress:#9a471e;--progressbg:#fff1e8}
+    *{box-sizing:border-box}body{margin:0;padding:30px 28px 24px;background:#f1eee8;color:var(--ink);font:14px/1.5 Jakarta,system-ui,sans-serif}
+    button,input{font:inherit}button{cursor:pointer;color:inherit}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--green);outline-offset:4px}
+    button{touch-action:manipulation}a{color:var(--green)}.review{max-width:1440px;margin:auto}.review-heading{display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:18px}
+    .eyebrow{font-size:11px;letter-spacing:.15em;text-transform:uppercase;font-weight:700;color:var(--muted)}.review-heading h1{font-size:25px;letter-spacing:-.035em;margin:6px 0 4px;font-weight:700}
+    .review-heading p{margin:0;color:var(--muted);font-size:12px}.review-tag{border:1px solid #d8ddd6;border-radius:30px;padding:8px 12px;color:var(--muted);font-size:11px;white-space:nowrap}
+    .view-tabs{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:0 0 18px}.view-tabs button{border:1px solid transparent;border-radius:9px;padding:10px 13px;min-height:44px;background:transparent;font-size:12px;color:var(--muted)}
+    .view-tabs button span{font-size:10px;margin-right:7px;opacity:.8}.view-tabs button[aria-pressed=true]{background:var(--green);color:#fff}.view-tabs button:not([aria-pressed=true]):hover{background:#fff8}
+    .view-tabs .phone{margin-left:auto;border-color:#d6ddd7}.application{position:relative;overflow:hidden;background:var(--canvas);border:1px solid #e0e3dc;border-radius:18px;box-shadow:0 16px 48px #19372c08;margin-inline:auto}
+    .app-header{height:70px;display:flex;align-items:center;padding:0 24px;gap:32px;border-bottom:1px solid #e7e9e2;background:#ffffffc9}
+    .brand{display:flex;align-items:center;gap:9px;font-size:15px;letter-spacing:.12em;font-weight:700}.brand img{width:28px;height:30px;object-fit:contain}
+    .global-search{display:flex;align-items:center;gap:9px;color:var(--muted);width:270px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:9px 12px;font-size:11px}
+    .global-search .icon{width:16px;height:16px}.motto{margin-left:auto;font-size:9px;letter-spacing:.1em;color:#62766c}.header-actions{display:flex;align-items:center;gap:20px}.avatar{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:#e7f0e9;font-size:11px;font-weight:700}
+    .app-body{display:grid;grid-template-columns:72px minmax(0,1fr);height:668px;min-height:650px}.sidebar{background:#ffffff95;border-right:1px solid #e8eae5;padding:17px 9px;display:flex;flex-direction:column;gap:17px;align-items:center}
+    .nav-item{width:52px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9px;color:var(--muted);padding:8px 0;border-radius:10px}.nav-item.active{background:#e7f0ea;color:var(--green);font-weight:700}.nav-item .icon{width:21px;height:21px}.nav-item:last-child{margin-top:auto}
+    .workspace{min-width:0;min-height:0;position:relative;display:grid;grid-template-columns:minmax(0,1fr)}.workspace.has-panel{grid-template-columns:minmax(0,1fr) 344px}
+    .panel[hidden]{display:none!important}
+    .map-region{min-width:0;min-height:0;display:flex;flex-direction:column;position:relative}.map-toolbar{height:66px;flex:none;display:flex;align-items:center;padding:0 26px;gap:10px}.breadcrumbs{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted);min-width:0}
+    .breadcrumbs button{background:none;border:0;padding:8px 0;font-size:11px;min-height:44px;white-space:nowrap}.breadcrumbs .current{font-weight:700;color:var(--ink)}.breadcrumbs .sep{color:#7f9387}.back{border:1px solid var(--line);background:#fff;display:grid;place-items:center;width:36px;min-width:36px;height:36px;border-radius:9px}
+    .toolbar-actions{margin-left:auto;display:flex;gap:8px}.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:10px;background:#fff;min-height:44px;padding:9px 13px;font-size:11px;font-weight:600;box-shadow:0 2px 4px #17382f03}.button .icon{width:16px;height:16px}.button.square{width:44px;padding:0}.button:hover{border-color:#9cafa5}
+    .context{display:flex;gap:16px;align-items:center;padding:5px 30px 16px;min-height:99px;flex:none}.context h2{font-size:23px;line-height:1.3;letter-spacing:-.035em;margin:0 0 5px}.context p{font-size:11px;color:var(--muted);margin:4px 0 0;max-width:500px}.context .facts{font-size:11px}.context .facts strong{font-weight:700}.context .well{width:62px;height:66px;flex:none;border-radius:16px;background:#edf5ef;display:grid;place-items:center}.context .well .medical{width:48px;height:48px}
+    .map-stage{position:relative;flex:1;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#c7d5ca transparent}
+    .map-board{position:relative;transform-origin:top center;margin-inline:auto;transition:opacity .15s ease;min-height:390px}.connections{position:absolute;inset:0;overflow:visible;pointer-events:none}.connections path{fill:none;stroke:#bacbc5;stroke-width:1.25}
+    .map-card{position:absolute;width:156px;height:176px;border:1px solid var(--line);background:#fff;border-radius:18px;box-shadow:0 2px 4px #0f3d3207,0 12px 28px #0f3d320b;transition:border-color .15s,box-shadow .15s}
+    .map-card.main-node{width:168px;height:184px}.map-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 12px 28px #0f3d320b}.map-card:hover{border-color:#a7bdb0;box-shadow:0 5px 8px #0f3d3207,0 16px 30px #0f3d320d}.map-card.selected:hover{border-color:var(--accent)}
+    .map-card .open{width:100%;height:100%;padding:16px 10px 12px;display:flex;flex-direction:column;align-items:center;border:0;border-radius:18px;background:transparent}.map-card .well{display:grid;place-items:center;width:62px;height:62px;border-radius:18px;background:#f1f6f2;margin-bottom:8px}.map-card.main-node .well{width:65px;height:65px}
+    .map-card .title{font-size:14px;font-weight:700;line-height:1.35;max-width:135px;min-height:18px;display:flex;align-items:center}.map-card .percent{font-size:12px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}.map-card .meta{font-size:10px;color:var(--muted);margin-top:2px}.map-card .badge{margin-top:5px}.map-card .more{position:absolute;right:3px;top:2px;width:30px;height:28px;border:0;background:none;color:#708178;border-radius:8px;font-size:15px;opacity:0}.map-card:hover .more,.map-card:focus-within .more{opacity:1}
+    .badge{display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:10px;line-height:16px;font-weight:600;padding:2px 9px;border-radius:30px;white-space:nowrap}.badge.progress{color:var(--progress);background:var(--progressbg)}.badge.complete{color:var(--ok);background:var(--okbg)}.badge.new{color:#52615b;background:#edf0ee}
+    .map-bottom{height:56px;flex:none;display:flex;align-items:center;padding:0 26px 12px;gap:8px}.zoom-group{display:flex;align-items:center;height:38px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 4px #0f3d3203}.zoom-group button{width:37px;height:36px;border:0;background:transparent;border-radius:9px;font-size:16px}.zoom-group output{font-size:11px;font-weight:600;width:43px;text-align:center}.map-bottom .button{height:38px;min-height:38px;width:38px;padding:0}.map-hint{font-size:10px;color:var(--muted);margin-left:8px}.data-hint{margin-left:auto;font-size:9px;color:#697b71}
+    .panel{border-left:1px solid var(--line);background:#ffffffbb;padding:24px 21px 18px;display:flex;flex-direction:column;min-width:0;max-height:668px}.panel-heading{display:flex;gap:12px;align-items:center;position:relative;padding-right:20px}.panel-heading .well{display:grid;place-items:center;width:51px;height:56px;flex:none;border-radius:14px;background:#f1f6f2}.panel-heading .medical{width:41px;height:41px}.panel-heading h3{font-size:20px;letter-spacing:-.025em;margin:0 0 4px}.panel-heading p{font-size:10px;color:var(--muted);margin:4px 0 0}.close-panel{border:0;background:transparent;width:32px;height:32px;position:absolute;right:-11px;top:-10px;border-radius:8px;font-size:20px}
+    .panel-description{font-size:12px;line-height:1.7;color:var(--muted);margin:17px 0 13px}.panel-tabs{display:flex;gap:21px;border-bottom:1px solid var(--line);margin-bottom:12px}.panel-tabs button{border:0;background:none;min-height:40px;padding:0 0 9px;font-size:10px;color:var(--muted)}.panel-tabs button[aria-selected=true]{border-bottom:2px solid var(--green);font-weight:700;color:var(--green)}
+    .roadmap{list-style:none;padding:0;margin:0;overflow:auto;flex:1;min-height:100px}.roadmap li{position:relative}.roadmap li:not(:last-child):before{content:"";position:absolute;left:11px;top:28px;bottom:-8px;width:1px;background:#dce5df}
+    .step{width:100%;display:flex;gap:10px;align-items:center;text-align:left;border:1px solid transparent;border-radius:9px;background:transparent;padding:8px 4px;font-size:11px;min-height:48px}.step .number{display:grid;place-items:center;position:relative;z-index:1;border-radius:7px;background:#edf0ee;color:var(--muted);width:23px;height:23px;flex:none;font-size:10px;font-weight:600}.step.done .number{background:#168568;color:#fff}.step.current{background:#fff7f1;border-color:#f1c9b6}.step.current .number{background:var(--accent);color:#fff}.step .copy strong{font-weight:600;font-size:12px;display:block}.step .copy small{font-size:10px;color:var(--muted)}.step .end{margin-left:auto;color:var(--accent);font-size:13px;padding-right:4px}
+    .next-activity{border-top:1px solid var(--line);padding-top:13px;margin-top:14px}.next-activity h4{font-size:11px;margin:0 0 8px}.next-row{display:flex;align-items:center;gap:9px;font-size:11px;margin-bottom:12px}.next-row .icon-box{width:35px;height:38px;border-radius:9px;display:grid;place-items:center;background:#eef5ef}.next-row small{display:block;font-size:9px;color:var(--muted)}
+    .primary{display:flex;align-items:center;justify-content:center;gap:12px;min-height:44px;width:100%;border:0;background:var(--green);color:white;border-radius:9px;font-size:13px;font-weight:600}.primary:hover{background:#174f40}.primary .icon{width:16px;height:16px}
+    .suggestion-heading{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:4px 0 9px}.suggestion-title{font-size:19px;line-height:1.5;letter-spacing:-.035em;margin:0 0 8px}.suggestion-intro{font-size:11px;line-height:1.7;color:var(--muted);margin:0 0 25px}
+    .suggestion{display:flex;gap:10px;align-items:center;border-bottom:1px solid #e8ece6;padding:16px 0}.suggestion .icon-box{width:37px;height:40px;border-radius:12px;background:#edf5ef;display:grid;place-items:center;flex:none}.suggestion strong{font-size:11px;display:block}.suggestion small{font-size:9px;color:var(--muted);display:block;margin-top:3px}.suggestion button{width:44px;height:44px;flex:none;background:#fff;border:1px solid var(--line);border-radius:10px;margin-left:auto;font-size:18px}
+    .panel-note{margin-top:auto;padding-top:35px;font-size:11px;line-height:1.8;color:var(--muted)}.panel-note strong{display:block;color:var(--ink);font-size:12px;margin-bottom:4px}
+    .child-list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}.child-list button{width:100%;min-height:49px;border:1px solid transparent;border-bottom-color:#e7eae4;border-radius:7px;background:transparent;display:flex;gap:9px;align-items:center;text-align:left;font-size:10px}.child-list button:hover{background:#f0f6f2}.child-list .medical{width:25px;height:25px}.child-list strong{font-size:10px;font-weight:600}.child-list .child-percent{margin-left:auto;font-size:10px;font-variant-numeric:tabular-nums}.child-list .chosen{background:#fff7f1;border-color:#e9b9a6}
+    .icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}.medical{width:46px;height:46px;fill:none;stroke:var(--green);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+    .design-notes{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin:20px 4px 0}.design-note{font-size:11px;line-height:1.7;color:var(--muted)}.design-note strong{display:block;font-size:12px;color:var(--ink);margin-bottom:3px}.design-note .num{color:var(--accent);margin-right:7px;font-size:10px}
+    .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 20px;box-shadow:0 8px 40px #0002;border-radius:11px;font-size:12px;max-width:min(560px,90vw);z-index:10}.toast[hidden]{display:none}
+    dialog{width:min(460px,calc(100vw - 30px));border:1px solid var(--line);border-radius:18px;background:#fffefa;color:var(--ink);padding:26px;box-shadow:0 25px 100px #17382f30}dialog::backdrop{background:#17382f44;backdrop-filter:blur(3px)}dialog h2{font-size:21px;margin:0 0 10px}dialog p{font-size:12px;color:var(--muted)}dialog .dialog-close{float:right;border:0;background:none;width:30px;height:30px;font-size:20px}dialog input{width:100%;border:1px solid #b9c9bf;border-radius:10px;padding:12px;margin:10px 0 15px;background:#fff}dialog .demo-result{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}dialog .demo-result>div{flex:1}dialog .demo-result strong{display:block;font-size:12px}dialog .demo-result small{font-size:10px;color:var(--muted)}dialog .demo-result button{width:44px;height:44px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:20px}
+    @media(max-width:1180px){body{padding:20px 16px}.motto{display:none}.header-actions{margin-left:auto}.workspace.has-panel{grid-template-columns:minmax(0,1fr)}.panel{position:absolute;right:0;top:0;bottom:0;width:344px;z-index:3;background:#fffefb;box-shadow:-12px 0 44px #17382f14}.panel.suggestions{display:none}.map-hint{display:none}}
+    @media(max-width:760px){body{padding:16px 10px}.review-heading h1{font-size:21px}.review-tag{display:none}.view-tabs{gap:0}.view-tabs button{font-size:10px;padding:8px 9px}.view-tabs .phone{margin-left:0}.sidebar{display:none}.app-body{grid-template-columns:minmax(0,1fr)}.app-header{height:62px;padding:0 16px;gap:12px}.global-search{display:none}.application{border-radius:14px}.map-toolbar{padding:0 16px;height:62px}.context{padding:5px 18px 16px}.context h2{font-size:21px}.context p{font-size:11px}.toolbar-actions .button.add{font-size:0;width:44px;padding:0}.toolbar-actions .button.add .icon{width:18px;height:18px}.breadcrumbs{gap:7px}.breadcrumbs button{font-size:10px}.map-stage{min-height:0}.map-bottom{padding:0 16px 12px}.data-hint{display:none}.panel{width:100%;top:100px;bottom:0;border-radius:24px 24px 0 0;border:1px solid var(--line);padding:24px 20px;max-height:none;box-shadow:0 -10px 35px #17382f19}.design-notes{grid-template-columns:1fr;gap:12px;margin-inline:8px}.roadmap{min-height:140px}}
+    body.phone-mode .application{max-width:430px}body.phone-mode .app-body{grid-template-columns:minmax(0,1fr)}body.phone-mode .sidebar,body.phone-mode .global-search,body.phone-mode .motto{display:none}body.phone-mode .app-header{padding:0 18px;gap:12px}body.phone-mode .header-actions{margin-left:auto}body.phone-mode .workspace.has-panel{grid-template-columns:minmax(0,1fr)}body.phone-mode .panel{position:absolute;top:100px;bottom:0;width:100%;right:0;z-index:3;background:#fffefb;border-radius:24px 24px 0 0;max-height:none;box-shadow:0 -10px 35px #17382f19}body.phone-mode .panel.suggestions{display:none}body.phone-mode .toolbar-actions .add{font-size:0;width:44px;padding:0}body.phone-mode .map-toolbar{padding-inline:16px}body.phone-mode .context{padding-inline:20px}body.phone-mode .map-hint,body.phone-mode .data-hint{display:none}body.phone-mode .map-bottom{padding-inline:16px}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+<main class="review">
+  <header class="review-heading">
+    <div><div class="eyebrow">KORAS · Aprendizaje guiado</div><h1>Un espacio para conectar lo que aprendes.</h1><p>Referencia visual del plan maestro. Navega entre las vistas o entra en Anatomía y Tórax.</p></div>
+    <div class="review-tag">Maqueta local · datos ficticios</div>
+  </header>
+  <nav class="view-tabs" aria-label="Vistas del ejemplo">
+    <button data-scene="root" aria-pressed="true"><span>01</span>Mi mapa</button>
+    <button data-scene="anatomy" aria-pressed="false"><span>02</span>Anatomía</button>
+    <button data-scene="thorax" aria-pressed="false"><span>03</span>Tórax</button>
+    <button data-scene="heart" aria-pressed="false"><span>04</span>Lección</button>
+    <button data-scene="physiology" aria-pressed="false"><span>05</span>Lecciones directas</button>
+    <button id="phone" class="phone" aria-pressed="false">Vista móvil</button>
+  </nav>
+  <section class="application" aria-label="Ejemplo de interfaz KORAS">
+    <header class="app-header">
+      <div class="brand"><img src="assets/koras-mark.png" alt="">KORAS</div>
+      <button class="global-search" id="global-search"><span data-icon="search"></span>Buscar nodos, bloques o lecciones…</button>
+      <span class="motto">ESTUDIA &nbsp; · &nbsp; EXPLORA &nbsp; · &nbsp; APLICA &nbsp; · &nbsp; TRASCIENDE</span>
+      <div class="header-actions"><span data-icon="bell" aria-hidden="true"></span><span class="avatar" aria-label="Perfil de ejemplo">MA</span></div>
+    </header>
+    <div class="app-body">
+      <aside class="sidebar" aria-label="Contexto de navegación">
+        <span class="nav-item"><span data-icon="home"></span>Inicio</span>
+        <span class="nav-item active"><span data-icon="map"></span>Aprende</span>
+        <span class="nav-item"><span data-icon="book"></span>Cursos</span>
+        <span class="nav-item"><span data-icon="library"></span>Biblioteca</span>
+        <span class="nav-item"><span data-icon="search"></span>Explorar</span>
+        <span class="nav-item"><span data-icon="settings"></span>Ajustes</span>
+      </aside>
+      <div class="workspace has-panel" id="workspace">
+        <section class="map-region" aria-label="Mapa de contenidos">
+          <div class="map-toolbar"><div id="crumbs" class="breadcrumbs"></div><div class="toolbar-actions"><button class="button add" id="add"><span data-icon="plus"></span><span id="add-label">Agregar nodo</span></button><button class="button square" id="info" title="Ver resumen" aria-label="Ver resumen"><span data-icon="info"></span></button></div></div>
+          <header class="context" id="context"></header>
+          <div class="map-stage" id="stage"><div class="map-board" id="board"></div></div>
+          <footer class="map-bottom"><div class="zoom-group"><button id="zoom-out" aria-label="Alejar">−</button><output id="zoom-label">100%</output><button id="zoom-in" aria-label="Acercar">+</button></div><button class="button" id="fit" title="Ajustar vista" aria-label="Ajustar vista"><span data-icon="expand"></span></button><span class="map-hint">Entra en un contenido para explorar su interior</span><span class="data-hint">Ejemplo de diseño</span></footer>
+        </section>
+        <aside class="panel suggestions" id="panel" aria-label="Detalle contextual"></aside>
+      </div>
+    </div>
+  </section>
+  <footer class="design-notes">
+    <div class="design-note"><strong><span class="num">01</span>Una tarjeta, una idea</strong>Icono verde, título y avance. El estado vive en una etiqueta suave; la información extensa aparece al profundizar.</div>
+    <div class="design-note"><strong><span class="num">02</span>El contexto permanece</strong>La misma superficie acompaña cada nivel. Los breadcrumbs y el panel ayudan a encontrar el siguiente paso.</div>
+    <div class="design-note"><strong><span class="num">03</span>El detalle tiene su lugar</strong>La lección abre un roadmap vertical con una acción clara. En móvil, el panel se convierte en una hoja inferior.</div>
+  </footer>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+<dialog id="add-dialog" aria-labelledby="add-title">
+  <button class="dialog-close" id="close-dialog" aria-label="Cerrar">×</button><div class="eyebrow">Tu próximo tema</div><h2 id="add-title">Agregar contenido</h2><p>Ejemplo del buscador contextual. Los cambios de esta maqueta solo duran mientras la página está abierta.</p>
+  <label for="demo-search" class="eyebrow">Buscar</label><input id="demo-search" type="search" placeholder="Bloque o lección…"><div id="demo-results"></div>
+</dialog>
+<script>
+  const shapes={
+    search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',
+    back:'<path d="M20 12H4m6-6-6 6 6 6"/>',
+    home:'<path d="m3 10 9-7 9 7M5 9v12h5v-7h4v7h5V9"/>',
+    book:'<path d="M3 5c4-1 6 0 9 2 3-2 5-3 9-2v15c-4-1-6 0-9 1-3-1-5-2-9-1V5Zm9 2v14"/>',
+    library:'<rect x="3" y="4" width="5" height="17" rx="1"/><path d="M11 4v17M15 4l5-1 3 17-5 1z"/>',
+    map:'<rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v5m8-5v5M7 12h3v3h4v-4h3"/>',
+    bell:'<path d="M5 16h14l-2-3V9a5 5 0 0 0-10 0v4zm5 4h4"/><circle cx="18" cy="5" r="2" fill="#c75a3a" stroke="none"/>',
+    info:'<circle cx="12" cy="12" r="9"/><path d="M12 10v7m0-11v1"/>',
+    expand:'<path d="M4 9V4h5m6 0h5v5M4 15v5h5m6 0h5v-5"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="m9 3 6 0 1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/>',
+    play:'<path d="m9 5 10 7-10 7z"/>'
+  };
+  function icon(name){return '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">'+(shapes[name]||shapes.book)+'</svg>'}
+  const ribs=[0,1,2,3,4].map(i=>'<path d="M29 '+(20+i*6)+'C'+(16-i)+' '+(15+i*5)+' '+(8-i)+' '+(21+i*6)+' '+(10-i)+' '+(27+i*6)+'c5 2 12 1 19-3M35 '+(20+i*6)+'C'+(48+i)+' '+(15+i*5)+' '+(56+i)+' '+(21+i*6)+' '+(54+i)+' '+(27+i*6)+'c-5 2-12 1-19-3"/>').join('');
+  const med={
+    anatomy:'<path d="M28 12h8v41h-8zM25 7c0-6 14-6 14 0s-14 6-14 0Z"/>'+ribs,
+    chest:'<path d="M29 10h6v43h-6zM23 10l9 5 9-5"/>'+ribs,
+    heart:'<path d="M25 21c-8-8-17 2-14 15s13 23 25 20c10-3 13-14 10-24-2-7-5-10-10-12l1-11-6-2-2 16M23 20l-2-11 6-1 2 9M38 24l8-9 5 5-9 10M23 31c7-4 12-1 11 7s8 14 8 14M20 38c3-7 6-8 10-8"/>',
+    molecule:'<circle cx="15" cy="44" r="6"/><circle cx="29" cy="25" r="6"/><circle cx="30" cy="9" r="4"/><circle cx="48" cy="31" r="5"/><path d="m19 39 7-9m4-11V13m5 14 8 3"/>',
+    tissue:'<path d="m26 5 12 0 2 8 7 4 8-2 5 10-6 6v8l6 5-6 10-8-2-7 4-2 7H25l-2-7-7-4-8 2-5-10 6-6v-8l-6-5 5-10 8 2 7-4z" transform="translate(2 1) scale(.92)"/><circle cx="32" cy="32" r="14"/><circle cx="32" cy="32" r="7"/>',
+    pill:'<path d="M15 30 32 12c16-13 32 6 18 19L33 49C18 63 1 44 15 30Zm8-8 20 19"/>',
+    stethoscope:'<path d="M13 8v16c0 18 27 18 27 0V8M13 9h6m15 0h6M26 37v10c0 15 27 15 27-1v-9"/><circle cx="53" cy="31" r="6"/>',
+    head:'<path d="M22 53v-9c-6-3-10-7-10-17C12 5 45 4 47 24l5 9h-8v7c0 4-5 5-10 4v9M28 23c7-5 12 1 6 6v6m-3 3v1"/>',
+    arm:'<path d="M25 7c-6 2-6 7-4 14l-7 19c-6 16 28 16 36 7l-2-7-12 1-6-7 3-13-1-6 3-4-2-5zM16 41l12 4 8-4"/>',
+    abdomen:'<path d="M15 10v10c-9 3-9 12-2 16-6 8-1 18 9 15l9 6 10-6c10 3 14-7 8-15 7-4 7-13-2-16V10M18 19h27M19 27c-7 9 26-2 25 8-1 9-26 0-25 9 1 5 17 1 18 6"/>',
+    pelvis:'<path d="M16 10c-15 6-10 24 2 27l-2 15 9 4 7-18 7 18 9-4-2-15c12-3 17-21 2-27l-10 13H26zM24 24l8 8 8-8"/>',
+    leg:'<path d="M24 7h12l5 21-5 17 5 7-1 5H14c-3-5 9-8 10-11l-1-17zM24 47l12-2M20 53h16"/>',
+    brain:'<path d="M30 12C22 0 11 10 15 17 3 20 6 35 13 35c-2 11 9 17 17 10V12Zm4 0c8-12 19-2 15 5 12 3 9 18 2 18 2 11-9 17-17 10V12ZM22 18c-7 6-6 13 0 16m20-16c7 6 6 13 0 16M30 38v20m4-20v20"/>',
+    skin:'<path d="M32 5C24 19 12 31 12 41a20 20 0 0 0 40 0C52 31 40 19 32 5ZM23 39c-2 8 3 13 9 13"/>',
+    lungs:'<path d="M29 8v18L17 15C8 18 6 36 8 48c2 11 19 7 20 0V30M35 8v18l12-11c9 3 11 21 9 33-2 11-19 7-20 0V30M29 23l-9 12m15-12 9 12M21 35l-5 8m27-8 5 8"/>',
+    vessel:'<path d="M22 6v19L11 47l9 9 12-25 12 25 9-9-11-22V6M32 6v16M14 46l8 4m20 0 8-4"/>',
+    diaphragm:'<path d="M10 43c6-27 38-27 44 0M10 43c13-12 31-12 44 0M15 34v-9m9 4V17m8 9V11m8 18V17m9 17v-9"/>',
+    kidney:'<path d="M20 12c-14-5-18 34-3 39 9 3 12-8 6-13s-4-10 1-13c6-4 4-12-4-13Zm24 0c14-5 18 34 3 39-9 3-12-8-6-13s4-10-1-13c-6-4-4-12 4-13ZM24 29l5 5v22m11-27-5 5v22"/>',
+    endocrine:'<path d="M23 8v10c-17-6-18 20-6 22l12-6v22m12-48v10c17-6 18 20 6 22l-12-6v22M29 34l3-7 3 7"/>',
+    folder:'<path d="M7 18V11h19l6 7h25v34H7zM7 23h50"/>'
+  };
+  function medical(name){return '<svg class="medical" viewBox="0 0 64 64" aria-hidden="true">'+(med[name]||med.folder)+'</svg>'}
+  document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
+  const pct=(c,t)=>c===t&&t>0?100:Math.min(99,Math.round(c/t*100));
+  const item=(id,title,ico,c,t,meta='')=>({id,title,ico,c,t,meta});
+  const thorax=[
+    item('wall','Pared torácica','chest',8,8),item('mediastinum','Mediastino','abdomen',6,9),item('heart','Corazón','heart',1,8),item('lungs','Pulmones','lungs',0,3),
+    item('vessels','Grandes vasos','vessel',0,3),item('diaphragm','Diafragma','diaphragm',0,3),item('pleura','Pleura','lungs',0,3),item('lymph','Sistema linfático','endocrine',0,3)
+  ];
+  const anatomy=[
+    item('head','Cabeza y cuello','head',8,10,'5 lecciones'),item('arm','Miembro superior','arm',5,8,'6 lecciones'),item('thorax','Tórax','chest',15,40,'8 lecciones'),item('abdomen','Abdomen','abdomen',1,4,'7 lecciones'),
+    item('pelvis','Pelvis','pelvis',0,5,'5 lecciones'),item('leg','Miembro inferior','leg',3,10,'6 lecciones'),item('brain','Sistema nervioso','brain',1,5,'8 lecciones'),item('skin','Sistema tegumentario','skin',1,10,'4 lecciones')
+  ];
+  const roots=[item('biochemistry','Bioquímica','molecule',8,21,'5 bloques'),item('anatomy','Anatomía','anatomy',34,92,'8 bloques'),item('physiology','Fisiología','heart',9,20,'6 lecciones'),item('histology','Histología','tissue',1,5,'4 bloques'),item('pharmacology','Farmacología','pill',3,20,'3 bloques'),item('clinic','Medicina clínica','stethoscope',1,10,'5 bloques')];
+  const phys=[item('cardiovascular','Fisiología cardiovascular','heart',4,5),item('respiratory','Fisiología respiratoria','lungs',2,5),item('renal','Fisiología renal','kidney',0,2),item('digestive','Fisiología digestiva','abdomen',2,4),item('endocrine','Fisiología endocrina','endocrine',1,2),item('balance','Equilibrio hidroelectrolítico','skin',0,2)];
+  const datasets={root:roots,anatomy,thorax,physiology:phys};
+  const contexts={root:{title:'Mi mapa de aprendizaje',description:'Conecta conocimientos. Construye tu propio recorrido.'},anatomy:{title:'Anatomía',ico:'anatomy',c:34,t:92,count:'8 bloques',description:'Explora la estructura del cuerpo humano y sus relaciones.'},thorax:{title:'Tórax',ico:'chest',c:15,t:40,count:'8 lecciones',description:'Un recorrido por las estructuras del tórax y sus relaciones.'},physiology:{title:'Fisiología',ico:'heart',c:9,t:20,count:'6 lecciones',description:'Comprende cómo funcionan y se relacionan los sistemas del cuerpo.'}};
+  let scene='root',detail=null,summary=false,zoom=1,tab='activities',toastTimer,focusedBeforePanel=null;
+  const $=id=>document.getElementById(id);
+  const status=x=>x.c===x.t?'complete':x.c>0?'progress':'new';
+  function badge(x){const s=status(x);return '<span class="badge '+s+'">'+(s==='complete'?'✓ Completado':s==='progress'?'En progreso':'No iniciado')+'</span>'}
+  function notify(msg){clearTimeout(toastTimer);$('toast').textContent=msg;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,4000)}
+  function go(next){scene=next==='heart'?'thorax':next;detail=next==='heart'?thorax[2]:null;summary=false;tab='activities';zoom=1;render()}
+  function render(){
+    document.querySelectorAll('[data-scene]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.scene===(detail?.id==='heart'?'heart':scene))));
+    const c=contexts[scene];
+    $('context').innerHTML=(c.ico?'<div class="well">'+medical(c.ico)+'</div>':'')+'<div><h2>'+c.title+'</h2>'+(c.ico?'<div class="facts"><strong>'+pct(c.c,c.t)+'%</strong> completado · '+c.count+'</div>':'')+'<p>'+c.description+'</p></div>';
+    let crumbs='<button data-go="root" class="'+(scene==='root'?'current':'')+'">Mi mapa</button>';
+    if(scene!=='root'){crumbs='<button class="back" aria-label="Volver al nivel superior" data-go="'+(scene==='thorax'?'anatomy':'root')+'">'+icon('back')+'</button>'+crumbs+'<span class="sep">›</span><button data-go="'+(scene==='physiology'?'physiology':'anatomy')+'" class="'+(scene!=='thorax'?'current':'')+'">'+(scene==='physiology'?'Fisiología':'Anatomía')+'</button>'}
+    if(scene==='thorax')crumbs+='<span class="sep">›</span><button class="current" data-go="thorax">Tórax</button>';
+    $('crumbs').innerHTML=crumbs;
+    $('crumbs').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+    $('add-label').textContent=scene==='root'?'Agregar nodo':'Agregar contenido';
+    const show=scene==='root'||Boolean(detail)||summary;
+    $('workspace').classList.toggle('has-panel',show);$('panel').hidden=!show;
+    renderPanel();requestAnimationFrame(renderBoard);
+  }
+  function renderBoard(){
+    const items=datasets[scene];const compact=document.body.classList.contains('phone-mode')||$('stage').clientWidth<650;
+    const w=scene==='root'?168:156,h=scene==='root'?184:176;
+    const columns=compact?2:items.length===6?3:Math.min(4,Math.max(2,Math.floor(($('stage').clientWidth-32+46)/(w+46))));
+    const gap=compact?20:48,vGap=scene==='root'?62:56;
+    const boardW=columns*w+(columns-1)*gap+32,boardH=Math.ceil(items.length/columns)*(h+vGap)-vGap+40;
+    const positions=items.map((x,i)=>({x:16+(i%columns)*(w+gap),y:12+Math.floor(i/columns)*(h+vGap)}));
+    $('board').style.width=boardW+'px';$('board').style.height=boardH+'px';$('board').style.transform='scale('+zoom+')';$('zoom-label').textContent=Math.round(zoom*100)+'%';
+    let paths='';
+    const pairs=scene==='root'?[[0,1],[1,2],[0,3],[1,4],[2,5],[3,4],[4,5]]:items.slice(1).map((x,i)=>[i,i+1]);
+    pairs.forEach(([a,b])=>{const p=positions[a],q=positions[b];if(!q)return;if(p.y===q.y){const sx=p.x+w,sy=p.y+h/2,tx=q.x,ty=q.y+h/2;paths+='<path d="M'+sx+' '+sy+' C'+(sx+gap/2)+' '+sy+' '+(tx-gap/2)+' '+ty+' '+tx+' '+ty+'"/>'}else{const sx=p.x+w/2,sy=p.y+h,tx=q.x+w/2,ty=q.y;paths+='<path d="M'+sx+' '+sy+' C'+sx+' '+(sy+vGap/2)+' '+tx+' '+(ty-vGap/2)+' '+tx+' '+ty+'"/>'}});
+    let html='<svg class="connections" width="'+boardW+'" height="'+boardH+'" aria-hidden="true">'+paths+'</svg>';
+    items.forEach((x,i)=>{const p=positions[i];html+='<article class="map-card '+(scene==='root'?'main-node ':'')+(detail?.id===x.id?'selected':'')+'" style="left:'+p.x+'px;top:'+p.y+'px"><button class="open" data-open="'+x.id+'" aria-label="'+x.title+', '+pct(x.c,x.t)+' por ciento"><span class="well">'+medical(x.ico)+'</span><span class="title">'+x.title+'</span><span class="percent">'+pct(x.c,x.t)+'%</span>'+(scene==='root'?'<span class="meta">'+x.meta+'</span>'+badge(x):badge(x))+'</button><button class="more" data-more="'+x.id+'" aria-label="Información de '+x.title+'">···</button></article>'});
+    $('board').innerHTML=html;
+    $('board').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{const x=items.find(x=>x.id===b.dataset.open);if(x.id==='anatomy'||x.id==='physiology'||x.id==='thorax'){go(x.id);return}if(scene==='root'||scene==='anatomy'){notify('Esta agrupación ilustra el diseño. Explora Anatomía → Tórax para recorrer el ejemplo completo.');return}focusedBeforePanel=b;detail=x;summary=false;tab='activities';render()});
+    $('board').querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{if(scene==='thorax'||scene==='physiology'){detail=items.find(x=>x.id===b.dataset.more);summary=false;render()}else if(b.dataset.more==='anatomy'||b.dataset.more==='thorax'){go(b.dataset.more);summary=true;render()}else notify('En la aplicación: renombrar agrupación, agregar contenido, ver información o quitar del mapa.')});
+  }
+  const steps=[['Introducción','Video · 5 min'],['Guía de estudio','Documento · 10 min'],['Anatomía coronaria','Video · 12 min'],['Relaciones anatómicas','Guía · 15 min'],['Flashcards','Repaso · 10 min'],['Cuestionario','Evaluación · 10 min'],['Integración del tema','Guía · 15 min'],['Cierre','Resumen · 5 min']];
+  function renderPanel(){
+    const p=$('panel');p.classList.toggle('suggestions',!detail&&!summary);
+    if(!detail&&!summary){p.innerHTML='<div class="suggestion-heading">Sigue conectando</div><h3 class="suggestion-title">Tu mapa puede<br>seguir creciendo.</h3><p class="suggestion-intro">Añade un tema a tu recorrido y encuentra nuevas conexiones.</p>'+[['heart','Electrofisiología cardíaca','Lección · Fisiología'],['brain','Neuroanatomía funcional','Bloque · Anatomía'],['molecule','Metabolismo energético','Bloque · Bioquímica']].map(x=>'<div class="suggestion"><span class="icon-box">'+medical(x[0])+'</span><div><strong>'+x[1]+'</strong><small>'+x[2]+'</small></div><button data-suggest="'+x[1]+'" aria-label="Agregar '+x[1]+'">+</button></div>').join('')+'<div class="panel-note"><strong>Un recorrido que se siente tuyo.</strong>Agrupa contenidos de distintas materias y vuelve a ellos sin perder el contexto.</div>';p.querySelectorAll('[data-suggest]').forEach(b=>b.onclick=()=>addSuggestion(b.dataset.suggest));return}
+    const x=detail||contexts[scene];const count=detail?x.c+' de '+x.t+' actividades completadas':x.count;
+    const genericNames=['Introducción','Guía de estudio','Conceptos clave','Flashcards','Cuestionario','Aplicación del tema','Repaso','Síntesis','Cierre'];
+    const localSteps=x.id==='heart'?steps:Array.from({length:x.t||0},(_,i)=>[genericNames[i%genericNames.length],'Actividad de ejemplo']);
+    p.innerHTML='<div class="panel-heading"><div class="well">'+medical(x.ico)+'</div><div><h3>'+x.title+'</h3>'+badge(x)+'<p>'+count+'</p></div><button class="close-panel" id="close-panel" aria-label="Cerrar detalle">×</button></div><p class="panel-description">'+(detail?'Revisa el tema y avanza a tu ritmo entre la explicación, la práctica y el repaso.':contexts[scene].description)+'</p><div class="panel-tabs" role="tablist"><button role="tab" id="activities-tab" aria-selected="'+(tab==='activities')+'">'+(detail?'Actividades':'Lecciones')+'</button><button role="tab" id="resources-tab" aria-selected="'+(tab==='resources')+'">Recursos</button></div>';
+    if(tab==='resources'){p.innerHTML+='<div class="panel-note" style="margin-top:0;padding-top:10px"><strong>Materiales del tema</strong>Las guías, videos y alternativas autorizadas de esta lección aparecerán aquí. Esta maqueta no contiene material académico.</div>'}
+    else if(detail){p.innerHTML+='<ol class="roadmap">'+localSteps.map((s,i)=>'<li><button class="step '+(i<x.c?'done':i===x.c?'current':'')+'" data-step="'+i+'"><span class="number">'+(i<x.c?'✓':i+1)+'</span><span class="copy"><strong>'+s[0]+'</strong><small>'+s[1]+'</small></span>'+(i===x.c?'<span class="end">›</span>':'')+'</button></li>').join('')+'</ol><div class="next-activity"><h4>Siguiente actividad</h4><div class="next-row"><span class="icon-box">'+icon('book')+'</span><span><strong>'+((localSteps[x.c]||localSteps[0])[0])+'</strong><small>'+((localSteps[x.c]||localSteps[0])[1])+'</small></span></div><button class="primary" id="begin">Comenzar actividad '+icon('arrow')+'</button></div>'}
+    else{p.innerHTML+='<ul class="child-list">'+datasets[scene].map(n=>'<li><button data-child="'+n.id+'"><span>'+medical(n.ico)+'</span><strong>'+n.title+'</strong><span class="child-percent">'+pct(n.c,n.t)+'%</span></button></li>').join('')+'</ul><div class="next-activity"><h4>Siguiente lección recomendada</h4><div class="next-row"><span class="icon-box">'+medical('heart')+'</span><span><strong>Corazón</strong><small>1 de 8 actividades</small></span></div><button class="primary" id="continue-lesson">Continuar lección '+icon('arrow')+'</button></div>'}
+    $('close-panel').onclick=()=>{detail=null;summary=false;render();focusedBeforePanel?.focus()};
+    $('activities-tab').onclick=()=>{tab='activities';renderPanel()};$('resources-tab').onclick=()=>{tab='resources';renderPanel()};
+    p.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>notify('Ejemplo de selección: '+localSteps[Number(b.dataset.step)][0]+'. La implementación abrirá la actividad existente.'));
+    if($('begin'))$('begin').onclick=()=>notify('La implementación creará o reanudará el intento existente y conservará el regreso a este mapa.');
+    p.querySelectorAll('[data-child]').forEach(b=>b.onclick=()=>{const n=datasets[scene].find(x=>x.id===b.dataset.child);if(scene==='anatomy'&&n.id==='thorax')go('thorax');else if(scene==='thorax'||scene==='physiology'){detail=n;summary=false;render()}else notify('Explora Tórax para ver el detalle de una lección.')});
+    if($('continue-lesson'))$('continue-lesson').onclick=()=>go('heart');
+  }
+  function recomputeDemo(){
+    const sum=xs=>({c:xs.reduce((n,x)=>n+x.c,0),t:xs.reduce((n,x)=>n+x.t,0)});
+    Object.assign(contexts.thorax,sum(thorax),{count:thorax.length+' lecciones'});
+    Object.assign(anatomy.find(x=>x.id==='thorax'),sum(thorax),{meta:thorax.length+' lecciones'});
+    Object.assign(contexts.anatomy,sum(anatomy),{count:anatomy.length+' bloques'});
+    Object.assign(roots.find(x=>x.id==='anatomy'),sum(anatomy),{meta:anatomy.length+' bloques'});
+    Object.assign(contexts.physiology,sum(phys),{count:phys.length+' lecciones'});
+    Object.assign(roots.find(x=>x.id==='physiology'),sum(phys),{meta:phys.length+' lecciones'});
+  }
+  function addSuggestion(title){
+    if(!datasets[scene].some(x=>x.title===title)){datasets[scene].push(item('suggested-'+datasets[scene].length,title,'folder',0,8,'1 bloque'));recomputeDemo();render();notify('Añadido a esta maqueta. No se ha guardado en la plataforma.');}
+    else notify('Este contenido ya está añadido a la maqueta.');
+  }
+  function openAdd(q=''){$('add-dialog').showModal();$('demo-search').value=q;renderResults();$('demo-search').focus()}
+  const demoItems=[{title:'Fisiología cardíaca',kind:'Lección · Fisiología',ico:'heart'},{title:'Circulación coronaria',kind:'Lección · Anatomía',ico:'vessel'},{title:'Grandes vasos',kind:'Lección · Anatomía',ico:'vessel'},{title:'Tórax',kind:'Bloque · Anatomía',ico:'chest'}];
+  function renderResults(){const q=$('demo-search').value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');const matches=demoItems.filter(x=>x.title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q));$('demo-results').innerHTML=matches.length?matches.map((x,i)=>'<div class="demo-result">'+medical(x.ico)+'<div><strong>'+x.title+'</strong><small>'+x.kind+'</small></div><button data-demo-add="'+i+'" aria-label="Agregar '+x.title+'">+</button></div>').join(''):'<p>No hay coincidencias en este catálogo de ejemplo.</p>';$('demo-results').querySelectorAll('[data-demo-add]').forEach(b=>b.onclick=()=>{const x=matches[Number(b.dataset.demoAdd)];const target=datasets[scene];if(!target.some(n=>n.title===x.title))target.push(item('added-'+target.length,x.title,x.ico,0,8,x.kind.split(' · ')[0]));$('add-dialog').close();recomputeDemo();render();notify('Añadido a esta maqueta. No se ha guardado en la plataforma.');})}
+  document.querySelectorAll('[data-scene]').forEach(b=>b.onclick=()=>go(b.dataset.scene));
+  $('phone').onclick=()=>{document.body.classList.toggle('phone-mode');$('phone').setAttribute('aria-pressed',String(document.body.classList.contains('phone-mode')));zoom=1;render()};
+  $('zoom-in').onclick=()=>{zoom=Math.min(1.3,Math.round((zoom+.1)*10)/10);renderBoard()};
+  $('zoom-out').onclick=()=>{zoom=Math.max(.7,Math.round((zoom-.1)*10)/10);renderBoard()};
+  $('fit').onclick=()=>{zoom=1;$('stage').scrollTo({left:0,top:0});renderBoard()};
+  $('add').onclick=()=>openAdd();$('global-search').onclick=()=>openAdd();$('demo-search').oninput=renderResults;$('close-dialog').onclick=()=>$('add-dialog').close();
+  $('info').onclick=()=>{if(scene==='root'){notify('El mapa reúne agrupaciones personales. Entra en Anatomía o Fisiología para explorar.');return}summary=!summary;detail=null;render()};
+  window.addEventListener('resize',()=>requestAnimationFrame(renderBoard));
+  window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('add-dialog').open&&(detail||summary)){detail=null;summary=false;render()}});
+  render();
+</script>
+</body>
+</html>
