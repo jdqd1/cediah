@@ -1,11 +1,11 @@
 # Operación de Aprendizaje guiado
 
-Procedimiento de activación, observabilidad y desactivación para la fase 7. Este documento no autoriza un despliegue por sí solo: requiere un ambiente preview aislado, acceso operativo explícito y revisión académica de la ruta piloto.
+Procedimiento de activación, observabilidad y desactivación para la fase 7. El piloto técnico quedó activo en producción el 7 de septiembre de 2026 por autorización explícita del operador; ampliar su promoción todavía requiere las validaciones humanas y editoriales de `VALIDACION.md`.
 
 ## Principios
 
 - La API y PostgreSQL son la autoridad. La web solo muestra la capacidad que devuelve `/v1/auth/me`.
-- `GUIDED_LEARNING_ENABLED` permanece `false` hasta que las migraciones, permisos, contenido y pruebas del ambiente estén verificados.
+- `GUIDED_LEARNING_ENABLED` permanece `true` en producción mientras las señales de este documento estén sanas; cualquier ambiente nuevo comienza en `false` hasta verificar migraciones, permisos, contenido y pruebas.
 - Los ambientes no comparten base de datos, secretos, bucket ni cuentas de prueba.
 - Una regresión se contiene apagando la bandera y corrigiendo hacia adelante. No se eliminan tablas ni progreso como rollback.
 - Logs y reportes no incluyen respuestas, soluciones, correos, UUID de usuarios, claves idempotentes, parámetros de ruta ni URLs firmadas.
@@ -32,6 +32,16 @@ No se activa producción hasta que todos los P0 estén cerrados y exista una dec
 - La ejecución se ensayó primero dentro de una transacción revertida. La aplicación posterior registró 15/15 checksums sin discrepancias.
 - Las 20 tablas guiadas pertenecen a `cediah_runtime`, tienen RLS activa y no conceden acceso a `anon`, `authenticated` ni `service_role`.
 - Los advisors posteriores reportaron cero avisos de seguridad y cero claves foráneas guiadas sin índice.
+
+### Registro de activación y video flexible — 7 y 8 de septiembre de 2026
+
+- Ruta piloto: `peritoneo-fundamentos-anatomicos`; la inscripción usada para smoke quedó fijada a la versión 1 de tres pasos.
+- Activación base: `c303227` desplegado por Vercel (`dpl_fYqR4dPKSiu9xE6fFqePpovSVX3J`) y Render (`dep-dafmqm3bc2fs73deoh70`).
+- Compatibilidad de videos sin duración editorial: API `38b6a9f`, Render `dep-dafnh03bc2fs73df97g0` en estado `live`.
+- Reproductor final: web `d162ff8`, Vercel `dpl_Dj8Tf3NszGZevzcUZ7rPtQpBoAxk` en estado `READY`.
+- El botón **Omitir video y completar** termina el paso con método `self_reported` y 2 XP de actividad. La cobertura mínima observada conserva método `observed` y 10 XP cuando esa identidad de recompensa aún no fue concedida. Repetir o cambiar de método no duplica XP.
+- El smoke de un activo histórico de 69,252 s fijó 70 s en el intento, persistió la cobertura y terminó `observed`. No hubo 5xx de Render ni errores runtime agrupados en Vercel tras el recorrido.
+- Las versiones editoriales 2 y 3 de la ruta aparecieron después del smoke inicial. No se revierten automáticamente: coordinación debe revisar su selección de fuentes antes de promover la ruta más allá del piloto.
 
 ## Smoke test con la bandera activa
 

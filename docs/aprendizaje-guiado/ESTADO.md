@@ -1,6 +1,6 @@
 # Estado de implementación de Aprendizaje guiado
 
-Última actualización: 7 de septiembre de 2026.
+Última actualización: 8 de septiembre de 2026.
 
 ## Resumen
 
@@ -8,12 +8,12 @@
 | --- | --- | --- | --- |
 | 0. Verificación y preparación | Completa | Bandera servidor→UI; baseline, inventario y límites registrados | — |
 | 1. Identidad y revisiones | Completa | Migración `0009`; resolver/adaptadores; T14–T16 y filtrado exclusivo cubiertos | — |
-| 2. Catálogo y editor | Completa en desarrollo local | Migración `0010`; workflow, catálogo, inscripción, editor y preview persistentes | — |
-| 3. Intentos y progreso | Completa en desarrollo local | Migración `0011`; cuatro formatos, reanudación, idempotencia, progreso de servidor y Biblioteca; API 126/126, web 76/76 | — |
-| 4. Evidencia y recomendaciones | Completa en desarrollo local | Migración `0012`; evidencia, scheduler, repaso mixto e Inicio explicable; API 144/144, web 77/77 | — |
-| 5. Experiencia visual | Completa en desarrollo local | Migración `0013`; Inicio, Hoy, progreso, mapa vertical, cierre, XP/hitos y fixtures visuales; API 145/145, web 79/79 | — |
-| 6. Actualizaciones editoriales | Completa en desarrollo local | Preview/upgrade explícito, historial y mappings; catálogo editorial paginado, retiro seguro y adaptador extensible; API 151/151, web 79/79 | — |
-| 7. Validación y lanzamiento | Esquema de producción listo; activación bloqueada | `0014`–`0015`, telemetría privada, 15 checksums, RLS/grants y advisors verificados en PostgreSQL 17.6 | Desplegar con bandera apagada y completar smoke/concurrencia/piloto |
+| 2. Catálogo y editor | Completa | Migración `0010`; workflow, catálogo, inscripción, editor y preview persistentes | — |
+| 3. Intentos y progreso | Completa | Migración `0011`; cuatro formatos, reanudación, idempotencia, progreso de servidor y Biblioteca | — |
+| 4. Evidencia y recomendaciones | Completa | Migración `0012`; evidencia, scheduler, repaso mixto e Inicio explicable | — |
+| 5. Experiencia visual | Completa | Migración `0013`; Inicio, Hoy, progreso, mapa vertical, cierre, XP/hitos y fixtures visuales | — |
+| 6. Actualizaciones editoriales | Completa | Preview/upgrade explícito, historial y mappings; catálogo editorial paginado, retiro seguro y adaptador extensible | — |
+| 7. Validación y lanzamiento | Piloto activo en producción | `0014`–`0015`, API/Next desplegados, bandera activa, smoke autenticado, concurrencia e invariantes remotos verificados | Completar QA físico, prueba de uso, p95 representativo y restore integral |
 
 ## Fase 0 — Verificación y preparación
 
@@ -112,7 +112,7 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 
 - `0011_guided_learning_attempts.sql` añade intentos con manifest fijo, respuestas append-only, progreso por paso, recibos idempotentes y eventos con clave semántica única. El contexto y el manifest no pueden reescribirse desde SQL.
 - Fastify crea y recupera intentos solo para la identidad de Better Auth y la inscripción activa fijada. Todas las mutaciones usan `Idempotency-Key`, hash canónico del payload y `rowVersion`; misma clave/mismo payload reproduce el resultado y una clave reutilizada con otro payload falla sin segunda escritura.
-- El cuestionario se corrige exclusivamente en servidor y no entrega soluciones futuras. Las flashcards requieren revelar en servidor antes de calificarse. Guía y video externo exigen confirmación explícita; el video nativo acumula rangos reproducidos y saltar al final no satisface cobertura.
+- El cuestionario se corrige exclusivamente en servidor y no entrega soluciones futuras. Las flashcards requieren revelar en servidor antes de calificarse. Guía y video externo exigen confirmación explícita; el video nativo acumula rangos reproducidos y saltar al final no satisface cobertura. El estudiante también puede omitir/completar expresamente el video sin quedar bloqueado.
 - Las reglas de cierre son específicas del formato. Completar una alternativa guía/video actualiza una sola fila del paso y no duplica el porcentaje. El porcentaje queda en 99 mientras falte cualquier paso esencial y solo llega a 100 con todos ellos completos.
 - Next.js ofrece sesiones reanudables para los cuatro formatos, estados de guardado honestos y un panel final conectado al resumen persistido. Una falla al cargar progreso no abre un intento nuevo ni presenta cero como dato.
 - La cola IndexedDB conserva cuerpo, cuenta y clave idempotente. Solo denomina `pendiente` a una escritura que realmente quedó persistida, separa claves locales por usuario y vuelve a enviar con la misma clave; el cambio confirmado por servidor prevalece aunque falle la limpieza local.
@@ -179,7 +179,7 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 ### Comportamiento implementado
 
 - `0013_guided_learning_rewards.sql` añade recompensas durables con clave única por usuario, evento de origen, fecha local, RLS, grants mínimos e índices. Los puntos se insertan en la misma transacción que acepta el aprendizaje; solo las filas nuevas se devuelven al cliente.
-- El servidor concede 10 XP por guía/video esencial, 10 por flashcards esenciales, 15 por cuestionario esencial, 20 por unidad y 50 por ruta/version fijada. Diagnósticos, pasos opcionales y repeticiones no generan puntos. Los repasos aplicados conceden 2 XP por ítem con máximo de 20 al día según la zona del usuario.
+- El servidor concede 10 XP por guía esencial o video observado, 2 XP por video omitido/declarado, 10 por flashcards esenciales, 15 por cuestionario esencial, 20 por unidad y 50 por ruta/version fijada. Diagnósticos, pasos opcionales y repeticiones no generan puntos. Los repasos aplicados conceden 2 XP por ítem con máximo de 20 al día según la zona del usuario.
 - Las opciones equivalentes comparten `rewardIdentity` y `rewardVersion`, por lo que completar guía y después video no cobra dos veces. Se persisten una sola vez los hitos «Primera actividad», «Primera unidad», «Ruta completada» y «Volví a repasar».
 - Los contratos de mutación incluyen exclusivamente recompensas recién insertadas; `/home` calcula desde PostgreSQL los puntos acumulados y los hitos persistidos. La UI no calcula ni acepta XP enviado por el navegador.
 - `/dashboard` carga en paralelo aprendizaje, contenido reciente y destacados. Cuando la capacidad está activa, el bloque de aprendizaje aparece antes del descubrimiento y resume avance confirmado, próxima tarea, puntos, constancia opcional y acceso a preferencias.
@@ -237,7 +237,7 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 - Safari iOS, Chrome Android físico, lector de pantalla, zoom de texto 200 %, orientación horizontal, red lenta, reapertura real de IndexedDB, firma del bucket y métricas p95 requieren el ambiente y dispositivos de fase 7.
 - El lanzamiento sigue condicionado a backup/restore, rollback, observabilidad, privacidad, seguridad, soporte y aprobación formal descritos en el plan.
 
-## Fase 7 — Validación y lanzamiento controlado (en progreso)
+## Fase 7 — Validación y lanzamiento controlado (piloto activo)
 
 ### Primera porción local implementada
 
@@ -264,11 +264,21 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 - Verificación posterior: 15 migraciones sin discrepancias, 20 tablas guiadas con propietario correcto y RLS activa, cero grants Data API, cero constraints sin validar y cero preguntas sin identidad estable.
 - Advisors posteriores: cero avisos de seguridad y cero claves foráneas guiadas sin índice. Los índices recién creados permanecen naturalmente sin uso mientras la bandera está apagada.
 
-### Dependencias externas aún abiertas
+### Activación y smoke de producción — 7 y 8 de septiembre de 2026
 
-- La base de producción ya está migrada, pero API/web aún no incluyen esta revisión desplegada y `GUIDED_LEARNING_ENABLED` continúa apagada.
-- Continúan pendientes T09/T25 con concurrencia real contra el pool, prueba de restore completa, bucket privado, p95 representativo y dispositivos/navegadores de la matriz.
-- Falta inventario actual, ruta piloto académicamente revisada, prueba de uso y aprobación formal. La bandera permanece desactivada por defecto y el producto no se declara listo para lanzamiento.
+- El piloto `Peritoneo: fundamentos anatómicos` se publicó y una inscripción real quedó fijada a su versión inicial de tres actividades. `GUIDED_LEARNING_ENABLED=true` quedó declarado en `render.yaml` y confirmado por `/health` y por la capacidad privada que consume la web.
+- Vercel desplegó el flujo de omisión en `c303227` y la compatibilidad final del reproductor en `d162ff8` (`dpl_Dj8Tf3NszGZevzcUZ7rPtQpBoAxk`, estado `READY`). Render desplegó la API compatible en `38b6a9f` (`dep-dafnh03bc2fs73df97g0`, estado `live`).
+- El recorrido autenticado completó guía, flashcards y video. Omitir el video produjo `completionMethod=self_reported` y 2 XP de actividad; completar el mismo paso nuevo por cobertura produjo `completionMethod=observed`. Las recompensas de unidad/ruta y los eventos permanecieron exactamente una vez.
+- Un video histórico sin duración editorial detectó 69,252 s en el reproductor, fijó 70 s en el estado del intento, guardó cobertura por lotes válidos y terminó observado. La web detiene reintentos automáticos después de una falla no confirmada, evitando la ráfaga previa de `409 invalid_state`.
+- Una carrera real de mutaciones contra el pool de producción aceptó una sola versión y devolvió `version_conflict` al estado obsoleto; no duplicó progreso, eventos ni recompensas. La reproducción privada se obtuvo únicamente desde el intento autenticado y la URL firmada no se persistió ni se mostró en logs.
+- Tras el smoke final no hubo 5xx de Render ni errores runtime agrupados en Vercel. Supabase mantuvo cero avisos de seguridad; los avisos de rendimiento restantes son informativos por índices todavía sin uso representativo.
+- Verificación local final: API 21 archivos/154 pruebas, web 18 archivos/82 pruebas, contratos, lint y typecheck correctos. El build optimizado de Next.js genera 20 páginas.
+
+### Validaciones humanas y operativas aún abiertas
+
+- Continúan pendientes la prueba de restore integral, expiración/reautorización física de la URL firmada, `home.read` p95 con volumen representativo, Safari iOS/Chrome Android físicos, lector de pantalla, zoom 200 %, orientación, red lenta y reapertura real de IndexedDB.
+- Falta la prueba de uso con aproximadamente cinco estudiantes y una revisión académica formal antes de ampliar la promoción fuera del piloto técnico.
+- La ruta pública recibió posteriormente versiones editoriales 2 y 3 ajenas a este smoke; la versión 3 combina fuentes que deben ser revisadas antes de promoverla. No se revirtió ni sobrescribió ese trabajo externo. La inscripción de validación permanece fijada a la versión 1 verificada.
 
 ## Registro de pruebas posteriores
 
@@ -299,3 +309,6 @@ Véase `INVENTARIO.md`. La fuente disponible es el snapshot de la migración his
 - Fase 7 local: `pnpm --filter @cediah/web test` — 17 archivos, 79 pruebas correctas.
 - Fase 7 local: contratos, `pnpm lint`, `pnpm typecheck` y `pnpm build` — correctos; Next.js generó 20 páginas.
 - Fase 7 local: audit remoto bloqueado por política del sandbox; no hubo cambios de manifiesto o lockfile y no se reescribió el baseline previo.
+- Fase 7 final: `pnpm --filter @cediah/api test` — 21 archivos, 154 pruebas correctas.
+- Fase 7 final: `pnpm --filter @cediah/web test` — 18 archivos, 82 pruebas correctas.
+- Fase 7 final: contratos, lint, typecheck y build optimizado de Next.js — correctos; 20 páginas.
