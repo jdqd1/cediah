@@ -4,10 +4,11 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle, MapTrifold, Sparkle, Trophy } from "@phosphor-icons/react";
 import type { LearningAttempt, LearningEnrollmentProgress, LearningReward } from "@cediah/contracts";
 
-export function LearningCompletionPanel({ attempt, awards, progress }: {
+export function LearningCompletionPanel({ attempt, awards, progress, returnHref }: {
   attempt: LearningAttempt;
   awards: LearningReward[];
   progress: LearningEnrollmentProgress | null;
+  returnHref?: string;
 }) {
   const awardedXp = awards.reduce((total, award) => total + award.xp, 0);
   const milestones = awards.filter((award) => award.kind === "route_completed" || award.kind.startsWith("milestone_"));
@@ -25,7 +26,7 @@ export function LearningCompletionPanel({ attempt, awards, progress }: {
         <progress aria-label="Avance actualizado de la ruta" max={progress.totalEssentialSteps} value={progress.completedEssentialSteps} />
       </div> : <p>El calendario quedó actualizado solo para las respuestas aceptadas. Puedes elegir otra actividad o volver a Inicio.</p>}
       <div className="learning-completion-actions">
-        <Link className="learning-primary-button" href="/aprendizaje?tab=hoy">Continuar <ArrowRight aria-hidden="true" size={19} /></Link>
+        <Link className="learning-primary-button" href={returnHref ?? "/aprendizaje?tab=hoy"}>{returnHref ? "Volver a mi mapa" : "Continuar"} <ArrowRight aria-hidden="true" size={19} /></Link>
         <Link className="learning-secondary-button" href={attempt.pathSlug ? `/aprendizaje/rutas/${attempt.pathSlug}` : "/aprendizaje?tab=rutas"}><MapTrifold aria-hidden="true" size={19} />{attempt.pathSlug ? "Volver a mi ruta" : "Elegir otra actividad"}</Link>
       </div>
     </section>

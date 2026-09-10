@@ -30,7 +30,7 @@ const evidenceLabels = {
   unassessed: "Por comprobar",
 } as const;
 
-export function LearningPathScreen({ path, progress, upgrade }: { path: LearningPathDetail; progress: LearningEnrollmentProgress | null; upgrade: LearningEnrollmentUpgradePreviewResponse | null }) {
+export function LearningPathScreen({ path, progress, upgrade, focusUnit }: { path: LearningPathDetail; progress: LearningEnrollmentProgress | null; upgrade: LearningEnrollmentUpgradePreviewResponse | null; focusUnit?: string }) {
   const progressByStep = new Map(progress?.units.flatMap((unit) => unit.steps).map((step) => [step.stepId, step]) ?? []);
   const progressByUnit = new Map(progress?.units.map((unit) => [unit.id, unit]) ?? []);
   const minutes = path.version.units.flatMap((unit) => unit.steps).reduce((sum, step) => {
@@ -80,7 +80,7 @@ export function LearningPathScreen({ path, progress, upgrade }: { path: Learning
             const completed = Boolean(unitProgress && unitProgress.totalEssentialSteps > 0 && unitProgress.completedEssentialSteps === unitProgress.totalEssentialSteps);
             const active = !completed && index === currentUnitIndex;
             return (
-            <details key={unit.id} open={active || (!progress && index === 0)} className="learning-unit" data-state={completed ? "completed" : active ? "active" : "available"}>
+            <details key={unit.id} id={`leccion-${unit.stableKey}`} open={focusUnit ? unit.stableKey === focusUnit : active || (!progress && index === 0)} className="learning-unit" data-state={completed ? "completed" : active ? "active" : "available"}>
               <summary>
                 <span className="learning-unit-number">{completed ? <CheckCircle aria-hidden="true" size={24} weight="fill" /> : index + 1}</span>
                 <span><small>{completed ? "Unidad completada" : active ? "Unidad actual" : `Unidad ${index + 1} · disponible`}</small><strong>{unit.title}</strong><em>{unitProgress ? `${unitProgress.completedEssentialSteps}/${unitProgress.totalEssentialSteps} esenciales` : `${unit.steps.length} actividades`}</em></span>

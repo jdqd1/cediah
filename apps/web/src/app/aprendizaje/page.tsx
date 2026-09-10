@@ -1,4 +1,6 @@
 import { LearningHomeScreen } from "@/components/learning/learning-home-screen";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/server/current-user";
 import { getLearningHome, getLearningPaths, getLearningProgress } from "@/lib/server/guided-learning-api";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +9,8 @@ export default async function LearningPage({ searchParams }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
   const requested = (await searchParams).tab;
+  const current = await getCurrentUser();
+  if (!requested && current.status === "authenticated" && current.features.guidedLearning && current.features.guidedLearningMap) redirect("/aprendizaje/mapa");
   const tab = requested === "rutas" || requested === "progreso" ? requested : "hoy";
   const [result, homeResult] = await Promise.all([getLearningPaths(), getLearningHome()]);
   const paths = result.status === "ready" ? result.items : [];

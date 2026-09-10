@@ -1,0 +1,438 @@
+{
+  "advisories": {
+    "1158508": {
+      "findings": [
+        {
+          "version": "3.30.2",
+          "paths": [
+            "apps__web>@tiptap/extension-highlight>@tiptap/core",
+            "apps__web>@tiptap/extension-image>@tiptap/core",
+            "apps__web>@tiptap/extension-link>@tiptap/core",
+            "apps__web>@tiptap/extension-placeholder>@tiptap/extensions>@tiptap/core",
+            "apps__web>@tiptap/extension-table>@tiptap/core",
+            "apps__web>@tiptap/extension-text-align>@tiptap/core",
+            "apps__web>@tiptap/extension-underline>@tiptap/core",
+            "apps__web>@tiptap/react>@tiptap/core",
+            "apps__web>@tiptap/react>@tiptap/extension-bubble-menu>@tiptap/core",
+            "apps__web>@tiptap/react>@tiptap/extension-floating-menu>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-blockquote>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-bold>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-bullet-list>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-code>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-code-block>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-document>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-dropcursor>@tiptap/extensions>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-gapcursor>@tiptap/extensions>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-hard-break>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-heading>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-horizontal-rule>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-italic>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-link>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-list-item>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-list-keymap>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-ordered-list>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-paragraph>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-strike>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-text>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-underline>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extensions>@tiptap/core"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1158508,
+      "title": "Tiptap: mergeAttributes() turns an own __proto__ key into inherited executable DOM attributes",
+      "module_name": "@tiptap/core",
+      "vulnerable_versions": ">=2.0.0-alpha.0 <3.30.4",
+      "patched_versions": ">=3.30.4",
+      "severity": "moderate",
+      "cwe": "CWE-79, CWE-1321",
+      "github_advisory_id": "GHSA-cp6q-959q-f8rh",
+      "url": "https://github.com/advisories/GHSA-cp6q-959q-f8rh"
+    },
+    "1158514": {
+      "findings": [
+        {
+          "version": "5.11.0",
+          "paths": [
+            "apps__api>fastify"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1158514,
+      "title": "fastify vulnerable to schema validation bypass via root primitive coercion mismatch",
+      "module_name": "fastify",
+      "vulnerable_versions": "<5.12.1",
+      "patched_versions": ">=5.12.1",
+      "severity": "moderate",
+      "cwe": "CWE-20",
+      "github_advisory_id": "GHSA-w2qp-rph6-63g4",
+      "url": "https://github.com/advisories/GHSA-w2qp-rph6-63g4"
+    },
+    "1158519": {
+      "findings": [
+        {
+          "version": "5.11.0",
+          "paths": [
+            "apps__api>fastify"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1158519,
+      "title": "fastify vulnerable to X-Forwarded-* spoofing under trustProxy hop-count",
+      "module_name": "fastify",
+      "vulnerable_versions": ">=5.8.3 <5.12.1",
+      "patched_versions": ">=5.12.1",
+      "severity": "moderate",
+      "cwe": "CWE-348",
+      "github_advisory_id": "GHSA-3m5p-2c4r-xxw2",
+      "url": "https://github.com/advisories/GHSA-3m5p-2c4r-xxw2"
+    },
+    "1193676": {
+      "findings": [
+        {
+          "version": "16.2.12",
+          "paths": [
+            "apps__api>better-auth>next",
+            "apps__web>better-auth>next",
+            "apps__web>next"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193676,
+      "title": "Next.js: Unauthenticated Remote Code Execution on windows-hosted servers",
+      "module_name": "next",
+      "vulnerable_versions": ">=16.0.0 <16.3.3",
+      "patched_versions": ">=16.3.3",
+      "severity": "critical",
+      "cwe": "CWE-22",
+      "github_advisory_id": "GHSA-p293-qw3h-jr36",
+      "url": "https://github.com/advisories/GHSA-p293-qw3h-jr36"
+    },
+    "1193683": {
+      "findings": [
+        {
+          "version": "4.1.10",
+          "paths": [
+            "apps__api>better-auth>vitest",
+            "apps__api>vitest",
+            "apps__web>better-auth>vitest",
+            "apps__web>vitest"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193683,
+      "title": "Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock",
+      "module_name": "vitest",
+      "vulnerable_versions": ">=2.1.0 <4.1.11",
+      "patched_versions": ">=4.1.11",
+      "severity": "moderate",
+      "cwe": "CWE-22",
+      "github_advisory_id": "GHSA-82fw-gwwq-j7x9",
+      "url": "https://github.com/advisories/GHSA-82fw-gwwq-j7x9"
+    },
+    "1193684": {
+      "findings": [
+        {
+          "version": "4.1.10",
+          "paths": [
+            "apps__api>better-auth>vitest>@vitest/mocker",
+            "apps__api>vitest>@vitest/mocker",
+            "apps__web>better-auth>vitest>@vitest/mocker",
+            "apps__web>vitest>@vitest/mocker"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193684,
+      "title": "Vitest: Path Traversal / Arbitrary File Read via @vitest/mocker Redirect Mock",
+      "module_name": "@vitest/mocker",
+      "vulnerable_versions": ">=2.1.0 <4.1.11",
+      "patched_versions": ">=4.1.11",
+      "severity": "moderate",
+      "cwe": "CWE-22",
+      "github_advisory_id": "GHSA-82fw-gwwq-j7x9",
+      "url": "https://github.com/advisories/GHSA-82fw-gwwq-j7x9"
+    },
+    "1193725": {
+      "findings": [
+        {
+          "version": "0.35.0",
+          "paths": [
+            "apps__api>better-auth>next>sharp",
+            "apps__web>better-auth>next>sharp",
+            "apps__web>next>sharp"
+          ],
+          "dev": false,
+          "optional": true,
+          "bundled": false
+        }
+      ],
+      "id": 1193725,
+      "title": "sharp: Vulnerabilities in libheif: GHSA-g89c-p67h-r497 and GHSA-2jg2-4ch7-h545",
+      "module_name": "sharp",
+      "vulnerable_versions": "<0.35.4",
+      "patched_versions": ">=0.35.4",
+      "severity": "high",
+      "cwe": "CWE-122",
+      "github_advisory_id": "GHSA-rgj7-g3m4-5g8c",
+      "url": "https://github.com/advisories/GHSA-rgj7-g3m4-5g8c"
+    },
+    "1193727": {
+      "findings": [
+        {
+          "version": "4.3.1",
+          "paths": [
+            "apps__api>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/type-utils>@typescript-eslint/utils>@eslint-community/eslint-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/type-utils>@typescript-eslint/utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/type-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/utils>@eslint-community/eslint-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/eslint-plugin>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/utils>@eslint-community/eslint-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>@typescript-eslint/utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__api>typescript-eslint>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-import-resolver-typescript>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-import-resolver-typescript>eslint-plugin-import>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-import-resolver-typescript>eslint-plugin-import>eslint-module-utils>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-import-resolver-typescript>eslint-plugin-import>eslint-module-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-import-resolver-typescript>eslint-plugin-import>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-import>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-import>eslint-module-utils>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-import>eslint-module-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-import>eslint-module-utils>eslint-import-resolver-typescript>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-import>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-jsx-a11y>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-react>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>eslint-plugin-react-hooks>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/type-utils>@typescript-eslint/utils>@eslint-community/eslint-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/type-utils>@typescript-eslint/utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/type-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/utils>@eslint-community/eslint-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>@typescript-eslint/utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/eslint-plugin>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/parser>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/utils>@eslint-community/eslint-utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>@typescript-eslint/utils>eslint>@eslint/eslintrc>js-yaml",
+            "apps__web>eslint-config-next>typescript-eslint>eslint>@eslint/eslintrc>js-yaml"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193727,
+      "title": "js-yaml: maxTotalMergeKeys does not limit CPU use for empty merge sources",
+      "module_name": "js-yaml",
+      "vulnerable_versions": ">=4.0.0 <4.3.2",
+      "patched_versions": ">=4.3.2",
+      "severity": "high",
+      "cwe": "CWE-400, CWE-407",
+      "github_advisory_id": "GHSA-2883-xcg3-v3hh",
+      "url": "https://github.com/advisories/GHSA-2883-xcg3-v3hh"
+    },
+    "1193728": {
+      "findings": [
+        {
+          "version": "3.30.2",
+          "paths": [
+            "apps__web>@tiptap/extension-highlight>@tiptap/core",
+            "apps__web>@tiptap/extension-image>@tiptap/core",
+            "apps__web>@tiptap/extension-link>@tiptap/core",
+            "apps__web>@tiptap/extension-placeholder>@tiptap/extensions>@tiptap/core",
+            "apps__web>@tiptap/extension-table>@tiptap/core",
+            "apps__web>@tiptap/extension-text-align>@tiptap/core",
+            "apps__web>@tiptap/extension-underline>@tiptap/core",
+            "apps__web>@tiptap/react>@tiptap/core",
+            "apps__web>@tiptap/react>@tiptap/extension-bubble-menu>@tiptap/core",
+            "apps__web>@tiptap/react>@tiptap/extension-floating-menu>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-blockquote>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-bold>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-bullet-list>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-code>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-code-block>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-document>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-dropcursor>@tiptap/extensions>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-gapcursor>@tiptap/extensions>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-hard-break>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-heading>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-horizontal-rule>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-italic>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-link>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-list-item>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-list-keymap>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-ordered-list>@tiptap/extension-list>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-paragraph>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-strike>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-text>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extension-underline>@tiptap/core",
+            "apps__web>@tiptap/starter-kit>@tiptap/extensions>@tiptap/core"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193728,
+      "title": "Tiptap: Quadratic ReDoS in block and inline Markdown attribute parsing",
+      "module_name": "@tiptap/core",
+      "vulnerable_versions": ">=3.7.0 <3.30.5",
+      "patched_versions": ">=3.30.5",
+      "severity": "high",
+      "cwe": "CWE-400, CWE-1333",
+      "github_advisory_id": "GHSA-j95f-988m-3j2f",
+      "url": "https://github.com/advisories/GHSA-j95f-988m-3j2f"
+    },
+    "1193732": {
+      "findings": [
+        {
+          "version": "16.2.12",
+          "paths": [
+            "apps__api>better-auth>next",
+            "apps__web>better-auth>next",
+            "apps__web>next"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193732,
+      "title": "Next.js: Unauthenticated Remote Code Execution in Image Optimization API when AVIF files are used",
+      "module_name": "next",
+      "vulnerable_versions": ">=16.0.0 <16.3.3",
+      "patched_versions": ">=16.3.3",
+      "severity": "critical",
+      "cwe": "CWE-1395",
+      "github_advisory_id": "GHSA-2xp9-vwfh-vxw4",
+      "url": "https://github.com/advisories/GHSA-2xp9-vwfh-vxw4"
+    },
+    "1193741": {
+      "findings": [
+        {
+          "version": "9.0.6",
+          "paths": [
+            "apps__api>nodemailer"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193741,
+      "title": "Nodemailer: resolveContent() on a MailMessage bypasses disableFileAccess/disableUrlAccess when called with the legacy signature",
+      "module_name": "nodemailer",
+      "vulnerable_versions": "<=9.1.0",
+      "patched_versions": ">=9.1.1",
+      "severity": "moderate",
+      "cwe": "CWE-73, CWE-918",
+      "github_advisory_id": "GHSA-8m3c-c648-2xjj",
+      "url": "https://github.com/advisories/GHSA-8m3c-c648-2xjj"
+    },
+    "1193770": {
+      "findings": [
+        {
+          "version": "9.0.6",
+          "paths": [
+            "apps__api>nodemailer"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193770,
+      "title": "Nodemailer: IDN/Punycode domain allow-list bypass leads to email delivery to an attacker-controlled domain",
+      "module_name": "nodemailer",
+      "vulnerable_versions": "<9.1.0",
+      "patched_versions": ">=9.1.0",
+      "severity": "moderate",
+      "cwe": "CWE-20, CWE-436",
+      "github_advisory_id": "GHSA-wmmp-3585-3rmp",
+      "url": "https://github.com/advisories/GHSA-wmmp-3585-3rmp"
+    },
+    "1193778": {
+      "findings": [
+        {
+          "version": "9.0.6",
+          "paths": [
+            "apps__api>nodemailer"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193778,
+      "title": "Nodemailer: Quadratic (O(n²)) time complexity in addressparser allows remote denial of service via a crafted address list",
+      "module_name": "nodemailer",
+      "vulnerable_versions": "<9.1.0",
+      "patched_versions": ">=9.1.0",
+      "severity": "high",
+      "cwe": "CWE-400, CWE-407",
+      "github_advisory_id": "GHSA-2x7j-588g-ccc2",
+      "url": "https://github.com/advisories/GHSA-2x7j-588g-ccc2"
+    },
+    "1193779": {
+      "findings": [
+        {
+          "version": "9.0.6",
+          "paths": [
+            "apps__api>nodemailer"
+          ],
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1193779,
+      "title": "Nodemailer: Recipient-domain validation bypass via RFC 5322 comment mis-parsing leads to email delivery to an attacker-controlled domain",
+      "module_name": "nodemailer",
+      "vulnerable_versions": ">=6.9.16 <9.1.0",
+      "patched_versions": ">=9.1.0",
+      "severity": "moderate",
+      "cwe": "CWE-20, CWE-436",
+      "github_advisory_id": "GHSA-cc9r-2j5m-2m83",
+      "url": "https://github.com/advisories/GHSA-cc9r-2j5m-2m83"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 8,
+      "high": 4,
+      "critical": 2
+    },
+    "dependencies": 286,
+    "devDependencies": 293,
+    "optionalDependencies": 126,
+    "totalDependencies": 680
+  }
+}

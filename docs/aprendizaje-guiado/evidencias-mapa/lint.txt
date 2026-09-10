@@ -1,0 +1,7 @@
+$ pnpm -r --if-present lint
+No projects matched the filters "D:\Jose (Datos)\Medicina\CEDIAH\Web" in "D:\Jose (Datos)\Medicina\CEDIAH\Web"
+Scope: all 4 workspace projects
+apps/web lint$ eslint . --max-warnings=0
+apps/api lint$ eslint . --max-warnings=0
+apps/api lint: Done
+apps/web lint: Done

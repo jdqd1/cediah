@@ -10,7 +10,7 @@ import { requestContentApi } from "./content-api";
 
 export type CurrentUserResult =
   | {
-      features: { guidedLearning: boolean };
+      features: { guidedLearning: boolean; guidedLearningMap?: boolean };
       roles: PlatformRole[];
       status: "authenticated";
       user: CurrentUser;

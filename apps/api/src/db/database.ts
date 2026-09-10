@@ -514,7 +514,27 @@ export interface LearningTaskOverrideTable {
   user_id: string;
 }
 
+export interface LearningMapTable {
+  id: Generated<string>; user_id: string; row_version: Generated<number>;
+  created_at: GeneratedTimestamp; updated_at: GeneratedTimestamp;
+}
+export interface LearningMapNodeTable {
+  id: Generated<string>; map_id: string; title: string; icon_key: import("@cediah/contracts").MapIconKey;
+  origin_topic_id: string | null; sort_order: number; created_at: GeneratedTimestamp; updated_at: GeneratedTimestamp;
+}
+export interface LearningMapEntryTable {
+  id: Generated<string>; map_id: string; node_id: string; kind: "block" | "lesson"; path_id: string;
+  unit_stable_key: string | null; sort_order: number; created_at: GeneratedTimestamp; updated_at: GeneratedTimestamp;
+}
+export interface LearningMapLayoutTable {
+  map_id: string; level_key: string; row_version: Generated<number>; schema_version: Generated<number>;
+  positions_json: GeneratedJsonDocument; updated_at: GeneratedTimestamp;
+}
 export interface CediahDatabase {
+  learning_maps: LearningMapTable;
+  learning_map_nodes: LearningMapNodeTable;
+  learning_map_entries: LearningMapEntryTable;
+  learning_map_layouts: LearningMapLayoutTable;
   content_reaction_counts: {
     content_item_id: string;
     like_count: ColumnType<string, number | string, number | string>;

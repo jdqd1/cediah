@@ -64,6 +64,8 @@ import { createS3ObjectStorage } from "./providers/s3-object-storage.js";
 import { createS3VideoProvider } from "./providers/s3-video.js";
 import { registerGuidedLearningEditorRoutes } from "./guided-learning/editor-routes.js";
 import { registerGuidedLearningRoutes } from "./guided-learning/routes.js";
+import { registerLearningMapRoutes } from "./learning-map/routes.js";
+import { createPostgresLearningMapProvider } from "./providers/postgres-learning-map.js";
 import {
   registerGuidedLearningObservability,
   type GuidedLearningObserver,
@@ -73,6 +75,7 @@ type AppDependencies = {
   authService?: AuthService;
   contentProvider?: ContentProvider;
   guidedLearningProvider?: GuidedLearningProvider;
+  learningMapProvider?: import("@cediah/contracts").LearningMapProvider;
   guidedLearningObserver?: GuidedLearningObserver;
   subjectProvider?: SubjectProvider;
   roleManagementProvider?: RoleManagementProvider;
@@ -437,7 +440,7 @@ export async function buildApp(
     }
 
     const response = CurrentUserResponseSchema.parse({
-      features: { guidedLearning: environment.guidedLearningEnabled === true },
+      features: { guidedLearning: environment.guidedLearningEnabled === true, guidedLearningMap: environment.guidedLearningEnabled === true && environment.guidedLearningMapEnabled === true },
       roles,
       user: resolution.user,
     });
@@ -445,6 +448,10 @@ export async function buildApp(
   });
 
   if (environment.guidedLearningEnabled) {
+    if (environment.guidedLearningMapEnabled) await registerLearningMapRoutes(app, {
+      identityProvider,
+      provider: dependencies.learningMapProvider ?? (database ? createPostgresLearningMapProvider(database) : undefined),
+    });
     registerGuidedLearningObservability(app, dependencies.guidedLearningObserver);
     await registerGuidedLearningRoutes(app, {
       identityProvider,

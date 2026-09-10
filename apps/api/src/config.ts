@@ -16,7 +16,8 @@ const EnvironmentSchema = z
     DATABASE_URL: z.string().min(1).optional(),
     DATABASE_MIGRATIONS_ENABLED: z.enum(["true", "false"]).default("true"),
     DATABASE_MIGRATIONS_PATH: z.string().min(1).optional(),
-    GUIDED_LEARNING_ENABLED: z.enum(["true", "false"]).default("false"),
+  GUIDED_LEARNING_ENABLED: z.enum(["true", "false"]).default("false"),
+  GUIDED_LEARNING_MAP_ENABLED: z.enum(["true", "false"]).default("false"),
     HOST: z.string().min(1).default("0.0.0.0"),
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
@@ -165,6 +166,7 @@ export type ApiEnvironment = {
   contentStorage?: S3StorageConfiguration;
   databaseUrl?: string;
   guidedLearningEnabled?: boolean;
+  guidedLearningMapEnabled?: boolean;
   migrationsEnabled?: boolean;
   migrationsPath?: string;
   HOST: string;
@@ -256,6 +258,7 @@ export function readEnvironment(source: NodeJS.ProcessEnv = process.env): ApiEnv
     contentStorage,
     databaseUrl: environment.DATABASE_URL,
     guidedLearningEnabled: environment.GUIDED_LEARNING_ENABLED === "true",
+    guidedLearningMapEnabled: environment.GUIDED_LEARNING_ENABLED === "true" && environment.GUIDED_LEARNING_MAP_ENABLED === "true",
     HOST: environment.HOST,
     NODE_ENV: environment.NODE_ENV,
     PORT: environment.PORT,

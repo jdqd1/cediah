@@ -1,10 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { ArrowLeft, Play } from "@phosphor-icons/react";
-import { LearningAttemptMutationResponseSchema } from "@cediah/contracts";
+import { useLearningActivityLauncher } from "./use-learning-activity-launcher";
 
 export function ActivityLauncher({
   existingAttemptId,
@@ -17,38 +15,7 @@ export function ActivityLauncher({
   pathSlug: string;
   stepTitle: string;
 }) {
-  const router = useRouter();
-  const [requestIdentity] = useState(() => ({
-    clientAttemptId: crypto.randomUUID(),
-    idempotencyKey: crypto.randomUUID(),
-  }));
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-
-  async function start() {
-    setBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/guided-learning/attempts", {
-        body: JSON.stringify({ clientAttemptId: requestIdentity.clientAttemptId, stepOptionId: optionId }),
-        headers: { "Content-Type": "application/json", "Idempotency-Key": requestIdentity.idempotencyKey },
-        method: "POST",
-      });
-      const body: unknown = await response.json();
-      const parsed = LearningAttemptMutationResponseSchema.safeParse(body);
-      if (!response.ok || !parsed.success) {
-        setMessage(response.status === 409
-          ? "La actividad cambió o ya no está disponible. Vuelve a la ruta para elegir otra opción."
-          : "Necesitas conexión para iniciar una actividad nueva. Tu progreso anterior no cambió.");
-        return;
-      }
-      router.push(`/aprendizaje/sesiones/${parsed.data.attempt.id}`);
-    } catch {
-      setMessage("Necesitas conexión para iniciar una actividad nueva. Tu progreso anterior no cambió.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { busy, message, launch } = useLearningActivityLauncher();
 
   return (
     <main className="learning-main learning-activity-launcher">
@@ -64,7 +31,7 @@ export function ActivityLauncher({
             <Play aria-hidden="true" size={19} />Continuar donde quedaste
           </Link>
         ) : (
-          <button className="learning-primary-button" disabled={busy} onClick={() => void start()} type="button">
+          <button className="learning-primary-button" disabled={busy} onClick={() => void launch(optionId, null)} type="button">
             <Play aria-hidden="true" size={19} />{busy ? "Iniciando…" : "Comenzar actividad"}
           </button>
         )}

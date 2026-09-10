@@ -1,0 +1,79 @@
+$ pnpm -r --if-present build
+No projects matched the filters "D:\Jose (Datos)\Medicina\CEDIAH\Web" in "D:\Jose (Datos)\Medicina\CEDIAH\Web"
+Scope: all 4 workspace projects
+packages/contracts build$ tsc -p tsconfig.json
+packages/contracts build: Done
+apps/api build$ tsc -p tsconfig.build.json
+apps/web build$ next build
+apps/web build: ▲ Next.js 16.2.12 (Turbopack)
+apps/web build:   Creating an optimized production build ...
+apps/api build: Done
+apps/web build: ✓ Compiled successfully in 47s
+apps/web build:   Running TypeScript ...
+apps/web build:   Finished TypeScript in 49s ...
+apps/web build:   Collecting page data using 5 workers ...
+apps/web build:   Generating static pages using 5 workers (0/20) ...
+apps/web build:   Generating static pages using 5 workers (5/20) 
+apps/web build:   Generating static pages using 5 workers (10/20) 
+apps/web build:   Generating static pages using 5 workers (15/20) 
+apps/web build: ✓ Generating static pages using 5 workers (20/20) in 546ms
+apps/web build:   Finalizing page optimization ...
+apps/web build: Route (app)
+apps/web build: ┌ ƒ /
+apps/web build: ├ ○ /_not-found
+apps/web build: ├ ƒ /acceder
+apps/web build: ├ ƒ /api/admin/roles
+apps/web build: ├ ƒ /api/auth/[...path]
+apps/web build: ├ ƒ /api/content/[contentId]/reaction
+apps/web build: ├ ƒ /api/content/[contentId]/views
+apps/web build: ├ ƒ /api/editor/assets/[assetId]
+apps/web build: ├ ƒ /api/editor/assets/[assetId]/finalize
+apps/web build: ├ ƒ /api/editor/content
+apps/web build: ├ ƒ /api/editor/content/[contentId]
+apps/web build: ├ ƒ /api/editor/content/[contentId]/assets
+apps/web build: ├ ƒ /api/editor/content/[contentId]/subjects
+apps/web build: ├ ƒ /api/editor/content/[contentId]/transition
+apps/web build: ├ ƒ /api/editor/learning-paths
+apps/web build: ├ ƒ /api/editor/learning-paths/[...path]
+apps/web build: ├ ƒ /api/editor/learning-resources
+apps/web build: ├ ƒ /api/editor/subjects
+apps/web build: ├ ƒ /api/editor/subjects/[subjectId]
+apps/web build: ├ ƒ /api/guided-learning/[...path]
+apps/web build: ├ ƒ /api/search
+apps/web build: ├ ƒ /api/system-health
+apps/web build: ├ ƒ /api/video-tests/[videoId]
+apps/web build: ├ ƒ /api/video-tests/uploads
+apps/web build: ├ ƒ /aprendizaje
+apps/web build: ├ ƒ /aprendizaje/mapa
+apps/web build: ├ ƒ /aprendizaje/repaso
+apps/web build: ├ ƒ /aprendizaje/rutas/[slug]
+apps/web build: ├ ƒ /aprendizaje/rutas/[slug]/actividades/[stepId]
+apps/web build: ├ ƒ /aprendizaje/sesiones/[attemptId]
+apps/web build: ├ ƒ /asignaturas
+apps/web build: ├ ƒ /asignaturas/[slug]
+apps/web build: ├ ƒ /auth/actualizar-contrasena
+apps/web build: ├ ƒ /auth/callback
+apps/web build: ├ ƒ /biblioteca
+apps/web build: ├ ƒ /biblioteca/[slug]
+apps/web build: ├ ƒ /clases/reproductor
+apps/web build: ├ ƒ /contenido/[slug]
+apps/web build: ├ ƒ /cursos
+apps/web build: ├ ƒ /cursos/[slug]
+apps/web build: ├ ƒ /cursos/[slug]/lecciones/[lessonSlug]
+apps/web build: ├ ƒ /dashboard
+apps/web build: ├ ƒ /guias
+apps/web build: ├ ƒ /guias/[slug]
+apps/web build: ├ ƒ /guias/musculos-compartimento-anterior
+apps/web build: ├ ƒ /panel
+apps/web build: ├ ƒ /panel/administracion/roles
+apps/web build: ├ ƒ /panel/contenido
+apps/web build: ├ ƒ /panel/rutas
+apps/web build: ├ ƒ /panel/rutas/[pathId]
+apps/web build: ├ ƒ /pruebas/video
+apps/web build: ├ ƒ /recuperar-acceso
+apps/web build: ├ ƒ /visual-fixtures/aprendizaje
+apps/web build: └ ƒ /visual-fixtures/mapa
+apps/web build: ƒ Proxy (Middleware)
+apps/web build: ○  (Static)   prerendered as static content
+apps/web build: ƒ  (Dynamic)  server-rendered on demand
+apps/web build: Done

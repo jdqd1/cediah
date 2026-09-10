@@ -5,7 +5,7 @@ import { getLearningPath, getLearningProgress, getLearningUpgradePreview } from 
 
 export const dynamic = "force-dynamic";
 
-export default async function LearningPathPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function LearningPathPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ leccion?: string }> }) {
   const { slug } = await params;
   const result = await getLearningPath(slug);
   if (result.status === "not_found") notFound();
@@ -18,5 +18,7 @@ export default async function LearningPathPage({ params }: { params: Promise<{ s
       getLearningUpgradePreview(result.path.enrollment.id),
     ])
     : [null, null];
-  return <LearningPathScreen path={result.path} progress={progress?.status === "ready" ? progress.progress : null} upgrade={upgrade?.status === "ready" ? upgrade : null} />;
+  const requestedUnit = (await searchParams).leccion;
+  const focusUnit = result.path.version.units.find(unit => unit.stableKey === requestedUnit)?.stableKey;
+  return <LearningPathScreen path={result.path} progress={progress?.status === "ready" ? progress.progress : null} upgrade={upgrade?.status === "ready" ? upgrade : null} focusUnit={focusUnit} />;
 }

@@ -1,4 +1,9 @@
 import {
+  LearningMapSummaryResponseSchema,
+  LearningMapLevelResponseSchema,
+  LearningMapCatalogResponseSchema,
+  LearningMapSuggestionsResponseSchema,
+  LearningMapMutationResponseSchema,
   LearningAttemptMutationResponseSchema,
   LearningAttemptMediaResponseSchema,
   LearningAttemptSchema,
@@ -28,6 +33,12 @@ async function segments(context: RouteContext) {
 export async function GET(request: Request, context: RouteContext) {
   const path = await segments(context);
   const query = new URL(request.url).search;
+  if (path.length === 1 && path[0] === "map") return forwardGuidedLearningRequest({ apiPath: `/v1/guided-learning/map${query}`, method: "GET", request, responseSchema: LearningMapSummaryResponseSchema });
+  if (path.length === 2 && path[0] === "map") {
+    if (path[1] === "level") return forwardGuidedLearningRequest({ apiPath: `/v1/guided-learning/map/level${query}`, method: "GET", request, responseSchema: LearningMapLevelResponseSchema });
+    if (path[1] === "catalog") return forwardGuidedLearningRequest({ apiPath: `/v1/guided-learning/map/catalog${query}`, method: "GET", request, responseSchema: LearningMapCatalogResponseSchema });
+    if (path[1] === "suggestions") return forwardGuidedLearningRequest({ apiPath: `/v1/guided-learning/map/suggestions${query}`, method: "GET", request, responseSchema: LearningMapSuggestionsResponseSchema });
+  }
   if (path.length === 1 && path[0] === "home") {
     return forwardGuidedLearningRequest({
       apiPath: `/v1/guided-learning/home${query}`,
@@ -105,6 +116,7 @@ export async function GET(request: Request, context: RouteContext) {
 
 export async function POST(request: Request, context: RouteContext) {
   const path = await segments(context);
+  if (path.length === 2 && path[0] === "map" && ["ensure", "nodes", "entries", "group", "complete-block", "remove", "restore"].includes(path[1]!)) return forwardGuidedLearningRequest({ apiPath: `/v1/guided-learning/map/${path[1]}`, method: "POST", request, responseSchema: LearningMapMutationResponseSchema });
   if (path.length === 1 && path[0] === "review-sessions") {
     return forwardGuidedLearningRequest({
       apiPath: "/v1/guided-learning/review-sessions",
@@ -166,6 +178,8 @@ export async function POST(request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const path = await segments(context);
+  if (path.length === 2 && path[0] === "map" && path[1] === "layout") return forwardGuidedLearningRequest({ apiPath: "/v1/guided-learning/map/layout", method: "PATCH", request, responseSchema: LearningMapMutationResponseSchema });
+  if (path.length === 3 && path[0] === "map" && path[1] === "nodes" && Uuid.test(path[2] ?? "")) return forwardGuidedLearningRequest({ apiPath: `/v1/guided-learning/map/nodes/${path[2]}`, method: "PATCH", request, responseSchema: LearningMapMutationResponseSchema });
   if (path.length === 1 && path[0] === "preferences") {
     return forwardGuidedLearningRequest({
       apiPath: "/v1/guided-learning/preferences",

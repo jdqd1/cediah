@@ -57,7 +57,8 @@ export const CurrentUserSchema = z.object({
 export const CurrentUserResponseSchema = z.object({
   features: z.object({
     guidedLearning: z.boolean().default(false),
-  }).default({ guidedLearning: false }),
+    guidedLearningMap: z.boolean().default(false),
+  }).default({ guidedLearning: false, guidedLearningMap: false }),
   roles: z.array(PlatformRoleSchema).default([]),
   user: CurrentUserSchema,
 });
@@ -1177,3 +1178,4 @@ export interface ContentProvider {
     roles: PlatformRole[];
   }): Promise<ContentMutationResult<ContentItem>>;
 }
+export * from "./learning-map.js";

@@ -8,9 +8,11 @@
     "lint": "eslint . --max-warnings=0",
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@xyflow/react": "12.11.6",
     "@cediah/contracts": "workspace:*",
     "@phosphor-icons/react": "2.1.7",
     "@tiptap/extension-highlight": "3.29.2",
@@ -31,6 +33,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "26.1.2",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",

@@ -1,0 +1,9 @@
+{
+  "benchmark": "map-root",
+  "engine": "PGlite",
+  "references": 5000,
+  "visibleLevel": 200,
+  "samples": 30,
+  "p95Ms": 388,
+  "queriesPerRead": 8
+}

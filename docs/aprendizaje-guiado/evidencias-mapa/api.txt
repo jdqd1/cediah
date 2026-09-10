@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.10 D:/Jose (Datos)/Medicina/CEDIAH/Web/apps/api
+
+
+ Test Files  24 passed (24)
+      Tests  175 passed (175)
+   Start at  18:25:56
+   Duration  101.41s (transform 4.11s, setup 0ms, import 86.42s, tests 91.88s, environment 11ms)
+

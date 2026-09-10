@@ -16,6 +16,10 @@ export type GuidedLearningObserver = (
 ) => Promise<void> | void;
 
 const operations = new Map<string, Pick<GuidedLearningObservation, "operation" | "surface">>([
+  ...["", "/level", "/catalog", "/suggestions"].map((suffix): [string, Pick<GuidedLearningObservation, "operation" | "surface">] => [`GET /v1/guided-learning/map${suffix}`, { operation: `map.${suffix.slice(1) || "summary"}.read`, surface: "student" }]),
+  ...["ensure", "nodes", "entries", "group", "complete-block", "remove", "restore"].map((operation): [string, Pick<GuidedLearningObservation, "operation" | "surface">] => [`POST /v1/guided-learning/map/${operation}`, { operation: `map.${operation}`, surface: "student" }]),
+  ["PATCH /v1/guided-learning/map/layout", { operation: "map.layout.update", surface: "student" }],
+  ["PATCH /v1/guided-learning/map/nodes/:id", { operation: "map.node.update", surface: "student" }],
   ["GET /v1/guided-learning/home", { operation: "home.read", surface: "student" }],
   ["GET /v1/guided-learning/preferences", { operation: "preferences.read", surface: "student" }],
   ["PATCH /v1/guided-learning/preferences", { operation: "preferences.update", surface: "student" }],
@@ -49,6 +53,7 @@ const operations = new Map<string, Pick<GuidedLearningObservation, "operation" |
 ]);
 
 const knownErrorCodes = new Set([
+  "map_unavailable",
   "active_attempt",
   "conflict",
   "forbidden",

@@ -57,7 +57,7 @@ describe("GET /health", () => {
     expect(allowed.statusCode).toBe(200);
     expect(allowed.headers["cache-control"]).toBe("no-store");
     expect(allowed.json()).toEqual({
-      features: { guidedLearning: false },
+      features: { guidedLearning: false, guidedLearningMap: false },
       roles: [],
       user: { email: "estudiante@example.test", id: "04761a7d-4c02-48d7-b3a2-94b8baadf021" },
     });

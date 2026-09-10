@@ -10,6 +10,7 @@
     "migrate": "tsx src/db/run-migrations.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
+    "test:map-server": "tsx test/helpers/learning-map-server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

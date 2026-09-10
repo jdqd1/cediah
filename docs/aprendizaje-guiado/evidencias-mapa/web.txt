@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.10 D:/Jose (Datos)/Medicina/CEDIAH/Web/apps/web
+
+
+ Test Files  20 passed (20)
+      Tests  92 passed (92)
+   Start at  23:00:55
+   Duration  5.07s (transform 1.79s, setup 0ms, import 7.58s, tests 1.02s, environment 6ms)
+

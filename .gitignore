@@ -5,6 +5,9 @@ node_modules.corrupt-*/
 .next/
 dist/
 coverage/
+playwright-report/
+test-results/
+.map-test-results/
 .turbo/
 .vercel/
 *.tsbuildinfo

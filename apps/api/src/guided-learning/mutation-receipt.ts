@@ -33,6 +33,7 @@ function parseStoredResult<T>(value: JsonValue | null, schema: ZodType<T>): Guid
     const parsed = schema.safeParse(record.value);
     return parsed.success ? { status: "success", value: parsed.data } : { status: "conflict" };
   }
+  if (record.status === "not_ready" && Array.isArray(record.issues)) return { status:"not_ready", issues:record.issues };
   return typeof record.status === "string" && failureStatuses.has(record.status as GuidedLearningFailure)
     ? { status: record.status as GuidedLearningFailure }
     : { status: "conflict" };

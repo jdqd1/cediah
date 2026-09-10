@@ -23,10 +23,12 @@ export function ActivityShell({
   initialAttempt,
   initialProgress,
   userId,
+  returnHref,
 }: {
   initialAttempt: LearningAttempt;
   initialProgress: LearningEnrollmentProgress | null;
   userId: string;
+  returnHref?: string;
 }) {
   const [attempt, setAttempt] = useState(initialAttempt);
   const [progress, setProgress] = useState(initialProgress);
@@ -89,7 +91,7 @@ export function ActivityShell({
   return (
     <main className="learning-activity-main">
       <header className="learning-activity-header">
-        <Link href={attempt.pathSlug ? `/aprendizaje/rutas/${attempt.pathSlug}` : "/aprendizaje"}><ArrowLeft size={18} />{attempt.pathSlug ? "Mi ruta" : "Inicio"}</Link>
+        <Link href={returnHref ?? (attempt.pathSlug ? `/aprendizaje/rutas/${attempt.pathSlug}` : "/aprendizaje")}><ArrowLeft size={18} />{returnHref ? "Mi mapa" : attempt.pathSlug ? "Mi ruta" : "Inicio"}</Link>
         <div>
           <span>{attempt.manifest.projection === "quiz" ? "Cuestionario" : attempt.manifest.projection === "flashcards" ? "Flashcards" : attempt.manifest.projection === "guide" ? "Guía" : attempt.manifest.projection === "review" ? "Repaso" : "Video"}</span>
           <h1>{attempt.manifest.title}</h1>
@@ -100,7 +102,7 @@ export function ActivityShell({
         </div>
       </header>
       <p aria-live="polite" className="learning-activity-message">{message}</p>
-      {attempt.status === "completed" && !feedback ? <LearningCompletionPanel attempt={attempt} awards={awards} progress={progress} /> : null}
+      {attempt.status === "completed" && !feedback ? <LearningCompletionPanel attempt={attempt} awards={awards} progress={progress} returnHref={returnHref} /> : null}
       {attempt.status !== "completed" || feedback ? (
         attempt.manifest.projection === "quiz" ? <QuizActivity attempt={attempt as LearningAttempt & { manifest: Extract<LearningAttempt["manifest"], { projection: "quiz" }> }} feedback={feedback} mutate={mutate} onFeedback={setFeedback} />
           : attempt.manifest.projection === "flashcards" ? <FlashcardActivity attempt={attempt as LearningAttempt & { manifest: Extract<LearningAttempt["manifest"], { projection: "flashcards" }> }} mutate={mutate} />

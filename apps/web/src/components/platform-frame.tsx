@@ -8,7 +8,7 @@ import { AccessProvider } from "./access-context";
 import { PersistentAppShell } from "./app-shell";
 
 type ShellSession = {
-  features: { guidedLearning: boolean };
+  features: { guidedLearning: boolean; guidedLearningMap?: boolean };
   roles: PlatformRole[];
   viewer: { email: string };
 };
@@ -45,7 +45,8 @@ export function AuthenticatedShellSession({ features, roles, viewer }: ShellSess
     setSession?.((previous) =>
       previous?.viewer.email === viewer.email &&
       previous.roles.join() === roles.join() &&
-      previous.features.guidedLearning === features.guidedLearning
+      previous.features.guidedLearning === features.guidedLearning &&
+      previous.features.guidedLearningMap === features.guidedLearningMap
         ? previous
         : { features, roles, viewer },
     );
