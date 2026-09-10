@@ -15,7 +15,7 @@
     "@xyflow/react": "12.11.6",
     "@cediah/contracts": "workspace:*",
     "@phosphor-icons/react": "2.1.7",
-    "@tiptap/extension-highlight": "3.29.2",
+    "@tiptap/extension-highlight": "3.31.3",
     "@tiptap/extension-image": "3.29.2",
     "@tiptap/extension-link": "3.29.2",
     "@tiptap/extension-placeholder": "3.29.2",
