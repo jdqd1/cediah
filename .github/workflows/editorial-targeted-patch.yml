@@ -1,0 +1,49 @@
+name: Editorial targeted patch
+
+on:
+  push:
+    branches: [fix/editorial-guides-topics]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/editorial-guides-topics
+      - name: Pass selected subject ids to the topic selector
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('apps/web/src/components/content-studio.tsx')
+          text = path.read_text()
+          old = '''                      <TopicSelector
+                        allowCreate={capabilities.canManageTaxonomy}
+                        disabled={!editable || busy !== null}
+                        subjectSelected={draft.subjectIds.length > 0}
+'''
+          new = '''                      <TopicSelector
+                        allowCreate={capabilities.canManageTaxonomy}
+                        disabled={!editable || busy !== null}
+                        subjectIds={draft.subjectIds}
+                        subjectSelected={draft.subjectIds.length > 0}
+'''
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('TopicSelector call site did not match expected source')
+              path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit targeted patch and remove helper workflow
+        run: |
+          git rm .github/workflows/editorial-targeted-patch.yml
+          git add apps/web/src/components/content-studio.tsx
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "wire selected subjects into topic creation"
+          git push origin HEAD:fix/editorial-guides-topics
