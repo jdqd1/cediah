@@ -62,6 +62,15 @@ revoke all on table public.content_topic_subjects from anon, authenticated;
 grant select, insert, update, delete on table public.content_topics to service_role;
 grant select, insert, update, delete on table public.content_topic_subjects to service_role;
 
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'cediah_runtime') then
+    execute 'grant select, insert, update, delete on table public.content_topics to cediah_runtime';
+    execute 'grant select, insert, update, delete on table public.content_topic_subjects to cediah_runtime';
+  end if;
+end
+$$;
+
 create policy cediah_deny_data_api
 on public.content_topics
 for all
@@ -76,14 +85,23 @@ to anon, authenticated
 using (false)
 with check (false);
 
-do $$
-begin
-  if exists (select 1 from pg_roles where rolname = 'cediah_runtime') then
-    execute 'alter table public.content_topics owner to cediah_runtime';
-    execute 'alter table public.content_topic_subjects owner to cediah_runtime';
-  end if;
-end
-$$;
+-- The API connects directly as cediah_runtime. Keep ownership with the
+-- migration executor and permit only that SQL role through RLS. Using PUBLIC
+-- here keeps local Supabase migrations portable when cediah_runtime is absent;
+-- anon/authenticated still have no table grants and evaluate this predicate false.
+create policy cediah_runtime_sql
+on public.content_topics
+for all
+to public
+using (current_user = 'cediah_runtime')
+with check (current_user = 'cediah_runtime');
+
+create policy cediah_runtime_sql
+on public.content_topic_subjects
+for all
+to public
+using (current_user = 'cediah_runtime')
+with check (current_user = 'cediah_runtime');
 
 with extracted_topics as (
   select btrim(content.topic) as name
