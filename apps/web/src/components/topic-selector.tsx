@@ -6,8 +6,11 @@ import { ContentTopicSchema, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioNameDialog } from "./studio-name-dialog";
 
-const topicErrors: Record<string, string> = {
-  content_unavailable: "No se pudo guardar el tema. Actualiza la página y vuelve a intentarlo.",
+const contentUnavailableMessage =
+  "No se pudo guardar el tema. Actualiza la página y vuelve a intentarlo.";
+
+const topicErrors: Partial<Record<string, string>> = {
+  content_unavailable: contentUnavailableMessage,
   forbidden: "Tu cuenta no tiene permiso para crear temas.",
   invalid_topic: "El nombre del tema no es válido.",
   not_found: "No se pudo asociar el tema con las materias seleccionadas.",
@@ -108,7 +111,7 @@ export function TopicSelector({
       const parsed = ContentTopicSchema.safeParse(
         body && typeof body === "object" && "topic" in body ? body.topic : null,
       );
-      if (!parsed.success) throw new Error(topicErrors.content_unavailable);
+      if (!parsed.success) throw new Error(contentUnavailableMessage);
 
       setCreatedTopics((current) => [
         ...current.filter(
@@ -120,7 +123,7 @@ export function TopicSelector({
       setDialogOpen(false);
       setInput("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : topicErrors.content_unavailable);
+      setError(caught instanceof Error ? caught.message : contentUnavailableMessage);
     } finally {
       setBusy(false);
     }
