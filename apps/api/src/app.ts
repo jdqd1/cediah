@@ -56,7 +56,10 @@ import { createPostgresDatabase, createPostgresPool } from "./db/database.js";
 import { applySqlMigrations } from "./db/migrate.js";
 import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
 import { createPostgresLearningProvider } from "./providers/postgres-learning.js";
-import { createPostgresContentProvider } from "./providers/postgres-content.js";
+import {
+  createPostgresContentProvider,
+  type PostgresContentProvider,
+} from "./providers/postgres-content.js";
 import { createPostgresRoleManagementProvider } from "./providers/postgres-role-management.js";
 import { createPostgresSubjectProvider } from "./providers/postgres-subjects.js";
 import { createPostgresGuidedLearningProvider } from "./providers/postgres-guided-learning.js";
@@ -117,6 +120,16 @@ const ContentSlugParamsSchema = z.object({
 });
 const SubjectSlugParamsSchema = ContentSlugParamsSchema;
 const SubjectIdParamsSchema = z.object({ subjectId: z.string().uuid() });
+const ContentTopicCreateRequestSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  subjectIds: z.array(z.string().uuid()).min(1).max(20),
+});
+const ContentTopicResponseSchema = z.object({
+  topic: z.object({
+    name: z.string().trim().min(1).max(120),
+    subjectIds: z.array(z.string().uuid()),
+  }),
+});
 const ContentListQuerySchema = z.object({
   kind: ContentKindSchema.optional(),
   linkedVideoId: z.string().uuid().optional(),
@@ -707,8 +720,8 @@ export async function buildApp(
           topics,
         }),
       );
-    } catch {
-      request.log.error("Content workspace request failed");
+    } catch (error) {
+      request.log.error({ err: error }, "Content workspace request failed");
       return reply
         .status(503)
         .header("Cache-Control", "no-store")
@@ -745,8 +758,8 @@ export async function buildApp(
         .status(201)
         .header("Cache-Control", "no-store")
         .send(SubjectResponseSchema.parse({ subject: result.value }));
-    } catch {
-      request.log.error("Subject creation failed");
+    } catch (error) {
+      request.log.error({ err: error }, "Subject creation failed");
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
     }
   });
@@ -780,12 +793,60 @@ export async function buildApp(
         return reply
           .header("Cache-Control", "no-store")
           .send(DeletedSubjectSchema.parse(result.value));
-      } catch {
-        request.log.error("Subject deletion failed");
+      } catch (error) {
+        request.log.error({ err: error }, "Subject deletion failed");
         return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
       }
     },
   );
+
+  app.post<{ Body: unknown }>("/v1/editor/topics", async (request, reply) => {
+    const editor = await resolveEditorUser(
+      toIdentityRequest(request.headers),
+      identityProvider,
+      contentProvider,
+    );
+    if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+    if (!editor.capabilities.canManageTaxonomy) {
+      return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+    }
+
+    const input = ContentTopicCreateRequestSchema.safeParse(request.body);
+    if (!input.success) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_topic" });
+    }
+
+    const topicProvider = contentProvider as Partial<PostgresContentProvider> | undefined;
+    if (!topicProvider?.createTopic) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    try {
+      const result = await topicProvider.createTopic({
+        actorUserId: editor.user.id,
+        name: input.data.name,
+        roles: editor.roles,
+        subjectIds: input.data.subjectIds,
+      });
+      if (result.status === "forbidden") {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+      if (result.status === "conflict") {
+        return reply.status(409).header("Cache-Control", "no-store").send({ error: "topic_conflict" });
+      }
+      if (result.status === "not_found") {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      return reply
+        .status(201)
+        .header("Cache-Control", "no-store")
+        .send(ContentTopicResponseSchema.parse({ topic: result.value }));
+    } catch (error) {
+      request.log.error({ err: error }, "Content topic creation failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
   app.post<{ Body: unknown }>("/v1/editor/content", async (request, reply) => {
     const editor = await resolveEditorUser(
       toIdentityRequest(request.headers),
@@ -820,8 +881,8 @@ export async function buildApp(
         .status(201)
         .header("Cache-Control", "no-store")
         .send(ContentItemSchema.parse(result.value));
-    } catch {
-      request.log.error("Content creation failed");
+    } catch (error) {
+      request.log.error({ err: error }, "Content creation failed");
       return reply
         .status(503)
         .header("Cache-Control", "no-store")
@@ -865,8 +926,8 @@ export async function buildApp(
         return reply
           .header("Cache-Control", "no-store")
           .send(ContentItemSchema.parse(result.value));
-      } catch {
-        request.log.error("Content subject assignment failed");
+      } catch (error) {
+        request.log.error({ err: error }, "Content subject assignment failed");
         return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
       }
     },
@@ -910,8 +971,8 @@ export async function buildApp(
         return reply
           .header("Cache-Control", "no-store")
           .send(ContentItemSchema.parse(result.value));
-      } catch {
-        request.log.error("Content update failed");
+      } catch (error) {
+        request.log.error({ err: error }, "Content update failed");
         return reply
           .status(503)
           .header("Cache-Control", "no-store")
