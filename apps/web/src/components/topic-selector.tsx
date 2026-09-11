@@ -18,7 +18,7 @@ export function TopicSelector({
   allowCreate = false,
   disabled = false,
   onChange,
-  subjectIds,
+  subjectIds = [],
   subjectSelected,
   suggestions = [],
   values,
@@ -26,7 +26,7 @@ export function TopicSelector({
   allowCreate?: boolean;
   disabled?: boolean;
   onChange: (values: string[]) => void;
-  subjectIds: readonly string[];
+  subjectIds?: readonly string[];
   subjectSelected: boolean;
   suggestions?: readonly string[];
   values: readonly string[];
@@ -40,7 +40,9 @@ export function TopicSelector({
     () => uniqueRegions([
       ...suggestions,
       ...createdTopics
-        .filter((topic) => subjectIds.every((id) => topic.subjectIds.includes(id)))
+        .filter((topic) =>
+          subjectIds.length === 0 || subjectIds.every((id) => topic.subjectIds.includes(id)),
+        )
         .map((topic) => topic.name),
       ...values,
     ]),
@@ -60,10 +62,28 @@ export function TopicSelector({
   }
 
   async function addTopic() {
-    if (!allowCreate || !interactive || !cleanInput || subjectIds.length === 0) return;
+    if (!allowCreate || !interactive || !cleanInput) return;
     if (existingTopic) {
       onChange(uniqueRegions([...values, existingTopic]));
       closeDialog();
+      return;
+    }
+
+    // Older callers only supplied whether a subject was selected. Keep the
+    // topic stable in the current editor session; saving the content will
+    // persist it through the content provider. New callers pass subjectIds and
+    // persist immediately through the taxonomy endpoint below.
+    if (subjectIds.length === 0) {
+      const localTopic = { name: cleanInput, subjectIds: [] } satisfies ContentTopic;
+      setCreatedTopics((current) => [
+        ...current.filter(
+          (topic) => normalizeRegion(topic.name) !== normalizeRegion(localTopic.name),
+        ),
+        localTopic,
+      ]);
+      onChange(uniqueRegions([...values, localTopic.name]));
+      setDialogOpen(false);
+      setInput("");
       return;
     }
 
