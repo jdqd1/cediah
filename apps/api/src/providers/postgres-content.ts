@@ -37,6 +37,20 @@ type QueryDatabase = DatabaseClient | Transaction<CediahDatabase>;
 type ContentRow = Selectable<ContentItemTable>;
 type AssetRow = Selectable<ContentAssetTable>;
 type ContentAssetDownloadStorage = Pick<S3ObjectStorage, "bucket" | "createDownloadUrl">;
+type TopicMutationResult =
+  | { status: "success"; value: ContentTopic }
+  | { status: "conflict" }
+  | { status: "forbidden" }
+  | { status: "not_found" };
+
+export type PostgresContentProvider = ContentProvider & {
+  createTopic(input: {
+    actorUserId: string;
+    name: string;
+    roles: PlatformRole[];
+    subjectIds: string[];
+  }): Promise<TopicMutationResult>;
+};
 
 export type PostgresContentProviderConfiguration = {
   assetStorage?: ContentAssetDownloadStorage;
@@ -370,34 +384,121 @@ function contentTopics(content: JsonValue, fallback: string) {
   return [...unique.values()];
 }
 
+async function listPersistedTopics(database: QueryDatabase): Promise<ContentTopic[]> {
+  const result = await sql<{ name: string; subject_id: string | null }>`
+    select topic.name, link.subject_id
+    from public.content_topics as topic
+    left join public.content_topic_subjects as link on link.topic_id = topic.id
+    order by topic.name asc, link.subject_id asc
+  `.execute(database);
+  const topics = new Map<string, { name: string; subjectIds: Set<string> }>();
+  for (const row of result.rows) {
+    const key = normalizeTopic(row.name);
+    const current = topics.get(key) ?? { name: row.name, subjectIds: new Set<string>() };
+    if (row.subject_id) current.subjectIds.add(row.subject_id);
+    topics.set(key, current);
+  }
+  return [...topics.values()].map((topic) => ({
+    name: topic.name,
+    subjectIds: [...topic.subjectIds].sort(),
+  }));
+}
+
+async function ensurePersistedTopic(
+  database: QueryDatabase,
+  name: string,
+  subjectIds: string[],
+): Promise<ContentTopic> {
+  const cleanName = name.trim();
+  const uniqueSubjectIds = [...new Set(subjectIds)];
+  const existing = await sql<{ id: string; name: string }>`
+    select id, name
+    from public.content_topics
+    where lower(name) = lower(${cleanName})
+    limit 1
+    for update
+  `.execute(database);
+  let topic = existing.rows[0];
+
+  if (!topic) {
+    const inserted = await sql<{ id: string; name: string }>`
+      insert into public.content_topics (name)
+      values (${cleanName})
+      on conflict do nothing
+      returning id, name
+    `.execute(database);
+    topic = inserted.rows[0];
+    if (!topic) {
+      const concurrent = await sql<{ id: string; name: string }>`
+        select id, name
+        from public.content_topics
+        where lower(name) = lower(${cleanName})
+        limit 1
+        for update
+      `.execute(database);
+      topic = concurrent.rows[0];
+    }
+  }
+
+  if (!topic) throw new Error("content_topic_upsert_failed");
+
+  for (const subjectId of uniqueSubjectIds) {
+    await sql`
+      insert into public.content_topic_subjects (topic_id, subject_id)
+      values (${topic.id}, ${subjectId})
+      on conflict do nothing
+    `.execute(database);
+  }
+
+  const links = await sql<{ subject_id: string }>`
+    select subject_id
+    from public.content_topic_subjects
+    where topic_id = ${topic.id}
+    order by subject_id asc
+  `.execute(database);
+
+  return {
+    name: topic.name,
+    subjectIds: links.rows.map((row) => row.subject_id),
+  };
+}
+
 async function listTopics(database: QueryDatabase): Promise<ContentTopic[]> {
+  const topics = new Map<string, { name: string; subjectIds: Set<string> }>();
+  for (const topic of await listPersistedTopics(database)) {
+    topics.set(normalizeTopic(topic.name), {
+      name: topic.name,
+      subjectIds: new Set(topic.subjectIds),
+    });
+  }
+
   const rows = await database
     .selectFrom("content_items")
     .select(["content", "id", "topic"])
     .execute();
-  if (rows.length === 0) return [];
 
-  const links = await database
-    .selectFrom("content_subjects")
-    .select(["content_item_id", "subject_id"])
-    .where("content_item_id", "in", rows.map((row) => row.id))
-    .execute();
-  const subjectsByContent = new Map<string, Set<string>>();
-  for (const link of links) {
-    const subjectIds = subjectsByContent.get(link.content_item_id) ?? new Set<string>();
-    subjectIds.add(link.subject_id);
-    subjectsByContent.set(link.content_item_id, subjectIds);
-  }
+  if (rows.length > 0) {
+    const links = await database
+      .selectFrom("content_subjects")
+      .select(["content_item_id", "subject_id"])
+      .where("content_item_id", "in", rows.map((row) => row.id))
+      .execute();
+    const subjectsByContent = new Map<string, Set<string>>();
+    for (const link of links) {
+      const subjectIds = subjectsByContent.get(link.content_item_id) ?? new Set<string>();
+      subjectIds.add(link.subject_id);
+      subjectsByContent.set(link.content_item_id, subjectIds);
+    }
 
-  const topics = new Map<string, { name: string; subjectIds: Set<string> }>();
-  for (const row of rows) {
-    for (const name of contentTopics(row.content, row.topic)) {
-      const key = normalizeTopic(name);
-      const current = topics.get(key) ?? { name, subjectIds: new Set<string>() };
-      for (const subjectId of subjectsByContent.get(row.id) ?? []) {
-        current.subjectIds.add(subjectId);
+    for (const row of rows) {
+      for (const name of contentTopics(row.content, row.topic)) {
+        const key = normalizeTopic(name);
+        const current = topics.get(key) ?? { name, subjectIds: new Set<string>() };
+        for (const subjectId of subjectsByContent.get(row.id) ?? []) {
+          current.subjectIds.add(subjectId);
+        }
+        topics.set(key, current);
       }
-      topics.set(key, current);
     }
   }
 
@@ -464,7 +565,7 @@ async function replaceSubjectLinks(
 export function createPostgresContentProvider(
   database: DatabaseClient,
   configuration: PostgresContentProviderConfiguration = {},
-): ContentProvider {
+): PostgresContentProvider {
   return {
     async createAssetUpload(input) {
       const access = await getStoredAccess(database, input.contentId);
@@ -497,6 +598,11 @@ export function createPostgresContentProvider(
           const normalizedDraft = ContentDraftSchema.parse(
             normalizeContentLearningIdentity(input.draft, randomUUID).value,
           );
+          if (getContentCapabilities(input.roles).canManageTaxonomy) {
+            for (const topic of contentTopics(normalizedDraft.content as JsonValue, normalizedDraft.topic)) {
+              await ensurePersistedTopic(transaction, topic, normalizedDraft.subjectIds);
+            }
+          }
           const row = await transaction
             .insertInto("content_items")
             .values({
@@ -532,6 +638,37 @@ export function createPostgresContentProvider(
         if (isUniqueConflict(error)) return { status: "conflict" };
         throw error;
       }
+    },
+
+    async createTopic(input) {
+      if (!getContentCapabilities(input.roles).canManageTaxonomy) return { status: "forbidden" };
+      const name = input.name.trim();
+      const subjectIds = [...new Set(input.subjectIds)];
+      if (!name || subjectIds.length === 0) return { status: "conflict" };
+      if (!(await subjectIdsExist(database, subjectIds))) return { status: "conflict" };
+
+      return database.transaction().execute(async (transaction) => {
+        const topic = await ensurePersistedTopic(transaction, name, subjectIds);
+        const stored = await sql<{ id: string }>`
+          select id
+          from public.content_topics
+          where lower(name) = lower(${topic.name})
+          limit 1
+        `.execute(transaction);
+        const topicId = stored.rows[0]?.id;
+        if (!topicId) return { status: "not_found" };
+        await transaction
+          .insertInto("audit_log")
+          .values({
+            action: "content_topic_upserted",
+            actor_user_id: input.actorUserId,
+            metadata: { name: topic.name, subjectIds },
+            target_id: topicId,
+            target_type: "content_topic",
+          })
+          .execute();
+        return { status: "success", value: topic };
+      });
     },
 
     async deleteContent(input) {
@@ -949,6 +1086,11 @@ export function createPostgresContentProvider(
           }
           if (!(await draftUsesExistingTopics(transaction, normalizedDraft, input.roles))) {
             return { status: "forbidden" };
+          }
+          if (getContentCapabilities(input.roles).canManageTaxonomy) {
+            for (const topic of contentTopics(normalizedDraft.content as JsonValue, normalizedDraft.topic)) {
+              await ensurePersistedTopic(transaction, topic, normalizedDraft.subjectIds);
+            }
           }
           const nextStatus =
             access.status === "in_review" || access.status === "approved"
