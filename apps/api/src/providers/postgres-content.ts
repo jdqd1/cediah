@@ -39,7 +39,9 @@ type AssetRow = Selectable<ContentAssetTable>;
 type ContentAssetDownloadStorage = Pick<S3ObjectStorage, "bucket" | "createDownloadUrl">;
 type TopicMutationResult =
   | { status: "success"; value: ContentTopic }
-  | { status: "conflict" | "forbidden" | "not_found" };
+  | { status: "conflict" }
+  | { status: "forbidden" }
+  | { status: "not_found" };
 
 export type PostgresContentProvider = ContentProvider & {
   createTopic(input: {
