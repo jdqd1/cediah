@@ -32,6 +32,10 @@ services:
         # Production rollout passed migrations, permissions and guided-learning
         # smoke tests on 2026-09-07. Turning this off remains the first rollback step.
         value: "true"
+      - key: GUIDED_LEARNING_MAP_ENABLED
+        # Learning-map migration, permissions and production smoke verified on
+        # 2026-09-12. Turning this off restores the classic learning entry point.
+        value: "true"
       - key: BETTER_AUTH_URL
         value: https://koraz-app.vercel.app
       - key: BETTER_AUTH_SECRET

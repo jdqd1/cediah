@@ -5,7 +5,7 @@ Estado inicial limpio; sin AGENTS.md aplicables encontrados. Se conserva el plan
 
 ## Registro de implementación
 
-Implementación realizada en el checkout compartido, sin subagentes ni publicación. Se conserva el plan maestro. Las comprobaciones finales y la matriz de aceptación se registran por separado en `MAPA-VALIDACION.md`; esta tabla identifica el código entregado, no sustituye esas pruebas.
+Implementación realizada en el checkout compartido, sin subagentes. El código del mapa quedó incluido en `bed9155`; producción ejecuta la revisión posterior `221fd80`, que conserva ese cambio. Se conserva el plan maestro. Las comprobaciones finales y la matriz de aceptación se registran por separado en `MAPA-VALIDACION.md`; esta tabla identifica el código entregado, no sustituye esas pruebas.
 
 | Tarea | Resultado y archivos principales |
 | --- | --- |
@@ -41,9 +41,9 @@ Implementación realizada en el checkout compartido, sin subagentes ni publicaci
 | T030 | Pruebas de contratos, SQL, versiones, agrupación, aislamiento, recibos, caché, transporte, BFF y regresión. |
 | T031 | Playwright escritorio/móvil, servidores automáticos, API efímera, actividad real, persistencia, edición, capturas. |
 | T032 | Dataset SQL de 5.000 referencias/200 nodos, 5 warmups y 30 muestras; ocho consultas por lectura; artefacto JSON. Rendimiento remoto pendiente. |
-| T033 | Revisión de capturas detectó y corrigió contenedor comprimido, cabecera móvil, superposición de controles y retorno de foco. Capturas finales en validación. |
-| T034 | Procedimiento de migración, preview, rollback de bandera y recuperación en `MAPA-OPERACION.md`. Ambiente remoto NO VERIFICADO. |
-| T035 | Documentación de ejecución, operación y matriz de validación; cierre local sujeto a los resultados finales registrados. |
+| T033 | Revisión de capturas detectó y corrigió contenedor comprimido, cabecera móvil, superposición de controles, títulos largos y retorno de foco. Capturas finales conservadas en `evidencias-mapa`. |
+| T034 | Producción activada el 2026-09-12: migración 0016 transaccional, checksum registrado, RLS/grants comprobados, despliegue Render `dep-dain1he7bikc739b22hg` live y smoke autenticado completo. Flag apagada dio 404 y rutas clásicas 200 antes de activarla. Preview con restore y concurrencia de dos conexiones sigue NO VERIFICADO porque no existe branch y el plan gratuito no ofrece backups administrados. |
+| T035 | Documentación de ejecución, operación y matriz de validación entregada. Hito local validado: 175 pruebas API, 92 web, 15 navegador, lint/tipos/build/diff correctos. Hito productivo activado y probado; límites externos conservados como NO VERIFICADO. |
 | T036 | Fuera de alcance: notas privadas opcionales no solicitadas. |
 
 ## Incidencias resueltas durante la ejecución
@@ -61,4 +61,4 @@ Implementación realizada en el checkout compartido, sin subagentes ni publicaci
 - La lista ajusta el fondo de cada tarjeta a todo su contenido; la cabecera compacta mantiene su altura y separa breadcrumbs de navegación global.
 - Si el nivel no cabe a zoom 0,65, el encuadre inicial centra el siguiente elemento disponible; las seis tarjetas raíz utilizan dos columnas en compacto. El resto sigue accesible mediante pan y lista.
 
-Los archivos de log locales `mapa-*.log` son salidas de trabajo ignoradas por Git. Los resultados y artefactos seleccionados se conservan en la documentación de validación. No se han aplicado migraciones ni cambiado banderas de producción.
+Los archivos de log locales `mapa-*.log` son salidas de trabajo ignoradas por Git. Los resultados y artefactos seleccionados se conservan en la documentación de validación. La migración productiva y la bandera están registradas en `MAPA-OPERACION.md`; apagar `GUIDED_LEARNING_MAP_ENABLED` sigue siendo el primer rollback.

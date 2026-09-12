@@ -1,0 +1,6 @@
+{
+  "environment": "Next development, browser automation included",
+  "warmups": 5,
+  "samples": 30,
+  "p95Ms": 462
+}

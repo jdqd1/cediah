@@ -13,7 +13,17 @@ Antes de activar en un ambiente:
 3. Comprobar las cuatro tablas, índices, claves foráneas, RLS y permisos del rol real `cediah_runtime`. Las políticas dan acceso al backend; el aislamiento por propietario se aplica en el proveedor. Los roles de navegador no reciben grants.
 4. Publicar el código con la bandera del mapa apagada. Verificar las rutas clásicas.
 5. En preview, activar ambas banderas y recorrer con dos cuentas las pruebas de `MAPA-VALIDACION.md`, incluidas dos conexiones PostgreSQL y pérdida de respuesta.
-6. La activación productiva es un hito separado: requiere la autorización del responsable y el smoke del ambiente. Esta implementación local no ha publicado ni activado servicios remotos.
+6. La activación productiva es un hito separado: requiere la autorización del responsable y el smoke del ambiente.
+
+## Estado productivo del 2026-09-12
+
+El responsable autorizó la activación. La revisión productiva `221fd80` contiene el commit del mapa `bed9155`. Antes de activar, `/health` respondió 200, el endpoint del mapa respondió 404 con la bandera apagada y las rutas web nueva y clásica respondieron 200.
+
+Se aplicó `0016_learning_maps.sql` a Supabase PostgreSQL dentro de una transacción. El registro de la aplicación conserva el checksum `4874aad19fd76288fa89f3bf3f2b4bc4f10c4d58d076eb0936b3fd63b786be4f`; Supabase la registra como `20260912153059_cediah_0016_learning_maps`. Las cuatro tablas quedaron inicialmente vacías. Se comprobaron sus trece índices, siete claves foráneas, RLS y políticas. `cediah_runtime` tiene SELECT/INSERT/UPDATE/DELETE; `anon` y `authenticated` no tienen privilegios sobre las tablas. Security Advisor no informó hallazgos.
+
+Render activó `GUIDED_LEARNING_MAP_ENABLED=true` mediante el despliegue `dep-dain1he7bikc739b22hg`, revisión `221fd80`, estado `live`. Después, `/health` respondió 200 y el endpoint sin sesión respondió 401 con caché privada. Una cuenta temporal recorrió summary → ensure → crear nodo → replay con la misma clave → level → guardar layout. El replay no duplicó el nodo, la posición se recuperó y la UI productiva mostró “Prueba de humo”. La cuenta y todos sus datos se eliminaron al finalizar; las tablas del mapa y los recibos huérfanos volvieron a cero.
+
+El plan gratuito muestra `No backups` y no hay branch de preview. Por ello no se declara probado un restore ni la carrera con dos conexiones PostgreSQL. La migración es aditiva y transaccional; no modifica tablas existentes. Para completar ese gate se necesita crear un branch de Supabase, que tiene costo por hora, y confirmar ese costo antes de crearlo.
 
 ## Persistencia y recuperación
 
@@ -71,4 +81,4 @@ Las operaciones `map.*` participan en la observabilidad de aprendizaje guiado: d
 
 Ante una incidencia, desactivar `GUIDED_LEARNING_MAP_ENABLED` y reiniciar/republicar la API con la configuración habitual del ambiente. La UI vuelve a la experiencia anterior mediante las capacidades de sesión. Conservar las tablas y los recibos para recuperar el servicio; no borrar datos ni revertir la migración para apagar una interfaz.
 
-No se verificaron en un ambiente remoto la restauración de backup, los roles reales, la concurrencia con dos conexiones ni la activación. Esos resultados deben añadirse con evidencia antes de declarar el hito de preview o producción.
+La activación, los roles reales y el smoke están verificados en producción. Restauración, concurrencia de dos conexiones y rendimiento repetido siguen pendientes de un ambiente preview. No presentar esos puntos como PASS hasta ejecutarlos allí.

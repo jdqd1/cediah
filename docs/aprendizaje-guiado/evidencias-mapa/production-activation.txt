@@ -1,0 +1,52 @@
+KORAS learning map — production activation evidence
+Date: 2026-09-12
+Feature revision: bed91559287d43a97736bec6000cd8aa8f492632
+Deployed revision: 221fd80a14af44fdb27bf5a869e1d7096ec0e756
+
+Pre-activation
+- API /health: 200
+- API /v1/guided-learning/map without session: 404 (flag off)
+- Web /aprendizaje/mapa: 200
+- Web /aprendizaje?tab=rutas: 200
+
+Database migration
+- Supabase migration: 20260912153059_cediah_0016_learning_maps
+- Application migration: 0016_learning_maps.sql
+- SHA-256: 4874aad19fd76288fa89f3bf3f2b4bc4f10c4d58d076eb0936b3fd63b786be4f
+- Transaction: committed
+- Tables: learning_maps, learning_map_nodes, learning_map_entries, learning_map_layouts
+- Verification: 4 tables with RLS; 13 indexes; 7 foreign keys
+- Permissions: cediah_runtime SELECT/INSERT/UPDATE/DELETE; anon/authenticated none
+- Supabase Security Advisor: no findings
+
+Activation
+- Render deployment: dep-dain1he7bikc739b22hg
+- Status: live
+- GUIDED_LEARNING_ENABLED=true
+- GUIDED_LEARNING_MAP_ENABLED=true
+- API /health: 200
+- API map endpoint without session: 401, Cache-Control private/no-store
+
+Authenticated smoke
+- Registration and session: 200
+- Summary before ensure: map absent
+- Ensure: 200
+- Create node: 200
+- Exact idempotency replay: 200, same structural version and changed IDs
+- Summary after mutation: one map and one node
+- Root level: 200, one item
+- Layout save: 200
+- Layout reload: coordinates persisted
+- Browser: production map rendered the node “Prueba de humo”
+
+Cleanup
+- Temporary smoke users: 0
+- learning_maps: 0
+- learning_map_nodes: 0
+- learning_map_entries: 0
+- learning_map_layouts: 0
+- Orphan mutation receipts: 0
+
+External limits
+- Supabase dashboard reports no managed backups for the current plan.
+- No preview branch exists, so restore, two-connection concurrency and repeated remote performance remain unverified.

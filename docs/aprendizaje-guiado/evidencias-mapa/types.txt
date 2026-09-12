@@ -3,7 +3,7 @@ No projects matched the filters "D:\Jose (Datos)\Medicina\CEDIAH\Web" in "D:\Jos
 Scope: all 4 workspace projects
 packages/contracts typecheck$ tsc --noEmit
 packages/contracts typecheck: Done
-apps/api typecheck$ tsc --noEmit
 apps/web typecheck$ tsc --noEmit
+apps/api typecheck$ tsc --noEmit
 apps/api typecheck: Done
 apps/web typecheck: Done
