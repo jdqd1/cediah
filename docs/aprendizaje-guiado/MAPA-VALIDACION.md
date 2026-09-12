@@ -29,7 +29,9 @@ El hito local está validado y el mapa está activo en producción desde el 2026
 | Flag apagada | PASS | API del mapa respondió 404; `/health`, `/aprendizaje/mapa` y `/aprendizaje?tab=rutas` conservaron respuesta HTTP válida. |
 | Activación | PASS | Render `dep-dain1he7bikc739b22hg`, revisión `221fd80`, estado `live`; `/health` 200 y endpoint del mapa sin sesión 401 con `private, no-store`. |
 | Smoke autenticado | PASS | Cuenta temporal: summary sin mapa, ensure, nodo, replay idempotente, summary/level, layout persistido y render visual del nodo. Limpieza posterior: cero usuarios, mapas, nodos, entradas, layouts o recibos huérfanos de la prueba. |
-| Errores | PASS | Sin errores de runtime en Vercel ni errores de aplicación/requests en Render durante la ventana de activación. |
+| Concurrencia HTTP productiva | PASS | Dos sesiones autenticadas enviaron mutaciones simultáneas con la misma versión: respuestas 200/409 y un solo nodo persistido. No se instrumentó el identificador de dos conexiones PostgreSQL distintas. |
+| Lectura API productiva | NO VERIFICADO | Muestra auxiliar con volumen pequeño: 5 warmups, 30 lecturas directas, mediana 348,6 ms y p95 412,7 ms. Cumple el presupuesto temporal, pero no sustituye el dataset preview de 5.000 referencias/200 elementos. |
+| Errores | PASS | La sincronización inicial reveló que `render.yaml` omitía `koraz.app` de `WEB_ORIGINS`; un registro devolvió 500 y no creó usuario. Se amplió la allowlist, se redesplegó y se repitió la prueba. Sin errores de Vercel ni del mapa después de la corrección. |
 | Backup/restore preview | NO VERIFICADO | El panel informa “No backups” y no existe branch preview. La migración fue aditiva/transaccional y no modificó tablas existentes, pero eso no sustituye restaurar una copia. |
 
 Render emitió un warning preexistente de Better Auth durante el registro: el rate limiter no pudo resolver la IP del cliente detrás del proxy y utilizó un bucket compartido por ruta. No causó errores en el smoke del mapa, pero la configuración de `trustedProxies`/cabeceras de IP debe revisarse como mantenimiento de autenticación separado.
@@ -59,7 +61,7 @@ PASS se limita al método indicado en la evidencia. Una comprobación local no a
 | F13 | PASS | `learning-map-contract.test.ts`: redondeo 1/8, límite 99, vacío y deduplicación; agregado real SQL por unidad. |
 | F14 | PASS | Regresión del dominio de aprendizaje y DTO de alternativas; la guía tiene recorrido de navegador. Los cuatro formatos no se recorrieron manualmente desde el nuevo panel. |
 | F15 | PASS | Prueba de versión fijada, publicación posterior, upgrade con stableKey ausente y null/unavailable; UI segura para contenido ausente. |
-| F16 | NO VERIFICADO | Cola local prueba respuesta perdida, retry inmutable, borrador nuevo y elección de conflicto. Falta PostgreSQL real con dos conexiones. |
+| F16 | NO VERIFICADO | Cola local prueba respuesta perdida, retry inmutable, borrador nuevo y elección de conflicto. En producción, dos sesiones simultáneas produjeron 200/409 y un solo nodo. Falta instrumentar dos conexiones PostgreSQL distintas en preview. |
 | F17 | PASS | Launcher usa el dominio existente; recorrido de guía real y regresión de intentos/progreso/premios. |
 | V01 | PASS | Seis estados capturados en escritorio/móvil; revisión visual de raíz, nodo, bloque, lección, contenido directo y mixto. Archivos `desktop-*.png` y `mobile-*.png`. |
 | V02 | PASS | Fixtures 0/13/100 y aserciones de Corazón; selección usa borde independiente del estado. |
@@ -74,7 +76,7 @@ PASS se limita al método indicado en la evidencia. Una comprobación local no a
 | A05 | NO VERIFICADO | Nombres y estados accesibles y reduced motion probados en navegador; no se utilizó lector de pantalla real. |
 | P01 | PASS | SQL con 5.000 referencias y nivel de 200; DTO sin manifiestos/soluciones, ocho consultas. Caché 12 niveles/2 MiB. |
 | P02 | NO VERIFICADO | Muestra local: p95 462 ms en 30 transiciones tras 5 warmups, incluyendo automatización y Next dev; `navigation-performance.json`. El SLO de preview requiere medir ese ambiente. |
-| P03 | PASS | Muestra local del proveedor PGlite: p95 388 ms, 30 lecturas, ocho consultas; `evidencias-mapa/root-performance.json`. HTTP/PostgreSQL remoto NO VERIFICADO. |
+| P03 | PASS | Muestra local del proveedor PGlite: p95 388 ms, 30 lecturas, ocho consultas; `evidencias-mapa/root-performance.json`. Muestra productiva pequeña directa: p95 412,7 ms; el volumen remoto representativo sigue NO VERIFICADO. |
 | P04 | NO VERIFICADO | Estado de arrastre local al canvas y caché acotada por diseño/tests; falta perfil React/handler p95 en preview. |
 | S01 | PASS | Pruebas parametrizadas de escritura y lectura entre dos cuentas; no se confía en usuario ni padre enviados por el cliente. |
 | S02 | PASS | PostgreSQL productivo confirma RLS en las cuatro tablas, políticas/grants exclusivos de `cediah_runtime` y cero permisos para `anon`/`authenticated`. |

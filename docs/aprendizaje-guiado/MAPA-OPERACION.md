@@ -23,7 +23,11 @@ Se aplicó `0016_learning_maps.sql` a Supabase PostgreSQL dentro de una transacc
 
 Render activó `GUIDED_LEARNING_MAP_ENABLED=true` mediante el despliegue `dep-dain1he7bikc739b22hg`, revisión `221fd80`, estado `live`. Después, `/health` respondió 200 y el endpoint sin sesión respondió 401 con caché privada. Una cuenta temporal recorrió summary → ensure → crear nodo → replay con la misma clave → level → guardar layout. El replay no duplicó el nodo, la posición se recuperó y la UI productiva mostró “Prueba de humo”. La cuenta y todos sus datos se eliminaron al finalizar; las tablas del mapa y los recibos huérfanos volvieron a cero.
 
-El plan gratuito muestra `No backups` y no hay branch de preview. Por ello no se declara probado un restore ni la carrera con dos conexiones PostgreSQL. La migración es aditiva y transaccional; no modifica tablas existentes. Para completar ese gate se necesita crear un branch de Supabase, que tiene costo por hora, y confirmar ese costo antes de crearlo.
+La primera sincronización del Blueprint mostró que la allowlist versionada solo contenía dominios Vercel anteriores. El formulario desde `koraz.app` recibió `Origin not allowed` y no creó datos. Se añadió `https://koraz.app` y `https://www.koraz.app` a `WEB_ORIGINS`, manteniendo los dominios anteriores, y se redesplegó antes de repetir el smoke.
+
+Después de corregir la allowlist, dos sesiones autenticadas enviaron simultáneamente dos nodos con la misma versión esperada. Una petición respondió 200, la otra 409 y quedó un solo nodo, como exige el control optimista. Una muestra auxiliar de lectura directa a la API, con 5 warmups y 30 repeticiones sobre un mapa pequeño, dio mediana 348,6 ms y p95 412,7 ms. No se usa como sustituto del benchmark de volumen en preview. La segunda cuenta temporal también se eliminó con sus datos.
+
+El plan gratuito muestra `No backups` y no hay branch de preview. Se confirmó el costo anunciado de USD 0,01344/h, pero Supabase rechazó la creación porque branching requiere un plan Pro; no se creó ningún recurso facturable. Por ello no se declara probado un restore ni se afirma que las dos peticiones usaron conexiones PostgreSQL distintas. La migración es aditiva y transaccional; no modifica tablas existentes.
 
 ## Persistencia y recuperación
 

@@ -50,3 +50,17 @@ Cleanup
 External limits
 - Supabase dashboard reports no managed backups for the current plan.
 - No preview branch exists, so restore, two-connection concurrency and repeated remote performance remain unverified.
+
+Post-publication configuration correction
+- Blueprint sync exposed a stale WEB_ORIGINS allowlist: koraz.app registration returned 500 Origin not allowed and created no user.
+- WEB_ORIGINS was corrected to include koraz.app and www.koraz.app while preserving the prior Vercel domains.
+- The service was redeployed and the authenticated smoke was repeated after the correction.
+
+Post-correction production checks
+- Two authenticated HTTP sessions submitted different mutations with the same expected structural version at the same time.
+- Responses: 200 and 409; persisted node count: 1.
+- Direct API read sample: 5 warmups + 30 measurements.
+- Median: 348.6 ms; p95: 412.7 ms.
+- The sample used a small map and is not the representative 5,000-reference/200-item preview benchmark.
+- The second temporary account and all cascading map data were deleted.
+- Supabase branch creation was attempted after the USD 0.01344/hour confirmation, but the provider rejected it because branching requires Pro. No branch or billable resource was created.

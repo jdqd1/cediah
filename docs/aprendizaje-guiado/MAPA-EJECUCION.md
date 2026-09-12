@@ -42,7 +42,7 @@ Implementación realizada en el checkout compartido, sin subagentes. El código 
 | T031 | Playwright escritorio/móvil, servidores automáticos, API efímera, actividad real, persistencia, edición, capturas. |
 | T032 | Dataset SQL de 5.000 referencias/200 nodos, 5 warmups y 30 muestras; ocho consultas por lectura; artefacto JSON. Rendimiento remoto pendiente. |
 | T033 | Revisión de capturas detectó y corrigió contenedor comprimido, cabecera móvil, superposición de controles, títulos largos y retorno de foco. Capturas finales conservadas en `evidencias-mapa`. |
-| T034 | Producción activada el 2026-09-12: migración 0016 transaccional, checksum registrado, RLS/grants comprobados, despliegue Render `dep-dain1he7bikc739b22hg` live y smoke autenticado completo. Flag apagada dio 404 y rutas clásicas 200 antes de activarla. Preview con restore y concurrencia de dos conexiones sigue NO VERIFICADO porque no existe branch y el plan gratuito no ofrece backups administrados. |
+| T034 | Producción activada el 2026-09-12: migración 0016 transaccional, checksum registrado, RLS/grants comprobados y smoke autenticado. Dos sesiones HTTP simultáneas dieron 200/409 y un único nodo; 30 lecturas directas dieron p95 412,7 ms con volumen pequeño. Flag apagada dio 404 y rutas clásicas 200. Preview con restore y dos conexiones PostgreSQL instrumentadas sigue NO VERIFICADO: branching requiere Pro y el plan gratuito no ofrece backups. |
 | T035 | Documentación de ejecución, operación y matriz de validación entregada. Hito local validado: 175 pruebas API, 92 web, 15 navegador, lint/tipos/build/diff correctos. Hito productivo activado y probado; límites externos conservados como NO VERIFICADO. |
 | T036 | Fuera de alcance: notas privadas opcionales no solicitadas. |
 

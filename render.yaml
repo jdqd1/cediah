@@ -19,7 +19,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: WEB_ORIGINS
-        value: https://koraz-app.vercel.app,https://cediah.vercel.app
+        value: https://koraz.app,https://www.koraz.app,https://koraz-app.vercel.app,https://cediah.vercel.app
       - key: DATABASE_URL
         # Supabase's pooled connection string is managed in Render and must
         # never be committed to this Blueprint.
