@@ -73,7 +73,7 @@ pnpm --config.verify-deps-before-run=false --filter @cediah/web test:e2e
 Remove-Item Env:MAP_E2E_REAL
 ```
 
-El servidor `apps/api/test/helpers/learning-map-server.ts` exige `NODE_ENV=test` y `MAP_E2E_TEST_SERVER=true`, escucha solo en loopback:4100 y usa PGlite efímero. Su identidad sintética está definida únicamente en ese bootstrap de test, nunca en la aplicación. Los tests abren la web en localhost:3000. Evitar reutilizar en ese puerto un servidor iniciado con otra API. Las capturas y trazas quedan en `apps/web/test-results`; el informe en `apps/web/playwright-report`.
+El servidor `apps/api/test/helpers/learning-map-server.ts` exige `NODE_ENV=test` y `MAP_E2E_TEST_SERVER=true`, escucha solo en loopback:4100 y usa PGlite efímero. Su identidad sintética está definida únicamente en ese bootstrap de test, nunca en la aplicación. Los tests abren la web en localhost:3000. Evitar reutilizar en ese puerto un servidor iniciado con otra API. Las capturas y trazas quedan en `apps/web/.map-test-results`; el informe en `apps/web/playwright-report`.
 
 Si Windows bloquea la limpieza de un resultado anterior, ejecutar Playwright con un directorio nuevo bajo `test-results`, por ejemplo `--output test-results/validacion-20260910`. Esto conserva las trazas anteriores y evita confundir una espera de limpieza con un fallo de la aplicación.
 

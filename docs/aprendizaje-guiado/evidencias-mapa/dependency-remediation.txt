@@ -1,0 +1,23 @@
+Dependency remediation validation
+Date: 2026-09-12
+
+Updated production dependencies:
+- next 16.2.12 -> 16.3.5
+- @tiptap/* 3.29.2 -> 3.31.3
+- nodemailer 9.0.6 -> 9.1.1
+- fastify 5.11.0 -> 5.12.1
+- sharp override 0.35.0 -> 0.35.4
+- js-yaml override 4.3.1 -> 4.3.2
+
+Updated test dependency:
+- vitest 4.1.10 -> 4.1.11
+
+Validation:
+- pnpm --filter @cediah/contracts build: PASS
+- pnpm lint: PASS
+- pnpm typecheck: PASS
+- pnpm test: PASS (API 175/175, web 92/92)
+- pnpm build: PASS (Next.js 16.3.5 optimized production build)
+- pnpm audit --json: PASS (0 info, 0 low, 0 moderate, 0 high, 0 critical)
+- Playwright with disposable API/PostgreSQL: PASS (15 passed, 1 expected mobile benchmark skip, 4.5 minutes)
+- Playwright-managed webServer after moving output to .map-test-results: PASS (2/2 targeted desktop navigation tests)

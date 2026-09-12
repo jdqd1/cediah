@@ -2,7 +2,7 @@
 
 Fecha de ejecución: 2026-09-08 a 2026-09-12. Base: `2d9c363ce36da7e70b4909ab2be3a5a2c5abb98c`.
 Revisión del código validada: `bed9155` (`mapa`).
-Revisión desplegada en web y API: `221fd80`, descendiente de `bed9155`.
+Revisión de activación inicial en web y API: `221fd80`, descendiente de `bed9155`. La allowlist productiva quedó corregida en `80bb88a`; la revisión actual de `main` incorpora además la remediación de dependencias descrita abajo.
 
 El hito local está validado y el mapa está activo en producción desde el 2026-09-12. Se aplicó la migración a PostgreSQL real, se verificaron roles, se probó el estado apagado y se completó un smoke autenticado de API y navegador. No existe un ambiente preview del mapa; backup/restore, dos conexiones PostgreSQL, rendimiento remoto repetido, dispositivo físico y lector de pantalla real permanecen **NO VERIFICADO**.
 
@@ -18,7 +18,7 @@ El hito local está validado y el mapa está activo en producción desde el 2026
 | Build final | PASS | Compilación optimizada completa de contratos, API y web; `evidencias-mapa/build.txt`. |
 | Diff final | PASS | `git diff --check` sin incidencias. |
 | Navegador final | PASS | 15 pruebas pasan en 4,1 minutos; una omisión prevista del benchmark en móvil. API/SQL efímeros activos. `evidencias-mapa/browser.txt`. |
-| Dependencias | PASS | Audit del lockfile base y actual: mismos 14 avisos, ningún identificador nuevo. Esto no significa ausencia de vulnerabilidades. |
+| Dependencias | PASS | El audit actual informa 0 avisos en todas las severidades. La base histórica tenía 14 avisos: 8 moderados, 4 altos y 2 críticos. `evidencias-mapa/audit-baseline.json`, `audit.json` y `dependency-remediation.txt`. |
 
 ## Comprobaciones remotas
 
@@ -36,7 +36,7 @@ El hito local está validado y el mapa está activo en producción desde el 2026
 
 Render emitió un warning preexistente de Better Auth durante el registro: el rate limiter no pudo resolver la IP del cliente detrás del proxy y utilizó un bucket compartido por ruta. No causó errores en el smoke del mapa, pero la configuración de `trustedProxies`/cabeceras de IP debe revisarse como mantenimiento de autenticación separado.
 
-El audit conserva avisos previos, incluidos críticos de Next.js y altos/moderados de otras dependencias. No se actualizaron paquetes ajenos al mapa. Los informes íntegros están en `evidencias-mapa/audit-baseline.json` y `evidencias-mapa/audit.json`. El único paquete nuevo de producción es React Flow 12.11.6; Playwright 1.63.0 se utiliza para pruebas. Los cambios de peer de Next/better-auth en el lockfile proceden de añadir Playwright, sin cambiar sus versiones.
+La auditoría publicada después de la activación detectó avisos nuevos para las versiones fijadas en el lockfile. Se actualizaron Next.js a 16.3.5, Tiptap a 3.31.3, Nodemailer a 9.1.1, Fastify a 5.12.1 y Vitest a 4.1.11; los overrides de Sharp y js-yaml pasaron a 0.35.4 y 4.3.2. El audit final informa cero vulnerabilidades. React Flow 12.11.6 sigue siendo el único paquete de producción añadido por el mapa y Playwright 1.63.0 continúa como herramienta de pruebas.
 
 Las capturas finales están en `evidencias-mapa`: los prefijos `desktop-` y `mobile-` identifican los dos proyectos de Playwright; `root`, `node`, `block`, `lesson`, `direct` y `mixed` cubren los seis estados. `long-*` contiene la lista y `long-canvas-*` el lienzo en las cuatro anchuras. `persistent-map` corresponde al recorrido con API y SQL, no a fixtures. El indicador de Next visible en las capturas pertenece al servidor de desarrollo.
 
@@ -85,7 +85,7 @@ PASS se limita al método indicado en la evidencia. Una comprobación local no a
 | S05 | PASS | Cambio de cuenta en escritorio/móvil borra encuadres privados (incluido uno corrupto), rechaza el enlace de la otra cuenta y permite abrir el mapa propio vacío. |
 | R01 | PASS | Cuatro combinaciones de banderas, endpoints nuevos cerrados por defecto y suite de rutas/sesiones existentes. |
 | R02 | NO VERIFICADO | Migración productiva aplicada y restricciones verificadas sin pérdida ni cambios en tablas existentes. Backup/restore preview no se pudo ejecutar: el plan actual no ofrece backup y no existe branch de preview. |
-| R03 | PASS | Contratos, 175 pruebas API, 92 web, lint, tipos, build optimizado, navegador y diff sin incidencias pendientes en el hito local. |
+| R03 | PASS | Contratos, 175 pruebas API, 92 web, lint, tipos, build optimizado y audit sin vulnerabilidades. El recorrido de navegador posterior a la remediación completó 15 pruebas y la omisión prevista del benchmark móvil. |
 
 ## Reproducción y limitaciones
 

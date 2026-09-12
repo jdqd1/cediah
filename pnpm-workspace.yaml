@@ -6,10 +6,10 @@ injectWorkspacePackages: true
 
 overrides:
   postcss: 8.5.23
-  sharp: 0.35.0
+  sharp: 0.35.4
   fast-uri@3.1.4: 3.1.6
   fast-uri@4.1.1: 4.1.3
-  js-yaml: 4.3.1
+  js-yaml: 4.3.2
   nanoid: 3.3.18
 
 allowBuilds:
@@ -28,4 +28,4 @@ minimumReleaseAgeExclude:
   - '@better-auth/prisma-adapter@1.7.2'
   - '@better-auth/telemetry@1.7.2'
   - better-auth@1.7.2
-  - nodemailer@9.0.6
+  - nodemailer@9.1.1
