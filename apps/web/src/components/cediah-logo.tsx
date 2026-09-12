@@ -14,14 +14,14 @@ export function CediahLogo({ className = "", priority = false, variant = "light"
       role="img"
     >
       <Image
-        className="koras-logo-mark"
+        className="koras-logo-mark koraz-logo-mark"
         src="/brand/koras-mark.png"
         alt=""
         width={1512}
         height={1512}
         priority={priority}
       />
-      <span className="koras-logo-copy">
+      <span className="koras-logo-copy koraz-logo-copy">
         <strong>KORAS</strong>
       </span>
     </span>
