@@ -14,7 +14,7 @@
   "dependencies": {
     "@xyflow/react": "12.11.6",
     "@cediah/contracts": "workspace:*",
-    "@phosphor-icons/react": "2.1.7",
+    "@phosphor-icons/react": "2.1.10",
     "@tiptap/extension-highlight": "3.31.3",
     "@tiptap/extension-image": "3.31.3",
     "@tiptap/extension-link": "3.31.3",
