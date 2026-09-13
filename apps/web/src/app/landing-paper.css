@@ -418,7 +418,7 @@
   transform: rotate(-1.5deg);
 }
 
-.marketing-page-paper .marketing-devices img {
+.marketing-page-paper .marketing-devices > img {
   width: 100%;
   height: auto;
   aspect-ratio: auto;
@@ -1217,7 +1217,7 @@
     margin: -2px 0 0;
   }
 
-  .marketing-page-paper .marketing-devices img {
+  .marketing-page-paper .marketing-devices > img {
     aspect-ratio: auto;
     object-fit: contain;
   }

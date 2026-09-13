@@ -19,6 +19,7 @@ import {
   X,
   YoutubeLogo,
 } from "@phosphor-icons/react";
+import { BrandPlatformPreview } from "./brand-platform-preview";
 import { CediahLogo } from "./cediah-logo";
 
 const featureItems = [
@@ -94,26 +95,34 @@ export function LandingScreen() {
     <main className="marketing-page marketing-page-paper">
       <section className="marketing-hero" aria-labelledby="marketing-title">
         <div className="marketing-hero-art" aria-hidden="true">
-          {(["side", "base"] as const).map((layer) => (
-            <div className={`marketing-hero-art-layer marketing-hero-art-${layer}`} key={layer}>
-              <Image
-                className="marketing-hero-reference marketing-hero-reference-desktop"
-                src="/landing/landing-hero-integrated-desktop.png"
-                alt=""
-                fill
-                priority={layer === "side"}
-                sizes="(max-width: 700px) 1px, 100vw"
-              />
-              <Image
-                className="marketing-hero-reference marketing-hero-reference-mobile"
-                src="/landing/landing-hero-integrated-mobile.png"
-                alt=""
-                fill
-                priority={layer === "side"}
-                sizes="(max-width: 700px) 100vw, 1px"
-              />
-            </div>
-          ))}
+          <span className="marketing-flow-ribbon marketing-flow-ribbon-one" />
+          <span className="marketing-flow-ribbon marketing-flow-ribbon-two" />
+          <span className="marketing-flow-ribbon marketing-flow-ribbon-three" />
+          <Image
+            className="marketing-hero-watermark"
+            src="/brand/koras-mark-dark.png"
+            alt=""
+            width={1254}
+            height={1254}
+            priority
+          />
+          <Image
+            className="marketing-hero-anatomy"
+            src="/landing/anatomy-hero.png"
+            alt=""
+            width={1254}
+            height={1254}
+            priority
+            sizes="(max-width: 700px) 88vw, 48vw"
+          />
+          <div className="marketing-hero-note marketing-hero-note-course">
+            <BookOpen size={19} weight="duotone" />
+            <span><strong>Anatomía humana</strong><small>12 lecciones</small></span>
+          </div>
+          <div className="marketing-hero-note marketing-hero-note-progress">
+            <span><small>Progreso general</small><strong>38%</strong></span>
+            <i><b /></i>
+          </div>
         </div>
 
         <header className="marketing-header">
@@ -164,13 +173,7 @@ export function LandingScreen() {
             <p>Tus clases y recursos te acompañan estés donde estés.</p>
           </div>
           <div className="marketing-devices">
-            <Image
-              src="/landing/platform-devices.png"
-              alt="Vista de Koras en tablet y teléfono con distintas materias médicas"
-              width={1536}
-              height={1024}
-              sizes="(max-width: 700px) 100vw, 64vw"
-            />
+            <BrandPlatformPreview />
           </div>
         </div>
       </section>
@@ -263,7 +266,7 @@ export function LandingScreen() {
       <footer className="marketing-footer" id="instituciones">
         <div className="marketing-footer-inner">
           <div className="marketing-footer-brand">
-            <Link href="/" aria-label="Koras, inicio"><CediahLogo variant="dark" /></Link>
+            <Link href="/" aria-label="Koras, inicio"><CediahLogo variant="light" /></Link>
             <p>Aprendizaje que se ve,<br />conocimiento que se queda.</p>
             <div className="marketing-socials" aria-label="Redes sociales" role="group">
               <a href="#instagram" aria-label="Instagram"><InstagramLogo size={16} /></a>

@@ -1,15 +1,15 @@
 .workspace {
-  --map-canvas: #faf7f2;
+  --map-canvas: #f6f7fc;
   --map-surface: #fff;
-  --map-ink: #17382f;
-  --map-muted: #52665f;
-  --map-primary: #0f3d32;
-  --map-line: #dfe5e0;
-  --map-connector: #bacbc5;
-  --map-icon-well: #f0f6f2;
-  --map-accent: #c75a3a;
+  --map-ink: #1a2034;
+  --map-muted: #59627b;
+  --map-primary: #29356f;
+  --map-line: #e2e6f2;
+  --map-connector: #b9c2e5;
+  --map-icon-well: #eef0ff;
+  --map-accent: #5364d9;
   --map-card-shadow:
-    0 2px 4px rgb(15 61 50 / 3%), 0 12px 28px rgb(15 61 50 / 5%);
+    0 2px 4px rgb(41 53 111 / 3%), 0 12px 28px rgb(41 53 111 / 7%);
   background: var(--map-canvas);
   color: var(--map-ink);
   font-family: var(--font-plus-jakarta), system-ui, sans-serif;
@@ -255,16 +255,16 @@
   font-size: 11px;
   line-height: 16px;
   font-weight: 600;
-  color: #52615b;
-  background: #edf0ee;
+  color: #59627b;
+  background: #eef0f6;
 }
 .badge[data-status="completed"] {
-  color: #116b50;
-  background: #e8f5ee;
+  color: #15803d;
+  background: #ecfdf3;
 }
 .badge[data-status="in_progress"] {
-  color: #9a471e;
-  background: #fff1e8;
+  color: #b45309;
+  background: #fff7ed;
 }
 .percentage {
   font-variant-numeric: tabular-nums;
@@ -519,7 +519,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgb(15 35 28 / 25%);
+  background: rgb(26 32 52 / 25%);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -528,7 +528,7 @@
 }
 .dialog {
   background: white;
-  color: #17382f;
+  color: var(--map-ink);
   width: min(640px, 100%);
   max-height: 85dvh;
   border-radius: 24px;
@@ -583,7 +583,7 @@
 .panelBackdrop {
   position: fixed;
   inset: 0;
-  background: rgb(15 35 28 / 25%);
+  background: rgb(26 32 52 / 25%);
   z-index: 100;
 }
 .hidden {

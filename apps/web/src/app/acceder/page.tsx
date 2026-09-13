@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { AuthForm } from "@/components/auth-form";
+import { BrandPlatformPreview } from "@/components/brand-platform-preview";
 import { CediahLogo } from "@/components/cediah-logo";
 import { getSafeNextPath } from "@/lib/auth/validation";
 
@@ -61,14 +61,7 @@ export default async function AccessPage({ searchParams }: AccessPageProps) {
           </div>
 
           <div className="auth-showcase-art" aria-hidden="true">
-            <Image
-              alt=""
-              height={1024}
-              priority
-              sizes="(max-width: 960px) 1px, 62vw"
-              src="/landing/platform-devices.png"
-              width={1536}
-            />
+            <BrandPlatformPreview className="brand-platform-preview-auth" />
           </div>
         </aside>
 

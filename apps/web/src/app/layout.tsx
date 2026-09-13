@@ -9,6 +9,7 @@ import "./platform-chrome.css";
 import "./landing-paper.css";
 import "./auth-paper.css";
 import "./learning.css";
+import "./identity-v3.css";
 
 const plusJakartaSans = localFont({
   src: [
@@ -27,14 +28,14 @@ export const metadata: Metadata = {
   description:
     "Plataforma educativa para aprender con videos, guías y recursos organizados por materia.",
   icons: {
-    icon: "/brand/koras-mark.png",
-    apple: "/brand/koras-mark.png",
+    icon: "/brand/koras-mark-dark.png",
+    apple: "/brand/koras-mark-dark.png",
   },
 };
 
 export const viewport: Viewport = {
   colorScheme: "light",
-  themeColor: "#0F3D32",
+  themeColor: "#29356F",
   width: "device-width",
   initialScale: 1,
 };

@@ -372,7 +372,7 @@ function ShellChrome({
             onClick={closeSidebar}
             title="Ir al inicio"
           >
-            <CediahLogo variant="light" priority={activeKey === "dashboard"} />
+            <CediahLogo variant="dark" priority={activeKey === "dashboard"} />
           </Link>
           <button
             aria-controls="app-sidebar"

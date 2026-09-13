@@ -241,7 +241,7 @@
   filter: blur(45px);
 }
 
-.auth-showcase-art img {
+.auth-showcase-art > img {
   display: block;
   width: 100%;
   height: auto;

@@ -2,21 +2,21 @@
    Presentation-only cascade layered after the legacy application styles. */
 
 :root {
-  --koraz-cyan: #C75A3A;
-  --koraz-blue: #0F3D32;
-  --koraz-blue-deep: #0B2D25;
-  --koraz-violet: #F4B996;
-  --koraz-violet-deep: #D9DDF7;
+  --koraz-cyan: #5364D9;
+  --koraz-blue: #29356F;
+  --koraz-blue-deep: #1A2034;
+  --koraz-violet: #98A5FF;
+  --koraz-violet-deep: #5364D9;
   --koraz-green: #22c55e;
-  --koraz-mint: #A7C7A0;
-  --koraz-ink: #1F2937;
-  --koraz-slate: #4B5563;
+  --koraz-mint: #DCE1FF;
+  --koraz-ink: #1A2034;
+  --koraz-slate: #59627B;
   --koraz-surface: #ffffff;
-  --koraz-canvas: #FAF7F2;
-  --koraz-line: #E5E7EB;
-  --koraz-line-strong: #D1D5DB;
-  --koraz-primary-gradient: linear-gradient(135deg, #0F3D32 0%, #0B2D25 100%);
-  --koraz-violet-gradient: linear-gradient(135deg, #F4B996 0%, #D9DDF7 100%);
+  --koraz-canvas: #F6F7FC;
+  --koraz-line: #E2E6F2;
+  --koraz-line-strong: #C8CFE4;
+  --koraz-primary-gradient: linear-gradient(135deg, #29356F 0%, #5364D9 100%);
+  --koraz-violet-gradient: linear-gradient(135deg, #98A5FF 0%, #DCE1FF 100%);
   --koraz-green-gradient: linear-gradient(135deg, #22C55E 0%, #0F9F7A 100%);
   /* Standard surfaces are separated by tone and spacing; elevation is reserved for overlays. */
   --koraz-shadow-sm: none;
@@ -26,7 +26,7 @@
   --wine: var(--koraz-blue);
   --wine-deep: var(--koraz-ink);
   --wine-soft: var(--koraz-blue-deep);
-  --wine-pale: #F4B99622;
+  --wine-pale: #DCE1FF66;
   --cream: var(--koraz-canvas);
   --cream-deep: var(--koraz-surface);
   --paper: #ffffff;
@@ -36,7 +36,7 @@
   --line: var(--koraz-line);
   --line-strong: var(--koraz-line-strong);
   --gold: var(--koraz-violet);
-  --gold-pale: #F4B99622;
+  --gold-pale: #DCE1FF66;
   --green: var(--koraz-green);
   --blue: var(--koraz-blue);
   --purple: var(--koraz-violet-deep);
@@ -2398,7 +2398,7 @@ a.icon-back-link:hover,
   box-shadow: 0 0 0 1px rgb(217 119 6 / 22%);
 }
 
-/* Koraz logo lockup: use the supplied symbol and wordmark artwork. */
+/* KORAS logo lockup: use the supplied symbol and wordmark artwork. */
 
 .cediah-logo .koraz-logo-wordmark {
   display: block;
@@ -3589,7 +3589,7 @@ a.icon-back-link:hover,
   }
 }
 
-/* Landing page recreated from the August 2026 Koraz marketing reference. */
+/* Landing page recreated from the August 2026 KORAS marketing reference. */
 
 .marketing-page {
   --marketing-ink: #071439;

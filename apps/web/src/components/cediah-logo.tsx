@@ -6,7 +6,11 @@ type CediahLogoProps = {
   variant?: "dark" | "light";
 };
 
-export function CediahLogo({ className = "", priority = false, variant = "light" }: CediahLogoProps) {
+export function CediahLogo({ className = "", priority = false, variant = "dark" }: CediahLogoProps) {
+  const markSource = variant === "light"
+    ? "/brand/koras-mark-light.png"
+    : "/brand/koras-mark-dark.png";
+
   return (
     <span
       aria-label="KORAS"
@@ -15,10 +19,10 @@ export function CediahLogo({ className = "", priority = false, variant = "light"
     >
       <Image
         className="koras-logo-mark koraz-logo-mark"
-        src="/brand/koras-mark.png"
+        src={markSource}
         alt=""
-        width={1512}
-        height={1512}
+        width={1254}
+        height={1254}
         priority={priority}
       />
       <span className="koras-logo-copy koraz-logo-copy">
