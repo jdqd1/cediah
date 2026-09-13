@@ -18,8 +18,9 @@
   --koraz-primary-gradient: linear-gradient(135deg, #0F3D32 0%, #0B2D25 100%);
   --koraz-violet-gradient: linear-gradient(135deg, #F4B996 0%, #D9DDF7 100%);
   --koraz-green-gradient: linear-gradient(135deg, #22C55E 0%, #0F9F7A 100%);
-  --koraz-shadow-sm: 0 1px 2px rgb(15 23 42 / 4%), 0 4px 14px rgb(15 23 42 / 4%);
-  --koraz-shadow-md: 0 12px 34px rgb(15 61 50 / 10%), 0 2px 8px rgb(15 23 42 / 5%);
+  /* Standard surfaces are separated by tone and spacing; elevation is reserved for overlays. */
+  --koraz-shadow-sm: none;
+  --koraz-shadow-md: none;
 
   /* Compatibility aliases keep every existing surface on one brand system. */
   --wine: var(--koraz-blue);

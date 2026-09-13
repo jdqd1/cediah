@@ -1,74 +1,116 @@
-# Design QA — Ruta de aprendizaje en Inicio
+# Design QA — App shell inspirado en Google Drive
 
-## Evidencia
+Fecha: 2026-09-13
 
-- Verdad visual de estructura: `C:\Users\josed\AppData\Local\Temp\codex-clipboard-c12a45b0-ae25-40cd-b64f-4b2ce951be69.png` (1536 × 1024 px; tablero con objetivos de escritorio y móvil).
-- Estado previo señalado por el usuario: `C:\Users\josed\AppData\Local\Temp\codex-clipboard-e5217806-5d13-480a-bce0-271c9916ecb1.png` (733 × 667 px).
-- Implementación de escritorio: `D:\Jose (Datos)\Medicina\CEDIAH\Web\tmp\design-qa\dashboard-learning-desktop-final.png` (739 × 696 px).
-- Implementación móvil: `D:\Jose (Datos)\Medicina\CEDIAH\Web\tmp\design-qa\dashboard-learning-mobile-final.png` (586 × 1319 px).
+## Alcance
+
+Actualización visual del dashboard de aprendizaje en modo claro: control del sidebar colapsado al extremo izquierdo, control de cierre a la derecha del logotipo, desplazamiento real del contenido al expandir el sidebar y sustitución de tarjetas flotantes con sombra por una jerarquía tonal semejante a Google Drive. Se conservaron el contenido, la marca y la funcionalidad de Koras.
+
+## Verdad visual y evidencia
+
+- Referencia principal, Drive claro: `C:\Users\josed\AppData\Local\Temp\codex-clipboard-fd42474e-c24e-408f-a22d-129c94235881.png` (1836 × 953 px).
+- Referencia secundaria de contraste, Drive oscuro: `C:\Users\josed\AppData\Local\Temp\codex-clipboard-56886ee4-047d-4ac8-8f12-fa987539422c.png` (1846 × 953 px).
+- Estado previo de Koras: `C:\Users\josed\AppData\Local\Temp\codex-clipboard-17223053-cb02-400b-9cac-61eda522b14c.png` (1800 × 1125 px).
+- Comparación enfocada final: `C:\Users\josed\.codex\visualizations\2026\09\13\01a09b85-275b-7351-9ade-de2bf1c4e500\koras-drive-light-desktop-qa.png` (925 × 575 px).
+- Vista expandida: `C:\Users\josed\.codex\visualizations\2026\09\13\01a09b85-275b-7351-9ade-de2bf1c4e500\koras-drive-light-desktop-header-route.png` (1100 × 650 px).
+- Vista móvil cerrada: `C:\Users\josed\.codex\visualizations\2026\09\13\01a09b85-275b-7351-9ade-de2bf1c4e500\koras-drive-light-mobile.png` (312 × 675 px).
 - Ruta verificada: `http://localhost:3000/visual-fixtures/aprendizaje?estado=dashboard`.
-- Estado: ruta activa con 3 de 7 actividades completadas, una actividad para continuar y un repaso recomendado.
-- Captura de escritorio: override de 488 × 445 px; la página reportó 610 × 557 CSS px y DPR 0.8 por el escalado interno del panel.
-- Captura móvil: override de 390 × 844 px; la página reportó 488 × 1055 CSS px y DPR 0.8 por el mismo escalado.
-- Normalización: la referencia previa y la captura de escritorio tienen un encuadre y una densidad visual equivalentes. Para móvil se comparó la región del componente, descontando chrome de la aplicación, escala del panel y contenido posterior a la tarjeta; no se atribuyeron hallazgos a esas diferencias de densidad.
+- Estado funcional: dashboard con ruta activa, 3 de 7 actividades completadas, actividad actual azul, actividad para continuar y repaso recomendado.
+
+## Normalización de captura
+
+El panel del navegador aplica un zoom interno de 0.8. La comprobación de escritorio se ejecutó con un viewport CSS de 1440 × 900 y la captura enfocada se recortó únicamente para retirar el área vacía generada por el escalado del panel. La comprobación móvil usó 390 × 844 CSS px y produjo una imagen de 312 × 675 px. Las conclusiones se basan en la comparación visual conjunta y en coordenadas CSS leídas del DOM, no en una superposición de píxeles sin normalizar.
+
+La captura de Drive es una referencia de lenguaje visual, no una especificación de contenido. Las diferencias de copy, iconografía de marca y estructura de aprendizaje son intencionales.
 
 ## Comparación completa
 
-La implementación mantiene la arquitectura visual solicitada: identificación de la ruta, título y avance, anillo porcentual, secuencia de pasos y un bloque sólido “Para hoy”. La revisión conjunta de las referencias y las capturas finales confirma los cambios intencionales:
-
-- El punto actual pasó de terracota a azul (`#2563eb`) y su aro exterior se ve completo, incluida la parte superior.
-- El contenedor con desplazamiento reserva 6 px arriba del stepper, evitando que el estado actual sea recortado.
-- “Para hoy” conserva el verde salvia sólido (`#f1f5ef`), sin degradado, y reduce notablemente altura, paddings, separaciones y tamaño de sus tarjetas.
-- En escritorio ancho, actividad, repaso y CTA forman una sola franja. En anchos intermedios y móvil, la actividad principal ocupa la primera línea y repaso + CTA comparten la segunda; en pantallas muy estrechas se apilan sin desbordar.
-- El CTA permanece en el campo táctil inferior derecho, dice “Ir a la actividad” y conserva un objetivo de 50 px en escritorio y 48 px en móvil.
-- No aparece el cierre “Vas muy bien”.
-
-## Superficies de fidelidad
-
-- Tipografía: se conserva la familia y jerarquía del producto; título, porcentaje, etiquetas y metadatos siguen siendo legibles. Los textos largos se truncan dentro de sus tarjetas y no fuerzan el ancho del componente.
-- Espaciado y ritmo: “Para hoy” ahora usa 15/22/17 px de padding en escritorio y 14/14/16 px en móvil, con tarjetas de 68 px y 56–62 px respectivamente. La reducción no comprime el encabezado ni la ruta de progreso.
-- Color y tokens: la superficie principal es blanca, el área diaria usa un color plano y sutil, los pasos completados siguen en verde y el paso actual usa azul semántico. El anillo porcentual conserva su representación de datos; no se usa como fondo decorativo del contenedor.
-- Imágenes e iconos: este componente no requiere recursos rasterizados. Los iconos visibles provienen de Phosphor y mantienen un grosor y una escala coherentes.
-- Copy: aparecen “Ruta activa”, “Para hoy”, “Ver toda la ruta” e “Ir a la actividad”; no aparece “Vas muy bien” ni “Continuar mi ruta”.
+- El chrome de header y sidebar usa un gris verdoso muy claro, mientras el workspace principal permanece blanco, reproduciendo la separación por tono de Drive.
+- Ruta activa, accesos directos, destacados y controles secundarios usan superficies tonales relacionadas, sin el efecto de tarjetas blancas flotantes.
+- Se eliminaron sombras y elevaciones de tarjetas, botones, buscador y contenedor principal. La elevación permanece únicamente en overlays reales, como el drawer móvil.
+- El buscador ahora se integra en el header mediante un fondo tonal suave; al enfocarse cambia a blanco con outline visible.
+- El contenedor principal mantiene una única gran superficie blanca con radio moderado y sin borde o sombra perceptible.
+- La ruta activa conserva la jerarquía propia de Koras, pero se integra al workspace como una sección tonal y deja 18 px de separación respecto del borde superior del contenedor principal.
 
 ## Comparación enfocada
 
-No se necesitaron recortes adicionales: en la comparación conjunta, el stepper y el bloque “Para hoy” ocupan suficiente área para verificar el aro superior, el color azul, el fondo sólido, el CTA y el comportamiento de las etiquetas. Las capturas finales no muestran recortes, colisiones ni desbordamiento del componente.
+### Sidebar colapsado, escritorio
+
+- Header: x=0, z-index=120.
+- Botón visible de expansión: x=14, ancho=44 px.
+- Buscador: x=74 px.
+- Sidebar colapsado: x=0, ancho=72 px.
+- Contenido principal: x=72 px y se amplía al espacio liberado.
+- Desbordamiento horizontal: 0 px.
+
+El primer pase colocó el botón en x=14, pero el header tenía z-index 100 y quedaba debajo del sidebar con z-index 110; el control se ocultaba parcialmente (P1). Se elevó el header colapsado a z-index 120 y la captura posterior confirma que el botón queda completamente visible al extremo izquierdo.
+
+### Sidebar expandido, escritorio
+
+- Logotipo: x=14, ancho=113 px.
+- Botón de cierre: x=214, ancho=44 px; queda a la derecha del logotipo.
+- Sidebar: ancho=272 px.
+- Contenido principal: x=272 px y reduce su ancho sin overlay.
+- Desbordamiento horizontal: 0 px.
+
+### Superficies y elevación
+
+Las únicas sombras no nulas visibles son el indicador inset del enlace activo del sidebar y el doble aro del paso actual azul. No se detectaron sombras en header, buscador, workspace, ruta activa, accesos directos, tareas ni CTA.
+
+### Móvil
+
+- Header, shell y main comparten exactamente `rgb(246, 248, 247)`.
+- El main no tiene borde, radio exterior ni sombra de app shell.
+- Las tarjetas se apoyan directamente sobre el fondo mediante contraste tonal.
+- Viewport CSS: 390 × 844; desbordamiento horizontal: 0 px.
+- Drawer cerrado: fuera del viewport y `body` con overflow restaurado.
+- Drawer abierto: x=0, ancho=288 px, backdrop visible y bloqueo de scroll.
+- En el drawer, el logotipo comienza en x=12 y el botón de cierre en x=232, por lo que el control queda a la derecha y dentro del área accesible.
+
+## Superficies de fidelidad
+
+- Tipografía: se conserva la familia, peso y jerarquía de Koras. No se imitó la tipografía de Google porque la referencia es estilística.
+- Espaciado y layout: header y sidebar se leen como una unidad; el workspace comienza después del sidebar y responde a sus dos anchos.
+- Color y tokens: chrome `#f6f8f7`, superficies tonales `#eef2f0`, hover `#e3ebe7`, workspace blanco y sección diaria `#e6eeea`.
+- Imágenes y assets: se mantienen el logotipo y los iconos existentes, sin rasterización nueva ni degradación.
+- Copy y contenido: sin cambios funcionales o editoriales.
+- Iconos: conservan tamaño, grosor y labels accesibles existentes.
+- Interacciones: expansión/colapso de escritorio, apertura/cierre del drawer móvil y bloqueo/restauración del scroll comprobados.
+- Responsividad: comprobada en escritorio amplio, escritorio del panel y móvil de 390 px.
+- Movimiento: el pulso azul del paso actual se conserva; los cambios de sidebar mantienen transición y no introducen desplazamientos en hover.
 
 ## Historial de iteración
 
-1. Revisión anterior: la estructura coincidía con el mock, pero el estado actual seguía en terracota y su aro superior quedaba cortado (P2). “Para hoy” conservaba tres filas visuales y una altura excesiva en relación con el resto de la tarjeta (P2).
-2. Corrección: se cambió el estado actual a `#2563eb`, se amplió el espacio vertical seguro del scroll y se reorganizó “Para hoy” como una cuadrícula compacta con tarjetas horizontales, paddings menores y CTA alineado al extremo inferior derecho.
-3. Evidencia posterior: las capturas `dashboard-learning-desktop-final.png` y `dashboard-learning-mobile-final.png` muestran el aro completo y azul. La actividad principal, el repaso y el CTA mantienen jerarquía y targets táctiles sin recuperar la altura anterior.
-
-## Interacciones y consola
-
-- El CTA “Ir a la actividad” se comprobó y navegó a `/aprendizaje/sesiones/a1000000-0000-4000-8000-000000000309`.
-- “Ver toda la ruta” expone `/aprendizaje/rutas/bases-de-la-fisiologia-respiratoria`.
-- Se comprobaron los estados `dashboard`, `dashboard-empty` y `dashboard-error` durante la implementación.
-- Errores o advertencias de consola en la carga final: ninguno.
+1. Referencia y estado previo: exceso de superficies blancas con borde/sombra; botón colapsado separado del extremo izquierdo.
+2. Primer pase: se aplicó la jerarquía tonal y se movió el control, pero el botón quedó bajo la capa del sidebar (P1).
+3. Corrección: header colapsado elevado a z-index 120; botón confirmado en x=14 y completamente visible.
+4. Pase final: revisión conjunta de Drive claro y Koras, verificación responsive, drawer móvil, sombras computadas, desbordamiento y consola.
 
 ## Comprobaciones técnicas
 
-- `pnpm --filter @cediah/web typecheck`: aprobado.
 - `pnpm --filter @cediah/web lint`: aprobado.
+- `pnpm --filter @cediah/web typecheck`: aprobado.
 - `pnpm --filter @cediah/web test`: 20 archivos y 92 pruebas aprobadas.
-- `pnpm --filter @cediah/web build`: aprobado.
+- `git diff --check`: aprobado.
+- Errores o advertencias de consola en la carga final: ninguno.
 
 ## Findings
 
-No quedan hallazgos P0, P1 o P2. Como refinamiento opcional P3, el contrato podría enviar nombres específicos para todos los pasos futuros y sustituir las etiquetas genéricas “Actividad 5”, “Actividad 6”, etc.
+No quedan hallazgos P0, P1 o P2 dentro del alcance solicitado.
 
 ## Open Questions
 
-- Ninguna para este alcance.
+- Ninguna.
 
 ## Implementation Checklist
 
-- [x] Punto actual azul y sin recorte.
-- [x] “Para hoy” sólido, compacto y responsive.
-- [x] CTA “Ir a la actividad” abajo a la derecha.
-- [x] Sin “Vas muy bien” ni fondo degradado.
+- [x] Botón de expansión completamente alineado a la izquierda.
+- [x] Botón de cierre a la derecha del logotipo.
+- [x] Sidebar expandido desplaza y reduce el workspace.
+- [x] Header y sidebar forman una sola franja visual.
+- [x] Tarjetas y botones sin sombra, diferenciados por tono.
+- [x] Ruta activa separada del borde superior.
+- [x] Móvil sin app shell exterior y con fondo continuo.
 - [x] Validación visual, responsive, funcional y técnica completada.
 
 final result: passed

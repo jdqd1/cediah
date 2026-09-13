@@ -178,7 +178,7 @@
   transition: background-color 180ms ease-out, border-color 180ms ease-out, box-shadow 180ms ease-out;
   touch-action: manipulation;
 }
-.learning-primary-button { background: var(--koraz-blue); color: #fff; box-shadow: 0 8px 20px rgb(67 97 238 / 20%); }
+.learning-primary-button { background: var(--koraz-blue); color: #fff; box-shadow: none; }
 .learning-primary-button:hover { background: var(--koraz-blue-deep); }
 .learning-secondary-button { border-color: var(--koraz-line-strong); background: #fff; color: var(--koraz-blue-deep); }
 .learning-secondary-button:hover { border-color: #a5b4fc; background: var(--learning-soft); }
@@ -611,10 +611,10 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
 .dashboard-learning {
   width: 100%;
   overflow: hidden;
-  border: 1px solid #dce4df;
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: var(--koraz-shadow-sm);
+  border: 0;
+  border-radius: 18px;
+  background: #f1f4f2;
+  box-shadow: none;
 }
 
 .dashboard-learning-heading {
@@ -804,7 +804,7 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
   position: absolute;
   inset: 12px;
   border-radius: inherit;
-  background: #fff;
+  background: #f1f4f2;
   content: "";
 }
 .dashboard-learning-progress-ring strong {
@@ -925,8 +925,8 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
 }
 
 .dashboard-learning-today {
-  border-top: 1px solid #dfe6df;
-  background: #f1f5ef;
+  border-top: 0;
+  background: #e6eeea;
   padding: 15px 22px 17px;
 }
 .dashboard-learning-today-heading {
@@ -964,7 +964,7 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
 .dashboard-learning-featured-task,
 .dashboard-learning-secondary-task {
   min-width: 0;
-  border: 1px solid #d7e1d9;
+  border: 0;
   border-radius: 13px;
   background: #fff;
 }
@@ -1029,9 +1029,9 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
   touch-action: manipulation;
 }
 .dashboard-learning-secondary-task:hover {
-  border-color: #b8cabe;
-  background: #fbfdfb;
-  transform: translateY(-1px);
+  border-color: transparent;
+  background: #f7faf8;
+  transform: none;
 }
 .dashboard-learning-secondary-task .dashboard-learning-task-copy small {
   color: var(--koraz-blue-deep);
@@ -1070,14 +1070,14 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
   color: #fff;
   font-size: .8rem;
   font-weight: 780;
-  box-shadow: 0 6px 14px rgb(15 61 50 / 14%);
+  box-shadow: none;
   transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   touch-action: manipulation;
 }
 .dashboard-learning-activity-button:hover {
   background: var(--koraz-blue-deep);
-  box-shadow: 0 10px 22px rgb(15 61 50 / 20%);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 .dashboard-learning-today-clear {
   display: grid;

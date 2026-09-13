@@ -8,10 +8,12 @@
   --sidebar-expanded-width: 272px;
   --app-shell-sidebar-width: var(--sidebar-expanded-width);
   --sidebar-width: var(--app-shell-sidebar-width);
-  --app-chrome: #f2f3ef;
-  --app-workspace: var(--koraz-canvas);
-  --floating-surface: #ffffff;
-  --floating-shadow: 0 4px 18px rgb(15 61 50 / 7%), 0 1px 3px rgb(15 23 42 / 5%);
+  --app-chrome: #f6f8f7;
+  --app-workspace: #ffffff;
+  --app-tonal-surface: #eef2f0;
+  --app-tonal-hover: #e3ebe7;
+  --floating-surface: transparent;
+  --floating-shadow: none;
   display: grid;
   min-height: 100svh;
   grid-template-columns: var(--app-shell-sidebar-width) minmax(0, 1fr);
@@ -99,9 +101,9 @@
   min-width: 44px;
   min-height: 44px;
   place-items: center;
-  border: 1px solid var(--koraz-line);
+  border: 0;
   border-radius: 50%;
-  background: var(--floating-surface);
+  background: transparent;
   padding: 0;
   color: var(--koraz-blue);
   box-shadow: var(--floating-shadow);
@@ -111,8 +113,8 @@
 .app-topbar.app-topbar-simplified :is(.menu-trigger, .notification-trigger, .profile-trigger):hover,
 .app-topbar.app-topbar-simplified .notification-trigger.is-active,
 .app-shell .sidebar-menu-trigger:hover {
-  border-color: #b9cec5;
-  background: #e9f2ed;
+  border-color: transparent;
+  background: var(--app-tonal-hover);
   color: var(--koraz-blue-deep);
 }
 
@@ -129,8 +131,8 @@
 .app-topbar-simplified .profile-avatar {
   width: 36px;
   height: 36px;
-  border-color: #c8ddd4;
-  background: #edf5f1;
+  border-color: #d1ddd7;
+  background: #e7efeb;
   color: var(--koraz-blue);
   box-shadow: none;
 }
@@ -148,16 +150,18 @@
 .app-topbar-simplified .global-content-search-form {
   min-height: 44px;
   margin: 0;
-  border: 1px solid var(--koraz-line);
-  background: var(--floating-surface);
+  border: 0;
+  background: #e9eeeb;
   color: var(--koraz-blue);
   box-shadow: var(--floating-shadow);
 }
 
 .app-topbar-simplified .global-content-search-form:focus-within {
-  border-color: #9ebcaf;
+  border-color: transparent;
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgb(15 61 50 / 11%), var(--floating-shadow);
+  outline: 2px solid #9ebcaf;
+  outline-offset: 0;
+  box-shadow: none;
 }
 
 .app-topbar-simplified .global-content-search-form input { color: var(--koraz-ink); }
@@ -320,13 +324,13 @@
 
 .app-shell .app-body > .app-main {
   min-width: 0;
-  min-height: calc(100svh - var(--topbar-height) - 14px);
+  min-height: calc(100svh - var(--topbar-height) - 10px);
   flex: 1 0 auto;
-  margin: 0 14px 14px 0;
-  border: 1px solid #dfe4df;
-  border-radius: 22px;
+  margin: 0 10px 10px 0;
+  border: 0;
+  border-radius: 18px;
   background: var(--app-workspace);
-  box-shadow: 0 2px 7px rgb(30 45 38 / 3%);
+  box-shadow: none;
 }
 
 .app-shell .app-body > .dashboard-main {
@@ -340,8 +344,35 @@
   box-shadow: none;
 }
 
+.app-shell .dashboard-main .section-heading-row a,
+.app-shell .dashboard-main :is(.dashboard-video-card, .study-material-card, .dashboard-featured-content) {
+  border-color: transparent;
+  background: var(--app-tonal-surface);
+  box-shadow: none;
+}
+
+.app-shell .dashboard-main .dashboard-shortcuts > .study-material-card {
+  background: var(--app-tonal-surface);
+}
+
+.app-shell .dashboard-main .section-heading-row a:hover,
+.app-shell .dashboard-main :is(.dashboard-video-card, .study-material-card):hover {
+  border-color: transparent;
+  background: var(--app-tonal-hover);
+  box-shadow: none;
+  transform: none;
+}
+
 @media (min-width: 961px) {
   .app-shell .sidebar-backdrop { display: none; }
+
+  .app-shell.sidebar-collapsed .app-topbar.app-topbar-simplified,
+  .app-shell.dashboard-shell.sidebar-collapsed .app-topbar.app-topbar-simplified {
+    z-index: 120;
+    width: calc(100% + var(--sidebar-collapsed-width));
+    margin-left: calc(-1 * var(--sidebar-collapsed-width));
+    padding-left: 14px;
+  }
 
   .app-shell:not(.sidebar-collapsed) .app-topbar.app-topbar-simplified {
     grid-template-columns: minmax(14rem, 38rem) minmax(0, 1fr) auto;
@@ -384,7 +415,7 @@
   .app-shell:has(.published-rich-guide-reader) {
     --topbar-height: 72px;
     display: block;
-    background: var(--koraz-canvas);
+    background: var(--app-chrome);
   }
 
   .app-shell .app-body {
@@ -396,7 +427,7 @@
   .app-shell.dashboard-shell .app-topbar.app-topbar-simplified {
     grid-template-columns: 44px minmax(0, 1fr) auto;
     gap: 10px;
-    background: var(--koraz-canvas);
+    background: var(--app-chrome);
     padding: 12px;
   }
 
@@ -429,7 +460,7 @@
     margin: 0;
     border: 0;
     border-radius: 0;
-    background: var(--koraz-canvas);
+    background: var(--app-chrome);
     box-shadow: none;
   }
 
@@ -482,7 +513,7 @@
     pointer-events: none;
   }
 
-  .video-mobile-navbar > button { pointer-events: auto; box-shadow: 0 6px 24px rgb(24 42 70 / 14%); }
+  .video-mobile-navbar > button { pointer-events: auto; box-shadow: none; }
 }
 
 /* The list uses the same soft icon treatment as its resource tab. */
