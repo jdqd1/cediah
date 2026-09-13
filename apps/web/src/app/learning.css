@@ -879,9 +879,19 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
 }
 .dashboard-learning-stepper li[data-state="current"] { color: #2563eb; }
 .dashboard-learning-stepper li[data-state="current"] .dashboard-learning-step-node {
+  position: relative;
   border-color: #dbeafe;
   background: #2563eb;
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2563eb;
+}
+.dashboard-learning-stepper li[data-state="current"] .dashboard-learning-step-node::before {
+  position: absolute;
+  inset: -8px;
+  border: 2px solid rgb(37 99 235 / 38%);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+  animation: dashboard-current-step-pulse 2.6s ease-out infinite;
 }
 .dashboard-learning-stepper li[data-state="current"] .dashboard-learning-step-node::after {
   width: 8px;
@@ -889,6 +899,13 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
   border-radius: 50%;
   background: #fff;
   content: "";
+}
+
+@keyframes dashboard-current-step-pulse {
+  0% { opacity: 0; transform: scale(.78); }
+  18% { opacity: .48; }
+  56%,
+  100% { opacity: 0; transform: scale(1.14); }
 }
 .dashboard-learning-stepper small {
   margin-top: 3px;
@@ -1444,4 +1461,5 @@ a.learning-option:hover { border-color: #a5b4fc; background: var(--learning-soft
   .learning-unit-caret { transition: none; }
   .learning-skeleton::after,
   .learning-skeleton-heading > span::after { animation: none; }
+  .dashboard-learning-stepper li[data-state="current"] .dashboard-learning-step-node::before { animation: none; opacity: 0; }
 }

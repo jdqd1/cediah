@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bell,
   BookOpen,
   CardsThree,
   CheckSquareOffset,
@@ -220,6 +221,7 @@ function ShellChrome({
     activeKey === "editor" || activeKey === "roles",
   );
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const accessRoles = useAccessRoles();
@@ -231,14 +233,14 @@ function ShellChrome({
       ? { email: session.data.user.email }
       : null;
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const sidebarMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   useNavigationIntent();
 
-  const drawerOpen = isDesktopSidebar ? !sidebarCollapsed : sidebarOpen;
+  const drawerOpen = !isDesktopSidebar && sidebarOpen;
   useBodyScrollLock(drawerOpen);
   const closeSidebar = () => {
     setSidebarOpen(false);
-    if (isDesktopSidebar) setSidebarCollapsedPreference(true);
   };
   const showBreadcrumbs = Boolean(breadcrumbs && breadcrumbs.length > 0);
   const accessIsAdministrator = accessRoles.includes("administrator");
@@ -283,9 +285,13 @@ function ShellChrome({
 
   function togglePrimaryMenu() {
     setProfileOpen(false);
+    setNotificationsOpen(false);
     if (window.matchMedia("(min-width: 961px)").matches) {
-      setSidebarCollapsedPreference(!sidebarCollapsed);
-      if (!sidebarCollapsed) window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
+      const nextCollapsed = !sidebarCollapsed;
+      setSidebarCollapsedPreference(nextCollapsed);
+      window.requestAnimationFrame(() => {
+        (nextCollapsed ? menuTriggerRef : sidebarMenuTriggerRef).current?.focus();
+      });
     } else {
       if (sidebarOpen) {
         setSidebarOpen(false);
@@ -330,13 +336,12 @@ function ShellChrome({
     ).filter((element) => !element.closest("[inert]") && element.getClientRects().length > 0);
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    first?.focus();
+    (sidebarMenuTriggerRef.current ?? first)?.focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
         setSidebarOpen(false);
-        if (isDesktopSidebar) setSidebarCollapsedPreference(true);
         window.requestAnimationFrame(() => menuTriggerRef.current?.focus());
         return;
       }
@@ -374,6 +379,7 @@ function ShellChrome({
             aria-expanded={isDesktopSidebar ? !sidebarCollapsed : sidebarOpen}
             aria-label={menuButtonLabel}
             className="sidebar-menu-trigger"
+            ref={sidebarMenuTriggerRef}
             title={menuButtonLabel}
             type="button"
             onClick={togglePrimaryMenu}
@@ -461,6 +467,26 @@ function ShellChrome({
             {showBreadcrumbs && <p>Ruta actual: {breadcrumbs?.join(" / ")}</p>}
           </div>
           <div className="topbar-actions">
+            <div className="topbar-popover-wrap topbar-notification-wrap">
+              <button
+                aria-expanded={notificationsOpen}
+                aria-label="Notificaciones"
+                className={`notification-trigger ${notificationsOpen ? "is-active" : ""}`.trim()}
+                onClick={() => {
+                  setProfileOpen(false);
+                  setNotificationsOpen((open) => !open);
+                }}
+                type="button"
+              >
+                <Bell aria-hidden="true" size={22} />
+              </button>
+              {notificationsOpen && (
+                <div className="topbar-popover notification-popover" role="status">
+                  <strong>Notificaciones</strong>
+                  <p>No tienes notificaciones nuevas.</p>
+                </div>
+              )}
+            </div>
             <div className="topbar-popover-wrap">
               {viewer ? (
                 <>
@@ -469,7 +495,10 @@ function ShellChrome({
                     type="button"
                     aria-label={"Abrir menú de perfil de " + viewer.email}
                     aria-expanded={profileOpen}
-                    onClick={() => setProfileOpen((open) => !open)}
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      setProfileOpen((open) => !open);
+                    }}
                   >
                     <span className="profile-avatar">{getProfileInitials(viewer.email)}</span>
                     <CaretDown size={17} weight="bold" />
