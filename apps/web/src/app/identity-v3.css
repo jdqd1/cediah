@@ -7,6 +7,7 @@
   --koras-accent: #98a5ff;
   --koras-accent-soft: #dce1ff;
   --koras-background: #f6f7fc;
+  --koras-app-chrome: #edf0f7;
   --koras-surface: #ffffff;
   --koras-text: #1a2034;
   --koras-muted: #59627b;
@@ -142,17 +143,17 @@ textarea {
 .app-shell,
 .app-shell.dashboard-shell,
 .app-shell:has(.published-rich-guide-reader) {
-  --app-chrome: var(--koras-background);
+  --app-chrome: var(--koras-app-chrome);
   --app-workspace: var(--koras-surface);
   --app-tonal-surface: #f1f3fb;
   --app-tonal-hover: #e8ebfb;
-  background: var(--koras-background);
+  background: var(--app-chrome);
 }
 
 .app-shell .app-sidebar,
 .app-shell .app-topbar.app-topbar-simplified,
 .app-shell.dashboard-shell .app-topbar.app-topbar-simplified {
-  background: var(--koras-background);
+  background: var(--app-chrome);
 }
 
 .app-shell .sidebar-brand .cediah-logo-dark,
@@ -187,7 +188,7 @@ textarea {
 }
 
 .app-topbar-simplified .global-content-search-form {
-  background: #eceef7;
+  background: #e2e7f1;
   color: var(--koras-primary);
 }
 

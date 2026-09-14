@@ -28,8 +28,8 @@ export const metadata: Metadata = {
   description:
     "Plataforma educativa para aprender con videos, guías y recursos organizados por materia.",
   icons: {
-    icon: "/brand/koras-mark-dark.png",
-    apple: "/brand/koras-mark-dark.png",
+    icon: "/brand/koras-mark-white-bg.png",
+    apple: "/brand/koras-mark-white-bg.png",
   },
 };
 

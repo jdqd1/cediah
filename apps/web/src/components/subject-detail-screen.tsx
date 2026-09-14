@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  BookOpen,
   CardsThree,
-  CheckSquareOffset,
+  ClipboardText,
   Compass,
   MagnifyingGlass,
+  Notebook,
   PlayCircle,
   X,
 } from "@phosphor-icons/react";
@@ -29,13 +29,13 @@ import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
 
 const sectionDefinitions: Array<{
-  icon: typeof BookOpen;
+  icon: typeof PlayCircle;
   kind: StudyContentKind;
 }> = [
   { icon: PlayCircle, kind: "video" },
-  { icon: BookOpen, kind: "guide" },
+  { icon: Notebook, kind: "guide" },
   { icon: CardsThree, kind: "flashcards" },
-  { icon: CheckSquareOffset, kind: "quiz" },
+  { icon: ClipboardText, kind: "quiz" },
 ];
 
 const kindSearchLabels: Record<StudyContentKind, string> = {

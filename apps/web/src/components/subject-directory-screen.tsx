@@ -115,7 +115,7 @@ export function SubjectDirectoryScreen({
       mainClassName="subject-directory-main"
     >
       <section className="subject-directory-page" aria-label={headerTitle}>
-        <h2 className="sr-only">{initialKind ? `${headerTitle} por materia` : headerTitle}</h2>
+        <h2 className="subject-directory-title">{initialKind ? `${headerTitle} por materia` : headerTitle}</h2>
 
         <label className="subject-directory-search">
           <MagnifyingGlass aria-hidden="true" size={19} />
