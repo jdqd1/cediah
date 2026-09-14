@@ -11,6 +11,7 @@ import {
   Play,
 } from "@phosphor-icons/react/dist/ssr";
 import type { LearningHome, LearningHomeTask } from "@cediah/contracts";
+import { LearningDashboardActivityDetails } from "./learning-dashboard-activity-details";
 
 function TaskIcon({ task }: { task: LearningHomeTask }) {
   return task.kind === "review"
@@ -19,14 +20,11 @@ function TaskIcon({ task }: { task: LearningHomeTask }) {
 }
 
 function taskMeta(task: LearningHomeTask) {
-  if (task.kind === "review") {
-    return `${task.itemCount} ${task.itemCount === 1 ? "ítem" : "ítems"} · ${task.estimatedMinutes ?? 5} min`;
-  }
   return task.estimatedMinutes ? `${task.estimatedMinutes} min` : "A tu ritmo";
 }
 
 function taskLabel(task: LearningHomeTask) {
-  if (task.kind === "review") return "Repaso recomendado";
+  if (task.kind === "review") return "Repasar flashcards";
   if (task.kind === "resume") return "Continuar actividad";
   if (task.kind === "reinforcement") return "Refuerzo sugerido";
   if (task.kind === "explore") return "Para explorar";
@@ -97,6 +95,7 @@ export function LearningDashboardSummary({
     : Math.min(activePath.completedSteps, activePath.totalSteps - 1) / (activePath.totalSteps - 1) * 100;
   const stepperStyle = {
     "--dashboard-route-progress": `${stepProgress}%`,
+    "--dashboard-step-edge": `${50 / activePath.totalSteps}%`,
     "--dashboard-step-count": activePath.totalSteps,
   } as CSSProperties;
   const routeProgressRingStyle = {
@@ -117,7 +116,12 @@ export function LearningDashboardSummary({
         <article className="dashboard-learning-route">
           <header className="dashboard-learning-route-heading">
             <div className="dashboard-learning-route-copy">
-              <span><Path aria-hidden="true" size={17} /> En curso</span>
+              <div className="dashboard-learning-route-status">
+                <span><Path aria-hidden="true" size={17} /> En curso</span>
+                <Link className="dashboard-learning-route-link" href={activePathHref(activePath.continueHref)}>
+                  Ver ruta <ArrowRight aria-hidden="true" size={16} />
+                </Link>
+              </div>
               <h3>{activePath.title}</h3>
               <p>{activePath.completedSteps} de {activePath.totalSteps} actividades completadas</p>
             </div>
@@ -177,10 +181,7 @@ export function LearningDashboardSummary({
 
           <section aria-labelledby="dashboard-learning-today-title" className="dashboard-learning-today">
             <header className="dashboard-learning-today-heading">
-              <div>
-                <h4 id="dashboard-learning-today-title">Para hoy</h4>
-                <p>Paso {Math.min(activePath.completedSteps + 1, activePath.totalSteps)} de {activePath.totalSteps}</p>
-              </div>
+              <h4 id="dashboard-learning-today-title">Para hoy</h4>
             </header>
 
             {primaryTask ? (
@@ -192,6 +193,15 @@ export function LearningDashboardSummary({
                     <strong>{primaryTask.title}</strong>
                     <em>{taskMeta(primaryTask)}</em>
                   </span>
+                  <LearningDashboardActivityDetails
+                    details={{
+                      estimatedMinutes: primaryTask.estimatedMinutes,
+                      href: primaryTask.href,
+                      label: taskLabel(primaryTask),
+                      reason: primaryTask.reason,
+                      title: primaryTask.title,
+                    }}
+                  />
                 </article>
 
                 <Link className="dashboard-learning-activity-button" href={primaryTask.href}>
@@ -210,10 +220,6 @@ export function LearningDashboardSummary({
               </div>
             )}
           </section>
-
-          <Link className="dashboard-learning-route-link" href={activePathHref(activePath.continueHref)}>
-            Ver toda la ruta <ArrowRight aria-hidden="true" size={18} />
-          </Link>
         </article>
       </section>
 
@@ -226,8 +232,8 @@ export function LearningDashboardSummary({
           <header className="dashboard-review-heading">
             <span className="dashboard-review-icon"><ClockCounterClockwise aria-hidden="true" size={24} /></span>
             <span className="dashboard-review-copy">
-              <strong>{dueReviews === 0 ? "Repaso al día" : "Repaso recomendado"}</strong>
-              <span>{reviewTask?.title ?? "No tienes conceptos pendientes por ahora."}</span>
+              <strong>{dueReviews === 0 ? "Repaso al día" : "Repasar flashcards"}</strong>
+              {dueReviews === 0 ? <span>No tienes conceptos pendientes por ahora.</span> : null}
             </span>
             <div
               aria-label={dueReviews === 0 ? "No hay repasos pendientes" : `${dueReviews} repasos pendientes`}
@@ -242,16 +248,9 @@ export function LearningDashboardSummary({
           </header>
 
           {reviewTask ? (
-            <>
-              <p className="dashboard-review-session">
-                <strong>{reviewTask.itemCount}</strong> {reviewTask.itemCount === 1 ? "ítem" : "ítems"} en esta sesión
-                <span aria-hidden="true">·</span>
-                <span>{reviewTask.estimatedMinutes ?? 5} min</span>
-              </p>
-              <Link className="dashboard-learning-activity-button dashboard-review-button" href={reviewTask.href}>
-                Repasar ahora <ArrowRight aria-hidden="true" size={19} />
-              </Link>
-            </>
+            <Link className="dashboard-learning-activity-button dashboard-review-button" href={reviewTask.href}>
+              Iniciar <ArrowRight aria-hidden="true" size={19} />
+            </Link>
           ) : (
             <Link className="dashboard-learning-route-link dashboard-review-clear-link" href="/aprendizaje">
               Ver mi aprendizaje <ArrowRight aria-hidden="true" size={18} />

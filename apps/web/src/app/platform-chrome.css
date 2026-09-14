@@ -378,7 +378,9 @@
 
   .app-shell .app-topbar-simplified .topbar-leading {
     position: absolute;
-    left: 14px;
+    /* The topbar's padding participates in the absolute containing block.
+       Offset it so the trigger's optical center matches the collapsed nav. */
+    left: -6px;
   }
 
   .app-shell:not(.sidebar-collapsed) .topbar-leading { display: none; }

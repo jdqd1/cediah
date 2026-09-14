@@ -2,9 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
-  BookOpen,
   CardsThree,
-  CheckSquareOffset,
+  ClipboardText,
+  Notebook,
   PlayCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import type { ContentItem, ContentKind, LearningHome } from "@cediah/contracts";
@@ -31,30 +31,26 @@ function contentCover(item: ContentItem) {
 
 const materialDefinitions = [
   {
-    description: "Clases y explicaciones",
     href: "/asignaturas?tipo=video",
     icon: PlayCircle,
     kind: "video" as const,
     title: "Videos",
   },
   {
-    description: "Documentos y lecturas",
     href: "/guias",
-    icon: BookOpen,
+    icon: Notebook,
     kind: "guide" as const,
     title: "Guías",
   },
   {
-    description: "Repasos rápidos",
     href: "/asignaturas?tipo=flashcards",
     icon: CardsThree,
     kind: "flashcards" as const,
     title: "Flashcards",
   },
   {
-    description: "Evalúa tu conocimiento",
     href: "/asignaturas?tipo=quiz",
-    icon: CheckSquareOffset,
+    icon: ClipboardText,
     kind: "quiz" as const,
     title: "Cuestionarios",
   },
@@ -146,7 +142,7 @@ export function DashboardScreen({
         home={learningHome}
       />
       <nav className="study-material-grid dashboard-shortcuts" aria-label="Accesos directos de estudio">
-        {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => {
+        {materialDefinitions.map(({ title, icon: Icon, kind, href }) => {
           return (
             <Link className="study-material-card" data-kind={kind} href={href} key={kind}>
               <span className="study-material-icon" aria-hidden="true">
@@ -154,7 +150,6 @@ export function DashboardScreen({
               </span>
               <span className="study-material-copy">
                 <strong>{title}</strong>
-                <small>{description}</small>
               </span>
             </Link>
           );

@@ -22,6 +22,7 @@ type ContentApiRequest = {
   method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
   cachePublic?: boolean;
+  timeoutMs?: number;
 };
 
 type ContentApiResponse = {
@@ -71,7 +72,7 @@ export async function requestContentApi(
   input: ContentApiRequest,
 ): Promise<ContentApiResponse> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6_000);
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? 6_000);
 
   try {
     const environment = getServerEnvironment();
@@ -137,6 +138,9 @@ export async function getSubjectContent(slug: string): Promise<SubjectDetailResu
     method: "GET",
     path: "/v1/subjects/" + encodeURIComponent(slug),
     cachePublic: true,
+    // Subject details currently include the complete content documents and can
+    // legitimately take longer than the catalog endpoints on a cold API.
+    timeoutMs: 20_000,
   });
   if (response.status === 404) return { status: "not_found" };
   if (response.status !== 200) return { status: "unavailable" };

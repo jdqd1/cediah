@@ -1073,6 +1073,11 @@ textarea {
     background: var(--koras-background);
   }
 
+  .app-shell.dashboard-shell .app-body,
+  .app-shell.dashboard-shell .app-body > .dashboard-main {
+    background: var(--app-chrome);
+  }
+
   .auth-showcase-art {
     display: none;
   }

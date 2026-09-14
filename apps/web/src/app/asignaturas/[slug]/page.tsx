@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
 import { SubjectDetailScreen } from "@/components/subject-detail-screen";
 import { findVideoLinkedGuide } from "@/lib/content-guide-links";
 import { getPublishedContent, getSubjectContent } from "@/lib/server/content-api";
@@ -40,9 +41,14 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
   if (result.status === "not_found") notFound();
 
   return (
-    <main className="content-unavailable-page">
+    <AppShell
+      activeKey="subjects"
+      headerTitle="Materias"
+      isAdministrator={isAdministrator}
+      mainClassName="content-unavailable-page"
+    >
       <h1>No pudimos cargar esta materia.</h1>
       <p>Intenta actualizar la página en unos minutos.</p>
-    </main>
+    </AppShell>
   );
 }
