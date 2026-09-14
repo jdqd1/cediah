@@ -880,15 +880,15 @@ textarea:focus-visible {
 .study-material-card[data-kind="flashcards"] .study-material-icon,
 .subject-topic-list-flashcards .subject-topic-icon,
 .app-main .subject-destination-flashcards .subject-destination-icon {
-  background: #ede9fe;
-  color: var(--koraz-violet-deep);
+  background: #fff3c4;
+  color: #9a6700;
 }
 
 .study-material-card[data-kind="quiz"] .study-material-icon,
 .subject-topic-list-quiz .subject-topic-icon,
 .app-main .subject-destination-quiz .subject-destination-icon {
-  background: #dcfce7;
-  color: #16a34a;
+  background: #f1e8ff;
+  color: #7c3fb4;
 }
 
 .dashboard-most-viewed {

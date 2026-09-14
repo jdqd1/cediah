@@ -339,13 +339,6 @@
   padding-top: 18px;
 }
 
-.app-shell .app-body > .app-main.route-loading-main {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
 .app-shell .dashboard-main .section-heading-row a,
 .app-shell .dashboard-main :is(.dashboard-video-card, .study-material-card, .dashboard-featured-content) {
   border-color: transparent;
@@ -658,6 +651,35 @@
   :is(.subject-directory-arrow, .subject-destination-meta svg, svg:last-child) {
   color: var(--koraz-blue);
   transform: none;
+}
+
+/* Semantic study-material colors remain visible in the simplified list style. */
+.app-main .subject-destination-video .subject-destination-icon,
+.app-main .subject-topic-list-video .subject-topic-icon {
+  border-radius: 10px;
+  background: #feeceb;
+  color: #d93025;
+}
+
+.app-main .subject-destination-guide .subject-destination-icon,
+.app-main .subject-topic-list-guide .subject-topic-icon {
+  border-radius: 10px;
+  background: #e8efff;
+  color: #3457c5;
+}
+
+.app-main .subject-destination-flashcards .subject-destination-icon,
+.app-main .subject-topic-list-flashcards .subject-topic-icon {
+  border-radius: 10px;
+  background: #fff3c4;
+  color: #9a6700;
+}
+
+.app-main .subject-destination-quiz .subject-destination-icon,
+.app-main .subject-topic-list-quiz .subject-topic-icon {
+  border-radius: 10px;
+  background: #f1e8ff;
+  color: #7c3fb4;
 }
 
 .app-main .subject-destination.is-empty,
