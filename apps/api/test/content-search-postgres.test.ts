@@ -141,7 +141,7 @@ describe("PostgreSQL published-content search", () => {
   });
 
   it("finds an old publication even when more than 100 newer guides exist", async () => {
-    const response = await searchPublishedContent(database, { query: "neurovascularprof" });
+    const response = await searchPublishedContent(database, { query: "neurov" });
 
     expect(response.guides.map((guide) => guide.id)).toContain(targetGuide);
   });
