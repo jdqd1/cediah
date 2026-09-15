@@ -117,6 +117,7 @@ beforeAll(async () => {
     [author],
   );
 
+  await pg.exec("grant select on content_items to cediah_runtime;");
   await pg.exec("set role cediah_runtime;");
 }, 30_000);
 
