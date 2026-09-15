@@ -1,8 +1,8 @@
 import { SubjectDirectoryScreen } from "@/components/subject-directory-screen";
 import { isStudyContentKind } from "@/lib/content-navigation";
-import { getPublishedContent, getSubjects } from "@/lib/server/content-api";
+import { getPublishedStudyCatalog, getSubjects } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
-import { getStudyCatalog } from "@/lib/content-practice-links";
+import { getStudySummaryCatalog } from "@/lib/study-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,9 @@ export default async function SubjectsPage({ searchParams }: SubjectsPageProps) 
   const [result, isAdministrator, contentResult] = await Promise.all([
     getSubjects(),
     currentUserIsAdministrator(),
-    kind ? getPublishedContent({ kind: kind === "video" ? kind : undefined, limit: 100 }) : Promise.resolve(null),
+    kind
+      ? getPublishedStudyCatalog({ kind: kind === "video" ? kind : undefined, limit: 1_000 })
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -25,7 +27,9 @@ export default async function SubjectsPage({ searchParams }: SubjectsPageProps) 
       available={result.status === "ready"}
       initialKind={kind}
       isAdministrator={isAdministrator}
-      items={contentResult?.status === "ready" && kind ? getStudyCatalog(contentResult.catalog.items, kind) : []}
+      items={contentResult?.status === "ready" && kind
+        ? getStudySummaryCatalog(contentResult.catalog.items, kind)
+        : []}
       subjects={result.status === "ready" ? result.subjects : []}
     />
   );
