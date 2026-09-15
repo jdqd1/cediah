@@ -44,6 +44,11 @@ import {
   useSyncExternalStore,
 } from "react";
 import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
+import {
+  extractGuideKeyPoints,
+  isGuideKeyPointLinked,
+  mergeGuideKeyPoints,
+} from "@/lib/guide-key-points";
 import { normalizeMarkdownHighlights } from "@/lib/guide-markdown";
 import { getVideoGuideContent } from "@/lib/content-guide-links";
 import { questionAnswer } from "@/lib/question-answer";
@@ -255,6 +260,10 @@ export function PublishedGuideReader({
   );
   const outline = useMemo(() => extractGuideOutline(guideDocument), [guideDocument]);
   const numberedOutline = useMemo(() => numberGuideOutline(outline), [outline]);
+  const studyKeyPoints = useMemo(
+    () => mergeGuideKeyPoints(content.keyPoints, extractGuideKeyPoints(guideDocument)),
+    [content.keyPoints, guideDocument],
+  );
   const [activeHeadingId, setActiveHeadingId] = useState("");
   const [fontScale, setFontScale] = useState(100);
   const [highlightImportant, setHighlightImportant] = useState(false);
@@ -748,28 +757,33 @@ export function PublishedGuideReader({
           >
             <div className="published-rich-guide-support-grid">
               <ReaderSupportPanel
-                count={content.keyPoints.length}
+                count={studyKeyPoints.length}
                 icon={<Lightbulb aria-hidden="true" size={20} />}
                 id="published-guide-key-points"
                 title="Puntos clave"
                 tone="key-points"
               >
-                {content.keyPoints.length > 0 ? (
+                {studyKeyPoints.length > 0 ? (
                   <ul className="published-rich-guide-key-points">
-                    {content.keyPoints.map((point, index) => (
-                      <li key={`${point}-${index}`}>
-                        <Lightbulb aria-hidden="true" size={17} />
-                        <span>{point}</span>
-                        <button
-                          aria-label={`Ir al fragmento relacionado con el punto clave ${index + 1}`}
-                          title="Ver en el texto de la guía"
-                          type="button"
-                          onClick={() => goToKeyPoint(point)}
-                        >
-                          <ArrowRight aria-hidden="true" size={14} />
-                        </button>
-                      </li>
-                    ))}
+                    {studyKeyPoints.map((point, index) => {
+                      const linked = isGuideKeyPointLinked(guideDocument, point);
+                      return (
+                        <li key={`${point}-${index}`}>
+                          <Lightbulb aria-hidden="true" size={17} />
+                          <span>{point}</span>
+                          {linked ? (
+                            <button
+                              aria-label={`Ir al fragmento relacionado con el punto clave ${index + 1}`}
+                              title="Ver en el texto de la guía"
+                              type="button"
+                              onClick={() => goToKeyPoint(point)}
+                            >
+                              <ArrowRight aria-hidden="true" size={14} />
+                            </button>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="published-rich-guide-resource-empty">Esta guía no incluye puntos clave.</p>
