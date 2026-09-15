@@ -9,16 +9,15 @@ import {
   MagnifyingGlass,
   X,
 } from "@phosphor-icons/react";
-import type { ContentItem, Subject } from "@cediah/contracts";
+import type { StudyCatalogItem, Subject } from "@cediah/contracts";
 import { type MouseEvent, useMemo, useState } from "react";
 import { publishedContentHref } from "@/lib/content-navigation";
-import { contentItemSearchText } from "@/lib/content-search";
-import { uniqueRegions } from "@/lib/content-regions";
+import { studyItemSearchText, studyItemTopics } from "@/lib/study-catalog";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
 
-type GuideItem = ContentItem & { kind: "guide" };
+type GuideItem = StudyCatalogItem;
 
 const UNASSIGNED = "sin-asignatura";
 
@@ -30,7 +29,7 @@ function normalize(value: string) {
 }
 
 function guideTopics(guide: GuideItem) {
-  return uniqueRegions(guide.content.regions.length > 0 ? guide.content.regions : [guide.topic]);
+  return studyItemTopics(guide);
 }
 
 function queryHref(pathname: string, subjectSlug = "", topic = "") {
@@ -121,6 +120,10 @@ export function GuideDashboardScreen({
     }
     return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "es"));
   }, [selectedGuides]);
+  const ungroupedGuides = useMemo(
+    () => selectedGuides.filter((guide) => guideTopics(guide).length === 0),
+    [selectedGuides],
+  );
   const topicGuides = useMemo(() => {
     if (!selectedTopic) return selectedGuides;
     return selectedGuides.filter((guide) => (
@@ -130,7 +133,7 @@ export function GuideDashboardScreen({
   const visibleGuides = useMemo(() => {
     const search = normalize(query.trim());
     return topicGuides.filter((guide) => {
-      return !search || normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")} ${contentItemSearchText(guide)}`).includes(search);
+      return !search || normalize(studyItemSearchText(guide)).includes(search);
     });
   }, [query, topicGuides]);
   const globalSearchResults = useMemo(() => {
@@ -141,7 +144,7 @@ export function GuideDashboardScreen({
       const subjectNames = guide.subjectIds
         .map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name ?? "")
         .join(" ");
-      return normalize(`${guide.title} ${guide.summary} ${guide.topic} ${guideTopics(guide).join(" ")} ${subjectNames} ${contentItemSearchText(guide)}`).includes(search);
+      return normalize(`${studyItemSearchText(guide)} ${subjectNames}`).includes(search);
     });
   }, [guides, hasSelection, query, subjects]);
   function push(nextSubject = "", nextTopic = "") {
@@ -240,25 +243,44 @@ export function GuideDashboardScreen({
         )}
 
         {hasSelection && !selectedTopic && !hasSelectionQuery && topicGroups.length > 0 && (
-          <nav className="guide-topic-browser" aria-label="Temas con guías">
-            <ul className="subject-topic-list subject-topic-list-guide">
-              {topicGroups.map((group) => {
-                const href = queryHref(pathname, selectedSlug, group.name);
-                return (
-                  <li key={normalize(group.name)}>
-                    <Link href={href} onClick={(event) => navigate(event, selectedSlug, group.name)}>
-                      <span className="subject-topic-icon" aria-hidden="true"><BookOpen size={20} /></span>
-                      <span>
-                        <strong>{group.name}</strong>
-                        <small>{group.guides.length === 1 ? "1 guía" : `${group.guides.length} guías`}</small>
-                      </span>
-                      <ArrowRight aria-hidden="true" size={18} />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
+          <>
+            <nav className="guide-topic-browser" aria-label="Temas con guías">
+              <ul className="subject-topic-list subject-topic-list-guide">
+                {topicGroups.map((group) => {
+                  const href = queryHref(pathname, selectedSlug, group.name);
+                  return (
+                    <li key={normalize(group.name)}>
+                      <Link href={href} onClick={(event) => navigate(event, selectedSlug, group.name)}>
+                        <span className="subject-topic-icon" aria-hidden="true"><BookOpen size={20} /></span>
+                        <span>
+                          <strong>{group.name}</strong>
+                          <small>{group.guides.length === 1 ? "1 guía" : `${group.guides.length} guías`}</small>
+                        </span>
+                        <ArrowRight aria-hidden="true" size={18} />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+            {ungroupedGuides.length > 0 && (
+              <GuideList
+                guides={ungroupedGuides}
+                subjectSlug={selectedSlug}
+                subjects={subjects}
+                topic=""
+              />
+            )}
+          </>
+        )}
+
+        {hasSelection && !selectedTopic && !hasSelectionQuery && topicGroups.length === 0 && selectedGuides.length > 0 && (
+          <GuideList
+            guides={selectedGuides}
+            subjectSlug={selectedSlug}
+            subjects={subjects}
+            topic=""
+          />
         )}
 
         {hasSelection && (selectedTopic || hasSelectionQuery) && visibleGuides.length > 0 && (
@@ -278,7 +300,7 @@ export function GuideDashboardScreen({
 
         {((!hasSelection && (hasGlobalQuery ? globalSearchResults.length === 0 : buckets.length === 0)) ||
           (hasSelection && (selectedTopic || hasSelectionQuery) && visibleGuides.length === 0) ||
-          (hasSelection && !selectedTopic && !hasSelectionQuery && topicGroups.length === 0)) && (
+          (hasSelection && !selectedTopic && !hasSelectionQuery && selectedGuides.length === 0)) && (
           <div className="guide-catalog-empty" role="status">
             <BookOpen size={34} aria-hidden="true" />
             <h3>
@@ -287,7 +309,7 @@ export function GuideDashboardScreen({
                 : available
                   ? selectedTopic
                     ? "Aún no hay guías en este tema."
-                    : "Aún no hay temas con guías en esta selección."
+                    : "Aún no hay guías en esta selección."
                   : "No pudimos cargar las guías."}
             </h3>
             {query && (
