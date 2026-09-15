@@ -107,6 +107,7 @@ export async function getPublishedContent(input: {
   limit?: number;
   subjectId?: string;
   sort?: "recent" | "views";
+  timeoutMs?: number;
 } = {}): Promise<PublishedContentResult> {
   const query = new URLSearchParams();
   if (input.kind) query.set("kind", input.kind);
@@ -118,6 +119,7 @@ export async function getPublishedContent(input: {
     method: "GET",
     path: "/v1/content?" + query.toString(),
     cachePublic: true,
+    timeoutMs: input.timeoutMs,
   });
   if (response.status !== 200) return { status: "unavailable" };
 
