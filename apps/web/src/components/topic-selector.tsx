@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Plus, Tag } from "@phosphor-icons/react";
+import { Check, Plus, Tag, Trash } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { ContentTopicSchema, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
+import { StudioConfirmDialog } from "./studio-confirm-dialog";
 import { StudioNameDialog } from "./studio-name-dialog";
 
 const contentUnavailableMessage =
@@ -11,10 +12,11 @@ const contentUnavailableMessage =
 
 const topicErrors: Partial<Record<string, string>> = {
   content_unavailable: contentUnavailableMessage,
-  forbidden: "Tu cuenta no tiene permiso para crear temas.",
+  forbidden: "Tu cuenta no tiene permiso para administrar temas.",
   invalid_topic: "El nombre del tema no es válido.",
-  not_found: "No se pudo asociar el tema con las materias seleccionadas.",
+  not_found: "El tema ya no existe o no está disponible.",
   topic_conflict: "No se pudo crear el tema con las materias seleccionadas.",
+  topic_in_use: "No puedes eliminar este tema porque todavía está asociado a contenido. Quita el tema de ese contenido, guarda los cambios y vuelve a intentarlo.",
 };
 
 export function TopicSelector({
@@ -39,6 +41,9 @@ export function TopicSelector({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdTopics, setCreatedTopics] = useState<ContentTopic[]>([]);
+  const [deletedTopics, setDeletedTopics] = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const options = useMemo(
     () => uniqueRegions([
       ...suggestions,
@@ -48,14 +53,19 @@ export function TopicSelector({
         )
         .map((topic) => topic.name),
       ...values,
-    ]),
-    [createdTopics, subjectIds, suggestions, values],
+    ]).filter(
+      (topic) => !deletedTopics.some(
+        (deleted) => normalizeRegion(deleted) === normalizeRegion(topic),
+      ),
+    ),
+    [createdTopics, deletedTopics, subjectIds, suggestions, values],
   );
   const cleanInput = cleanRegion(input);
   const existingTopic = options.find(
     (topic) => normalizeRegion(topic) === normalizeRegion(cleanInput),
   );
   const interactive = !disabled && !busy && subjectSelected;
+  const selectedTopicForDeletion = values.length === 1 ? values[0] : null;
 
   function closeDialog() {
     if (busy) return;
@@ -129,6 +139,47 @@ export function TopicSelector({
     }
   }
 
+  async function deleteTopic() {
+    if (!allowCreate || !deleteTarget || busy) return;
+    setBusy(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch("/api/editor/topics", {
+        body: JSON.stringify({ name: deleteTarget }),
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      });
+      const body: unknown = await response
+        .json()
+        .catch(() => ({ error: "content_unavailable" }));
+      if (!response.ok) {
+        const code = body && typeof body === "object" && "error" in body && typeof body.error === "string"
+          ? body.error
+          : "content_unavailable";
+        throw new Error(topicErrors[code] ?? `No se pudo eliminar el tema (${response.status}).`);
+      }
+      const parsed = ContentTopicSchema.safeParse(
+        body && typeof body === "object" && "topic" in body ? body.topic : null,
+      );
+      if (!parsed.success) throw new Error(contentUnavailableMessage);
+
+      setCreatedTopics((current) => current.filter(
+        (topic) => normalizeRegion(topic.name) !== normalizeRegion(deleteTarget),
+      ));
+      setDeletedTopics((current) => uniqueRegions([...current, deleteTarget]));
+      onChange(values.filter(
+        (value) => normalizeRegion(value) !== normalizeRegion(deleteTarget),
+      ));
+      setDeleteTarget(null);
+      setDeleteError(null);
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : contentUnavailableMessage);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function toggleTopic(topic: string) {
     const selected = values.some(
       (value) => normalizeRegion(value) === normalizeRegion(topic),
@@ -178,18 +229,33 @@ export function TopicSelector({
           )}
         </div>
         {allowCreate && (
-          <button
-            className="studio-entity-create-button studio-entity-create-button-primary"
-            disabled={!interactive}
-            type="button"
-            onClick={() => {
-              setError(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus aria-hidden="true" size={16} />
-            Añadir tema
-          </button>
+          <>
+            <button
+              className="studio-entity-create-button studio-entity-create-button-primary"
+              disabled={!interactive}
+              type="button"
+              onClick={() => {
+                setError(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus aria-hidden="true" size={16} />
+              Añadir tema
+            </button>
+            <button
+              className="studio-entity-create-button"
+              disabled={!interactive || !selectedTopicForDeletion}
+              type="button"
+              onClick={() => {
+                if (!selectedTopicForDeletion) return;
+                setDeleteError(null);
+                setDeleteTarget(selectedTopicForDeletion);
+              }}
+            >
+              <Trash aria-hidden="true" size={16} />
+              Eliminar tema
+            </button>
+          </>
         )}
       </div>
 
@@ -215,6 +281,25 @@ export function TopicSelector({
           {error && <p role="alert">{error}</p>}
         </StudioNameDialog>
       )}
+
+      <StudioConfirmDialog
+        busy={busy}
+        busyLabel="Eliminando…"
+        confirmLabel="Eliminar tema"
+        description={deleteTarget
+          ? `Se eliminará “${deleteTarget}” de la lista de temas. Si todavía está asociado a cualquier contenido, la eliminación se bloqueará hasta que retires ese tema del contenido.`
+          : "Selecciona el tema que deseas eliminar."}
+        error={deleteError}
+        icon={<Trash size={21} />}
+        open={deleteTarget !== null}
+        title="Eliminar tema"
+        onClose={() => {
+          if (busy) return;
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+        onConfirm={deleteTopic}
+      />
     </div>
   );
 }

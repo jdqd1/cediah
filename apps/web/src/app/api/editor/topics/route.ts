@@ -14,7 +14,7 @@ const ContentTopicResponseSchema = z.object({
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+async function forwardTopicMutation(request: Request, method: "DELETE" | "POST") {
   const parsed = await readContentJson(request);
   if (parsed.status === "invalid") {
     return noStoreContentJson({ error: "invalid_topic" }, 400);
@@ -22,8 +22,16 @@ export async function POST(request: Request) {
 
   return forwardEditorContentRequest({
     body: parsed.body,
-    method: "POST",
+    method,
     path: "/v1/editor/topics",
     responseSchema: ContentTopicResponseSchema,
   });
+}
+
+export async function POST(request: Request) {
+  return forwardTopicMutation(request, "POST");
+}
+
+export async function DELETE(request: Request) {
+  return forwardTopicMutation(request, "DELETE");
 }
