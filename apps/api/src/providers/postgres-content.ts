@@ -464,49 +464,10 @@ async function ensurePersistedTopic(
 }
 
 async function listTopics(database: QueryDatabase): Promise<ContentTopic[]> {
-  const topics = new Map<string, { name: string; subjectIds: Set<string> }>();
-  for (const topic of await listPersistedTopics(database)) {
-    topics.set(normalizeTopic(topic.name), {
-      name: topic.name,
-      subjectIds: new Set(topic.subjectIds),
-    });
-  }
-
-  const rows = await database
-    .selectFrom("content_items")
-    .select(["content", "id", "topic"])
-    .execute();
-
-  if (rows.length > 0) {
-    const links = await database
-      .selectFrom("content_subjects")
-      .select(["content_item_id", "subject_id"])
-      .where("content_item_id", "in", rows.map((row) => row.id))
-      .execute();
-    const subjectsByContent = new Map<string, Set<string>>();
-    for (const link of links) {
-      const subjectIds = subjectsByContent.get(link.content_item_id) ?? new Set<string>();
-      subjectIds.add(link.subject_id);
-      subjectsByContent.set(link.content_item_id, subjectIds);
-    }
-
-    for (const row of rows) {
-      for (const name of contentTopics(row.content, row.topic)) {
-        const key = normalizeTopic(name);
-        const current = topics.get(key) ?? { name, subjectIds: new Set<string>() };
-        for (const subjectId of subjectsByContent.get(row.id) ?? []) {
-          current.subjectIds.add(subjectId);
-        }
-        topics.set(key, current);
-      }
-    }
-  }
-
-  return [...topics.values()]
-    .map((topic) => ({
-      name: topic.name,
-      subjectIds: [...topic.subjectIds].sort(),
-    }))
+  // Migration 0017 backfilled legacy topics, and all taxonomy-managing writes
+  // persist topic/subject links. Avoid re-reading every rich content JSONB document
+  // on every editor load; that scan grows with the full editorial corpus.
+  return (await listPersistedTopics(database))
     .sort((left, right) => left.name.localeCompare(right.name, "es"));
 }
 
@@ -1033,6 +994,11 @@ export function createPostgresContentProvider(
         }
         if (!(await replaceSubjectLinks(transaction, input.contentId, input.subjectIds))) {
           return { status: "conflict" };
+        }
+        if (getContentCapabilities(input.roles).canManageTaxonomy) {
+          for (const topic of contentTopics(current.content as JsonValue, current.topic)) {
+            await ensurePersistedTopic(transaction, topic, input.subjectIds);
+          }
         }
         await writeAudit(transaction, {
           action: "content_subjects_updated",
