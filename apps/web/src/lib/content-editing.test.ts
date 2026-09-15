@@ -64,7 +64,29 @@ describe("published content edits", () => {
     )).toBe(true);
   });
 
-  it("continues rejecting editorial content changes after publication", () => {
+  it("allows editing the full content of a published guide", () => {
+    expect(isPublishedPermittedDraftUpdate(
+      {
+        ...guideDraft,
+        summary: "Resumen actualizado",
+        estimatedMinutes: 8,
+        content: {
+          ...guideDraft.content,
+          keyPoints: ["Nuevo punto clave"],
+        },
+      },
+      guideDraft,
+    )).toBe(true);
+  });
+
+  it("keeps the published guide slug stable while editing", () => {
+    expect(isPublishedPermittedDraftUpdate(
+      { ...guideDraft, slug: "otro-slug" },
+      guideDraft,
+    )).toBe(false);
+  });
+
+  it("continues rejecting editorial content changes for other published content", () => {
     expect(isPublishedPermittedDraftUpdate(
       { ...videoDraft, summary: "Resumen modificado", title: "Título actualizado" },
       videoDraft,
