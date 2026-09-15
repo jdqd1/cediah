@@ -4,6 +4,10 @@ export function isPublishedPermittedDraftUpdate(
   current: ContentDraft,
   baseline: ContentDraft,
 ) {
+  if (current.kind === "guide" && baseline.kind === "guide") {
+    return current.slug === baseline.slug;
+  }
+
   const currentLinkedVideoId = current.kind === "guide" ? current.content.linkedVideoId : null;
   const baselineLinkedVideoId = baseline.kind === "guide" ? baseline.content.linkedVideoId : null;
   const permittedFieldChanged =
