@@ -41,13 +41,18 @@
 }
 
 .guide-citation-popover {
-  position: absolute;
-  z-index: 120;
-  bottom: calc(100% + 0.7rem);
-  left: 50%;
-  display: block;
+  --guide-citation-enter-y: 0.3rem;
+
+  position: fixed;
+  z-index: 260;
+  top: 0;
+  left: 0;
+  display: flex;
   width: min(27rem, calc(100vw - 2rem));
-  overflow: visible;
+  max-width: calc(100vw - 2rem);
+  max-height: min(26.25rem, calc(100dvh - 2rem));
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid #e2e5ee;
   border-radius: 0.95rem;
   background: rgb(255 255 255 / 98%);
@@ -56,15 +61,20 @@
   font-size: 0.9rem;
   line-height: 1.5;
   text-align: left;
-  transform: translateX(-50%);
+  transform-origin: var(--guide-citation-arrow-left, 50%) bottom;
   backdrop-filter: blur(14px);
   animation: guide-citation-popover-in 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.guide-citation-popover[data-placement="bottom"] {
+  --guide-citation-enter-y: -0.3rem;
+  transform-origin: var(--guide-citation-arrow-left, 50%) top;
 }
 
 .guide-citation-popover::after {
   position: absolute;
   bottom: -0.38rem;
-  left: 50%;
+  left: var(--guide-citation-arrow-left, 50%);
   width: 0.72rem;
   height: 0.72rem;
   border-right: 1px solid #e2e5ee;
@@ -74,13 +84,28 @@
   transform: translateX(-50%) rotate(45deg);
 }
 
+.guide-citation-popover[data-placement="bottom"]::after {
+  top: -0.38rem;
+  bottom: auto;
+  border: 0;
+  border-top: 1px solid #e2e5ee;
+  border-left: 1px solid #e2e5ee;
+}
+
 @keyframes guide-citation-popover-in {
-  from { opacity: 0; transform: translate(-50%, 0.3rem) scale(0.985); }
-  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(var(--guide-citation-enter-y)) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .guide-citation-popover-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
@@ -135,7 +160,10 @@
 
 .guide-citation-reference-list {
   display: block;
+  min-height: 0;
   max-height: 19.5rem;
+  flex: 1 1 auto;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.18rem 0.72rem 0.34rem;
@@ -183,6 +211,7 @@
 .guide-citation-source-link {
   display: inline-flex;
   width: max-content;
+  max-width: 100%;
   align-items: center;
   gap: 0.25rem;
   border-radius: 0.35rem;
@@ -208,16 +237,20 @@
   }
 
   .guide-citation-popover {
-    position: fixed;
-    z-index: 260;
     top: auto;
-    right: 0.75rem;
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
-    left: 0.75rem;
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+    bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    left: max(0.75rem, env(safe-area-inset-left, 0px));
     width: auto;
-    max-height: min(72svh, 31rem);
+    max-width: none;
+    max-height: min(
+      72svh,
+      31rem,
+      calc(100dvh - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
+    );
     border-radius: 1.1rem;
     transform: none;
+    transform-origin: center bottom;
     animation-name: guide-citation-mobile-in;
   }
 
@@ -226,8 +259,14 @@
   }
 
   @keyframes guide-citation-mobile-in {
-    from { opacity: 0; transform: translateY(0.65rem) scale(0.99); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translateY(0.65rem) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .guide-citation-popover-header {
@@ -235,7 +274,7 @@
   }
 
   .guide-citation-reference-list {
-    max-height: min(54svh, 21rem);
+    max-height: none;
     padding-inline: 0.82rem;
   }
 
