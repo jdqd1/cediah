@@ -171,6 +171,9 @@ export async function getContentWorkspace(): Promise<ContentWorkspaceResult> {
     cookie: session.cookie,
     method: "GET",
     path: "/v1/editor/content",
+    // The editorial workspace can legitimately include many rich guide documents.
+    // Give cold API/database starts enough time while the backend keeps this path no-store.
+    timeoutMs: 20_000,
   });
   if (response.status === 403) return { status: "forbidden" };
   if (response.status !== 200) return { status: "unavailable" };
