@@ -136,12 +136,19 @@ export function GlobalContentSearch() {
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       try {
-        const result = await fetch(`/api/search?query=${encodeURIComponent(normalizedQuery)}`, {
-          signal: controller.signal,
-        });
-        const payload: unknown = await result.json();
-        if (!result.ok || !isContentSearchResponse(payload)) throw new Error("Search request failed");
-        setResponse(payload);
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const result = await fetch(`/api/search?query=${encodeURIComponent(normalizedQuery)}`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          const payload: unknown = await result.json().catch(() => null);
+          if (result.ok && isContentSearchResponse(payload)) {
+            setResponse(payload);
+            return;
+          }
+          if (result.status !== 503 || attempt > 0) throw new Error("Search request failed");
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 250));
+        }
       } catch (requestError) {
         if (requestError instanceof DOMException && requestError.name === "AbortError") return;
         setError(true);
@@ -149,7 +156,7 @@ export function GlobalContentSearch() {
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 220);
+    }, 280);
 
     return () => {
       window.clearTimeout(timeout);
