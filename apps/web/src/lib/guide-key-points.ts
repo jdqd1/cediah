@@ -75,6 +75,28 @@ export function extractGuideKeyPoints(source: unknown): string[] {
   return points;
 }
 
+export function appendDiscoveredGuideKeyPoints(
+  existing: readonly string[],
+  discovered: readonly string[],
+  limit = 30,
+): string[] {
+  const merged = existing.slice(0, limit);
+  const seen = new Set(
+    merged.map(normalizeGuideKeyPoint).filter(Boolean),
+  );
+
+  for (const raw of discovered) {
+    if (merged.length >= limit) break;
+    const value = raw.replace(/\s+/g, " ").trim();
+    const normalized = normalizeGuideKeyPoint(value);
+    if (!value || !normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    merged.push(value);
+  }
+
+  return merged;
+}
+
 export function mergeGuideKeyPoints(
   existing: readonly string[],
   discovered: readonly string[],
