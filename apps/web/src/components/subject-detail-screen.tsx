@@ -12,7 +12,7 @@ import {
   PlayCircle,
   X,
 } from "@phosphor-icons/react";
-import type { ContentItem, Subject } from "@cediah/contracts";
+import type { StudyCatalogItem, Subject } from "@cediah/contracts";
 import { type MouseEvent, useMemo, useState } from "react";
 import {
   isStudyContentKind,
@@ -21,9 +21,11 @@ import {
   studyContentKindLabels,
   type StudyContentKind,
 } from "@/lib/content-navigation";
-import { contentItemSearchText } from "@/lib/content-search";
-import { uniqueRegions } from "@/lib/content-regions";
-import { getSubjectStudyCatalog } from "@/lib/content-practice-links";
+import {
+  getSubjectStudySummaryCatalog,
+  studyItemSearchText,
+  studyItemTopics,
+} from "@/lib/study-catalog";
 import { AppShell } from "./app-shell";
 import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
@@ -52,17 +54,13 @@ function normalize(value: string) {
     .toLocaleLowerCase("es");
 }
 
-function itemTopics(item: ContentItem) {
-  return uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic]);
-}
-
 function ResourceList({
   items,
   searchQuery = "",
   subject,
   topic,
 }: {
-  items: ContentItem[];
+  items: StudyCatalogItem[];
   searchQuery?: string;
   subject: Subject;
   topic?: string;
@@ -74,7 +72,7 @@ function ResourceList({
       hrefForItem={(item) => publishedContentHref(item, {
         origin: "asignatura",
         subjectSlug: subject.slug,
-        topic: topic || itemTopics(item)[0],
+        topic: topic || studyItemTopics(item)[0],
       })}
       items={items}
       searchQuery={searchQuery}
@@ -88,7 +86,7 @@ export function SubjectDetailScreen({
   subject,
 }: {
   isAdministrator?: boolean;
-  items: ContentItem[];
+  items: StudyCatalogItem[];
   subject: Subject;
 }) {
   const pathname = usePathname();
@@ -99,8 +97,8 @@ export function SubjectDetailScreen({
   const topic = searchParams.get("tema")?.trim() ?? "";
   const searching = Boolean(search.trim());
   const catalogs = useMemo(() => Object.fromEntries(
-    sectionDefinitions.map(({ kind }) => [kind, getSubjectStudyCatalog(items, kind, subject.id)]),
-  ) as Record<StudyContentKind, ContentItem[]>, [items, subject.id]);
+    sectionDefinitions.map(({ kind }) => [kind, getSubjectStudySummaryCatalog(items, kind, subject.id)]),
+  ) as Record<StudyContentKind, StudyCatalogItem[]>, [items, subject.id]);
   const kindItems = useMemo(
     () => kind ? catalogs[kind] : [],
     [catalogs, kind],
@@ -108,17 +106,16 @@ export function SubjectDetailScreen({
   const filteredItems = useMemo(() => {
     const query = normalize(search.trim());
     return kindItems.filter((item) => {
-      const matchesTopic = searching || !topic || itemTopics(item).some((value) => normalize(value) === normalize(topic));
-      const matchesSearch = !query || normalize(
-        `${item.title} ${item.summary} ${item.topic} ${itemTopics(item).join(" ")} ${contentItemSearchText(item)}`,
-      ).includes(query);
+      const itemTopics = studyItemTopics(item);
+      const matchesTopic = searching || !topic || itemTopics.some((value) => normalize(value) === normalize(topic));
+      const matchesSearch = !query || normalize(studyItemSearchText(item)).includes(query);
       return matchesTopic && matchesSearch;
     });
   }, [kindItems, search, searching, topic]);
   const topicGroups = useMemo(() => {
-    const groups = new Map<string, { name: string; items: ContentItem[] }>();
+    const groups = new Map<string, { name: string; items: StudyCatalogItem[] }>();
     for (const item of filteredItems) {
-      for (const name of itemTopics(item)) {
+      for (const name of studyItemTopics(item)) {
         const key = normalize(name);
         const current = groups.get(key);
         if (current) current.items.push(item);
@@ -127,6 +124,10 @@ export function SubjectDetailScreen({
     }
     return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "es"));
   }, [filteredItems]);
+  const ungroupedItems = useMemo(
+    () => filteredItems.filter((item) => studyItemTopics(item).length === 0),
+    [filteredItems],
+  );
 
   function navigate(event: MouseEvent<HTMLAnchorElement>, href: string) {
     if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -247,26 +248,33 @@ export function SubjectDetailScreen({
                 </div>
               ) : topic ? (
                 <ResourceList items={filteredItems} subject={subject} topic={topic} />
+              ) : topicGroups.length === 0 ? (
+                <ResourceList items={filteredItems} subject={subject} />
               ) : (
-                <nav className="subject-topic-browser" aria-label={`Temario de ${label} en ${subject.name}`}>
-                  <ul className={`subject-topic-list subject-topic-list-${kind}`}>
-                    {topicGroups.map((group) => {
-                      const href = subjectContentHref(subject.slug, kind, group.name);
-                      return (
-                        <li key={group.name}>
-                          <Link href={href} onClick={(event) => navigate(event, href)}>
-                            <span className="subject-topic-icon" aria-hidden="true"><KindIcon size={20} /></span>
-                            <span>
-                              <strong>{group.name}</strong>
-                              <small>{group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}</small>
-                            </span>
-                            <ArrowRight aria-hidden="true" size={18} />
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </nav>
+                <>
+                  <nav className="subject-topic-browser" aria-label={`Temario de ${label} en ${subject.name}`}>
+                    <ul className={`subject-topic-list subject-topic-list-${kind}`}>
+                      {topicGroups.map((group) => {
+                        const href = subjectContentHref(subject.slug, kind, group.name);
+                        return (
+                          <li key={group.name}>
+                            <Link href={href} onClick={(event) => navigate(event, href)}>
+                              <span className="subject-topic-icon" aria-hidden="true"><KindIcon size={20} /></span>
+                              <span>
+                                <strong>{group.name}</strong>
+                                <small>{group.items.length === 1 ? "1 recurso" : `${group.items.length} recursos`}</small>
+                              </span>
+                              <ArrowRight aria-hidden="true" size={18} />
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </nav>
+                  {ungroupedItems.length > 0 && (
+                    <ResourceList items={ungroupedItems} subject={subject} />
+                  )}
+                </>
               )
             ) : (
               <div className="subject-detail-empty" role="status">
