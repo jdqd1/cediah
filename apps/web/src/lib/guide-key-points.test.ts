@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendDiscoveredGuideKeyPoints,
   extractGuideKeyPoints,
   isGuideKeyPointLinked,
   mergeGuideKeyPoints,
@@ -39,7 +40,18 @@ describe("guide key points", () => {
     ]);
   });
 
-  it("merges imported callouts with manual points without duplicates", () => {
+  it("appends imported callouts without deleting blank or manual publisher entries", () => {
+    expect(appendDiscoveredGuideKeyPoints(
+      ["Dato manual", ""],
+      extractGuideKeyPoints(document),
+    )).toEqual([
+      "Dato manual",
+      "",
+      "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro.",
+    ]);
+  });
+
+  it("merges imported callouts with manual points without duplicates for the reader", () => {
     expect(mergeGuideKeyPoints(
       ["Dato manual", "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro."],
       extractGuideKeyPoints(document),
