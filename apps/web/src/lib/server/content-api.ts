@@ -3,15 +3,21 @@ import {
   ContentCatalogResponseSchema,
   ContentItemSchema,
   ContentWorkspaceResponseSchema,
+  StudyCatalogResponseSchema,
   SubjectCatalogResponseSchema,
   SubjectDetailResponseSchema,
+  SubjectStudyCatalogResponseSchema,
   type Subject,
   type SubjectDetailResponse,
   type ContentCatalogResponse,
   type ContentItem,
   type ContentKind,
   type ContentWorkspaceResponse,
+  type StudyCatalogKind,
+  type StudyCatalogResponse,
+  type SubjectStudyCatalogResponse,
 } from "@cediah/contracts";
+import { summarizeContentItem } from "../study-catalog";
 import { getServerEnvironment } from "./env";
 import { getApiRequestCookie } from "./api-session";
 
@@ -34,6 +40,10 @@ export type PublishedContentResult =
   | { catalog: ContentCatalogResponse; status: "ready" }
   | { status: "unavailable" };
 
+export type PublishedStudyCatalogResult =
+  | { catalog: StudyCatalogResponse; status: "ready" }
+  | { status: "unavailable" };
+
 export type PublishedContentItemResult =
   | { item: ContentItem; status: "ready" }
   | { status: "not_found" | "unavailable" };
@@ -50,6 +60,10 @@ export type SubjectsResult =
 export type SubjectDetailResult =
   | { status: "not_found" | "unavailable" }
   | { status: "ready"; detail: SubjectDetailResponse };
+
+export type SubjectStudyCatalogResult =
+  | { status: "not_found" | "unavailable" }
+  | { status: "ready"; detail: SubjectStudyCatalogResponse };
 
 export function getContentApiError(value: unknown) {
   if (
@@ -129,6 +143,41 @@ export async function getPublishedContent(input: {
     ? { catalog: catalog.data, status: "ready" }
     : { status: "unavailable" };
 }
+
+export async function getPublishedStudyCatalog(input: {
+  kind?: StudyCatalogKind;
+  limit?: number;
+  sort?: "recent" | "views";
+  timeoutMs?: number;
+} = {}): Promise<PublishedStudyCatalogResult> {
+  const query = new URLSearchParams();
+  if (input.kind) query.set("kind", input.kind);
+  if (input.sort) query.set("sort", input.sort);
+  query.set("limit", String(input.limit ?? 500));
+  const response = await requestContentApi({
+    method: "GET",
+    path: "/v1/study/catalog?" + query.toString(),
+    cachePublic: true,
+    timeoutMs: input.timeoutMs ?? 8_000,
+  });
+  if (response.status === 200) {
+    const catalog = StudyCatalogResponseSchema.safeParse(response.body);
+    if (catalog.success) return { catalog: catalog.data, status: "ready" };
+  }
+
+  // Keep the site usable while Render and Vercel roll out independently.
+  // The legacy path is intentionally only a fallback because it carries full documents.
+  const legacy = await getPublishedContent({
+    kind: input.kind,
+    limit: Math.min(input.limit ?? 100, 100),
+    sort: input.sort,
+    timeoutMs: 20_000,
+  });
+  return legacy.status === "ready"
+    ? { catalog: { items: legacy.catalog.items.map(summarizeContentItem) }, status: "ready" }
+    : { status: "unavailable" };
+}
+
 export async function getSubjects(): Promise<SubjectsResult> {
   const response = await requestContentApi({ method: "GET", path: "/v1/subjects", cachePublic: true });
   if (response.status !== 200) return { status: "unavailable" };
@@ -141,8 +190,8 @@ export async function getSubjectContent(slug: string): Promise<SubjectDetailResu
     method: "GET",
     path: "/v1/subjects/" + encodeURIComponent(slug),
     cachePublic: true,
-    // Subject details currently include the complete content documents and can
-    // legitimately take longer than the catalog endpoints on a cold API.
+    // This legacy route still includes complete content documents. New list
+    // screens use getSubjectStudyCatalog instead.
     timeoutMs: 20_000,
   });
   if (response.status === 404) return { status: "not_found" };
@@ -150,6 +199,45 @@ export async function getSubjectContent(slug: string): Promise<SubjectDetailResu
   const detail = SubjectDetailResponseSchema.safeParse(response.body);
   return detail.success ? { status: "ready", detail: detail.data } : { status: "unavailable" };
 }
+
+export async function getSubjectStudyCatalog(slug: string): Promise<SubjectStudyCatalogResult> {
+  const response = await requestContentApi({
+    method: "GET",
+    path: "/v1/study/subjects/" + encodeURIComponent(slug),
+    cachePublic: true,
+    timeoutMs: 8_000,
+  });
+  if (response.status === 404) return { status: "not_found" };
+  if (response.status === 200) {
+    const detail = SubjectStudyCatalogResponseSchema.safeParse(response.body);
+    if (detail.success) return { status: "ready", detail: detail.data };
+  }
+
+  // Deployment-order fallback. Once the API route is live this path is not used.
+  const [legacySubject, legacyGuides] = await Promise.all([
+    getSubjectContent(slug),
+    getPublishedContent({ kind: "guide", limit: 100, timeoutMs: 20_000 }),
+  ]);
+  if (legacySubject.status !== "ready") return legacySubject;
+
+  const items = legacySubject.detail.items.map(summarizeContentItem);
+  const videoIds = new Set(items.filter((item) => item.kind === "video").map((item) => item.id));
+  const byId = new Map(items.map((item) => [item.id, item]));
+  if (legacyGuides.status === "ready" && videoIds.size > 0) {
+    for (const guide of legacyGuides.catalog.items.map(summarizeContentItem)) {
+      if (guide.linkedVideoId && videoIds.has(guide.linkedVideoId)) byId.set(guide.id, guide);
+    }
+  }
+
+  return {
+    status: "ready",
+    detail: {
+      items: [...byId.values()],
+      subject: legacySubject.detail.subject,
+    },
+  };
+}
+
 export async function getPublishedContentItem(
   slug: string,
 ): Promise<PublishedContentItemResult> {

@@ -3,6 +3,7 @@ import { registerPublishedContentSearchRoute } from "./content-search.js";
 import { readEnvironment } from "./config.js";
 import { createPostgresDatabase, createPostgresPool } from "./db/database.js";
 import { registerEditorTopicDeleteRoute } from "./editor-topic-delete.js";
+import { registerPublishedStudyCatalogRoutes } from "./study-catalog.js";
 
 const environment = readEnvironment();
 const app = await buildApp(environment);
@@ -13,6 +14,7 @@ const auxiliaryDatabase = auxiliaryPool ? createPostgresDatabase(auxiliaryPool) 
 
 registerPublishedContentSearchRoute(app, auxiliaryDatabase);
 registerEditorTopicDeleteRoute(app, auxiliaryDatabase);
+registerPublishedStudyCatalogRoutes(app, auxiliaryDatabase);
 if (auxiliaryDatabase) {
   app.addHook("onClose", async () => {
     await auxiliaryDatabase.destroy();

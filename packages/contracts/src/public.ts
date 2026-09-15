@@ -4,6 +4,7 @@ import {
 } from "./index.js";
 
 export * from "./index.js";
+export * from "./study-catalog.js";
 
 // Editorial topics are optional when content is attached directly to at least
 // one subject. Keep the legacy string field for backwards compatibility and

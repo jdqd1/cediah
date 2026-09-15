@@ -1,19 +1,19 @@
 import { GuideDashboardScreen } from "@/components/guide-dashboard-screen";
-import { getPublishedContent, getSubjects } from "@/lib/server/content-api";
+import { getPublishedStudyCatalog, getSubjects } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
-import { getGuideCatalog } from "@/lib/content-guide-links";
+import { getStudySummaryCatalog } from "@/lib/study-catalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function GuidesPage() {
   const [result, subjectsResult, isAdministrator] = await Promise.all([
-    getPublishedContent({ limit: 100 }),
+    getPublishedStudyCatalog({ limit: 1_000 }),
     getSubjects(),
     currentUserIsAdministrator(),
   ]);
   const guides =
     result.status === "ready"
-      ? getGuideCatalog(result.catalog.items)
+      ? getStudySummaryCatalog(result.catalog.items, "guide")
       : [];
 
   return (

@@ -1,4 +1,4 @@
-import type { ContentItem, ContentKind } from "@cediah/contracts";
+import type { ContentKind } from "@cediah/contracts";
 
 export const studyContentKinds = ["video", "guide", "flashcards", "quiz"] as const;
 
@@ -32,7 +32,7 @@ export function subjectDirectoryHref(kind?: StudyContentKind) {
 }
 
 export function publishedContentHref(
-  item: ContentItem,
+  item: { kind: ContentKind; slug: string },
   context?: {
     origin?: "guias" | "asignatura";
     subjectSlug?: string;

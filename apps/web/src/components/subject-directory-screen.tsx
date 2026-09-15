@@ -14,14 +14,14 @@ import {
 } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { ContentItem, Subject } from "@cediah/contracts";
+import type { StudyCatalogItem, Subject } from "@cediah/contracts";
 import {
   publishedContentHref,
   subjectContentHref,
   studyContentKindLabels,
   type StudyContentKind,
 } from "@/lib/content-navigation";
-import { uniqueRegions } from "@/lib/content-regions";
+import { studyItemTopics } from "@/lib/study-catalog";
 import { AppShell } from "./app-shell";
 import { ContentResourceList } from "./content-resource-list";
 
@@ -66,7 +66,7 @@ export function SubjectDirectoryScreen({
   available: boolean;
   initialKind?: StudyContentKind;
   isAdministrator?: boolean;
-  items: ContentItem[];
+  items: StudyCatalogItem[];
   subjects: Subject[];
 }) {
   const [search, setSearch] = useState("");
@@ -99,7 +99,7 @@ export function SubjectDirectoryScreen({
       const subjectNames = item.subjectIds
         .map((subjectId) => subjectById.get(subjectId)?.name ?? "")
         .join(" ");
-      const regions = uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic]);
+      const regions = studyItemTopics(item);
       return normalize(`${item.title} ${item.summary} ${item.topic} ${regions.join(" ")} ${subjectNames}`).includes(query);
     });
   }, [initialKind, items, search, subjectById]);
@@ -147,7 +147,7 @@ export function SubjectDirectoryScreen({
               ]}
               hrefForItem={(item) => {
                 const subject = item.subjectIds.map((subjectId) => subjectById.get(subjectId)).find(Boolean);
-                const topic = uniqueRegions(item.content.regions.length > 0 ? item.content.regions : [item.topic])[0];
+                const topic = studyItemTopics(item)[0];
                 return publishedContentHref(item, {
                   origin: "asignatura",
                   subjectSlug: subject?.slug,
@@ -196,7 +196,7 @@ export function SubjectDirectoryScreen({
                   ? "Prueba con otro título, tema o materia."
                   : initialKind
                     ? `No hay ${headerTitle.toLocaleLowerCase("es")} en esta selección.`
-                  : "Prueba con otra búsqueda."
+                    : "Prueba con otra búsqueda."
                 : "Intenta de nuevo en unos minutos."}
             </p>
           </div>
