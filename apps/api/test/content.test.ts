@@ -1176,7 +1176,7 @@ describe("content API", () => {
     ).toBe(false);
   });
 
-  it("limits published updates to title, organization and guide video links", () => {
+  it("allows published guide editorial updates while preserving the slug", () => {
     const published = guideItem({ status: "published" });
     const organizationUpdate = ContentDraftSchema.parse({
       ...published,
@@ -1200,11 +1200,16 @@ describe("content API", () => {
       ...titleUpdate,
       summary: "Resumen modificado después de publicar",
     });
+    const slugUpdate = ContentDraftSchema.parse({
+      ...published,
+      slug: "otro-slug",
+    });
 
     expect(isPublishedPermittedUpdate(published, organizationUpdate)).toBe(true);
     expect(isPublishedPermittedUpdate(published, titleUpdate)).toBe(true);
     expect(isPublishedPermittedUpdate(published, combinedUpdate)).toBe(true);
-    expect(isPublishedPermittedUpdate(published, contentUpdate)).toBe(false);
+    expect(isPublishedPermittedUpdate(published, contentUpdate)).toBe(true);
+    expect(isPublishedPermittedUpdate(published, slugUpdate)).toBe(false);
   });
 
   it("allows a coordinator to restore archived content without granting that power to creators", () => {
