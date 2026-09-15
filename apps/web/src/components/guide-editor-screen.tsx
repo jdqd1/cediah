@@ -69,6 +69,10 @@ import {
   sectionsToRichTextDocument,
 } from "@/lib/guide-document";
 import {
+  appendDiscoveredGuideKeyPoints,
+  extractGuideKeyPoints,
+} from "@/lib/guide-key-points";
+import {
   markdownHighlightInputMatch,
   markdownInlineContent,
   normalizeMarkdownHighlights,
@@ -974,6 +978,13 @@ export function GuideEditorScreen({
       setDocumentState(parsed.data);
       const currentDraft = draftRef.current;
       let next = withDocument(currentDraft, parsed.data);
+      next = withKeyPoints(
+        next,
+        appendDiscoveredGuideKeyPoints(
+          guideKeyPoints(currentDraft),
+          extractGuideKeyPoints(parsed.data),
+        ),
+      );
       if (currentDraft.kind === "guide") {
         const summary = summaryFromText(richTextDocumentToPlainText(parsed.data));
         next = { ...next, summary } as EditableGuideDraft;
