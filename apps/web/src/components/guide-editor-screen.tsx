@@ -265,7 +265,7 @@ type MarkdownMark = { type: string; attrs?: Record<string, unknown> };
 
 function markdownInlineContent(value: string): JSONContent[] {
   const content: JSONContent[] = [];
-  const pattern = /(\*\*|__)(.+?)\1|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<!\w)(\*|_)([^*_]+)\7/g;
+  const pattern = /(\*\*|__)(.+?)\1|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<!\w)(\*|_)([^*_]+)\7|==(.+?)==/g;
   let cursor = 0;
 
   const pushText = (text: string, marks?: MarkdownMark[]) => {
@@ -285,6 +285,7 @@ function markdownInlineContent(value: string): JSONContent[] {
         attrs: { href: match[6], target: "_blank", rel: "noopener noreferrer" },
       }]);
     } else if (match[8]) pushText(match[8], [{ type: "italic" }]);
+    else if (match[9]) pushText(match[9], [{ type: "highlight" }]);
     else pushText(match[0]);
     cursor = start + match[0].length;
   }
@@ -1726,7 +1727,7 @@ export function GuideEditorScreen({
             onMouseMove={handleTablePointerMove}
           >
             <div className="guide-editor-canvas-label">
-              <span><TableIcon aria-hidden="true" size={15} /> Pega una tabla o escribe Markdown: el contenido seguirá siendo editable.</span>
+              <span><TableIcon aria-hidden="true" size={15} /> Pega una tabla o escribe Markdown: usa ==texto== para importar resaltados automáticamente.</span>
             </div>
             <div onPasteCapture={handlePlainPaste}>
               <EditorContent editor={editor} />
