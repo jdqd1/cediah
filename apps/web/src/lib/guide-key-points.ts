@@ -1,6 +1,13 @@
 type JsonNode = Record<string, unknown>;
 
-const KEY_POINT_PREFIX = /^\s*PUNTO\s+CLAVE\b\s*(?:[—–:\-]\s*)?/i;
+const KEY_POINT_PREFIX = /^\s*(?:💡|🔑|📌)?\s*PUNTO(?:S)?\s+CLAVE(?:S)?(?:\s+\d+)?\b\s*(?:[—–:.\-]\s*)?/iu;
+const KEY_POINT_CONTAINER_TYPES = new Set([
+  "blockquote",
+  "listItem",
+  "paragraph",
+  "tableCell",
+  "tableHeader",
+]);
 const LINKABLE_BLOCK_TYPES = new Set([
   "blockquote",
   "heading",
@@ -46,6 +53,13 @@ export function extractGuideKeyPoints(source: unknown): string[] {
   const points: string[] = [];
   const seen = new Set<string>();
 
+  const addPoint = (point: string) => {
+    const normalized = normalizeGuideKeyPoint(point);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    points.push(point);
+  };
+
   const visit = (value: unknown, depth = 0) => {
     if (depth > 100) return;
     if (Array.isArray(value)) {
@@ -56,16 +70,14 @@ export function extractGuideKeyPoints(source: unknown): string[] {
     const node = asNode(value);
     if (!node) return;
 
-    if (node.type === "blockquote") {
+    if (typeof node.type === "string" && KEY_POINT_CONTAINER_TYPES.has(node.type)) {
       const point = stripGuideKeyPointPrefix(nodeText(node));
       if (point) {
-        const normalized = normalizeGuideKeyPoint(point);
-        if (normalized && !seen.has(normalized)) {
-          seen.add(normalized);
-          points.push(point);
-        }
+        addPoint(point);
+        // A matching wrapper may contain a paragraph with the same text. Stop here
+        // so one semantic point is never emitted twice because of nested rich-text nodes.
+        return;
       }
-      return;
     }
 
     childrenOf(node).forEach((child) => visit(child, depth + 1));
