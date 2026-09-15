@@ -68,6 +68,11 @@ import {
   richTextDocumentToSections,
   sectionsToRichTextDocument,
 } from "@/lib/guide-document";
+import {
+  markdownHighlightInputMatch,
+  markdownInlineContent,
+  normalizeMarkdownHighlights,
+} from "@/lib/guide-markdown";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { IconBackLink } from "./compact-navigation";
 import { PlatformToast, type PlatformNotice } from "./platform-toast";
@@ -173,7 +178,7 @@ function showBubbleMenuForSelection({ from, to }: { from: number; to: number }) 
 
 function guideDocument(draft: EditableGuideDraft) {
   const guide = draft.kind === "video" ? draft.content.guide : draft.content;
-  return guide.document ?? sectionsToRichTextDocument(guide.sections);
+  return normalizeMarkdownHighlights(guide.document ?? sectionsToRichTextDocument(guide.sections));
 }
 
 function guideKeyPoints(draft: EditableGuideDraft) {
@@ -259,39 +264,6 @@ function sanitizeEditorJson(content: JSONContent): JSONContent {
     };
   }
   return node;
-}
-
-type MarkdownMark = { type: string; attrs?: Record<string, unknown> };
-
-function markdownInlineContent(value: string): JSONContent[] {
-  const content: JSONContent[] = [];
-  const pattern = /(\*\*|__)(.+?)\1|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<!\w)(\*|_)([^*_]+)\7|==(.+?)==/g;
-  let cursor = 0;
-
-  const pushText = (text: string, marks?: MarkdownMark[]) => {
-    if (!text) return;
-    content.push({ type: "text", text, ...(marks?.length ? { marks } : {}) });
-  };
-
-  for (const match of value.matchAll(pattern)) {
-    const start = match.index ?? cursor;
-    pushText(value.slice(cursor, start));
-    if (match[2]) pushText(match[2], [{ type: "bold" }]);
-    else if (match[3]) pushText(match[3], [{ type: "strike" }]);
-    else if (match[4]) pushText(match[4], [{ type: "code" }]);
-    else if (match[5] && match[6]) {
-      pushText(match[5], [{
-        type: "link",
-        attrs: { href: match[6], target: "_blank", rel: "noopener noreferrer" },
-      }]);
-    } else if (match[8]) pushText(match[8], [{ type: "italic" }]);
-    else if (match[9]) pushText(match[9], [{ type: "highlight" }]);
-    else pushText(match[0]);
-    cursor = start + match[0].length;
-  }
-
-  pushText(value.slice(cursor));
-  return content;
 }
 
 function paragraphFromMarkdown(value: string): JSONContent {
@@ -957,6 +929,26 @@ export function GuideEditorScreen({
       attributes: {
         "aria-label": "Contenido de la guía",
         class: "guide-editor-prosemirror",
+      },
+      handleTextInput(view, from, to, insertedText) {
+        if (from !== to) return false;
+        const resolved = view.state.doc.resolve(from);
+        if (resolved.parent.type.name === "codeBlock") return false;
+        if (resolved.marks().some((mark) => mark.type.name === "code")) return false;
+
+        const before = resolved.parent.textBetween(0, resolved.parentOffset, "\n", "\n");
+        const match = markdownHighlightInputMatch(before, insertedText);
+        const highlight = view.state.schema.marks.highlight;
+        if (!match || !highlight) return false;
+
+        const start = from - match.replacementLengthBeforeInput;
+        if (start < resolved.start()) return false;
+
+        const transaction = view.state.tr
+          .insertText(match.text, start, to)
+          .addMark(start, start + match.text.length, highlight.create());
+        view.dispatch(transaction);
+        return true;
       },
       handleKeyDown(view, event) {
         if (event.key !== "Backspace" && event.key !== "Delete") return false;

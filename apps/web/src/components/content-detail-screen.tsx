@@ -44,6 +44,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
+import { normalizeMarkdownHighlights } from "@/lib/guide-markdown";
 import { getVideoGuideContent } from "@/lib/content-guide-links";
 import { questionAnswer } from "@/lib/question-answer";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -249,7 +250,7 @@ export function PublishedGuideReader({
   title: string;
 }) {
   const guideDocument = useMemo(
-    () => content.document ?? sectionsToRichTextDocument(content.sections),
+    () => normalizeMarkdownHighlights(content.document ?? sectionsToRichTextDocument(content.sections)),
     [content.document, content.sections],
   );
   const outline = useMemo(() => extractGuideOutline(guideDocument), [guideDocument]);
