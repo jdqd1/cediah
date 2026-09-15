@@ -1,0 +1,233 @@
+name: Apply robust Markdown highlight fix
+
+on:
+  push:
+    branches:
+      - fix/markdown-highlight-recognition
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/markdown-highlight-recognition
+      - name: Patch highlight recognition
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          helper = Path('apps/web/src/lib/guide-markdown.ts')
+          helper.write_text(r'''import type { RichTextDocument } from "@cediah/contracts";
+import type { JSONContent } from "@tiptap/react";
+
+type MarkdownMark = { type: string; attrs?: Record<string, unknown> };
+
+const markdownHighlightPattern = /==([^=\n]+?)==/g;
+
+export function markdownInlineContent(value: string): JSONContent[] {
+  const content: JSONContent[] = [];
+  const pattern = /(\*\*|__)(.+?)\1|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<!\w)(\*|_)([^*_]+)\7|==([^=\n]+?)==/g;
+  let cursor = 0;
+
+  const pushText = (text: string, marks?: MarkdownMark[]) => {
+    if (!text) return;
+    content.push({ type: "text", text, ...(marks?.length ? { marks } : {}) });
+  };
+
+  for (const match of value.matchAll(pattern)) {
+    const start = match.index ?? cursor;
+    pushText(value.slice(cursor, start));
+    if (match[2]) pushText(match[2], [{ type: "bold" }]);
+    else if (match[3]) pushText(match[3], [{ type: "strike" }]);
+    else if (match[4]) pushText(match[4], [{ type: "code" }]);
+    else if (match[5] && match[6]) {
+      pushText(match[5], [{
+        type: "link",
+        attrs: { href: match[6], target: "_blank", rel: "noopener noreferrer" },
+      }]);
+    } else if (match[8]) pushText(match[8], [{ type: "italic" }]);
+    else if (match[9]) pushText(match[9], [{ type: "highlight" }]);
+    else pushText(match[0]);
+    cursor = start + match[0].length;
+  }
+
+  pushText(value.slice(cursor));
+  return content;
+}
+
+export function markdownHighlightInputMatch(textBeforeCursor: string, insertedText: string) {
+  if (insertedText !== "=") return null;
+  const match = (textBeforeCursor + insertedText).match(/==([^=\n]+)==$/);
+  if (!match || match[1] === undefined) return null;
+  return {
+    text: match[1],
+    replacementLengthBeforeInput: match[0].length - insertedText.length,
+  };
+}
+
+function normalizeNode(node: JSONContent, insideCodeBlock = false): JSONContent[] {
+  if (node.type === "text") {
+    if (
+      insideCodeBlock ||
+      typeof node.text !== "string" ||
+      !node.text.includes("==") ||
+      node.marks?.some((mark) => mark.type === "code")
+    ) return [node];
+
+    const normalized: JSONContent[] = [];
+    let cursor = 0;
+    let matched = false;
+    const baseMarks = node.marks ?? [];
+
+    const push = (text: string, marks = baseMarks) => {
+      if (!text) return;
+      normalized.push({ type: "text", text, ...(marks.length ? { marks } : {}) });
+    };
+
+    for (const match of node.text.matchAll(markdownHighlightPattern)) {
+      const start = match.index ?? cursor;
+      push(node.text.slice(cursor, start));
+      const highlightedText = match[1];
+      if (highlightedText) {
+        matched = True
+        const marks = [
+          ...baseMarks.filter((mark) => mark.type !== "highlight"),
+          { type: "highlight" },
+        ];
+        push(highlightedText, marks);
+      }
+      cursor = start + match[0].length;
+    }
+
+    if (!matched) return [node];
+    push(node.text.slice(cursor));
+    return normalized;
+  }
+
+  if (!node.content) return [node];
+  const childInsideCodeBlock = insideCodeBlock || node.type === "codeBlock";
+  return [{
+    ...node,
+    content: node.content.flatMap((child) => normalizeNode(child, childInsideCodeBlock)),
+  }];
+}
+
+export function normalizeMarkdownHighlights(document: RichTextDocument): RichTextDocument {
+  const normalized = normalizeNode(document as JSONContent)[0];
+  return (normalized ?? document) as RichTextDocument;
+}
+'''.replace('matched = True', 'matched = true'), encoding='utf-8')
+
+          tests = Path('apps/web/src/lib/guide-markdown.test.ts')
+          tests.write_text(r'''import { describe, expect, it } from "vitest";
+import type { RichTextDocument } from "@cediah/contracts";
+import {
+  markdownHighlightInputMatch,
+  markdownInlineContent,
+  normalizeMarkdownHighlights,
+} from "./guide-markdown";
+
+describe("guide Markdown highlights", () => {
+  it("converts ==text== into the native highlight mark while parsing pasted Markdown", () => {
+    expect(markdownInlineContent("La ==información clave== debe destacar.")).toEqual([
+      { type: "text", text: "La " },
+      { type: "text", text: "información clave", marks: [{ type: "highlight" }] },
+      { type: "text", text: " debe destacar." },
+    ]);
+  });
+
+  it("recognizes the second closing equals sign while typing", () => {
+    expect(markdownHighlightInputMatch("La ==información clave=", "=")).toEqual({
+      text: "información clave",
+      replacementLengthBeforeInput: "==información clave==".length - 1,
+    });
+  });
+
+  it("normalizes raw highlight markers already stored in rich-text documents", () => {
+    const document = {
+      type: "doc",
+      content: [{
+        type: "paragraph",
+        content: [{ type: "text", text: "Antes ==dato esencial== después" }],
+      }],
+    } as RichTextDocument;
+
+    expect(normalizeMarkdownHighlights(document)).toEqual({
+      type: "doc",
+      content: [{
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Antes " },
+          { type: "text", text: "dato esencial", marks: [{ type: "highlight" }] },
+          { type: "text", text: " después" },
+        ],
+      }],
+    });
+  });
+
+  it("does not interpret highlight markers inside code", () => {
+    const document = {
+      type: "doc",
+      content: [{
+        type: "codeBlock",
+        content: [{ type: "text", text: "==literal==" }],
+      }],
+    } as RichTextDocument;
+
+    expect(normalizeMarkdownHighlights(document)).toEqual(document);
+  });
+});
+''', encoding='utf-8')
+
+          editor = Path('apps/web/src/components/guide-editor-screen.tsx')
+          text = editor.read_text(encoding='utf-8')
+
+          old_import = '''import {\n  extractGuideOutline,\n  numberGuideOutline,\n  richTextDocumentToPlainText,\n  richTextDocumentToSections,\n  sectionsToRichTextDocument,\n} from "@/lib/guide-document";\n'''
+          new_import = old_import + '''import {\n  markdownHighlightInputMatch,\n  markdownInlineContent,\n  normalizeMarkdownHighlights,\n} from "@/lib/guide-markdown";\n'''
+          assert old_import in text
+          text = text.replace(old_import, new_import, 1)
+
+          old_doc = '''function guideDocument(draft: EditableGuideDraft) {\n  const guide = draft.kind === "video" ? draft.content.guide : draft.content;\n  return guide.document ?? sectionsToRichTextDocument(guide.sections);\n}\n'''
+          new_doc = '''function guideDocument(draft: EditableGuideDraft) {\n  const guide = draft.kind === "video" ? draft.content.guide : draft.content;\n  return normalizeMarkdownHighlights(guide.document ?? sectionsToRichTextDocument(guide.sections));\n}\n'''
+          assert old_doc in text
+          text = text.replace(old_doc, new_doc, 1)
+
+          start = text.index('type MarkdownMark = { type: string; attrs?: Record<string, unknown> };')
+          end = text.index('function paragraphFromMarkdown(value: string): JSONContent {', start)
+          text = text[:start] + text[end:]
+
+          old_props = '''    editorProps: {\n      attributes: {\n        "aria-label": "Contenido de la guía",\n        class: "guide-editor-prosemirror",\n      },\n      handleKeyDown(view, event) {\n'''
+          new_props = '''    editorProps: {\n      attributes: {\n        "aria-label": "Contenido de la guía",\n        class: "guide-editor-prosemirror",\n      },\n      handleTextInput(view, from, to, insertedText) {\n        if (from !== to) return false;\n        const resolved = view.state.doc.resolve(from);\n        if (resolved.parent.type.name === "codeBlock") return false;\n        if (resolved.marks().some((mark) => mark.type.name === "code")) return false;\n\n        const before = resolved.parent.textBetween(0, resolved.parentOffset, "\\n", "\\n");\n        const match = markdownHighlightInputMatch(before, insertedText);\n        const highlight = view.state.schema.marks.highlight;\n        if (!match || !highlight) return false;\n\n        const start = from - match.replacementLengthBeforeInput;\n        if (start < resolved.start()) return false;\n\n        const transaction = view.state.tr\n          .insertText(match.text, start, to)\n          .addMark(start, start + match.text.length, highlight.create());\n        view.dispatch(transaction);\n        return true;\n      },\n      handleKeyDown(view, event) {\n'''
+          assert old_props in text
+          text = text.replace(old_props, new_props, 1)
+          editor.write_text(text, encoding='utf-8')
+
+          detail = Path('apps/web/src/components/content-detail-screen.tsx')
+          text = detail.read_text(encoding='utf-8')
+          old_detail_import = 'import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";\n'
+          new_detail_import = old_detail_import + 'import { normalizeMarkdownHighlights } from "@/lib/guide-markdown";\n'
+          assert old_detail_import in text
+          text = text.replace(old_detail_import, new_detail_import, 1)
+          old_memo = '''  const guideDocument = useMemo(\n    () => content.document ?? sectionsToRichTextDocument(content.sections),\n    [content.document, content.sections],\n  );\n'''
+          new_memo = '''  const guideDocument = useMemo(\n    () => normalizeMarkdownHighlights(content.document ?? sectionsToRichTextDocument(content.sections)),\n    [content.document, content.sections],\n  );\n'''
+          assert old_memo in text
+          text = text.replace(old_memo, new_memo, 1)
+          detail.write_text(text, encoding='utf-8')
+          PY
+
+          rm .github/workflows/apply-markdown-highlight-fix.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/components/guide-editor-screen.tsx \
+                  apps/web/src/components/content-detail-screen.tsx \
+                  apps/web/src/lib/guide-markdown.ts \
+                  apps/web/src/lib/guide-markdown.test.ts \
+                  .github/workflows/apply-markdown-highlight-fix.yml
+          git commit -m "Fix Markdown highlight recognition across guide flows"
+          git push origin HEAD:fix/markdown-highlight-recognition
