@@ -70,19 +70,47 @@ const variantDocument = {
     },
     {
       type: "paragraph",
-      content: [{ type: "text", text: "RELACIÓN CLÍNICA: este bloque no debe convertirse en punto clave." }],
+      content: [{ type: "text", text: "RELACIÓN CLÍNICA: este párrafo normal no es un callout visual." }],
+    },
+  ],
+};
+
+const unlabeledCallouts = {
+  type: "doc",
+  content: [
+    {
+      type: "blockquote",
+      content: [{
+        type: "paragraph",
+        content: [{ type: "text", text: "CORRELACIÓN CLÍNICA: las SNARE son dianas de toxinas bacterianas." }],
+      }],
+    },
+    {
+      type: "blockquote",
+      content: [{
+        type: "paragraph",
+        content: [{ type: "text", text: "Este recuadro no tiene etiqueta, pero sigue siendo información importante." }],
+      }],
     },
   ],
 };
 
 describe("guide key points", () => {
-  it("extracts PUNTO CLAVE callouts from rich guide documents", () => {
+  it("extracts every visual blockquote callout regardless of its label", () => {
     expect(extractGuideKeyPoints(document)).toEqual([
       "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro.",
+      "RELACIÓN CLÍNICA — La digoxina inhibe la Na+/K+-ATPasa.",
     ]);
   });
 
-  it("recognizes key points by their semantic label across supported rich-text containers", () => {
+  it("includes clinical correlations and unlabeled visual callouts", () => {
+    expect(extractGuideKeyPoints(unlabeledCallouts)).toEqual([
+      "CORRELACIÓN CLÍNICA: las SNARE son dianas de toxinas bacterianas.",
+      "Este recuadro no tiene etiqueta, pero sigue siendo información importante.",
+    ]);
+  });
+
+  it("keeps compatibility with semantic Punto clave labels outside blockquotes", () => {
     expect(extractGuideKeyPoints(variantDocument)).toEqual([
       "El transporte vesicular conserva la identidad de membrana.",
       "Las SNARE acercan las membranas durante la fusión.",
@@ -90,13 +118,13 @@ describe("guide key points", () => {
     ]);
   });
 
-  it("does not treat headings or clinical correlations as study key points", () => {
+  it("does not treat headings or ordinary clinical-correlation paragraphs as visual callouts", () => {
     const extracted = extractGuideKeyPoints(variantDocument);
     expect(extracted).not.toContain("Puntos clave");
-    expect(extracted.some((point) => point.includes("RELACIÓN CLÍNICA"))).toBe(false);
+    expect(extracted.some((point) => point.includes("párrafo normal"))).toBe(false);
   });
 
-  it("does not duplicate a key point because blockquote and paragraph nodes are nested", () => {
+  it("does not duplicate a callout because blockquote and paragraph nodes are nested", () => {
     const nested = {
       type: "doc",
       content: [{
@@ -112,7 +140,7 @@ describe("guide key points", () => {
     ]);
   });
 
-  it("appends imported callouts without deleting blank or manual publisher entries", () => {
+  it("appends every imported callout without deleting manual publisher entries", () => {
     expect(appendDiscoveredGuideKeyPoints(
       ["Dato manual", ""],
       extractGuideKeyPoints(document),
@@ -120,28 +148,34 @@ describe("guide key points", () => {
       "Dato manual",
       "",
       "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro.",
+      "RELACIÓN CLÍNICA — La digoxina inhibe la Na+/K+-ATPasa.",
     ]);
   });
 
-  it("merges imported callouts with manual points without duplicates for the reader", () => {
+  it("merges visual callouts with manual points without duplicates for the reader", () => {
     expect(mergeGuideKeyPoints(
       ["Dato manual", "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro."],
       extractGuideKeyPoints(document),
     )).toEqual([
       "Dato manual",
       "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro.",
+      "RELACIÓN CLÍNICA — La digoxina inhibe la Na+/K+-ATPasa.",
     ]);
   });
 
-  it("recognizes imported callouts and selected passages as linked", () => {
+  it("recognizes visual callouts and selected passages as linked", () => {
     expect(isGuideKeyPointLinked(
       document,
       "La bomba Na+/K+-ATPasa transporta tres Na+ hacia afuera y dos K+ hacia adentro.",
     )).toBe(true);
+    expect(isGuideKeyPointLinked(
+      document,
+      "RELACIÓN CLÍNICA — La digoxina inhibe la Na+/K+-ATPasa.",
+    )).toBe(true);
     expect(isGuideKeyPointLinked(document, "mantiene gradientes electroquímicos")).toBe(true);
     expect(isGuideKeyPointLinked(
-      variantDocument,
-      "Las SNARE acercan las membranas durante la fusión.",
+      unlabeledCallouts,
+      "Este recuadro no tiene etiqueta, pero sigue siendo información importante.",
     )).toBe(true);
   });
 

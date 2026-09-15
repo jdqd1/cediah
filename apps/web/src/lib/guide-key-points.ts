@@ -2,7 +2,6 @@ type JsonNode = Record<string, unknown>;
 
 const KEY_POINT_PREFIX = /^\s*(?:💡|🔑|📌)?\s*PUNTO(?:S)?\s+CLAVE(?:S)?(?:\s+\d+)?\b\s*(?:[—–:.\-]\s*)?/iu;
 const KEY_POINT_CONTAINER_TYPES = new Set([
-  "blockquote",
   "listItem",
   "paragraph",
   "tableCell",
@@ -32,6 +31,11 @@ function nodeText(value: unknown, depth = 0): string {
   if (node.type === "text") return typeof node.text === "string" ? node.text : "";
   if (node.type === "hardBreak") return " ";
   return childrenOf(node).map((child) => nodeText(child, depth + 1)).join("");
+}
+
+function cleanGuideCalloutText(value: string): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return stripGuideKeyPointPrefix(compact) ?? compact;
 }
 
 export function normalizeGuideKeyPoint(value: string): string {
@@ -70,12 +74,24 @@ export function extractGuideKeyPoints(source: unknown): string[] {
     const node = asNode(value);
     if (!node) return;
 
+    // Every blockquote is rendered by the guide reader as an emphasized callout.
+    // Treat the visual callout itself as the source of truth for study resources,
+    // regardless of whether its label says "Punto clave", "Correlación clínica",
+    // "Relación clínica" or has no textual label at all.
+    if (node.type === "blockquote") {
+      const point = cleanGuideCalloutText(nodeText(node));
+      if (point) addPoint(point);
+      // Do not descend into the callout: its nested paragraph would otherwise be
+      // emitted again as a semantic key point.
+      return;
+    }
+
+    // Preserve compatibility with imported Markdown that semantically marks a
+    // Punto clave but, for historical/parser reasons, is not wrapped in blockquote.
     if (typeof node.type === "string" && KEY_POINT_CONTAINER_TYPES.has(node.type)) {
       const point = stripGuideKeyPointPrefix(nodeText(node));
       if (point) {
         addPoint(point);
-        // A matching wrapper may contain a paragraph with the same text. Stop here
-        // so one semantic point is never emitted twice because of nested rich-text nodes.
         return;
       }
     }
