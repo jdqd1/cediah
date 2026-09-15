@@ -10,6 +10,7 @@ import "./landing-paper.css";
 import "./auth-paper.css";
 import "./learning.css";
 import "./identity-v3.css";
+import "./guide-citations.css";
 
 const plusJakartaSans = localFont({
   src: [
