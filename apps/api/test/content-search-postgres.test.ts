@@ -52,6 +52,7 @@ beforeAll(async () => {
     "0006_simplify_platform_roles.sql",
     "0009_learning_content_identity.sql",
     "0019_content_search.sql",
+    "0020_content_search_function_hardening.sql",
   ]) {
     await pg.exec(
       `begin;\n${await readFile(new URL(`../../../database/migrations/${file}`, import.meta.url), "utf8")}\ncommit;`,
