@@ -1,0 +1,57 @@
+name: Apply Markdown highlight support
+
+on:
+  push:
+    branches:
+      - feature/markdown-highlight
+    paths:
+      - .github/workflows/apply-markdown-highlight.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/markdown-highlight
+          fetch-depth: 0
+
+      - name: Add ==text== highlight parsing
+        shell: python
+        run: |
+          from pathlib import Path
+
+          target = Path("apps/web/src/components/guide-editor-screen.tsx")
+          source = target.read_text(encoding="utf-8")
+
+          old_pattern = r'''  const pattern = /(\*\*|__)(.+?)\1|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<!\w)(\*|_)([^*_]+)\7/g;'''
+          new_pattern = r'''  const pattern = /(\*\*|__)(.+?)\1|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(?<!\w)(\*|_)([^*_]+)\7|==(.+?)==/g;'''
+          if old_pattern not in source:
+              raise SystemExit("Markdown inline pattern not found")
+          source = source.replace(old_pattern, new_pattern, 1)
+
+          old_handler = '''    } else if (match[8]) pushText(match[8], [{ type: "italic" }]);\n    else pushText(match[0]);'''
+          new_handler = '''    } else if (match[8]) pushText(match[8], [{ type: "italic" }]);\n    else if (match[9]) pushText(match[9], [{ type: "highlight" }]);\n    else pushText(match[0]);'''
+          if old_handler not in source:
+              raise SystemExit("Markdown inline handler not found")
+          source = source.replace(old_handler, new_handler, 1)
+
+          old_hint = "Pega una tabla o escribe Markdown: el contenido seguirá siendo editable."
+          new_hint = "Pega una tabla o escribe Markdown: usa ==texto== para importar resaltados automáticamente."
+          if old_hint not in source:
+              raise SystemExit("Editor Markdown hint not found")
+          source = source.replace(old_hint, new_hint, 1)
+
+          target.write_text(source, encoding="utf-8")
+          Path(".github/workflows/apply-markdown-highlight.yml").unlink()
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Reconoce resaltado Markdown en guías"
+          git push origin HEAD:feature/markdown-highlight
