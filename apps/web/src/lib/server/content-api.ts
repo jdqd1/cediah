@@ -102,6 +102,7 @@ export async function requestContentApi(
 }
 
 export async function getPublishedContent(input: {
+  cachePublic?: boolean;
   kind?: ContentKind;
   linkedVideoId?: string;
   limit?: number;
@@ -118,7 +119,7 @@ export async function getPublishedContent(input: {
   const response = await requestContentApi({
     method: "GET",
     path: "/v1/content?" + query.toString(),
-    cachePublic: true,
+    cachePublic: input.cachePublic ?? true,
     timeoutMs: input.timeoutMs,
   });
   if (response.status !== 200) return { status: "unavailable" };
