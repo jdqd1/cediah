@@ -57,6 +57,10 @@ export function isPublishedPermittedUpdate(
   current: ContentItem,
   next: ContentDraft,
 ) {
+  if (current.kind === "guide" && next.kind === "guide") {
+    return current.slug === next.slug;
+  }
+
   if (
     current.kind !== next.kind ||
     current.slug !== next.slug ||
