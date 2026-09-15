@@ -239,7 +239,15 @@ export async function searchPublishedContent(
 
   const byScore = (left: RankedSearchResult, right: RankedSearchResult) =>
     right.score - left.score || left.title.localeCompare(right.title, "es");
-  const stripScore = ({ score: _score, ...item }: RankedSearchResult): PublishedContentSearchResult => item;
+  const stripScore = (result: RankedSearchResult): PublishedContentSearchResult => ({
+    excerpt: result.excerpt,
+    excerptType: result.excerptType,
+    href: result.href,
+    id: result.id,
+    kind: result.kind,
+    title: result.title,
+    topic: result.topic,
+  });
 
   return {
     guides: ranked
