@@ -7,8 +7,10 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export function StudioConfirmDialog({
   busy = false,
+  busyLabel = "Archivando…",
   confirmLabel,
   description,
+  error = null,
   icon,
   onClose,
   onConfirm,
@@ -16,8 +18,10 @@ export function StudioConfirmDialog({
   title,
 }: {
   busy?: boolean;
+  busyLabel?: string;
   confirmLabel: string;
   description: string;
+  error?: string | null;
   icon: ReactNode;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
@@ -86,10 +90,11 @@ export function StudioConfirmDialog({
         <span className="studio-confirm-dialog-icon" aria-hidden="true">{icon}</span>
         <h3 id={titleId}>{title}</h3>
         <p id={descriptionId}>{description}</p>
+        {error && <p role="alert">{error}</p>}
         <footer>
           <button disabled={busy} ref={cancelRef} type="button" onClick={onClose}>Cancelar</button>
           <button className="is-danger" disabled={busy} type="button" onClick={() => void onConfirm()}>
-            {busy ? "Archivando…" : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </footer>
       </section>
