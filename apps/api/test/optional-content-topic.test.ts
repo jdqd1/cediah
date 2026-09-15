@@ -30,6 +30,16 @@ describe("optional editorial topics", () => {
     if (parsed.success) expect(parsed.data.topic).toBe("");
   });
 
+  it("still rejects content with neither a subject nor a topic", () => {
+    const parsed = PublishableContentDraftSchema.safeParse({
+      ...publishableGuide,
+      subjectIds: [],
+      topic: "",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
   it("keeps normal topic validation and normalization", () => {
     const parsed = PublishableContentDraftSchema.safeParse({
       ...publishableGuide,
