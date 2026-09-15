@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentDraft, ContentItem } from "@cediah/contracts";
-import { isPublishedPermittedUpdate } from "../src/content-authorization";
+import { isPublishedPermittedUpdate } from "../src/content-authorization.js";
 
 const guideDraft: ContentDraft = {
   content: {
