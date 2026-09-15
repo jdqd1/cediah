@@ -1,11 +1,17 @@
 import { ArrowRight } from "@phosphor-icons/react";
-import type { ContentItem } from "@cediah/contracts";
+import type { ContentKind } from "@cediah/contracts";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getSearchMatchRanges } from "@/lib/content-search";
 import { ContentTypeCover } from "./content-type-cover";
 
-type ContentResourceListProps<T extends ContentItem> = {
+type ContentResourceListItem = {
+  id: string;
+  kind: ContentKind;
+  title: string;
+};
+
+type ContentResourceListProps<T extends ContentResourceListItem> = {
   ariaLabel?: string;
   className?: string;
   contextForItem?: (item: T) => string[];
@@ -35,7 +41,7 @@ function HighlightedText({ query, value }: { query: string; value: string }) {
   return parts;
 }
 
-export function ContentResourceList<T extends ContentItem>({
+export function ContentResourceList<T extends ContentResourceListItem>({
   ariaLabel,
   className = "",
   contextForItem,
