@@ -1,4 +1,6 @@
+import type { FastifyInstance } from "fastify";
 import { sql } from "kysely";
+import { z } from "zod";
 import type { DatabaseClient, JsonValue } from "./db/database.js";
 
 export type PublishedContentSearchResult = {
@@ -30,6 +32,9 @@ type SearchRow = {
 
 type RankedSearchResult = PublishedContentSearchResult & { score: number };
 
+const SearchQuerySchema = z.object({
+  query: z.string().trim().min(1).max(120),
+});
 const diacriticPattern = /\p{Diacritic}/gu;
 const searchCharacterPattern = /[^\p{L}\p{N}]+/gu;
 const maxSearchTokens = 8;
@@ -249,4 +254,42 @@ export async function searchPublishedContent(
       .slice(0, limitPerKind)
       .map(stripScore),
   };
+}
+
+export function registerPublishedContentSearchRoute(
+  app: FastifyInstance,
+  database: DatabaseClient | undefined,
+) {
+  app.get<{ Querystring: unknown }>("/v1/content/search", async (request, reply) => {
+    if (!database) {
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "search_unavailable" });
+    }
+
+    const query = SearchQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply
+        .status(400)
+        .header("Cache-Control", "no-store")
+        .send({ error: "invalid_search_query" });
+    }
+
+    try {
+      const response = await searchPublishedContent(database, {
+        limitPerKind: 4,
+        query: query.data.query,
+      });
+      return reply
+        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .send(response);
+    } catch (error) {
+      request.log.error({ err: error }, "Published-content search failed");
+      return reply
+        .status(503)
+        .header("Cache-Control", "no-store")
+        .send({ error: "search_unavailable" });
+    }
+  });
 }
