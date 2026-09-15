@@ -2,6 +2,7 @@ import { buildApp } from "./app.js";
 import { registerPublishedContentSearchRoute } from "./content-search.js";
 import { readEnvironment } from "./config.js";
 import { createPostgresDatabase, createPostgresPool } from "./db/database.js";
+import { registerPublishedStudyCatalogRoutes } from "./study-catalog.js";
 
 const environment = readEnvironment();
 const app = await buildApp(environment);
@@ -11,6 +12,7 @@ const searchPool = environment.databaseUrl
 const searchDatabase = searchPool ? createPostgresDatabase(searchPool) : undefined;
 
 registerPublishedContentSearchRoute(app, searchDatabase);
+registerPublishedStudyCatalogRoutes(app, searchDatabase);
 if (searchDatabase) {
   app.addHook("onClose", async () => {
     await searchDatabase.destroy();
