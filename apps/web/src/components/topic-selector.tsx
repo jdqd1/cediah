@@ -140,10 +140,10 @@ export function TopicSelector({
 
   return (
     <div className="topic-selector-field studio-field-wide">
-      <span className="topic-selector-label">Seleccionar tema</span>
+      <span className="topic-selector-label">Tema (opcional)</span>
       <div className="topic-selector-controls">
         <div
-          aria-label="Seleccionar tema"
+          aria-label="Seleccionar tema opcional"
           aria-disabled={!interactive}
           className="topic-selector-options"
           role="group"
@@ -171,8 +171,8 @@ export function TopicSelector({
             <p>
               {subjectSelected
                 ? allowCreate
-                  ? "Aún no hay temas. Añade el primero."
-                  : "Administración aún no ha creado temas para esta materia."
+                  ? "El tema es opcional. Puedes publicar directamente en la materia o añadir uno para organizar el contenido."
+                  : "Esta materia no tiene temas. El contenido puede publicarse directamente en ella."
                 : "Selecciona primero una materia."}
             </p>
           )}
