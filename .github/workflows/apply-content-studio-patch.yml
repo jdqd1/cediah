@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
       - name: Apply patch
         run: |
-          git apply .tmp/content-studio.patch
+          patch -p1 --fuzz=3 < .tmp/content-studio.patch
           rm .tmp/content-studio.patch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
