@@ -141,10 +141,7 @@ export function GuideCitation({
   }, [open]);
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPopoverLayout(null);
-      return;
-    }
+    if (!open) return;
 
     positionPopover();
     const compactQuery = window.matchMedia("(max-width: 760px), (hover: none)");
