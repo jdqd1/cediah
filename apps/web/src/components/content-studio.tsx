@@ -1051,22 +1051,55 @@ export function ContentStudio({ initialWorkspace }: Props) {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function open(current: ContentItem) {
+  async function open(current: ContentItem) {
     if (busy) return;
     if (!isNew && current.id === editingId) return;
     if (!confirmDiscard()) return;
-    setDraft(itemDraft(current));
-    setEditingId(current.id);
-    setIsNew(false);
-    guideReturnRef.current = null;
-    resetFeedback();
-    if (current.kind === "guide") {
-      guideEntryDraftRef.current = itemDraft(current);
+
+    setBusy("open");
+    setNotice(null);
+    try {
+      const linkedSummary = current.kind === "video"
+        ? findVideoLinkedGuide(items, current.id)
+        : undefined;
+      const [loaded, loadedLinkedGuide] = await Promise.all([
+        contentItemJson(`/api/editor/content/${encodeURIComponent(current.id)}`),
+        linkedSummary
+          ? contentItemJson(`/api/editor/content/${encodeURIComponent(linkedSummary.id)}`)
+          : Promise.resolve(undefined),
+      ]);
+      if (loadedLinkedGuide && loadedLinkedGuide.kind !== "guide") {
+        throw new Error(errors.content_unavailable);
+      }
+
+      const loadedItems = loadedLinkedGuide ? [loaded, loadedLinkedGuide] : [loaded];
+      const loadedIds = new Set(loadedItems.map((entry) => entry.id));
+      setItems((existing) => [
+        ...loadedItems,
+        ...existing.filter((entry) => !loadedIds.has(entry.id)),
+      ]);
+      setDraft(itemDraft(loaded));
+      setEditingId(loaded.id);
+      setIsNew(false);
+      guideReturnRef.current = null;
+      resetFeedback();
+      if (loaded.kind === "guide") {
+        guideEntryDraftRef.current = itemDraft(loaded);
+      }
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        setPublicationsCollapsed(true);
+      }
+      setGuideEditing(false);
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error
+          ? error.message
+          : "No se pudo cargar esta publicación. Comprueba tu conexión y vuelve a intentarlo.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
     }
-    if (window.matchMedia("(max-width: 760px)").matches) {
-      setPublicationsCollapsed(true);
-    }
-    setGuideEditing(false);
   }
 
   function create(kind: ContentKind = "video") {
@@ -1126,17 +1159,42 @@ export function ContentStudio({ initialWorkspace }: Props) {
     }
   }
 
-  function beginGuideCreation(videoId: string | null) {
-    const linkedVideo = videoId
+  async function beginGuideCreation(videoId: string | null) {
+    const linkedVideoSummary = videoId
       ? guideCreationVideos.find((current) => current.id === videoId)
       : undefined;
-    if (videoId && !linkedVideo) {
+    if (videoId && !linkedVideoSummary) {
       setNotice({
         text: "Este video ya tiene una guía principal o dejó de estar disponible. Abre el video y usa «Editar guía y recursos» para trabajar en su guía actual.",
         tone: "warning",
       });
       return;
     }
+
+    let linkedVideo: (ContentItem & { kind: "video" }) | undefined;
+    if (linkedVideoSummary) {
+      setBusy("open");
+      setNotice(null);
+      try {
+        const loaded = await contentItemJson(
+          `/api/editor/content/${encodeURIComponent(linkedVideoSummary.id)}`,
+        );
+        if (loaded.kind !== "video") throw new Error(errors.content_unavailable);
+        linkedVideo = loaded;
+        upsert(loaded);
+      } catch (error) {
+        setNotice({
+          text: error instanceof Error
+            ? error.message
+            : "No se pudo cargar el video relacionado.",
+          tone: "error",
+        });
+        setBusy(null);
+        return;
+      }
+      setBusy(null);
+    }
+
     const created = emptyDraft("guide") as Extract<ContentDraft, { kind: "guide" }>;
     const regions = linkedVideo
       ? linkedVideo.content.regions.length > 0
@@ -1381,10 +1439,25 @@ export function ContentStudio({ initialWorkspace }: Props) {
         },
       );
       upsert(current);
-      const linkedVideo = current.kind === "guide" && current.content.linkedVideoId
+      const linkedVideoSummary = current.kind === "guide" && current.content.linkedVideoId
         ? items.find((candidate): candidate is ContentItem & { kind: "video" } =>
             candidate.kind === "video" && candidate.id === current.content.linkedVideoId)
         : undefined;
+      let linkedVideo: (ContentItem & { kind: "video" }) | undefined;
+      if (linkedVideoSummary) {
+        try {
+          const loaded = await contentItemJson(
+            `/api/editor/content/${encodeURIComponent(linkedVideoSummary.id)}`,
+          );
+          if (loaded.kind === "video") {
+            linkedVideo = loaded;
+            upsert(loaded);
+          }
+        } catch {
+          // The guide itself is already saved. Keep it selected if the related
+          // video cannot be refreshed instead of turning a successful save into an error.
+        }
+      }
       if (guideEditing && linkedVideo && !guideReturnRef.current) {
         guideReturnRef.current = {
           draft: itemDraft(linkedVideo) as VideoDraft,
@@ -1488,10 +1561,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       if (deleted.id !== item.id) throw new Error(errors.content_unavailable);
 
       const remaining = items.filter((current) => current.id !== item.id);
-      const next = getIndependentPublications(remaining)[0] ?? null;
       setItems(remaining);
-      setDraft(next ? itemDraft(next) : null);
-      setEditingId(next?.id ?? null);
+      setDraft(null);
+      setEditingId(null);
       setIsNew(false);
       setGuideEditing(false);
       guideReturnRef.current = null;
@@ -1899,7 +1971,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                 key={current.id}
                 title={publicationsCollapsed ? current.title : undefined}
                 type="button"
-                onClick={() => open(current)}
+                onClick={() => void open(current)}
               >
                 <span className={`studio-kind studio-kind-${current.kind}`}>
                   <ItemIcon aria-hidden="true" size={15} />
@@ -2251,6 +2323,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
                       <TopicSelector
                         allowCreate={capabilities.canManageTaxonomy}
                         disabled={!editable || busy !== null}
+                        items={items}
+                        subjectIds={draft.subjectIds}
                         subjectSelected={draft.subjectIds.length > 0}
                         suggestions={topicSuggestions}
                         values={draft.content.regions.length > 0
@@ -2297,12 +2371,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
                     draft={draft}
                     linkedGuide={videoLinkedGuide}
                     onChange={setDraft}
-                    onManageLinkedGuide={videoLinkedGuide ? () => open(videoLinkedGuide) : undefined}
+                    onManageLinkedGuide={videoLinkedGuide ? () => void open(videoLinkedGuide) : undefined}
                     onOpenGuide={openGuideEditor}
                   />
                 </fieldset>
 
-                {editable && (isNew || !actions.some((action) => action.status === "in_review")) && (
+                {editable && hasUnsavedChanges &&
+                  (isNew || !actions.some((action) => action.status === "in_review")) && (
                   <footer className="studio-save">
                     <button
                       className="studio-button studio-button-primary"
@@ -2400,7 +2475,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                 className="studio-guide-choice-card"
                 data-guide-choice-initial
                 type="button"
-                onClick={() => beginGuideCreation(null)}
+                onClick={() => void beginGuideCreation(null)}
               >
                 <span><Notebook size={22} /></span>
                 <strong>Guía independiente</strong>
@@ -2426,7 +2501,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                     ))}
                   </select>
                 </label>
-                <button disabled={!linkedVideoId} type="button" onClick={() => beginGuideCreation(linkedVideoId)}>
+                <button disabled={!linkedVideoId} type="button" onClick={() => void beginGuideCreation(linkedVideoId)}>
                   Continuar <CaretRight size={16} />
                 </button>
               </div>
