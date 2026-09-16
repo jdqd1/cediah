@@ -6,6 +6,7 @@ import type { DatabaseClient } from "./db/database.js";
 import {
   deleteContentTopic,
   listContentTopicItemOrders,
+  listContentTopicItems,
   renameContentTopic,
   reorderContentTopicItems,
 } from "./content-topic-taxonomy.js";
@@ -24,6 +25,30 @@ const ContentTopicResponseSchema = z.object({
     name: z.string().trim().min(1).max(120),
     subjectIds: z.array(z.string().uuid()),
   }),
+});
+
+const ContentTopicItemSummarySchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(["guide", "video"]),
+  status: z.enum([
+    "draft",
+    "in_review",
+    "changes_requested",
+    "approved",
+    "published",
+    "archived",
+  ]),
+  subjectIds: z.array(z.string().uuid()),
+  title: z.string().max(200),
+  topics: z.array(z.string().trim().min(1).max(120)),
+});
+
+const ContentTopicItemsResponseSchema = z.object({
+  items: z.array(ContentTopicItemSummarySchema),
+  topics: z.array(z.object({
+    name: z.string().trim().min(1).max(120),
+    subjectIds: z.array(z.string().uuid()),
+  })),
 });
 
 const ContentTopicOrderQuerySchema = z.object({
@@ -106,6 +131,33 @@ export async function registerContentTopicEditorRoutes(
     identityProvider: IdentityProvider | undefined;
   },
 ) {
+  app.get("/v1/editor/topic-items", async (request, reply) => {
+    const editor = await resolveTaxonomyEditor(
+      request,
+      dependencies.identityProvider,
+      dependencies.contentProvider,
+    );
+    if (editor.kind === "error") {
+      return reply
+        .status(editor.status)
+        .header("Cache-Control", "no-store")
+        .send({ error: editor.error });
+    }
+    if (!dependencies.database) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    try {
+      const result = await listContentTopicItems(dependencies.database);
+      return reply
+        .header("Cache-Control", "private, max-age=5, stale-while-revalidate=20")
+        .send(ContentTopicItemsResponseSchema.parse(result));
+    } catch (error) {
+      request.log.error({ err: error }, "Content topic item lookup failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
   app.get<{ Querystring: unknown }>("/v1/content/topic-order", async (request, reply) => {
     if (!dependencies.database) {
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
