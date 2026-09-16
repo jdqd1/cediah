@@ -6,6 +6,7 @@ import { ContentTopicSchema, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
 import { StudioNameDialog } from "./studio-name-dialog";
+import { TopicItemManagementProvider, TopicItemManager } from "./topic-item-manager";
 import styles from "./topic-selector.module.css";
 
 const contentUnavailableMessage =
@@ -106,10 +107,6 @@ export function TopicSelector({
       return;
     }
 
-    // Older callers only supplied whether a subject was selected. Keep the
-    // topic stable in the current editor session; saving the content will
-    // persist it through the content provider. New callers pass subjectIds and
-    // persist immediately through the taxonomy endpoint below.
     if (subjectIds.length === 0) {
       const localTopic = { name: cleanInput, subjectIds: [] } satisfies ContentTopic;
       setCreatedTopics((current) => [
@@ -276,159 +273,167 @@ export function TopicSelector({
   }
 
   return (
-    <div className="topic-selector-field studio-field-wide">
-      <span className="topic-selector-label">Tema (opcional)</span>
-      <div className="topic-selector-controls">
-        <div
-          aria-label="Seleccionar tema opcional"
-          aria-disabled={!interactive}
-          className="topic-selector-options"
-          role="group"
-        >
-          {subjectSelected && options.length > 0 ? options.map((topic) => {
-            const selected = values.some(
-              (value) => normalizeRegion(value) === normalizeRegion(topic),
-            );
-            return (
-              <div className={styles.topicRow} key={normalizeRegion(topic)}>
-                <button
-                  aria-pressed={selected}
-                  className={`${styles.topicToggle} ${selected ? styles.topicToggleSelected : ""}`}
-                  disabled={!interactive}
-                  type="button"
-                  onClick={() => toggleTopic(topic)}
-                >
-                  <span className={styles.topicCheck} aria-hidden="true">
-                    {selected && <Check size={14} weight="bold" />}
-                  </span>
-                  <Tag aria-hidden="true" size={16} />
-                  <span>{topic}</span>
-                </button>
-                {allowCreate && (
-                  <div className={styles.topicActions}>
+    <TopicItemManagementProvider
+      enabled={allowCreate && subjectSelected}
+      subjectIds={subjectIds}
+    >
+      <div className="topic-selector-field studio-field-wide">
+        <span className="topic-selector-label">Tema (opcional)</span>
+        <div className="topic-selector-controls">
+          <div
+            aria-label="Seleccionar tema opcional"
+            aria-disabled={!interactive}
+            className="topic-selector-options"
+            role="group"
+          >
+            {subjectSelected && options.length > 0 ? options.map((topic) => {
+              const selected = values.some(
+                (value) => normalizeRegion(value) === normalizeRegion(topic),
+              );
+              return (
+                <div className={styles.topicBlock} key={normalizeRegion(topic)}>
+                  <div className={styles.topicRow}>
                     <button
-                      aria-label={`Editar nombre del tema ${topic}`}
-                      className={styles.topicAction}
+                      aria-pressed={selected}
+                      className={`${styles.topicToggle} ${selected ? styles.topicToggleSelected : ""}`}
                       disabled={!interactive}
-                      title="Editar nombre"
                       type="button"
-                      onClick={() => {
-                        setRenameError(null);
-                        setRenameTarget(topic);
-                        setRenameInput(topic);
-                      }}
+                      onClick={() => toggleTopic(topic)}
                     >
-                      <NotePencil aria-hidden="true" size={16} />
+                      <span className={styles.topicCheck} aria-hidden="true">
+                        {selected && <Check size={14} weight="bold" />}
+                      </span>
+                      <Tag aria-hidden="true" size={16} />
+                      <span>{topic}</span>
                     </button>
-                    <button
-                      aria-label={`Eliminar tema ${topic}`}
-                      className={`${styles.topicAction} ${styles.topicActionDanger}`}
-                      disabled={!interactive}
-                      title="Eliminar tema"
-                      type="button"
-                      onClick={() => {
-                        setDeleteError(null);
-                        setDeleteTarget(topic);
-                      }}
-                    >
-                      <Trash aria-hidden="true" size={16} />
-                    </button>
+                    {allowCreate && (
+                      <div className={styles.topicActions}>
+                        <button
+                          aria-label={`Editar nombre del tema ${topic}`}
+                          className={styles.topicAction}
+                          disabled={!interactive}
+                          title="Editar nombre"
+                          type="button"
+                          onClick={() => {
+                            setRenameError(null);
+                            setRenameTarget(topic);
+                            setRenameInput(topic);
+                          }}
+                        >
+                          <NotePencil aria-hidden="true" size={16} />
+                        </button>
+                        <button
+                          aria-label={`Eliminar tema ${topic}`}
+                          className={`${styles.topicAction} ${styles.topicActionDanger}`}
+                          disabled={!interactive}
+                          title="Eliminar tema"
+                          type="button"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteTarget(topic);
+                          }}
+                        >
+                          <Trash aria-hidden="true" size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          }) : (
-            <p>
-              {subjectSelected
-                ? allowCreate
-                  ? "El tema es opcional. Puedes publicar directamente en la materia o añadir uno para organizar el contenido."
-                  : "Esta materia no tiene temas. El contenido puede publicarse directamente en ella."
-                : "Selecciona primero una materia."}
-            </p>
+                  {allowCreate && <TopicItemManager disabled={!interactive} topic={topic} />}
+                </div>
+              );
+            }) : (
+              <p>
+                {subjectSelected
+                  ? allowCreate
+                    ? "El tema es opcional. Puedes publicar directamente en la materia o añadir uno para organizar el contenido."
+                    : "Esta materia no tiene temas. El contenido puede publicarse directamente en ella."
+                  : "Selecciona primero una materia."}
+              </p>
+            )}
+          </div>
+          {allowCreate && (
+            <button
+              className={`studio-entity-create-button studio-entity-create-button-primary ${styles.addTopicButton}`}
+              disabled={!interactive}
+              type="button"
+              onClick={() => {
+                setError(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus aria-hidden="true" size={16} />
+              Añadir tema
+            </button>
           )}
         </div>
+
         {allowCreate && (
-          <button
-            className="studio-entity-create-button studio-entity-create-button-primary"
-            disabled={!interactive}
-            type="button"
-            onClick={() => {
+          <StudioNameDialog
+            busy={busy}
+            description="El tema quedará disponible dentro de las materias seleccionadas y se sumará a tu selección actual."
+            icon={<Tag size={21} />}
+            inputLabel="Nombre del tema"
+            maxLength={120}
+            open={dialogOpen}
+            placeholder="Ej. Abdomen"
+            submitLabel={existingTopic ? "Seleccionar tema" : "Crear tema"}
+            title="Añadir tema"
+            value={input}
+            onChange={(value) => {
+              setInput(value);
               setError(null);
-              setDialogOpen(true);
             }}
+            onClose={closeDialog}
+            onSubmit={addTopic}
           >
-            <Plus aria-hidden="true" size={16} />
-            Añadir tema
-          </button>
+            {error && <p role="alert">{error}</p>}
+          </StudioNameDialog>
         )}
+
+        {allowCreate && (
+          <StudioNameDialog
+            busy={busy}
+            description={renameTarget
+              ? `Cambia el nombre de “${renameTarget}”. El nuevo nombre se aplicará también al contenido que ya usa este tema.`
+              : "Cambia el nombre del tema."}
+            icon={<NotePencil size={21} />}
+            inputLabel="Nombre del tema"
+            maxLength={120}
+            open={renameTarget !== null}
+            placeholder="Ej. Abdomen"
+            submitLabel="Guardar nombre"
+            title="Editar nombre del tema"
+            value={renameInput}
+            onChange={(value) => {
+              setRenameInput(value);
+              setRenameError(null);
+            }}
+            onClose={closeRenameDialog}
+            onSubmit={renameTopic}
+          >
+            {renameError && <p role="alert">{renameError}</p>}
+          </StudioNameDialog>
+        )}
+
+        <StudioConfirmDialog
+          busy={busy}
+          busyLabel="Eliminando…"
+          confirmLabel="Eliminar tema"
+          description={deleteTarget
+            ? `Se eliminará “${deleteTarget}” de la lista de temas. Si todavía está asociado a cualquier contenido, la eliminación se bloqueará hasta que retires ese tema del contenido.`
+            : "Selecciona el tema que deseas eliminar."}
+          error={deleteError}
+          icon={<Trash size={21} />}
+          open={deleteTarget !== null}
+          title="Eliminar tema"
+          onClose={() => {
+            if (busy) return;
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }}
+          onConfirm={deleteTopic}
+        />
       </div>
-
-      {allowCreate && (
-        <StudioNameDialog
-          busy={busy}
-          description="El tema quedará disponible dentro de las materias seleccionadas y se sumará a tu selección actual."
-          icon={<Tag size={21} />}
-          inputLabel="Nombre del tema"
-          maxLength={120}
-          open={dialogOpen}
-          placeholder="Ej. Abdomen"
-          submitLabel={existingTopic ? "Seleccionar tema" : "Crear tema"}
-          title="Añadir tema"
-          value={input}
-          onChange={(value) => {
-            setInput(value);
-            setError(null);
-          }}
-          onClose={closeDialog}
-          onSubmit={addTopic}
-        >
-          {error && <p role="alert">{error}</p>}
-        </StudioNameDialog>
-      )}
-
-      {allowCreate && (
-        <StudioNameDialog
-          busy={busy}
-          description={renameTarget
-            ? `Cambia el nombre de “${renameTarget}”. El nuevo nombre se aplicará también al contenido que ya usa este tema.`
-            : "Cambia el nombre del tema."}
-          icon={<NotePencil size={21} />}
-          inputLabel="Nombre del tema"
-          maxLength={120}
-          open={renameTarget !== null}
-          placeholder="Ej. Abdomen"
-          submitLabel="Guardar nombre"
-          title="Editar nombre del tema"
-          value={renameInput}
-          onChange={(value) => {
-            setRenameInput(value);
-            setRenameError(null);
-          }}
-          onClose={closeRenameDialog}
-          onSubmit={renameTopic}
-        >
-          {renameError && <p role="alert">{renameError}</p>}
-        </StudioNameDialog>
-      )}
-
-      <StudioConfirmDialog
-        busy={busy}
-        busyLabel="Eliminando…"
-        confirmLabel="Eliminar tema"
-        description={deleteTarget
-          ? `Se eliminará “${deleteTarget}” de la lista de temas. Si todavía está asociado a cualquier contenido, la eliminación se bloqueará hasta que retires ese tema del contenido.`
-          : "Selecciona el tema que deseas eliminar."}
-        error={deleteError}
-        icon={<Trash size={21} />}
-        open={deleteTarget !== null}
-        title="Eliminar tema"
-        onClose={() => {
-          if (busy) return;
-          setDeleteTarget(null);
-          setDeleteError(null);
-        }}
-        onConfirm={deleteTopic}
-      />
-    </div>
+    </TopicItemManagementProvider>
   );
 }

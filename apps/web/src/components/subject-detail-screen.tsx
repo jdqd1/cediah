@@ -13,7 +13,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import type { StudyCatalogItem, Subject } from "@cediah/contracts";
-import { type MouseEvent, useMemo, useState } from "react";
+import { type MouseEvent, useEffect, useMemo, useState } from "react";
 import {
   isStudyContentKind,
   publishedContentHref,
@@ -21,6 +21,7 @@ import {
   studyContentKindLabels,
   type StudyContentKind,
 } from "@/lib/content-navigation";
+import { applyContentIdOrder } from "@/lib/content-order";
 import {
   getSubjectStudySummaryCatalog,
   studyItemSearchText,
@@ -92,6 +93,7 @@ export function SubjectDetailScreen({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
+  const [topicOrders, setTopicOrders] = useState<Record<string, string[]>>({});
   const requestedKind = searchParams.get("tipo");
   const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
@@ -112,6 +114,12 @@ export function SubjectDetailScreen({
       return matchesTopic && matchesSearch;
     });
   }, [kindItems, search, searching, topic]);
+  const orderedTopicItems = useMemo(
+    () => topic
+      ? applyContentIdOrder(filteredItems, topicOrders[normalize(topic)] ?? [])
+      : filteredItems,
+    [filteredItems, topic, topicOrders],
+  );
   const topicGroups = useMemo(() => {
     const groups = new Map<string, { name: string; items: StudyCatalogItem[] }>();
     for (const item of filteredItems) {
@@ -128,6 +136,33 @@ export function SubjectDetailScreen({
     () => filteredItems.filter((item) => studyItemTopics(item).length === 0),
     [filteredItems],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/content-order?subjectId=${encodeURIComponent(subject.id)}`, { cache: "no-store" })
+      .then(async (response) => ({
+        body: await response.json().catch(() => null) as unknown,
+        ok: response.ok,
+      }))
+      .then(({ body, ok }) => {
+        if (cancelled || !ok || !body || typeof body !== "object" || !("topics" in body)) return;
+        const topics = Array.isArray(body.topics) ? body.topics : [];
+        const next: Record<string, string[]> = {};
+        for (const entry of topics) {
+          if (!entry || typeof entry !== "object" || !("topic" in entry) || !("contentIds" in entry)) continue;
+          if (typeof entry.topic !== "string" || !Array.isArray(entry.contentIds)) continue;
+          next[normalize(entry.topic)] = entry.contentIds.filter(
+            (id): id is string => typeof id === "string",
+          );
+        }
+        setTopicOrders(next);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subject.id]);
 
   function navigate(event: MouseEvent<HTMLAnchorElement>, href: string) {
     if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -247,7 +282,7 @@ export function SubjectDetailScreen({
                   <ResourceList items={filteredItems} searchQuery={search} subject={subject} />
                 </div>
               ) : topic ? (
-                <ResourceList items={filteredItems} subject={subject} topic={topic} />
+                <ResourceList items={orderedTopicItems} subject={subject} topic={topic} />
               ) : topicGroups.length === 0 ? (
                 <ResourceList items={filteredItems} subject={subject} />
               ) : (

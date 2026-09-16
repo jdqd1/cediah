@@ -3,7 +3,12 @@ import { z } from "zod";
 import type { ContentProvider, IdentityProvider, IdentityRequest } from "@cediah/contracts";
 import { getContentCapabilities } from "./content-authorization.js";
 import type { DatabaseClient } from "./db/database.js";
-import { deleteContentTopic, renameContentTopic } from "./content-topic-taxonomy.js";
+import {
+  deleteContentTopic,
+  listContentTopicItemOrders,
+  renameContentTopic,
+  reorderContentTopicItems,
+} from "./content-topic-taxonomy.js";
 
 const ContentTopicRenameRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -18,6 +23,31 @@ const ContentTopicResponseSchema = z.object({
   topic: z.object({
     name: z.string().trim().min(1).max(120),
     subjectIds: z.array(z.string().uuid()),
+  }),
+});
+
+const ContentTopicOrderQuerySchema = z.object({
+  subjectId: z.string().uuid(),
+});
+
+const ContentTopicOrderRequestSchema = z.object({
+  contentIds: z.array(z.string().uuid()).max(500),
+  subjectId: z.string().uuid(),
+  topic: z.string().trim().min(1).max(120),
+});
+
+const ContentTopicOrdersResponseSchema = z.object({
+  topics: z.array(z.object({
+    contentIds: z.array(z.string().uuid()),
+    topic: z.string().trim().min(1).max(120),
+  })),
+});
+
+const ContentTopicOrderMutationResponseSchema = z.object({
+  order: z.object({
+    contentIds: z.array(z.string().uuid()),
+    subjectId: z.string().uuid(),
+    topic: z.string().trim().min(1).max(120),
   }),
 });
 
@@ -76,6 +106,67 @@ export async function registerContentTopicEditorRoutes(
     identityProvider: IdentityProvider | undefined;
   },
 ) {
+  app.get<{ Querystring: unknown }>("/v1/content/topic-order", async (request, reply) => {
+    if (!dependencies.database) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+    const query = ContentTopicOrderQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_subject" });
+    }
+
+    try {
+      const topics = await listContentTopicItemOrders(dependencies.database, query.data.subjectId);
+      return reply
+        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .send(ContentTopicOrdersResponseSchema.parse({ topics }));
+    } catch (error) {
+      request.log.error({ err: error }, "Content topic order lookup failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
+  app.patch<{ Body: unknown }>("/v1/editor/topic-order", async (request, reply) => {
+    const editor = await resolveTaxonomyEditor(
+      request,
+      dependencies.identityProvider,
+      dependencies.contentProvider,
+    );
+    if (editor.kind === "error") {
+      return reply
+        .status(editor.status)
+        .header("Cache-Control", "no-store")
+        .send({ error: editor.error });
+    }
+    if (!dependencies.database) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    const input = ContentTopicOrderRequestSchema.safeParse(request.body);
+    if (!input.success) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_topic_order" });
+    }
+
+    try {
+      const result = await reorderContentTopicItems(dependencies.database, {
+        actorUserId: editor.user.id,
+        ...input.data,
+      });
+      if (result.status === "not_found") {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      if (result.status === "conflict") {
+        return reply.status(409).header("Cache-Control", "no-store").send({ error: "topic_order_conflict" });
+      }
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(ContentTopicOrderMutationResponseSchema.parse({ order: result.value }));
+    } catch (error) {
+      request.log.error({ err: error }, "Content topic order update failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
   app.patch<{ Body: unknown }>("/v1/editor/topics", async (request, reply) => {
     const editor = await resolveTaxonomyEditor(
       request,

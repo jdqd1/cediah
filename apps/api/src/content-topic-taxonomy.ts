@@ -9,6 +9,16 @@ type TopicMutationResult =
   | { status: "in_use" }
   | { status: "not_found" };
 
+type TopicItemOrderMutationResult =
+  | { status: "success"; value: { contentIds: string[]; subjectId: string; topic: string } }
+  | { status: "conflict" }
+  | { status: "not_found" };
+
+export type ContentTopicItemOrder = {
+  contentIds: string[];
+  topic: string;
+};
+
 function normalizeTopic(value: string) {
   return value
     .normalize("NFD")
@@ -74,6 +84,108 @@ async function subjectIdsForTopic(database: QueryDatabase, topicId: string) {
   return links.rows.map((row) => row.subject_id);
 }
 
+export async function listContentTopicItemOrders(
+  database: DatabaseClient,
+  subjectId: string,
+): Promise<ContentTopicItemOrder[]> {
+  const rows = await sql<{ content_item_id: string; position: number; topic_key: string }>`
+    select content_item_id, position, topic_key
+    from public.content_topic_item_order
+    where subject_id = ${subjectId}
+    order by topic_key asc, position asc, content_item_id asc
+  `.execute(database);
+  const grouped = new Map<string, string[]>();
+  for (const row of rows.rows) {
+    grouped.set(row.topic_key, [...(grouped.get(row.topic_key) ?? []), row.content_item_id]);
+  }
+  return [...grouped.entries()].map(([topic, contentIds]) => ({ contentIds, topic }));
+}
+
+export async function reorderContentTopicItems(
+  database: DatabaseClient,
+  input: {
+    actorUserId: string;
+    contentIds: string[];
+    subjectId: string;
+    topic: string;
+  },
+): Promise<TopicItemOrderMutationResult> {
+  const topic = input.topic.trim();
+  const topicKey = normalizeTopic(topic);
+  const contentIds = [...new Set(input.contentIds)];
+  if (!topicKey || contentIds.length !== input.contentIds.length) return { status: "conflict" };
+
+  return database.transaction().execute(async (transaction) => {
+    const topicResult = await sql<{ id: string; name: string }>`
+      select topic.id, topic.name
+      from public.content_topics as topic
+      join public.content_topic_subjects as link on link.topic_id = topic.id
+      where link.subject_id = ${input.subjectId}
+        and lower(topic.name) = lower(${topic})
+      limit 1
+      for update of topic
+    `.execute(transaction);
+    const storedTopic = topicResult.rows[0];
+    if (!storedTopic) return { status: "not_found" };
+
+    if (contentIds.length > 0) {
+      const rows = await transaction
+        .selectFrom("content_items")
+        .innerJoin("content_subjects", "content_subjects.content_item_id", "content_items.id")
+        .select(["content_items.content", "content_items.id", "content_items.topic"])
+        .where("content_subjects.subject_id", "=", input.subjectId)
+        .where("content_items.id", "in", contentIds)
+        .execute();
+      if (rows.length !== contentIds.length) return { status: "conflict" };
+      if (rows.some((row) => !contentTopics(row.content, row.topic).some(
+        (candidate) => normalizeTopic(candidate) === topicKey,
+      ))) {
+        return { status: "conflict" };
+      }
+    }
+
+    await sql`
+      delete from public.content_topic_item_order
+      where subject_id = ${input.subjectId}
+        and topic_key = ${topicKey}
+    `.execute(transaction);
+
+    for (const [position, contentId] of contentIds.entries()) {
+      await sql`
+        insert into public.content_topic_item_order (
+          subject_id,
+          topic_key,
+          content_item_id,
+          position,
+          updated_at
+        ) values (
+          ${input.subjectId},
+          ${topicKey},
+          ${contentId},
+          ${position},
+          now()
+        )
+      `.execute(transaction);
+    }
+
+    await transaction
+      .insertInto("audit_log")
+      .values({
+        action: "content_topic_items_reordered",
+        actor_user_id: input.actorUserId,
+        metadata: { contentIds, subjectId: input.subjectId, topic: storedTopic.name },
+        target_id: storedTopic.id,
+        target_type: "content_topic",
+      })
+      .execute();
+
+    return {
+      status: "success",
+      value: { contentIds, subjectId: input.subjectId, topic: topicKey },
+    };
+  });
+}
+
 export async function renameContentTopic(
   database: DatabaseClient,
   input: { actorUserId: string; name: string; previousName: string },
@@ -128,6 +240,15 @@ export async function renameContentTopic(
         .executeTakeFirst();
       if (!updated) return { status: "conflict" };
       affectedContentCount += 1;
+    }
+
+    const nextTopicKey = normalizeTopic(name);
+    if (nextTopicKey !== previous) {
+      await sql`
+        update public.content_topic_item_order
+        set topic_key = ${nextTopicKey}, updated_at = now()
+        where topic_key = ${previous}
+      `.execute(transaction);
     }
 
     await sql`
@@ -185,6 +306,10 @@ export async function deleteContentTopic(
     if (inUse) return { status: "in_use" };
 
     const subjectIds = await subjectIdsForTopic(transaction, source.id);
+    await sql`
+      delete from public.content_topic_item_order
+      where topic_key = ${normalized}
+    `.execute(transaction);
     await sql`
       delete from public.content_topic_subjects
       where topic_id = ${source.id}

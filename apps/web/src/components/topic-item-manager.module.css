@@ -1,0 +1,187 @@
+.container {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.42rem 0 0.18rem;
+  border: 1px solid #eee5e1;
+  border-radius: 10px;
+  background: #fcfaf9;
+  padding: 0.65rem;
+}
+
+.header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.08rem;
+}
+
+.header > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.header strong {
+  color: #443b38;
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.header span,
+.header small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  border: 1px solid #e7ddda;
+  border-radius: 9px;
+  background: #fff;
+  padding: 0.38rem;
+  transition: border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.item:has(.moveButton:not(:disabled)):hover {
+  border-color: #d3beb8;
+}
+
+.itemDragging {
+  opacity: 0.58;
+  box-shadow: 0 0 0 2px rgb(116 27 34 / 7%);
+}
+
+.moveButton {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 0.22rem;
+  border: 1px solid #dfd3cf;
+  border-radius: 7px;
+  background: #faf7f5;
+  padding: 0 0.45rem;
+  color: #655b58;
+  cursor: grab;
+  font-size: 0.62rem;
+  font-weight: 720;
+}
+
+.moveButton:active {
+  cursor: grabbing;
+}
+
+.moveButton:hover:not(:disabled) {
+  border-color: #bfa39d;
+  background: #f5edeb;
+  color: var(--wine);
+}
+
+.moveButton:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.copy strong {
+  overflow: hidden;
+  color: #312a28;
+  font-size: 0.69rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy span {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+}
+
+.actions button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #e3d9d5;
+  border-radius: 7px;
+  background: #fff;
+  color: #655b58;
+}
+
+.actions button:hover:not(:disabled) {
+  border-color: #c3aaa5;
+  background: #faf5f3;
+  color: var(--wine);
+}
+
+.actions .danger:hover:not(:disabled) {
+  border-color: #d8aaa7;
+  background: #fff0f0;
+  color: #9b2d34;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.empty,
+.error {
+  border-radius: 8px;
+  padding: 0.55rem 0.62rem;
+  font-size: 0.64rem;
+  line-height: 1.45;
+}
+
+.empty {
+  background: #fff;
+  color: var(--muted);
+}
+
+.error {
+  background: #fff1f0;
+  color: #9b2d34;
+}
+
+@media (max-width: 620px) {
+  .header {
+    align-items: start;
+    flex-direction: column;
+    gap: 0.22rem;
+  }
+
+  .item {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.35rem;
+  }
+
+  .moveButton {
+    width: 34px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .moveButton span {
+    display: none;
+  }
+}
