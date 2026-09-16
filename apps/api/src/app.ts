@@ -52,6 +52,7 @@ import {
 import { type ApiEnvironment, readEnvironment } from "./config.js";
 import { type AuthService, createBetterAuthService } from "./auth.js";
 import { getContentCapabilities } from "./content-authorization.js";
+import { registerContentTopicEditorRoutes } from "./content-topic-editor-routes.js";
 import { createPostgresDatabase, createPostgresPool } from "./db/database.js";
 import { applySqlMigrations } from "./db/migrate.js";
 import { createCloudflareStreamVideoProvider } from "./providers/cloudflare-stream.js";
@@ -379,6 +380,12 @@ export async function buildApp(
       }
       callback(new Error("Origin not allowed"), false);
     },
+  });
+
+  await registerContentTopicEditorRoutes(app, {
+    contentProvider,
+    database,
+    identityProvider,
   });
 
   if (authService) {
