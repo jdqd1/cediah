@@ -1,0 +1,29 @@
+name: Apply content studio patch
+
+on:
+  push:
+    branches:
+      - fix/content-studio-index-topic-items-save-flow
+    paths:
+      - .github/workflows/apply-content-studio-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/content-studio-index-topic-items-save-flow
+          fetch-depth: 0
+      - name: Apply patch
+        run: |
+          git apply .tmp/content-studio.patch
+          rm .tmp/content-studio.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/components/content-studio.tsx .tmp/content-studio.patch
+          git commit -m "Lazy-load editorial content details"
+          git push origin HEAD:fix/content-studio-index-topic-items-save-flow
