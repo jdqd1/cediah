@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, Plus, Tag, Trash } from "@phosphor-icons/react";
+import { Check, NotePencil, Plus, Tag, Trash } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import { ContentTopicSchema, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
 import { StudioNameDialog } from "./studio-name-dialog";
+import styles from "./topic-selector.module.css";
 
 const contentUnavailableMessage =
   "No se pudo guardar el tema. Actualiza la página y vuelve a intentarlo.";
@@ -15,7 +16,7 @@ const topicErrors: Partial<Record<string, string>> = {
   forbidden: "Tu cuenta no tiene permiso para administrar temas.",
   invalid_topic: "El nombre del tema no es válido.",
   not_found: "El tema ya no existe o no está disponible.",
-  topic_conflict: "No se pudo crear el tema con las materias seleccionadas.",
+  topic_conflict: "Ya existe un tema con ese nombre o no se pudo guardar con las materias seleccionadas.",
   topic_in_use: "No puedes eliminar este tema porque todavía está asociado a contenido. Quita el tema de ese contenido, guarda los cambios y vuelve a intentarlo.",
 };
 
@@ -42,10 +43,27 @@ export function TopicSelector({
   const [error, setError] = useState<string | null>(null);
   const [createdTopics, setCreatedTopics] = useState<ContentTopic[]>([]);
   const [deletedTopics, setDeletedTopics] = useState<string[]>([]);
+  const [renamedTopics, setRenamedTopics] = useState<Record<string, string>>({});
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const options = useMemo(
-    () => uniqueRegions([
+  const options = useMemo(() => {
+    const resolveRenamedTopic = (topic: string) => {
+      let current = topic;
+      const seen = new Set<string>();
+      while (true) {
+        const key = normalizeRegion(current);
+        if (seen.has(key)) return current;
+        seen.add(key);
+        const renamed = renamedTopics[key];
+        if (!renamed) return current;
+        current = renamed;
+      }
+    };
+
+    return uniqueRegions([
       ...suggestions,
       ...createdTopics
         .filter((topic) =>
@@ -53,25 +71,31 @@ export function TopicSelector({
         )
         .map((topic) => topic.name),
       ...values,
-    ]).filter(
+    ].map(resolveRenamedTopic)).filter(
       (topic) => !deletedTopics.some(
         (deleted) => normalizeRegion(deleted) === normalizeRegion(topic),
       ),
-    ),
-    [createdTopics, deletedTopics, subjectIds, suggestions, values],
-  );
+    );
+  }, [createdTopics, deletedTopics, renamedTopics, subjectIds, suggestions, values]);
   const cleanInput = cleanRegion(input);
+  const cleanRenameInput = cleanRegion(renameInput);
   const existingTopic = options.find(
     (topic) => normalizeRegion(topic) === normalizeRegion(cleanInput),
   );
   const interactive = !disabled && !busy && subjectSelected;
-  const selectedTopicForDeletion = values.length === 1 ? values[0] : null;
 
   function closeDialog() {
     if (busy) return;
     setDialogOpen(false);
     setInput("");
     setError(null);
+  }
+
+  function closeRenameDialog() {
+    if (busy) return;
+    setRenameTarget(null);
+    setRenameInput("");
+    setRenameError(null);
   }
 
   async function addTopic() {
@@ -139,6 +163,68 @@ export function TopicSelector({
     }
   }
 
+  async function renameTopic() {
+    if (!allowCreate || !renameTarget || !cleanRenameInput || busy) return;
+    if (cleanRenameInput === renameTarget) {
+      closeRenameDialog();
+      return;
+    }
+
+    setBusy(true);
+    setRenameError(null);
+    try {
+      const response = await fetch("/api/editor/topics", {
+        body: JSON.stringify({ name: cleanRenameInput, previousName: renameTarget }),
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      const body: unknown = await response
+        .json()
+        .catch(() => ({ error: "content_unavailable" }));
+      if (!response.ok) {
+        const code = body && typeof body === "object" && "error" in body && typeof body.error === "string"
+          ? body.error
+          : "content_unavailable";
+        throw new Error(topicErrors[code] ?? `No se pudo renombrar el tema (${response.status}).`);
+      }
+      const parsed = ContentTopicSchema.safeParse(
+        body && typeof body === "object" && "topic" in body ? body.topic : null,
+      );
+      if (!parsed.success) throw new Error(contentUnavailableMessage);
+
+      const previousKey = normalizeRegion(renameTarget);
+      setCreatedTopics((current) => [
+        ...current.filter((topic) =>
+          normalizeRegion(topic.name) !== previousKey &&
+          normalizeRegion(topic.name) !== normalizeRegion(parsed.data.name),
+        ),
+        parsed.data,
+      ]);
+      setRenamedTopics((current) => {
+        const next = { ...current };
+        for (const [key, value] of Object.entries(next)) {
+          if (normalizeRegion(value) === previousKey) next[key] = parsed.data.name;
+        }
+        next[previousKey] = parsed.data.name;
+        return next;
+      });
+      setDeletedTopics((current) => current.filter(
+        (topic) => normalizeRegion(topic) !== normalizeRegion(parsed.data.name),
+      ));
+      onChange(uniqueRegions(values.map((value) =>
+        normalizeRegion(value) === previousKey ? parsed.data.name : value,
+      )));
+      setRenameTarget(null);
+      setRenameInput("");
+      setRenameError(null);
+    } catch (caught) {
+      setRenameError(caught instanceof Error ? caught.message : contentUnavailableMessage);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteTopic() {
     if (!allowCreate || !deleteTarget || busy) return;
     setBusy(true);
@@ -167,7 +253,7 @@ export function TopicSelector({
       setCreatedTopics((current) => current.filter(
         (topic) => normalizeRegion(topic.name) !== normalizeRegion(deleteTarget),
       ));
-      setDeletedTopics((current) => uniqueRegions([...current, deleteTarget]));
+      setDeletedTopics((current) => uniqueRegions([...current, parsed.data.name]));
       onChange(values.filter(
         (value) => normalizeRegion(value) !== normalizeRegion(deleteTarget),
       ));
@@ -199,24 +285,57 @@ export function TopicSelector({
           className="topic-selector-options"
           role="group"
         >
-          {interactive && options.length > 0 ? options.map((topic) => {
+          {subjectSelected && options.length > 0 ? options.map((topic) => {
             const selected = values.some(
               (value) => normalizeRegion(value) === normalizeRegion(topic),
             );
             return (
-              <button
-                aria-pressed={selected}
-                className={selected ? "is-selected" : ""}
-                key={normalizeRegion(topic)}
-                type="button"
-                onClick={() => toggleTopic(topic)}
-              >
-                <span className="topic-selector-check" aria-hidden="true">
-                  {selected && <Check size={14} weight="bold" />}
-                </span>
-                <Tag aria-hidden="true" size={16} />
-                <span>{topic}</span>
-              </button>
+              <div className={styles.topicRow} key={normalizeRegion(topic)}>
+                <button
+                  aria-pressed={selected}
+                  className={`${styles.topicToggle} ${selected ? styles.topicToggleSelected : ""}`}
+                  disabled={!interactive}
+                  type="button"
+                  onClick={() => toggleTopic(topic)}
+                >
+                  <span className={styles.topicCheck} aria-hidden="true">
+                    {selected && <Check size={14} weight="bold" />}
+                  </span>
+                  <Tag aria-hidden="true" size={16} />
+                  <span>{topic}</span>
+                </button>
+                {allowCreate && (
+                  <div className={styles.topicActions}>
+                    <button
+                      aria-label={`Editar nombre del tema ${topic}`}
+                      className={styles.topicAction}
+                      disabled={!interactive}
+                      title="Editar nombre"
+                      type="button"
+                      onClick={() => {
+                        setRenameError(null);
+                        setRenameTarget(topic);
+                        setRenameInput(topic);
+                      }}
+                    >
+                      <NotePencil aria-hidden="true" size={16} />
+                    </button>
+                    <button
+                      aria-label={`Eliminar tema ${topic}`}
+                      className={`${styles.topicAction} ${styles.topicActionDanger}`}
+                      disabled={!interactive}
+                      title="Eliminar tema"
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setDeleteTarget(topic);
+                      }}
+                    >
+                      <Trash aria-hidden="true" size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           }) : (
             <p>
@@ -229,33 +348,18 @@ export function TopicSelector({
           )}
         </div>
         {allowCreate && (
-          <>
-            <button
-              className="studio-entity-create-button studio-entity-create-button-primary"
-              disabled={!interactive}
-              type="button"
-              onClick={() => {
-                setError(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus aria-hidden="true" size={16} />
-              Añadir tema
-            </button>
-            <button
-              className="studio-entity-create-button"
-              disabled={!interactive || !selectedTopicForDeletion}
-              type="button"
-              onClick={() => {
-                if (!selectedTopicForDeletion) return;
-                setDeleteError(null);
-                setDeleteTarget(selectedTopicForDeletion);
-              }}
-            >
-              <Trash aria-hidden="true" size={16} />
-              Eliminar tema
-            </button>
-          </>
+          <button
+            className="studio-entity-create-button studio-entity-create-button-primary"
+            disabled={!interactive}
+            type="button"
+            onClick={() => {
+              setError(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus aria-hidden="true" size={16} />
+            Añadir tema
+          </button>
         )}
       </div>
 
@@ -279,6 +383,31 @@ export function TopicSelector({
           onSubmit={addTopic}
         >
           {error && <p role="alert">{error}</p>}
+        </StudioNameDialog>
+      )}
+
+      {allowCreate && (
+        <StudioNameDialog
+          busy={busy}
+          description={renameTarget
+            ? `Cambia el nombre de “${renameTarget}”. El nuevo nombre se aplicará también al contenido que ya usa este tema.`
+            : "Cambia el nombre del tema."}
+          icon={<NotePencil size={21} />}
+          inputLabel="Nombre del tema"
+          maxLength={120}
+          open={renameTarget !== null}
+          placeholder="Ej. Abdomen"
+          submitLabel="Guardar nombre"
+          title="Editar nombre del tema"
+          value={renameInput}
+          onChange={(value) => {
+            setRenameInput(value);
+            setRenameError(null);
+          }}
+          onClose={closeRenameDialog}
+          onSubmit={renameTopic}
+        >
+          {renameError && <p role="alert">{renameError}</p>}
         </StudioNameDialog>
       )}
 
