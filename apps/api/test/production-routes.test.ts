@@ -15,7 +15,7 @@ describe("production route composition", () => {
     const app = await buildApp(testEnvironment);
 
     expect(() => registerProductionAuxiliaryRoutes(app, undefined)).not.toThrow();
-    await expect(app.ready()).resolves.toBeUndefined();
+    await app.ready();
 
     const health = await app.inject({ method: "GET", url: "/health" });
     expect(health.statusCode).toBe(200);
