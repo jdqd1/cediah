@@ -12,6 +12,7 @@ jobs:
   apply-and-validate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://cediah:cediah@127.0.0.1:5432/cediah_test
