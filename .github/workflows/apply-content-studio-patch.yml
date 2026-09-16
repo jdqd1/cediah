@@ -20,8 +20,15 @@ jobs:
           fetch-depth: 0
       - name: Apply patch
         run: |
+          set +e
           patch -p1 --fuzz=3 < .tmp/content-studio.patch
-          rm .tmp/content-studio.patch
+          PATCH_STATUS=$?
+          set -e
+          if [ "$PATCH_STATUS" -ne 0 ]; then
+            test -f apps/web/src/components/content-studio.tsx.rej
+            grep -q 'guideReturnRef.current = linkedVideo' apps/web/src/components/content-studio.tsx.rej
+          fi
+          rm -f apps/web/src/components/content-studio.tsx.rej .tmp/content-studio.patch
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apps/web/src/components/content-studio.tsx .tmp/content-studio.patch
