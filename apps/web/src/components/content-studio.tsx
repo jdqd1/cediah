@@ -893,6 +893,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [draft, setDraft] = useState<ContentDraft | null>(null);
   const [newSubjectName, setNewSubjectName] = useState("");
   const [subjectCreateOpen, setSubjectCreateOpen] = useState(false);
+  const [subjectRenameTarget, setSubjectRenameTarget] = useState<Subject | null>(null);
+  const [subjectRenameName, setSubjectRenameName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [query, setQuery] = useState("");
@@ -1042,6 +1044,8 @@ export function ContentStudio({ initialWorkspace }: Props) {
     setArchiveConfirmationOpen(false);
     setNewSubjectName("");
     setSubjectCreateOpen(false);
+    setSubjectRenameTarget(null);
+    setSubjectRenameName("");
     setFile(null);
     setProgress(0);
     if (fileRef.current) fileRef.current.value = "";
@@ -1257,6 +1261,49 @@ export function ContentStudio({ initialWorkspace }: Props) {
     }
   }
 
+  async function renameSubject() {
+    const subject = subjectRenameTarget;
+    const name = subjectRenameName.trim();
+    if (!subject || !name || !capabilities.canManageTaxonomy || busy) return;
+    if (name === subject.name) {
+      setSubjectRenameTarget(null);
+      setSubjectRenameName("");
+      return;
+    }
+
+    setBusy("subject-rename");
+    setNotice(null);
+    try {
+      const response = await json<{ subject: unknown }>(
+        `/api/editor/subjects/${encodeURIComponent(subject.id)}`,
+        {
+          body: JSON.stringify({ name }),
+          method: "PATCH",
+        },
+      );
+      const parsed = SubjectSchema.safeParse(response.subject);
+      if (!parsed.success) throw new Error(errors.content_unavailable);
+      setSubjects((current) =>
+        current
+          .map((value) => value.id === parsed.data.id ? parsed.data : value)
+          .sort((left, right) => left.name.localeCompare(right.name, "es")),
+      );
+      setSubjectRenameTarget(null);
+      setSubjectRenameName("");
+      setNotice({
+        text: `Materia “${subject.name}” renombrada a “${parsed.data.name}”.`,
+        tone: "success",
+      });
+    } catch (error) {
+      setNotice({
+        text: error instanceof Error ? error.message : "No fue posible editar el nombre de la materia.",
+        tone: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function removeSubject(subject: Subject) {
     if (!capabilities.canManageTaxonomy || busy) return;
     const resourceLabel = subject.contentCount === 1
@@ -1378,11 +1425,16 @@ export function ContentStudio({ initialWorkspace }: Props) {
   async function transition(status: TargetStatus) {
     if (!item || busy) return;
     if (hasUnsavedChanges) {
-      setNotice({
-        text: "No se cambió el estado porque hay cambios sin guardar. Guarda el contenido y vuelve a intentar la transición.",
-        tone: "error",
-      });
-      return;
+      if (status === "in_review") {
+        const saved = await save();
+        if (!saved) return;
+      } else {
+        setNotice({
+          text: "No se cambió el estado porque hay cambios sin guardar. Guarda el contenido y vuelve a intentar la transición.",
+          tone: "error",
+        });
+        return;
+      }
     }
     if (
       item.status === "archived" &&
@@ -2147,16 +2199,31 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                 </span>
                               </label>
                               {capabilities.canManageTaxonomy && (
-                                <button
-                                  aria-label={`Eliminar materia ${subject.name}`}
-                                  className="studio-subject-delete"
-                                  disabled={busy !== null}
-                                  title={`Eliminar ${subject.name}`}
-                                  type="button"
-                                  onClick={() => void removeSubject(subject)}
-                                >
-                                  <Trash aria-hidden="true" size={15} />
-                                </button>
+                                <>
+                                  <button
+                                    aria-label={`Editar nombre de materia ${subject.name}`}
+                                    className="studio-subject-delete"
+                                    disabled={busy !== null}
+                                    title={`Editar nombre de ${subject.name}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setSubjectRenameTarget(subject);
+                                      setSubjectRenameName(subject.name);
+                                    }}
+                                  >
+                                    <NotePencil aria-hidden="true" size={15} />
+                                  </button>
+                                  <button
+                                    aria-label={`Eliminar materia ${subject.name}`}
+                                    className="studio-subject-delete"
+                                    disabled={busy !== null}
+                                    title={`Eliminar ${subject.name}`}
+                                    type="button"
+                                    onClick={() => void removeSubject(subject)}
+                                  >
+                                    <Trash aria-hidden="true" size={15} />
+                                  </button>
+                                </>
                               )}
                             </div>
                           ))}
@@ -2235,7 +2302,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                   />
                 </fieldset>
 
-                {editable && (
+                {editable && (isNew || !actions.some((action) => action.status === "in_review")) && (
                   <footer className="studio-save">
                     <button
                       className="studio-button studio-button-primary"
@@ -2269,6 +2336,25 @@ export function ContentStudio({ initialWorkspace }: Props) {
           setNewSubjectName("");
         }}
         onSubmit={createSubject}
+      />
+
+      <StudioNameDialog
+        busy={busy === "subject-rename"}
+        description="El nuevo nombre se aplicará a todas las publicaciones clasificadas en esta materia."
+        icon={<NotePencil size={22} />}
+        inputLabel="Nombre de la materia"
+        maxLength={120}
+        open={Boolean(subjectRenameTarget)}
+        placeholder="Ej. Anatomía"
+        submitLabel="Guardar nombre"
+        title="Editar nombre de materia"
+        value={subjectRenameName}
+        onChange={setSubjectRenameName}
+        onClose={() => {
+          setSubjectRenameTarget(null);
+          setSubjectRenameName("");
+        }}
+        onSubmit={renameSubject}
       />
 
       <StudioConfirmDialog

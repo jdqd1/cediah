@@ -60,7 +60,15 @@ async function selectSubjects(
   return rows.map((row) => SubjectSchema.parse(row));
 }
 
-export function createPostgresSubjectProvider(database: DatabaseClient): SubjectProvider {
+export type PostgresSubjectProvider = SubjectProvider & {
+  updateSubject(input: {
+    actorUserId: string;
+    name: string;
+    subjectId: string;
+  }): Promise<SubjectMutationResult<Subject>>;
+};
+
+export function createPostgresSubjectProvider(database: DatabaseClient): PostgresSubjectProvider {
   return {
     async createSubject(input) {
       const name = input.name.trim();
@@ -82,6 +90,60 @@ export function createPostgresSubjectProvider(database: DatabaseClient): Subject
               action: "subject_created",
               actor_user_id: input.actorUserId,
               metadata: { slug: subject.slug },
+              target_id: subject.id,
+              target_type: "subject",
+            })
+            .execute();
+
+          return {
+            status: "success",
+            value: subject,
+          } satisfies SubjectMutationResult<Subject>;
+        });
+      } catch (error) {
+        if (isUniqueConflict(error)) return { status: "conflict" };
+        throw error;
+      }
+    },
+
+    async updateSubject(input) {
+      const name = input.name.trim();
+      const slug = slugifySubject(name);
+      if (!slug) return { status: "conflict" };
+
+      try {
+        return await database.transaction().execute(async (transaction) => {
+          const previous = await transaction
+            .selectFrom("subjects")
+            .select(["id", "name", "slug"])
+            .where("id", "=", input.subjectId)
+            .executeTakeFirst();
+          if (!previous) return { status: "not_found" };
+
+          const row = await transaction
+            .updateTable("subjects")
+            .set({ name, slug })
+            .where("id", "=", input.subjectId)
+            .returning(["id", "name", "slug"])
+            .executeTakeFirstOrThrow();
+          const countRow = await transaction
+            .selectFrom("content_subjects")
+            .select(sql<number>`count(*)::integer`.as("contentCount"))
+            .where("subject_id", "=", input.subjectId)
+            .executeTakeFirstOrThrow();
+          const subject = SubjectSchema.parse({ ...row, contentCount: countRow.contentCount });
+
+          await transaction
+            .insertInto("audit_log")
+            .values({
+              action: "subject_updated",
+              actor_user_id: input.actorUserId,
+              metadata: {
+                name: subject.name,
+                previousName: previous.name,
+                previousSlug: previous.slug,
+                slug: subject.slug,
+              },
               target_id: subject.id,
               target_type: "subject",
             })

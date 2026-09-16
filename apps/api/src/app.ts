@@ -763,6 +763,53 @@ export async function buildApp(
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
     }
   });
+
+  app.patch<{ Body: unknown; Params: { subjectId: string } }>(
+    "/v1/editor/subjects/:subjectId",
+    async (request, reply) => {
+      const editor = await resolveEditorUser(
+        toIdentityRequest(request.headers),
+        identityProvider,
+        contentProvider,
+      );
+      if (editor.kind !== "authenticated") return sendEditorResolutionError(editor, reply);
+      if (!editor.capabilities.canManageTaxonomy) {
+        return reply.status(403).header("Cache-Control", "no-store").send({ error: "forbidden" });
+      }
+
+      const editableSubjectProvider = subjectProvider as
+        | Partial<ReturnType<typeof createPostgresSubjectProvider>>
+        | undefined;
+      if (!editableSubjectProvider?.updateSubject) {
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+      }
+
+      const params = SubjectIdParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      const input = SubjectCreateRequestSchema.safeParse(request.body);
+      if (!input.success) {
+        return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_subject" });
+      }
+
+      try {
+        const result = await editableSubjectProvider.updateSubject({
+          actorUserId: editor.user.id,
+          name: input.data.name,
+          subjectId: params.data.subjectId,
+        });
+        if (result.status !== "success") return sendSubjectMutationError(result.status, reply);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(SubjectResponseSchema.parse({ subject: result.value }));
+      } catch (error) {
+        request.log.error({ err: error }, "Subject update failed");
+        return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+      }
+    },
+  );
+
   app.delete<{ Params: { subjectId: string } }>(
     "/v1/editor/subjects/:subjectId",
     async (request, reply) => {
