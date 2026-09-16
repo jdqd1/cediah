@@ -956,8 +956,24 @@ export const ContentTopicSchema = z.object({
 
 export type ContentTopic = z.infer<typeof ContentTopicSchema>;
 
+export const ContentEditorIndexMetaSchema = z.object({
+  nextCursor: z.string().nullable(),
+  totalItems: z.number().int().nonnegative(),
+  totalPublications: z.number().int().nonnegative(),
+});
+
+export type ContentEditorIndexMeta = z.infer<typeof ContentEditorIndexMetaSchema>;
+
+export const ContentEditorIndexPageSchema = z.object({
+  index: ContentEditorIndexMetaSchema,
+  items: z.array(ContentItemSchema),
+});
+
+export type ContentEditorIndexPage = z.infer<typeof ContentEditorIndexPageSchema>;
+
 export const ContentWorkspaceResponseSchema = z.object({
   capabilities: ContentCapabilitiesSchema,
+  index: ContentEditorIndexMetaSchema.optional(),
   items: z.array(ContentItemSchema),
   roles: z.array(PlatformRoleSchema),
   subjects: z.array(SubjectSchema).default([]),

@@ -1,7 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
+  ContentEditorIndexPageSchema,
   ContentItemSchema,
+  ContentKindSchema,
+  ContentStatusSchema,
   ContentWorkspaceResponseSchema,
   type ContentProvider,
   type IdentityProvider,
@@ -17,6 +20,8 @@ import {
   reorderContentTopicItems,
 } from "./content-topic-taxonomy.js";
 import {
+  decodeEditorContentCursor,
+  EDITOR_CONTENT_INDEX_MAX_LIMIT,
   getEditorContentItem,
   listEditorContentIndex,
   listEditorSubjects,
@@ -89,6 +94,16 @@ const ContentTopicOrderMutationResponseSchema = z.object({
 });
 
 const ContentIdParamsSchema = z.object({ contentId: z.string().uuid() });
+
+const EditorContentIndexQuerySchema = z.object({
+  cursor: z.string().trim().min(1).max(512).optional(),
+  includeWorkspace: z.enum(["0", "1"]).default("1"),
+  kind: ContentKindSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(EDITOR_CONTENT_INDEX_MAX_LIMIT).default(500),
+  q: z.string().trim().max(200).optional(),
+  scope: z.enum(["all", "publications"]).default("all"),
+  status: ContentStatusSchema.optional(),
+});
 
 function toIdentityRequest(headers: FastifyRequest["headers"]): IdentityRequest {
   const forwardedFor = headers["x-forwarded-for"];
@@ -175,19 +190,45 @@ export async function registerContentTopicEditorRoutes(
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
     }
 
+    const query = EditorContentIndexQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_content_index_query" });
+    }
+    const decodedCursor = query.data.cursor ? decodeEditorContentCursor(query.data.cursor) : null;
+    if (query.data.cursor && !decodedCursor) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_content_index_query" });
+    }
+    const cursor = decodedCursor ?? undefined;
+
+    const indexInput = {
+      actorUserId: editor.user.id,
+      canEditAll: editor.capabilities.canEditAll,
+      cursor,
+      kind: query.data.kind,
+      limit: query.data.limit,
+      query: query.data.q,
+      scope: query.data.scope,
+      status: query.data.status,
+    };
+
     try {
-      const [items, subjects, topics] = await Promise.all([
-        listEditorContentIndex(dependencies.database, {
-          actorUserId: editor.user.id,
-          canEditAll: editor.capabilities.canEditAll,
-        }),
+      if (query.data.includeWorkspace === "0") {
+        const page = await listEditorContentIndex(dependencies.database, indexInput);
+        return reply
+          .header("Cache-Control", "no-store")
+          .send(ContentEditorIndexPageSchema.parse(page));
+      }
+
+      const [page, subjects, topics] = await Promise.all([
+        listEditorContentIndex(dependencies.database, indexInput),
         listEditorSubjects(dependencies.database),
         listEditorTopics(dependencies.database),
       ]);
       return reply.header("Cache-Control", "no-store").send(
         ContentWorkspaceResponseSchema.parse({
           capabilities: { ...editor.capabilities, canUpload: false },
-          items,
+          index: page.index,
+          items: page.items,
           roles: editor.roles,
           subjects,
           topics,
