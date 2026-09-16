@@ -7,7 +7,13 @@ import { getCurrentUser } from "@/lib/server/current-user";
 export const dynamic = "force-dynamic";
 
 export default async function ContentStudioPage() {
-  const user = await getCurrentUser();
+  // Both requests validate the same protected session independently, so they
+  // can run together instead of adding their network latency serially.
+  const [user, result] = await Promise.all([
+    getCurrentUser(),
+    getContentWorkspace(),
+  ]);
+
   if (user.status === "anonymous") {
     redirect("/acceder?next=/panel/contenido");
   }
@@ -25,7 +31,6 @@ export default async function ContentStudioPage() {
     );
   }
 
-  const result = await getContentWorkspace();
   if (result.status === "forbidden") {
     return (
       <main className="studio-gate">
