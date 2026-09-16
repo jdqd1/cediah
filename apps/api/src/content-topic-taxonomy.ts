@@ -1,5 +1,5 @@
 import { sql, type Transaction } from "kysely";
-import type { ContentTopic } from "@cediah/contracts";
+import type { ContentStatus, ContentTopic } from "@cediah/contracts";
 import type { CediahDatabase, DatabaseClient, JsonValue } from "./db/database.js";
 
 type QueryDatabase = DatabaseClient | Transaction<CediahDatabase>;
@@ -17,6 +17,20 @@ type TopicItemOrderMutationResult =
 export type ContentTopicItemOrder = {
   contentIds: string[];
   topic: string;
+};
+
+export type ContentTopicItemSummary = {
+  id: string;
+  kind: "guide" | "video";
+  status: ContentStatus;
+  subjectIds: string[];
+  title: string;
+  topics: string[];
+};
+
+export type ContentTopicTaxonomySummary = {
+  name: string;
+  subjectIds: string[];
 };
 
 function normalizeTopic(value: string) {
@@ -82,6 +96,71 @@ async function subjectIdsForTopic(database: QueryDatabase, topicId: string) {
     order by subject_id asc
   `.execute(database);
   return links.rows.map((row) => row.subject_id);
+}
+
+export async function listContentTopicItems(database: DatabaseClient): Promise<{
+  items: ContentTopicItemSummary[];
+  topics: ContentTopicTaxonomySummary[];
+}> {
+  const [itemResult, topicResult] = await Promise.all([
+    sql<{
+      id: string;
+      kind: "guide" | "video";
+      regions: JsonValue;
+      status: ContentStatus;
+      subject_ids: string[] | null;
+      title: string;
+      topic: string;
+    }>`
+      select
+        item.id,
+        item.kind,
+        item.status,
+        item.title,
+        item.topic,
+        case
+          when jsonb_typeof(item.content -> 'regions') = 'array' then item.content -> 'regions'
+          else '[]'::jsonb
+        end as regions,
+        coalesce((
+          select array_agg(link.subject_id order by link.subject_id)
+          from public.content_subjects as link
+          where link.content_item_id = item.id
+        ), '{}'::uuid[]) as subject_ids
+      from public.content_items as item
+      where item.kind in ('guide', 'video')
+      order by lower(item.title) asc, item.id asc
+    `.execute(database),
+    sql<{
+      name: string;
+      subject_ids: string[] | null;
+    }>`
+      select
+        topic.name,
+        coalesce((
+          select array_agg(link.subject_id order by link.subject_id)
+          from public.content_topic_subjects as link
+          where link.topic_id = topic.id
+        ), '{}'::uuid[]) as subject_ids
+      from public.content_topics as topic
+      order by lower(topic.name) asc, topic.id asc
+    `.execute(database),
+  ]);
+
+  return {
+    items: itemResult.rows.map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      status: row.status,
+      subjectIds: row.subject_ids ?? [],
+      title: row.title,
+      topics: contentTopics({ regions: row.regions } as JsonValue, row.topic),
+    })),
+    topics: topicResult.rows.map((row) => ({
+      name: row.name,
+      subjectIds: row.subject_ids ?? [],
+    })),
+  };
 }
 
 export async function listContentTopicItemOrders(
