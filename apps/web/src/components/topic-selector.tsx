@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, NotePencil, Plus, Tag, Trash } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { Check, MagnifyingGlass, NotePencil, Plus, Tag, Trash, X } from "@phosphor-icons/react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { ContentTopicSchema, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
@@ -50,6 +50,8 @@ export function TopicSelector({
   const [renameError, setRenameError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [topicSearch, setTopicSearch] = useState("");
+  const deferredTopicSearch = useDeferredValue(topicSearch);
   const options = useMemo(() => {
     const resolveRenamedTopic = (topic: string) => {
       let current = topic;
@@ -78,6 +80,24 @@ export function TopicSelector({
       ),
     );
   }, [createdTopics, deletedTopics, renamedTopics, subjectIds, suggestions, values]);
+  const filteredOptions = useMemo(() => {
+    const normalizedSearch = normalizeRegion(deferredTopicSearch);
+    if (!normalizedSearch) return options;
+    const terms = normalizedSearch.split(" ").filter(Boolean);
+    return options
+      .filter((topic) => {
+        const normalizedTopic = normalizeRegion(topic);
+        return terms.every((term) => normalizedTopic.includes(term));
+      })
+      .sort((left, right) => {
+        const normalizedLeft = normalizeRegion(left);
+        const normalizedRight = normalizeRegion(right);
+        const leftStarts = normalizedLeft.startsWith(normalizedSearch);
+        const rightStarts = normalizedRight.startsWith(normalizedSearch);
+        if (leftStarts !== rightStarts) return leftStarts ? -1 : 1;
+        return left.localeCompare(right, "es");
+      });
+  }, [deferredTopicSearch, options]);
   const cleanInput = cleanRegion(input);
   const cleanRenameInput = cleanRegion(renameInput);
   const existingTopic = options.find(
@@ -276,17 +296,44 @@ export function TopicSelector({
     <TopicItemManagementProvider
       enabled={allowCreate && subjectSelected}
       subjectIds={subjectIds}
+      topics={options}
     >
       <div className="topic-selector-field studio-field-wide">
         <span className="topic-selector-label">Tema (opcional)</span>
         <div className="topic-selector-controls">
+          {subjectSelected && options.length > 3 && (
+            <div className={styles.topicSearch} role="search">
+              <MagnifyingGlass aria-hidden="true" size={17} />
+              <input
+                aria-label="Buscar tema"
+                autoComplete="off"
+                placeholder="Buscar tema…"
+                type="search"
+                value={topicSearch}
+                onChange={(event) => setTopicSearch(event.target.value)}
+              />
+              {topicSearch && (
+                <button
+                  aria-label="Limpiar búsqueda de temas"
+                  title="Limpiar búsqueda"
+                  type="button"
+                  onClick={() => setTopicSearch("")}
+                >
+                  <X aria-hidden="true" size={15} />
+                </button>
+              )}
+              {deferredTopicSearch.trim() && (
+                <span aria-live="polite">{filteredOptions.length}/{options.length}</span>
+              )}
+            </div>
+          )}
           <div
             aria-label="Seleccionar tema opcional"
             aria-disabled={!interactive}
             className="topic-selector-options"
             role="group"
           >
-            {subjectSelected && options.length > 0 ? options.map((topic) => {
+            {subjectSelected && filteredOptions.length > 0 ? filteredOptions.map((topic) => {
               const selected = values.some(
                 (value) => normalizeRegion(value) === normalizeRegion(topic),
               );
@@ -344,9 +391,11 @@ export function TopicSelector({
             }) : (
               <p>
                 {subjectSelected
-                  ? allowCreate
-                    ? "El tema es opcional. Puedes publicar directamente en la materia o añadir uno para organizar el contenido."
-                    : "Esta materia no tiene temas. El contenido puede publicarse directamente en ella."
+                  ? options.length > 0 && deferredTopicSearch.trim()
+                    ? "No hay temas que coincidan con la búsqueda."
+                    : allowCreate
+                      ? "El tema es opcional. Puedes publicar directamente en la materia o añadir uno para organizar el contenido."
+                      : "Esta materia no tiene temas. El contenido puede publicarse directamente en ella."
                   : "Selecciona primero una materia."}
               </p>
             )}
