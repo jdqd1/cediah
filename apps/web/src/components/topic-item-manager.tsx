@@ -35,6 +35,34 @@ const orderResponseSchema = z.object({
   })),
 });
 
+const topicItemSummarySchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(["guide", "video"]),
+  status: z.enum([
+    "draft",
+    "in_review",
+    "changes_requested",
+    "approved",
+    "published",
+    "archived",
+  ]),
+  subjectIds: z.array(z.string().uuid()),
+  title: z.string().max(200),
+  topics: z.array(z.string().trim().min(1).max(120)),
+});
+
+const topicItemsResponseSchema = z.object({
+  items: z.array(topicItemSummarySchema),
+  topics: z.array(z.object({
+    name: z.string().trim().min(1).max(120),
+    subjectIds: z.array(z.string().uuid()),
+  })),
+});
+
+type TopicItemSummary = z.infer<typeof topicItemSummarySchema>;
+
+type TopicItemsSnapshot = z.infer<typeof topicItemsResponseSchema>;
+
 const mutationErrors: Partial<Record<string, string>> = {
   content_conflict: "El contenido cambió mientras intentabas editarlo. Actualiza la página y vuelve a intentarlo.",
   content_unavailable: "No se pudo actualizar el contenido. Comprueba la conexión y vuelve a intentarlo.",
@@ -45,7 +73,7 @@ const mutationErrors: Partial<Record<string, string>> = {
   topic_order_conflict: "El orden cambió o uno de los elementos ya no pertenece a este tema.",
 };
 
-const statusLabels: Record<ContentItem["status"], string> = {
+const statusLabels: Record<TopicItemSummary["status"], string> = {
   approved: "Aprobado",
   archived: "Archivado",
   changes_requested: "Cambios solicitados",
@@ -74,12 +102,24 @@ function contentItemDraft(item: ContentItem): ContentDraft {
   ).value;
 }
 
-function itemTopics(item: ContentItem) {
+function contentItemTopics(item: ContentItem) {
   return uniqueRegions(
     item.content.regions.length > 0
       ? item.content.regions
       : item.topic ? [item.topic] : [],
   );
+}
+
+function toTopicItemSummary(item: ContentItem): TopicItemSummary | null {
+  if (item.kind !== "guide" && item.kind !== "video") return null;
+  return {
+    id: item.id,
+    kind: item.kind,
+    status: item.status,
+    subjectIds: item.subjectIds,
+    title: item.title,
+    topics: contentItemTopics(item),
+  };
 }
 
 function errorMessage(body: unknown, fallback: string) {
@@ -89,32 +129,51 @@ function errorMessage(body: unknown, fallback: string) {
   return mutationErrors[code] ?? fallback;
 }
 
+function commonSubjectIds(
+  snapshot: TopicItemsSnapshot,
+  requestedTopicKeys: Set<string>,
+) {
+  const matchingTopics = snapshot.topics.filter(
+    (topic) => requestedTopicKeys.has(normalizeRegion(topic.name)),
+  );
+  if (matchingTopics.length === 0) return [];
+
+  const common = new Set(matchingTopics[0]?.subjectIds ?? []);
+  for (const topic of matchingTopics.slice(1)) {
+    const current = new Set(topic.subjectIds);
+    for (const subjectId of [...common]) {
+      if (!current.has(subjectId)) common.delete(subjectId);
+    }
+  }
+  return [...common];
+}
+
 type OrdersBySubject = Record<string, Record<string, string[]>>;
 
 type TopicItemManagementContextValue = {
   configuredSubjectIds: readonly string[];
   deleteItem: () => Promise<void>;
-  deleteTarget: ContentItem | null;
+  deleteTarget: TopicItemSummary | null;
   deleteError: string | null;
   draggingItemId: string | null;
   enabled: boolean;
-  items: ContentItem[];
+  items: TopicItemSummary[];
   loaded: boolean;
   localOrders: Record<string, string[]>;
   mutationBusyId: string | null;
-  openDelete: (item: ContentItem) => void;
-  openRename: (item: ContentItem) => void;
+  openDelete: (item: TopicItemSummary) => void;
+  openRename: (item: TopicItemSummary) => void;
   orderBusyTopic: string | null;
   ordersBySubject: OrdersBySubject;
-  persistOrder: (topic: string, orderedIds: string[], topicItems: ContentItem[]) => Promise<void>;
+  persistOrder: (topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) => Promise<void>;
   renameError: string | null;
   renameInput: string;
   renameItem: () => Promise<void>;
-  renameTarget: ContentItem | null;
-  setDeleteTarget: (item: ContentItem | null) => void;
+  renameTarget: TopicItemSummary | null;
+  setDeleteTarget: (item: TopicItemSummary | null) => void;
   setDraggingItemId: (id: string | null) => void;
   setRenameInput: (value: string) => void;
-  setRenameTarget: (item: ContentItem | null) => void;
+  setRenameTarget: (item: TopicItemSummary | null) => void;
 };
 
 const TopicItemManagementContext = createContext<TopicItemManagementContextValue | null>(null);
@@ -123,41 +182,68 @@ export function TopicItemManagementProvider({
   children,
   enabled,
   subjectIds = [],
+  topics = [],
 }: {
   children: ReactNode;
   enabled: boolean;
   subjectIds?: readonly string[];
+  topics?: readonly string[];
 }) {
-  const configuredSubjectIds = useMemo(() => [...new Set(subjectIds)], [subjectIds]);
-  const configuredSubjectKey = configuredSubjectIds.join("|");
-  const [items, setItems] = useState<ContentItem[]>([]);
+  const configuredSubjectKey = [...new Set(subjectIds)].sort().join("|");
+  const requestedTopicKey = uniqueRegions(topics)
+    .map(normalizeRegion)
+    .sort()
+    .join("|");
+  const [configuredSubjectIds, setConfiguredSubjectIds] = useState<string[]>(
+    configuredSubjectKey ? configuredSubjectKey.split("|") : [],
+  );
+  const [items, setItems] = useState<TopicItemSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [ordersBySubject, setOrdersBySubject] = useState<OrdersBySubject>({});
   const [localOrders, setLocalOrders] = useState<Record<string, string[]>>({});
   const [orderBusyTopic, setOrderBusyTopic] = useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
-  const [renameTarget, setRenameTarget] = useState<ContentItem | null>(null);
+  const [renameTarget, setRenameTarget] = useState<TopicItemSummary | null>(null);
   const [renameInput, setRenameInput] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ContentItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TopicItemSummary | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [mutationBusyId, setMutationBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setLoaded(false);
+      return;
+    }
     let cancelled = false;
+    setLoaded(false);
 
     void (async () => {
-      const workspaceResponse = await fetch("/api/editor/content", { cache: "no-store" });
-      const workspaceBody: unknown = await workspaceResponse
+      const topicItemsResponse = await fetch("/api/editor/topic-items", { cache: "no-store" });
+      const topicItemsBody: unknown = await topicItemsResponse
         .json()
         .catch(() => ({ error: "content_unavailable" }));
-      const workspace = ContentWorkspaceResponseSchema.safeParse(workspaceBody);
-      if (!workspaceResponse.ok || !workspace.success) throw new Error("workspace_unavailable");
+      const snapshot = topicItemsResponseSchema.safeParse(topicItemsBody);
+      if (!topicItemsResponse.ok || !snapshot.success) throw new Error("topic_items_unavailable");
 
-      const orderSubjectIds = configuredSubjectKey
+      const requestedTopicKeys = new Set(
+        requestedTopicKey ? requestedTopicKey.split("|") : [],
+      );
+      const explicitSubjectIds = configuredSubjectKey
         ? configuredSubjectKey.split("|")
-        : [...new Set(workspace.data.items.flatMap((item) => item.subjectIds))];
+        : [];
+      const inferredSubjectIds = explicitSubjectIds.length > 0
+        ? explicitSubjectIds
+        : commonSubjectIds(snapshot.data, requestedTopicKeys);
+      const relevantItems = requestedTopicKeys.size === 0
+        ? []
+        : snapshot.data.items.filter((item) => item.topics.some(
+            (topic) => requestedTopicKeys.has(normalizeRegion(topic)),
+          ));
+      const orderSubjectIds = inferredSubjectIds.length > 0
+        ? inferredSubjectIds
+        : [...new Set(relevantItems.flatMap((item) => item.subjectIds))];
+
       const orderResults = await Promise.all(orderSubjectIds.map(async (subjectId) => {
         const response = await fetch(
           `/api/content-order?subjectId=${encodeURIComponent(subjectId)}`,
@@ -180,26 +266,30 @@ export function TopicItemManagementProvider({
           result.topics.map((topic) => [normalizeRegion(topic.topic), topic.contentIds]),
         );
       }
-      setItems(workspace.data.items);
+      setConfiguredSubjectIds(inferredSubjectIds);
+      setItems(snapshot.data.items);
       setOrdersBySubject(nextOrders);
       setLoaded(true);
     })().catch(() => {
       if (cancelled) return;
+      setConfiguredSubjectIds(configuredSubjectKey ? configuredSubjectKey.split("|") : []);
+      setItems([]);
+      setOrdersBySubject({});
       setLoaded(true);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [configuredSubjectKey, enabled]);
+  }, [configuredSubjectKey, enabled, requestedTopicKey]);
 
-  function openRename(item: ContentItem) {
+  function openRename(item: TopicItemSummary) {
     setRenameError(null);
     setRenameTarget(item);
     setRenameInput(item.title);
   }
 
-  function openDelete(item: ContentItem) {
+  function openDelete(item: TopicItemSummary) {
     setDeleteError(null);
     setDeleteTarget(item);
   }
@@ -217,7 +307,20 @@ export function TopicItemManagementProvider({
     setMutationBusyId(renameTarget.id);
     setRenameError(null);
     try {
-      const draft = contentItemDraft(renameTarget);
+      // The lightweight topic index intentionally omits heavy guide documents.
+      // Fetch the complete item only when the user actually renames one.
+      const workspaceResponse = await fetch("/api/editor/content", { cache: "no-store" });
+      const workspaceBody: unknown = await workspaceResponse
+        .json()
+        .catch(() => ({ error: "content_unavailable" }));
+      const workspace = ContentWorkspaceResponseSchema.safeParse(workspaceBody);
+      if (!workspaceResponse.ok || !workspace.success) {
+        throw new Error(mutationErrors.content_unavailable);
+      }
+      const source = workspace.data.items.find((item) => item.id === renameTarget.id);
+      if (!source) throw new Error(mutationErrors.not_found);
+
+      const draft = contentItemDraft(source);
       const response = await fetch(`/api/editor/content/${encodeURIComponent(renameTarget.id)}`, {
         body: JSON.stringify({ ...draft, title }),
         cache: "no-store",
@@ -232,7 +335,9 @@ export function TopicItemManagementProvider({
       }
       const parsed = ContentItemSchema.safeParse(body);
       if (!parsed.success) throw new Error(mutationErrors.content_unavailable);
-      setItems((current) => current.map((item) => item.id === parsed.data.id ? parsed.data : item));
+      const summary = toTopicItemSummary(parsed.data);
+      if (!summary) throw new Error(mutationErrors.content_unavailable);
+      setItems((current) => current.map((item) => item.id === summary.id ? summary : item));
       setRenameTarget(null);
       setRenameInput("");
     } catch (error) {
@@ -280,7 +385,7 @@ export function TopicItemManagementProvider({
     }
   }
 
-  async function persistOrder(topic: string, orderedIds: string[], topicItems: ContentItem[]) {
+  async function persistOrder(topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) {
     const topicKey = normalizeRegion(topic);
     if (!topicKey || orderBusyTopic) return;
     const relevantSubjectIds = configuredSubjectIds.length > 0
@@ -429,10 +534,9 @@ export function TopicItemManager({
   const topicKey = normalizeRegion(topic);
   const topicItems = useMemo(() => {
     const filtered = management.items
-      .filter((item) => item.kind === "guide" || item.kind === "video")
-      .filter((item) => itemTopics(item).some((candidate) => normalizeRegion(candidate) === topicKey))
+      .filter((item) => item.topics.some((candidate) => normalizeRegion(candidate) === topicKey))
       .filter((item) => management.configuredSubjectIds.length === 0 ||
-        management.configuredSubjectIds.every((subjectId) => item.subjectIds.includes(subjectId)))
+        management.configuredSubjectIds.some((subjectId) => item.subjectIds.includes(subjectId)))
       .sort((left, right) => left.title.localeCompare(right.title, "es"));
 
     const localOrder = management.localOrders[topicKey];
@@ -499,7 +603,7 @@ export function TopicItemManager({
                 className={styles.moveButton}
                 disabled={!canReorder}
                 draggable={canReorder}
-                title="Arrastra para cambiar el orden"
+                title={canReorder ? "Arrastra para cambiar el orden" : "Se necesitan al menos dos elementos para reordenar"}
                 type="button"
                 onDragEnd={() => management.setDraggingItemId(null)}
                 onDragStart={(event) => {
