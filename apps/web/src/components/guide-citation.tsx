@@ -143,7 +143,7 @@ export function GuideCitation({
   useLayoutEffect(() => {
     if (!open) return;
 
-    positionPopover();
+    schedulePositionUpdate();
     const compactQuery = window.matchMedia("(max-width: 760px), (hover: none)");
     const resizeObserver = new ResizeObserver(schedulePositionUpdate);
     if (triggerRef.current) resizeObserver.observe(triggerRef.current);
@@ -167,7 +167,7 @@ export function GuideCitation({
         positionFrameRef.current = null;
       }
     };
-  }, [open, positionPopover, references, schedulePositionUpdate]);
+  }, [open, references, schedulePositionUpdate]);
 
   useEffect(() => () => clearCloseTimer(), []);
 
