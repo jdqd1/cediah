@@ -53,13 +53,14 @@ jobs:
           git rm .tmp/apply-editor-index-pagination.mjs
           git rm .github/workflows/apply-editor-index-pagination.yml
           git add -A
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.6.5
       - uses: actions/setup-node@v4
         with:
           node-version: 22.14.0
-          cache: pnpm
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.6.5 --activate
+          pnpm --version
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
