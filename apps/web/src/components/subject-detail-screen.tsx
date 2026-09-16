@@ -152,7 +152,7 @@ export function SubjectDetailScreen({
           if (!entry || typeof entry !== "object" || !("topic" in entry) || !("contentIds" in entry)) continue;
           if (typeof entry.topic !== "string" || !Array.isArray(entry.contentIds)) continue;
           next[normalize(entry.topic)] = entry.contentIds.filter(
-            (id): id is string => typeof id === "string",
+            (id: unknown): id is string => typeof id === "string",
           );
         }
         setTopicOrders(next);
