@@ -2,7 +2,7 @@
 
 import { Check, MagnifyingGlass, NotePencil, Plus, Tag, Trash, X } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
-import { ContentTopicSchema, type ContentTopic } from "@cediah/contracts";
+import { ContentTopicSchema, type ContentItem, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
 import { StudioNameDialog } from "./studio-name-dialog";
@@ -24,6 +24,7 @@ const topicErrors: Partial<Record<string, string>> = {
 export function TopicSelector({
   allowCreate = false,
   disabled = false,
+  items = [],
   onChange,
   subjectIds = [],
   subjectSelected,
@@ -32,6 +33,7 @@ export function TopicSelector({
 }: {
   allowCreate?: boolean;
   disabled?: boolean;
+  items?: readonly ContentItem[];
   onChange: (values: string[]) => void;
   subjectIds?: readonly string[];
   subjectSelected: boolean;
@@ -295,6 +297,7 @@ export function TopicSelector({
   return (
     <TopicItemManagementProvider
       enabled={allowCreate && subjectSelected}
+      items={items}
       subjectIds={subjectIds}
       topics={options}
     >
