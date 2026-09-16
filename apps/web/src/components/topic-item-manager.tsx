@@ -211,12 +211,8 @@ export function TopicItemManagementProvider({
   const [mutationBusyId, setMutationBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled) {
-      setLoaded(false);
-      return;
-    }
+    if (!enabled) return;
     let cancelled = false;
-    setLoaded(false);
 
     void (async () => {
       const topicItemsResponse = await fetch("/api/editor/topic-items", { cache: "no-store" });
