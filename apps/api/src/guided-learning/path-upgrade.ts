@@ -79,8 +79,10 @@ async function readHistory(database: QueryDatabase, enrollmentId: string) {
       "learning_path_versions.version_number",
     ])
     .where("learning_enrollment_versions.enrollment_id", "=", enrollmentId)
-    .orderBy("learning_enrollment_versions.adopted_at", "asc")
+    // Version numbers are monotonic for an enrollment. They are the stable semantic
+    // order even when timestamp precision makes multiple adoption rows tie.
     .orderBy("learning_path_versions.version_number", "asc")
+    .orderBy("learning_enrollment_versions.adopted_at", "asc")
     .execute();
   return rows.map((row) => LearningEnrollmentVersionHistorySchema.parse({
     adoptedAt: toIso(row.adopted_at),
