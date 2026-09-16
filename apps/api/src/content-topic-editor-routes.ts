@@ -1,6 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import type { ContentProvider, IdentityProvider, IdentityRequest } from "@cediah/contracts";
+import {
+  ContentItemSchema,
+  ContentWorkspaceResponseSchema,
+  type ContentProvider,
+  type IdentityProvider,
+  type IdentityRequest,
+} from "@cediah/contracts";
 import { getContentCapabilities } from "./content-authorization.js";
 import type { DatabaseClient } from "./db/database.js";
 import {
@@ -10,6 +16,12 @@ import {
   renameContentTopic,
   reorderContentTopicItems,
 } from "./content-topic-taxonomy.js";
+import {
+  getEditorContentItem,
+  listEditorContentIndex,
+  listEditorSubjects,
+  listEditorTopics,
+} from "./editor-content-index.js";
 
 const ContentTopicRenameRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -76,6 +88,8 @@ const ContentTopicOrderMutationResponseSchema = z.object({
   }),
 });
 
+const ContentIdParamsSchema = z.object({ contentId: z.string().uuid() });
+
 function toIdentityRequest(headers: FastifyRequest["headers"]): IdentityRequest {
   const forwardedFor = headers["x-forwarded-for"];
   return {
@@ -86,7 +100,7 @@ function toIdentityRequest(headers: FastifyRequest["headers"]): IdentityRequest 
   };
 }
 
-async function resolveTaxonomyEditor(
+async function resolveContentEditor(
   request: FastifyRequest,
   identityProvider: IdentityProvider | undefined,
   contentProvider: ContentProvider | undefined,
@@ -106,13 +120,27 @@ async function resolveTaxonomyEditor(
       return { kind: "error" as const, status: 503, error: "content_unavailable" };
     }
     const roles = await contentProvider.getRoles(user.id);
-    if (!getContentCapabilities(roles).canManageTaxonomy) {
+    const capabilities = getContentCapabilities(roles);
+    if (!capabilities.canCreate && !capabilities.canEditAll) {
       return { kind: "error" as const, status: 403, error: "forbidden" };
     }
-    return { kind: "success" as const, user };
+    return { kind: "success" as const, capabilities, roles, user };
   } catch {
     return { kind: "error" as const, status: 503, error: "content_unavailable" };
   }
+}
+
+async function resolveTaxonomyEditor(
+  request: FastifyRequest,
+  identityProvider: IdentityProvider | undefined,
+  contentProvider: ContentProvider | undefined,
+) {
+  const editor = await resolveContentEditor(request, identityProvider, contentProvider);
+  if (editor.kind === "error") return editor;
+  if (!editor.capabilities.canManageTaxonomy) {
+    return { kind: "error" as const, status: 403, error: "forbidden" };
+  }
+  return editor;
 }
 
 function topicMutationError(
@@ -131,6 +159,80 @@ export async function registerContentTopicEditorRoutes(
     identityProvider: IdentityProvider | undefined;
   },
 ) {
+  app.get("/v1/editor/content-index", async (request, reply) => {
+    const editor = await resolveContentEditor(
+      request,
+      dependencies.identityProvider,
+      dependencies.contentProvider,
+    );
+    if (editor.kind === "error") {
+      return reply
+        .status(editor.status)
+        .header("Cache-Control", "no-store")
+        .send({ error: editor.error });
+    }
+    if (!dependencies.database) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    try {
+      const [items, subjects, topics] = await Promise.all([
+        listEditorContentIndex(dependencies.database, {
+          actorUserId: editor.user.id,
+          canEditAll: editor.capabilities.canEditAll,
+        }),
+        listEditorSubjects(dependencies.database),
+        listEditorTopics(dependencies.database),
+      ]);
+      return reply.header("Cache-Control", "no-store").send(
+        ContentWorkspaceResponseSchema.parse({
+          capabilities: { ...editor.capabilities, canUpload: false },
+          items,
+          roles: editor.roles,
+          subjects,
+          topics,
+        }),
+      );
+    } catch (error) {
+      request.log.error({ err: error }, "Content editor index request failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
+  app.get<{ Params: { contentId: string } }>("/v1/editor/content/:contentId", async (request, reply) => {
+    const editor = await resolveContentEditor(
+      request,
+      dependencies.identityProvider,
+      dependencies.contentProvider,
+    );
+    if (editor.kind === "error") {
+      return reply
+        .status(editor.status)
+        .header("Cache-Control", "no-store")
+        .send({ error: editor.error });
+    }
+    if (!dependencies.database) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+    const params = ContentIdParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    }
+
+    try {
+      const item = await getEditorContentItem(dependencies.database, {
+        actorUserId: editor.user.id,
+        canEditAll: editor.capabilities.canEditAll,
+        contentId: params.data.contentId,
+      });
+      if (!item) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      return reply.header("Cache-Control", "no-store").send(ContentItemSchema.parse(item));
+    } catch (error) {
+      request.log.error({ err: error }, "Content editor detail request failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
   app.get("/v1/editor/topic-items", async (request, reply) => {
     const editor = await resolveTaxonomyEditor(
       request,
