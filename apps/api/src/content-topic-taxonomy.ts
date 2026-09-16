@@ -1,7 +1,8 @@
-import { sql } from "kysely";
+import { sql, type Transaction } from "kysely";
 import type { ContentTopic } from "@cediah/contracts";
-import type { DatabaseClient, JsonValue } from "./db/database.js";
+import type { CediahDatabase, DatabaseClient, JsonValue } from "./db/database.js";
 
+type QueryDatabase = DatabaseClient | Transaction<CediahDatabase>;
 type TopicMutationResult =
   | { status: "success"; value: ContentTopic }
   | { status: "conflict" }
@@ -59,11 +60,11 @@ function renameTopicReferences(content: JsonValue, previousName: string, name: s
 
   return {
     changed: true,
-    content: { ...content, regions: [...unique.values()] } satisfies JsonValue,
+    content: { ...content, regions: [...unique.values()] } as JsonValue,
   };
 }
 
-async function subjectIdsForTopic(database: DatabaseClient, topicId: string) {
+async function subjectIdsForTopic(database: QueryDatabase, topicId: string) {
   const links = await sql<{ subject_id: string }>`
     select subject_id
     from public.content_topic_subjects
