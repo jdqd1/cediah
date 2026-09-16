@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentItem } from "@cediah/contracts";
-import { mostViewedFirst, newestContentFirst } from "./content-order";
+import { applyContentIdOrder, mostViewedFirst, newestContentFirst } from "./content-order";
 
 const item = (id: string, publishedAt: string | null, viewCount?: number) => ({
   id, publishedAt, viewCount, createdAt: "2026-08-01T00:00:00Z",
@@ -20,5 +20,23 @@ describe("dashboard ordering", () => {
     const tied = item("tied", "2026-08-02T00:00:00Z", 2);
     const uncounted = item("uncounted", null);
     expect([recent, uncounted, tied, popular].sort(mostViewedFirst).map((entry) => entry.id)).toEqual(["popular", "recent", "tied", "uncounted"]);
+  });
+});
+
+describe("manual topic ordering", () => {
+  it("places explicitly ordered content first and keeps unlisted content stable", () => {
+    const items = [
+      { id: "alpha" },
+      { id: "beta" },
+      { id: "gamma" },
+      { id: "delta" },
+    ];
+    expect(applyContentIdOrder(items, ["gamma", "alpha"]).map((entry) => entry.id)).toEqual([
+      "gamma",
+      "alpha",
+      "beta",
+      "delta",
+    ]);
+    expect(items.map((entry) => entry.id)).toEqual(["alpha", "beta", "gamma", "delta"]);
   });
 });
