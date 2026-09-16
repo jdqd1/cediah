@@ -12,8 +12,56 @@ import {
 } from "@cediah/contracts";
 import type { DatabaseClient, JsonValue } from "./db/database.js";
 
+export const EDITOR_CONTENT_INDEX_DEFAULT_LIMIT = 500;
+export const EDITOR_CONTENT_INDEX_MAX_LIMIT = 500;
+
+export type EditorContentCursor = {
+  id: string;
+  updatedAt: string;
+};
+
+export type EditorContentIndexInput = {
+  actorUserId: string;
+  canEditAll: boolean;
+  cursor?: EditorContentCursor;
+  kind?: ContentKind;
+  limit?: number;
+  query?: string;
+  scope?: "all" | "publications";
+  status?: ContentStatus;
+};
+
+export type EditorContentIndexPage = {
+  index: {
+    nextCursor: string | null;
+    totalItems: number;
+    totalPublications: number;
+  };
+  items: ContentItem[];
+};
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function toIso(value: Date | string) {
   return (value instanceof Date ? value : new Date(value)).toISOString();
+}
+
+export function encodeEditorContentCursor(cursor: EditorContentCursor) {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+export function decodeEditorContentCursor(value: string): EditorContentCursor | null {
+  try {
+    const decoded: unknown = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    if (!decoded || typeof decoded !== "object") return null;
+    const id = "id" in decoded ? decoded.id : null;
+    const updatedAt = "updatedAt" in decoded ? decoded.updatedAt : null;
+    if (typeof id !== "string" || !uuidPattern.test(id)) return null;
+    if (typeof updatedAt !== "string" || !Number.isFinite(Date.parse(updatedAt))) return null;
+    return { id, updatedAt: new Date(updatedAt).toISOString() };
+  } catch {
+    return null;
+  }
 }
 
 function stringArray(value: JsonValue | null) {
@@ -72,6 +120,14 @@ type IndexRow = {
   title: string;
   topic: string;
   updated_at: Date | string;
+};
+
+type CountRow = { count: number | string };
+
+type NormalizedEditorContentIndexInput = EditorContentIndexInput & {
+  limit: number;
+  query: string;
+  scope: "all" | "publications";
 };
 
 async function subjectIdsByContent(database: DatabaseClient, ids: string[]) {
@@ -168,11 +224,97 @@ function compactItem(
   });
 }
 
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .trim();
+}
+
+function searchTsquery(value: string) {
+  const tokens = normalizeSearch(value).match(/[a-z0-9]+/g) ?? [];
+  return tokens.slice(0, 12).map((token) => `${token}:*`).join(" & ");
+}
+
+function accessPredicate(input: NormalizedEditorContentIndexInput, alias = "item") {
+  if (alias === "linked_video") {
+    return sql<boolean>`(${input.canEditAll} or linked_video.author_user_id = ${input.actorUserId})`;
+  }
+  return sql<boolean>`(${input.canEditAll} or item.author_user_id = ${input.actorUserId})`;
+}
+
+function independentPublicationPredicate(input: NormalizedEditorContentIndexInput) {
+  return sql<boolean>`not (
+    item.kind::text = 'guide'
+    and nullif(item.content ->> 'linkedVideoId', '') is not null
+    and exists (
+      select 1
+      from public.content_items as linked_video
+      where linked_video.id::text = nullif(item.content ->> 'linkedVideoId', '')
+        and linked_video.kind::text = 'video'
+        and ${accessPredicate(input, "linked_video")}
+    )
+  )`;
+}
+
+function editorFilterPredicate(
+  input: NormalizedEditorContentIndexInput,
+  forcePublications = false,
+) {
+  const tsquery = searchTsquery(input.query);
+  const normalizedQuery = normalizeSearch(input.query);
+  const slugNeedle = normalizedQuery.replace(/\s+/g, "-");
+  const kindPredicate = input.kind
+    ? sql<boolean>`item.kind::text = ${input.kind}`
+    : sql<boolean>`true`;
+  const statusPredicate = input.status
+    ? sql<boolean>`item.status::text = ${input.status}`
+    : sql<boolean>`true`;
+  const searchPredicate = tsquery
+    ? sql<boolean>`(
+        coalesce(item.search_vector, ''::tsvector) @@ to_tsquery('simple', ${tsquery})
+        or public.cediah_search_normalize(item.slug) like ${`%${slugNeedle}%`}
+      )`
+    : sql<boolean>`true`;
+  const scopePredicate = forcePublications || input.scope === "publications"
+    ? independentPublicationPredicate(input)
+    : sql<boolean>`true`;
+  return sql<boolean>`
+    ${accessPredicate(input)}
+    and ${kindPredicate}
+    and ${statusPredicate}
+    and ${searchPredicate}
+    and ${scopePredicate}
+  `;
+}
+
+function cursorPredicate(cursor: EditorContentCursor | undefined) {
+  if (!cursor) return sql<boolean>`true`;
+  return sql<boolean>`(
+    item.updated_at < ${cursor.updatedAt}::timestamptz
+    or (item.updated_at = ${cursor.updatedAt}::timestamptz and item.id > ${cursor.id}::uuid)
+  )`;
+}
+
+function normalizeIndexInput(input: EditorContentIndexInput): NormalizedEditorContentIndexInput {
+  return {
+    ...input,
+    limit: Math.min(
+      EDITOR_CONTENT_INDEX_MAX_LIMIT,
+      Math.max(1, input.limit ?? EDITOR_CONTENT_INDEX_DEFAULT_LIMIT),
+    ),
+    query: input.query?.trim() ?? "",
+    scope: input.scope ?? "all",
+  };
+}
+
 export async function listEditorContentIndex(
   database: DatabaseClient,
-  input: { actorUserId: string; canEditAll: boolean },
-): Promise<ContentItem[]> {
-  const result = await sql<IndexRow>`
+  rawInput: EditorContentIndexInput,
+): Promise<EditorContentIndexPage> {
+  const input = normalizeIndexInput(rawInput);
+  const selectRows = sql<IndexRow>`
     select
       item.author_user_id,
       item.catalog_visibility,
@@ -195,20 +337,51 @@ export async function listEditorContentIndex(
       item.topic,
       item.updated_at
     from public.content_items as item
-    where (${input.canEditAll} or item.author_user_id = ${input.actorUserId})
+    where ${editorFilterPredicate(input)}
+      and ${cursorPredicate(input.cursor)}
     order by item.updated_at desc, item.id asc
-    limit 200
+    limit ${input.limit + 1}
   `.execute(database);
-  const ids = result.rows.map((row) => row.id);
+  const countItems = sql<CountRow>`
+    select count(*)::integer as count
+    from public.content_items as item
+    where ${editorFilterPredicate(input)}
+  `.execute(database);
+  const countPublications = sql<CountRow>`
+    select count(*)::integer as count
+    from public.content_items as item
+    where ${editorFilterPredicate(input, true)}
+  `.execute(database);
+
+  const [result, totalItemsResult, totalPublicationsResult] = await Promise.all([
+    selectRows,
+    countItems,
+    countPublications,
+  ]);
+  const hasMore = result.rows.length > input.limit;
+  const pageRows = hasMore ? result.rows.slice(0, input.limit) : result.rows;
+  const ids = pageRows.map((row) => row.id);
   const [subjects, assets] = await Promise.all([
     subjectIdsByContent(database, ids),
     latestAssetsByContent(database, ids),
   ]);
-  return result.rows.map((row) => compactItem(
+  const items = pageRows.map((row) => compactItem(
     row,
     subjects.get(row.id) ?? [],
     assets.get(row.id),
   ));
+  const last = hasMore ? pageRows.at(-1) : undefined;
+
+  return {
+    index: {
+      nextCursor: last
+        ? encodeEditorContentCursor({ id: last.id, updatedAt: toIso(last.updated_at) })
+        : null,
+      totalItems: Number(totalItemsResult.rows[0]?.count ?? 0),
+      totalPublications: Number(totalPublicationsResult.rows[0]?.count ?? 0),
+    },
+    items,
+  };
 }
 
 export async function getEditorContentItem(

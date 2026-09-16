@@ -48,8 +48,9 @@ import {
 } from "@cediah/contracts";
 import { AppShell } from "./app-shell";
 import { isPublishedPermittedDraftUpdate } from "@/lib/content-editing";
-import { findVideoLinkedGuide, getIndependentPublications, getVideoGuideContent } from "@/lib/content-guide-links";
+import { findVideoLinkedGuide, getVideoGuideContent } from "@/lib/content-guide-links";
 import { uniqueRegions } from "@/lib/content-regions";
+import { useEditorPublicationIndex } from "@/lib/use-editor-publication-index";
 import { questionAnswer, withQuestionAnswer } from "@/lib/question-answer";
 import { TopicSelector } from "./topic-selector";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
@@ -966,24 +967,20 @@ export function ContentStudio({ initialWorkspace }: Props) {
     return candidates.sort((left, right) => left.title.localeCompare(right.title, "es"));
   }, [draft, editingId, items, linkableVideos]);
 
-  const visibleItems = useMemo(() => {
-    const text = normalizeSearch(query.trim());
-    return getIndependentPublications(items)
-      .filter((current) => {
-        const regions = current.content.regions.length > 0
-          ? current.content.regions
-          : [current.topic];
-        const haystack = normalizeSearch(
-          `${current.title} ${current.summary} ${current.topic} ${regions.join(" ")} ${current.slug}`,
-        );
-        return (
-          (!text || haystack.includes(text)) &&
-          (kindFilter === "all" || current.kind === kindFilter) &&
-          (statusFilter === "all" || current.status === statusFilter)
-        );
-      })
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }, [items, kindFilter, query, statusFilter]);
+  const {
+    hasMorePublications,
+    loadMorePublications,
+    publicationCount,
+    publicationIndexBusy,
+    publicationIndexError,
+    visibleItems,
+  } = useEditorPublicationIndex({
+    initialWorkspace,
+    items,
+    kindFilter,
+    query,
+    statusFilter,
+  });
 
   const editable =
     Boolean(draft) &&
@@ -1887,7 +1884,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
           <MagnifyingGlass aria-hidden="true" size={18} />
           <input
             aria-label="Buscar contenido"
-            placeholder="Buscar por título, región o slug…"
+            placeholder="Buscar en todo el contenido…"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -1947,7 +1944,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
           <header className="studio-publications-heading">
             <div>
               <strong>Publicaciones</strong>
-              <small>{visibleItems.length}</small>
+              <small>{publicationCount}</small>
             </div>
             <button
               aria-controls="studio-publications"
@@ -1985,8 +1982,25 @@ export function ContentStudio({ initialWorkspace }: Props) {
               </button>
             );
           })}
-          {visibleItems.length === 0 && (
+          {publicationIndexBusy && visibleItems.length === 0 && (
+            <p className="studio-empty">Buscando publicaciones…</p>
+          )}
+          {!publicationIndexBusy && visibleItems.length === 0 && (
             <p className="studio-empty">No hay contenido con estos filtros.</p>
+          )}
+          {publicationIndexError && (
+            <p className="studio-empty">{publicationIndexError}</p>
+          )}
+          {hasMorePublications && (
+            <button
+              className="studio-item"
+              disabled={publicationIndexBusy || busy !== null}
+              type="button"
+              onClick={() => void loadMorePublications()}
+            >
+              <strong>{publicationIndexBusy ? "Cargando…" : "Cargar más publicaciones"}</strong>
+              <small>Mostrar la siguiente página</small>
+            </button>
           )}
         </aside>
 
