@@ -146,19 +146,13 @@ export function useEditorPublicationIndex(input: {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!remoteRequired) {
-      setRemote(null);
-      setLoadingKey(null);
-      setLoadingMore(false);
-      setError(null);
-      return;
-    }
+    if (!remoteRequired) return;
 
     const controller = new AbortController();
     const delay = filtersActive ? 180 : 0;
-    setLoadingKey(key);
-    setError(null);
     const timer = window.setTimeout(() => {
+      setLoadingKey(key);
+      setError(null);
       void requestPublicationPage(filters, null, controller.signal)
         .then((page) => {
           if (controller.signal.aborted) return;
@@ -189,7 +183,7 @@ export function useEditorPublicationIndex(input: {
     ? remote.index.totalPublications
     : localItems.length;
   const hasMorePublications = Boolean(remoteReady && remote.index.nextCursor);
-  const publicationIndexBusy = loadingKey === key || loadingMore;
+  const publicationIndexBusy = remoteRequired && (loadingKey === key || loadingMore);
 
   const loadMorePublications = useCallback(async () => {
     if (!remoteReady || !remote.index.nextCursor || loadingMore) return;
@@ -222,7 +216,7 @@ export function useEditorPublicationIndex(input: {
     loadMorePublications,
     publicationCount,
     publicationIndexBusy,
-    publicationIndexError: error,
+    publicationIndexError: remoteRequired ? error : null,
     visibleItems,
   };
 }
