@@ -49,6 +49,7 @@ export type PublishedContentItemResult =
   | { status: "not_found" | "unavailable" };
 
 export type ContentWorkspaceResult =
+  | { status: "anonymous" }
   | { status: "forbidden" }
   | { status: "unavailable" }
   | { status: "ready"; workspace: ContentWorkspaceResponse };
@@ -255,22 +256,37 @@ export async function getPublishedContentItem(
     : { status: "unavailable" };
 }
 
-export async function getContentWorkspace(): Promise<ContentWorkspaceResult> {
-  const session = await getApiRequestCookie();
-  if (session.status === "anonymous") return { status: "forbidden" };
-  const response = await requestContentApi({
-    cookie: session.cookie,
-    method: "GET",
-    path: "/v1/editor/content",
-    // The editorial workspace can legitimately include many rich guide documents.
-    // Give cold API/database starts enough time while the backend keeps this path no-store.
-    timeoutMs: 20_000,
-  });
+function workspaceResult(response: ContentApiResponse): ContentWorkspaceResult | null {
+  if (response.status === 401) return { status: "anonymous" };
   if (response.status === 403) return { status: "forbidden" };
-  if (response.status !== 200) return { status: "unavailable" };
-
+  if (response.status !== 200) return null;
   const workspace = ContentWorkspaceResponseSchema.safeParse(response.body);
   return workspace.success
     ? { status: "ready", workspace: workspace.data }
-    : { status: "unavailable" };
+    : null;
+}
+
+export async function getContentWorkspace(): Promise<ContentWorkspaceResult> {
+  const session = await getApiRequestCookie();
+  if (session.status === "anonymous") return { status: "anonymous" };
+
+  // The index carries only the metadata needed by the publication list and taxonomy UI.
+  // Full rich documents are fetched lazily when an editor item is opened.
+  const indexed = await requestContentApi({
+    cookie: session.cookie,
+    method: "GET",
+    path: "/v1/editor/content-index",
+    timeoutMs: 8_000,
+  });
+  const indexedResult = workspaceResult(indexed);
+  if (indexedResult) return indexedResult;
+
+  // Deployment-order fallback: keep the editor functional while the API rollout catches up.
+  const legacy = await requestContentApi({
+    cookie: session.cookie,
+    method: "GET",
+    path: "/v1/editor/content",
+    timeoutMs: 20_000,
+  });
+  return workspaceResult(legacy) ?? { status: "unavailable" };
 }

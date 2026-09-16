@@ -2,33 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ContentStudio } from "@/components/content-studio";
 import { getContentWorkspace } from "@/lib/server/content-api";
-import { getCurrentUser } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContentStudioPage() {
-  // Both requests validate the same protected session independently, so they
-  // can run together instead of adding their network latency serially.
-  const [user, result] = await Promise.all([
-    getCurrentUser(),
-    getContentWorkspace(),
-  ]);
+  // The protected editorial request already authenticates the session and resolves
+  // editor roles, so a separate /v1/auth/me request only adds duplicated work.
+  const result = await getContentWorkspace();
 
-  if (user.status === "anonymous") {
+  if (result.status === "anonymous") {
     redirect("/acceder?next=/panel/contenido");
-  }
-
-  if (user.status === "unavailable") {
-    return (
-      <main className="studio-gate">
-        <section>
-          <p className="eyebrow dark">Gestión de contenido</p>
-          <h1>La identidad no está disponible.</h1>
-          <p>Configura PostgreSQL, Better Auth y la API antes de abrir el espacio editorial.</p>
-          <Link href="/">Volver al inicio</Link>
-        </section>
-      </main>
-    );
   }
 
   if (result.status === "forbidden") {

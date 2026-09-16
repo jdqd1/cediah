@@ -7,7 +7,6 @@ import {
 } from "@phosphor-icons/react";
 import {
   ContentItemSchema,
-  ContentWorkspaceResponseSchema,
   normalizeContentLearningIdentity,
   type ContentDraft,
   type ContentItem,
@@ -35,33 +34,14 @@ const orderResponseSchema = z.object({
   })),
 });
 
-const topicItemSummarySchema = z.object({
-  id: z.string().uuid(),
-  kind: z.enum(["guide", "video"]),
-  status: z.enum([
-    "draft",
-    "in_review",
-    "changes_requested",
-    "approved",
-    "published",
-    "archived",
-  ]),
-  subjectIds: z.array(z.string().uuid()),
-  title: z.string().max(200),
-  topics: z.array(z.string().trim().min(1).max(120)),
-});
-
-const topicItemsResponseSchema = z.object({
-  items: z.array(topicItemSummarySchema),
-  topics: z.array(z.object({
-    name: z.string().trim().min(1).max(120),
-    subjectIds: z.array(z.string().uuid()),
-  })),
-});
-
-type TopicItemSummary = z.infer<typeof topicItemSummarySchema>;
-
-type TopicItemsSnapshot = z.infer<typeof topicItemsResponseSchema>;
+type TopicItemSummary = {
+  id: string;
+  kind: "guide" | "video";
+  status: ContentItem["status"];
+  subjectIds: string[];
+  title: string;
+  topics: string[];
+};
 
 const mutationErrors: Partial<Record<string, string>> = {
   content_conflict: "El contenido cambió mientras intentabas editarlo. Actualiza la página y vuelve a intentarlo.",
@@ -73,7 +53,7 @@ const mutationErrors: Partial<Record<string, string>> = {
   topic_order_conflict: "El orden cambió o uno de los elementos ya no pertenece a este tema.",
 };
 
-const statusLabels: Record<TopicItemSummary["status"], string> = {
+const statusLabels: Record<ContentItem["status"], string> = {
   approved: "Aprobado",
   archived: "Archivado",
   changes_requested: "Cambios solicitados",
@@ -129,25 +109,6 @@ function errorMessage(body: unknown, fallback: string) {
   return mutationErrors[code] ?? fallback;
 }
 
-function commonSubjectIds(
-  snapshot: TopicItemsSnapshot,
-  requestedTopicKeys: Set<string>,
-) {
-  const matchingTopics = snapshot.topics.filter(
-    (topic) => requestedTopicKeys.has(normalizeRegion(topic.name)),
-  );
-  if (matchingTopics.length === 0) return [];
-
-  const common = new Set(matchingTopics[0]?.subjectIds ?? []);
-  for (const topic of matchingTopics.slice(1)) {
-    const current = new Set(topic.subjectIds);
-    for (const subjectId of [...common]) {
-      if (!current.has(subjectId)) common.delete(subjectId);
-    }
-  }
-  return [...common];
-}
-
 type OrdersBySubject = Record<string, Record<string, string[]>>;
 
 type TopicItemManagementContextValue = {
@@ -158,7 +119,6 @@ type TopicItemManagementContextValue = {
   draggingItemId: string | null;
   enabled: boolean;
   items: TopicItemSummary[];
-  loaded: boolean;
   localOrders: Record<string, string[]>;
   mutationBusyId: string | null;
   openDelete: (item: TopicItemSummary) => void;
@@ -181,24 +141,45 @@ const TopicItemManagementContext = createContext<TopicItemManagementContextValue
 export function TopicItemManagementProvider({
   children,
   enabled,
+  items = [],
   subjectIds = [],
   topics = [],
 }: {
   children: ReactNode;
   enabled: boolean;
+  items?: readonly ContentItem[];
   subjectIds?: readonly string[];
   topics?: readonly string[];
 }) {
   const configuredSubjectKey = [...new Set(subjectIds)].sort().join("|");
+  const configuredSubjectIds = useMemo(
+    () => configuredSubjectKey ? configuredSubjectKey.split("|") : [],
+    [configuredSubjectKey],
+  );
   const requestedTopicKey = uniqueRegions(topics)
     .map(normalizeRegion)
     .sort()
     .join("|");
-  const [configuredSubjectIds, setConfiguredSubjectIds] = useState<string[]>(
-    configuredSubjectKey ? configuredSubjectKey.split("|") : [],
+  const requestedTopicKeys = useMemo(
+    () => new Set(requestedTopicKey ? requestedTopicKey.split("|") : []),
+    [requestedTopicKey],
   );
-  const [items, setItems] = useState<TopicItemSummary[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const baseItems = useMemo(
+    () => items.flatMap((item) => {
+      const summary = toTopicItemSummary(item);
+      return summary ? [summary] : [];
+    }),
+    [items],
+  );
+  const [itemOverrides, setItemOverrides] = useState<Record<string, TopicItemSummary | null>>({});
+  const managedItems = useMemo(
+    () => baseItems.flatMap((item) => {
+      if (!(item.id in itemOverrides)) return [item];
+      const override = itemOverrides[item.id];
+      return override ? [override] : [];
+    }),
+    [baseItems, itemOverrides],
+  );
   const [ordersBySubject, setOrdersBySubject] = useState<OrdersBySubject>({});
   const [localOrders, setLocalOrders] = useState<Record<string, string[]>>({});
   const [orderBusyTopic, setOrderBusyTopic] = useState<string | null>(null);
@@ -210,74 +191,49 @@ export function TopicItemManagementProvider({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [mutationBusyId, setMutationBusyId] = useState<string | null>(null);
 
+  const orderSubjectKey = useMemo(() => {
+    if (configuredSubjectIds.length > 0) return configuredSubjectIds.join("|");
+    const inferred = new Set<string>();
+    for (const item of baseItems) {
+      if (!item.topics.some((topic) => requestedTopicKeys.has(normalizeRegion(topic)))) continue;
+      item.subjectIds.forEach((subjectId) => inferred.add(subjectId));
+    }
+    return [...inferred].sort().join("|");
+  }, [baseItems, configuredSubjectIds, requestedTopicKeys]);
+
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !orderSubjectKey) return;
     let cancelled = false;
+    const orderSubjectIds = orderSubjectKey.split("|");
 
-    void (async () => {
-      const topicItemsResponse = await fetch("/api/editor/topic-items", { cache: "no-store" });
-      const topicItemsBody: unknown = await topicItemsResponse
-        .json()
-        .catch(() => ({ error: "content_unavailable" }));
-      const snapshot = topicItemsResponseSchema.safeParse(topicItemsBody);
-      if (!topicItemsResponse.ok || !snapshot.success) throw new Error("topic_items_unavailable");
-
-      const requestedTopicKeys = new Set(
-        requestedTopicKey ? requestedTopicKey.split("|") : [],
+    void Promise.all(orderSubjectIds.map(async (subjectId) => {
+      const response = await fetch(
+        `/api/content-order?subjectId=${encodeURIComponent(subjectId)}`,
+        { cache: "no-store" },
       );
-      const explicitSubjectIds = configuredSubjectKey
-        ? configuredSubjectKey.split("|")
-        : [];
-      const inferredSubjectIds = explicitSubjectIds.length > 0
-        ? explicitSubjectIds
-        : commonSubjectIds(snapshot.data, requestedTopicKeys);
-      const relevantItems = requestedTopicKeys.size === 0
-        ? []
-        : snapshot.data.items.filter((item) => item.topics.some(
-            (topic) => requestedTopicKeys.has(normalizeRegion(topic)),
-          ));
-      const orderSubjectIds = inferredSubjectIds.length > 0
-        ? inferredSubjectIds
-        : [...new Set(relevantItems.flatMap((item) => item.subjectIds))];
-
-      const orderResults = await Promise.all(orderSubjectIds.map(async (subjectId) => {
-        const response = await fetch(
-          `/api/content-order?subjectId=${encodeURIComponent(subjectId)}`,
-          { cache: "no-store" },
-        );
-        const body: unknown = await response
-          .json()
-          .catch(() => ({ topics: [] }));
-        const parsed = orderResponseSchema.safeParse(body);
-        return {
-          subjectId,
-          topics: response.ok && parsed.success ? parsed.data.topics : [],
-        };
-      }));
-
+      const body: unknown = await response.json().catch(() => ({ topics: [] }));
+      const parsed = orderResponseSchema.safeParse(body);
+      return {
+        subjectId,
+        topics: response.ok && parsed.success ? parsed.data.topics : [],
+      };
+    })).then((results) => {
       if (cancelled) return;
       const nextOrders: OrdersBySubject = {};
-      for (const result of orderResults) {
+      for (const result of results) {
         nextOrders[result.subjectId] = Object.fromEntries(
           result.topics.map((topic) => [normalizeRegion(topic.topic), topic.contentIds]),
         );
       }
-      setConfiguredSubjectIds(inferredSubjectIds);
-      setItems(snapshot.data.items);
       setOrdersBySubject(nextOrders);
-      setLoaded(true);
-    })().catch(() => {
-      if (cancelled) return;
-      setConfiguredSubjectIds(configuredSubjectKey ? configuredSubjectKey.split("|") : []);
-      setItems([]);
-      setOrdersBySubject({});
-      setLoaded(true);
+    }).catch(() => {
+      if (!cancelled) setOrdersBySubject({});
     });
 
     return () => {
       cancelled = true;
     };
-  }, [configuredSubjectKey, enabled, requestedTopicKey]);
+  }, [enabled, orderSubjectKey]);
 
   function openRename(item: TopicItemSummary) {
     setRenameError(null);
@@ -303,20 +259,19 @@ export function TopicItemManagementProvider({
     setMutationBusyId(renameTarget.id);
     setRenameError(null);
     try {
-      // The lightweight topic index intentionally omits heavy guide documents.
-      // Fetch the complete item only when the user actually renames one.
-      const workspaceResponse = await fetch("/api/editor/content", { cache: "no-store" });
-      const workspaceBody: unknown = await workspaceResponse
+      const sourceResponse = await fetch(
+        `/api/editor/content/${encodeURIComponent(renameTarget.id)}`,
+        { cache: "no-store" },
+      );
+      const sourceBody: unknown = await sourceResponse
         .json()
         .catch(() => ({ error: "content_unavailable" }));
-      const workspace = ContentWorkspaceResponseSchema.safeParse(workspaceBody);
-      if (!workspaceResponse.ok || !workspace.success) {
-        throw new Error(mutationErrors.content_unavailable);
+      const source = ContentItemSchema.safeParse(sourceBody);
+      if (!sourceResponse.ok || !source.success) {
+        throw new Error(errorMessage(sourceBody, "No se pudo cargar el elemento para editarlo."));
       }
-      const source = workspace.data.items.find((item) => item.id === renameTarget.id);
-      if (!source) throw new Error(mutationErrors.not_found);
 
-      const draft = contentItemDraft(source);
+      const draft = contentItemDraft(source.data);
       const response = await fetch(`/api/editor/content/${encodeURIComponent(renameTarget.id)}`, {
         body: JSON.stringify({ ...draft, title }),
         cache: "no-store",
@@ -333,7 +288,7 @@ export function TopicItemManagementProvider({
       if (!parsed.success) throw new Error(mutationErrors.content_unavailable);
       const summary = toTopicItemSummary(parsed.data);
       if (!summary) throw new Error(mutationErrors.content_unavailable);
-      setItems((current) => current.map((item) => item.id === summary.id ? summary : item));
+      setItemOverrides((current) => ({ ...current, [summary.id]: summary }));
       setRenameTarget(null);
       setRenameInput("");
     } catch (error) {
@@ -358,7 +313,7 @@ export function TopicItemManagementProvider({
       if (!response.ok) {
         throw new Error(errorMessage(body, `No se pudo eliminar el elemento (${response.status}).`));
       }
-      setItems((current) => current.filter((item) => item.id !== deleteTarget.id));
+      setItemOverrides((current) => ({ ...current, [deleteTarget.id]: null }));
       setLocalOrders((current) => Object.fromEntries(
         Object.entries(current).map(([topic, ids]) => [topic, ids.filter((id) => id !== deleteTarget.id)]),
       ));
@@ -441,8 +396,7 @@ export function TopicItemManagementProvider({
     deleteError,
     draggingItemId,
     enabled,
-    items,
-    loaded,
+    items: managedItems,
     localOrders,
     mutationBusyId,
     openDelete,
@@ -577,9 +531,7 @@ export function TopicItemManager({
         </div>
         {topicItems.length > 1 && <small>Arrastra desde “Mover” para reorganizar.</small>}
       </header>
-      {!management.loaded ? (
-        <p className={styles.empty}>Cargando elementos…</p>
-      ) : topicItems.length === 0 ? (
+      {topicItems.length === 0 ? (
         <p className={styles.empty}>Todavía no hay guías o videos asociados a este tema.</p>
       ) : (
         <div className={styles.list}>

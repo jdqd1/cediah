@@ -12,6 +12,15 @@ type ContentRouteProps = {
   params: Promise<{ contentId: string }>;
 };
 
+export async function GET(_request: Request, { params }: ContentRouteProps) {
+  const { contentId } = await params;
+  return forwardEditorContentRequest({
+    method: "GET",
+    path: "/v1/editor/content/" + encodeURIComponent(contentId),
+    responseSchema: ContentItemSchema,
+  });
+}
+
 export async function PATCH(request: Request, { params }: ContentRouteProps) {
   const parsed = await readContentJson(request);
   if (parsed.status === "invalid") {
