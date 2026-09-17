@@ -21,42 +21,31 @@ function QuizImportPortal({
   draft,
   onChange,
 }: Pick<GuideEditorScreenProps, "busy" | "draft" | "onChange">) {
-  const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
-  const [panelDisabled, setPanelDisabled] = useState(true);
+  const [mountNodes, setMountNodes] = useState<HTMLElement[]>([]);
 
   useEffect(() => {
-    let panelObserver: MutationObserver | null = null;
-
     const connect = () => {
-      const builder = document.querySelector<HTMLElement>(".guide-quiz-builder");
-      if (!builder) {
-        setMountNode(null);
-        setPanelDisabled(true);
-        panelObserver?.disconnect();
-        panelObserver = null;
-        return;
-      }
+      const builders = Array.from(
+        document.querySelectorAll<HTMLElement>(".guide-quiz-builder"),
+      );
 
-      let slot = builder.querySelector<HTMLElement>(":scope > [data-guide-quiz-import-slot]");
-      if (!slot) {
-        slot = document.createElement("div");
-        slot.dataset.guideQuizImportSlot = "true";
-        builder.prepend(slot);
-      }
-      setMountNode(slot);
+      const slots = builders.map((builder) => {
+        let slot = builder.querySelector<HTMLElement>(
+          ":scope > [data-guide-quiz-import-slot]",
+        );
+        if (!slot) {
+          slot = document.createElement("div");
+          slot.dataset.guideQuizImportSlot = "true";
+          builder.prepend(slot);
+        }
+        return slot;
+      });
 
-      const syncDisabled = () => {
-        const addButton = builder.querySelector<HTMLButtonElement>("button.guide-panel-add");
-        setPanelDisabled(addButton?.disabled ?? true);
-      };
-      syncDisabled();
-
-      panelObserver?.disconnect();
-      panelObserver = new MutationObserver(syncDisabled);
-      panelObserver.observe(builder, {
-        attributes: true,
-        attributeFilter: ["disabled"],
-        subtree: true,
+      setMountNodes((current) => {
+        const unchanged =
+          current.length === slots.length &&
+          current.every((node, index) => node === slots[index]);
+        return unchanged ? current : slots;
       });
     };
 
@@ -64,13 +53,10 @@ function QuizImportPortal({
     const documentObserver = new MutationObserver(connect);
     documentObserver.observe(document.body, { childList: true, subtree: true });
 
-    return () => {
-      documentObserver.disconnect();
-      panelObserver?.disconnect();
-    };
+    return () => documentObserver.disconnect();
   }, []);
 
-  if (!mountNode) return null;
+  if (mountNodes.length === 0) return null;
 
   const questions = draft.content.quiz.questions;
   const maxQuestions = Math.max(0, 100 - questions.length);
@@ -88,13 +74,20 @@ function QuizImportPortal({
     } as GuideEditorScreenProps["draft"]);
   }
 
-  return createPortal(
-    <QuizImportDropzone
-      disabled={busy || panelDisabled}
-      maxQuestions={maxQuestions}
-      onImport={importQuestions}
-    />,
-    mountNode,
+  return (
+    <>
+      {mountNodes.map((mountNode, index) =>
+        createPortal(
+          <QuizImportDropzone
+            disabled={busy}
+            maxQuestions={maxQuestions}
+            onImport={importQuestions}
+          />,
+          mountNode,
+          `guide-quiz-import-${index}`,
+        ),
+      )}
+    </>
   );
 }
 
