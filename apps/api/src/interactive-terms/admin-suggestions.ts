@@ -156,18 +156,29 @@ async function loadSuggestions(
                ) order by example.updated_at desc, example.ordinal asc
              )
              from (
-               select guide.slug as guide_slug,
-                      guide.title as guide_title,
-                      section.anchor as section_anchor,
-                      section.heading as section_heading,
-                      guide.updated_at,
-                      section.ordinal
-               from public.guide_sections as section
-               join public.content_items as guide on guide.id = section.content_item_id
-               where section.heading_key = grouped.heading_key
-                 and guide.kind = 'guide'
-                 and guide.status = 'published'
-               order by guide.updated_at desc, section.ordinal asc
+               select deduplicated.guide_slug,
+                      deduplicated.guide_title,
+                      deduplicated.section_anchor,
+                      deduplicated.section_heading,
+                      deduplicated.updated_at,
+                      deduplicated.ordinal
+               from (
+                 select distinct on (guide.id)
+                        guide.id as guide_id,
+                        guide.slug as guide_slug,
+                        guide.title as guide_title,
+                        section.anchor as section_anchor,
+                        section.heading as section_heading,
+                        guide.updated_at,
+                        section.ordinal
+                 from public.guide_sections as section
+                 join public.content_items as guide on guide.id = section.content_item_id
+                 where section.heading_key = grouped.heading_key
+                   and guide.kind = 'guide'
+                   and guide.status = 'published'
+                 order by guide.id, section.ordinal asc
+               ) as deduplicated
+               order by deduplicated.updated_at desc, deduplicated.ordinal asc
                limit 3
              ) as example
            ), '[]'::jsonb) as examples
