@@ -226,8 +226,15 @@ async function loadDictionary(database: DatabaseClient) {
     ) byPattern.set(normalized, candidate);
   }
 
+  const entries: DictionaryEntry[] = [...byPattern.values()].map((entry) => ({
+    normalized: entry.normalized,
+    occurrencePolicy: entry.occurrencePolicy,
+    priority: entry.priority,
+    termId: entry.termId,
+  }));
+
   return {
-    automaton: buildAutomaton([...byPattern.values()].map(({ sourceRank: _sourceRank, ...entry }) => entry)),
+    automaton: buildAutomaton(entries),
     revision: Number(revisionResult.rows[0]?.revision ?? 1),
   };
 }
