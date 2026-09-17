@@ -1,0 +1,95 @@
+/* Editor/reader polish for interactive terms. */
+
+[data-guide-term-path] {
+  display: contents;
+}
+
+.interactive-term-trigger {
+  border-bottom-width: 2px;
+  border-bottom-color: color-mix(in srgb, var(--koraz-blue) 78%, transparent);
+  text-underline-offset: 3px;
+}
+
+.interactive-term-trigger:hover,
+.interactive-term-trigger[aria-expanded="true"] {
+  border-bottom-color: var(--koraz-blue);
+  background: color-mix(in srgb, var(--koraz-mint) 46%, transparent);
+}
+
+::highlight(koraz-editor-interactive-terms) {
+  color: inherit;
+  background-color: color-mix(in srgb, var(--koraz-mint) 18%, transparent);
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: color-mix(in srgb, var(--koraz-blue) 86%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.interactive-term-icon-actions {
+  gap: 0.5rem;
+}
+
+.interactive-term-icon-actions > a,
+.interactive-term-icon-actions > button {
+  position: relative;
+  display: inline-grid;
+  width: 2.3rem;
+  min-width: 2.3rem;
+  height: 2.3rem;
+  min-height: 2.3rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--koraz-line) 82%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--koraz-canvas) 62%, white);
+}
+
+.interactive-term-icon-actions > a:hover,
+.interactive-term-icon-actions > button:hover {
+  border-color: color-mix(in srgb, var(--koraz-blue) 34%, var(--koraz-line));
+  background: color-mix(in srgb, var(--koraz-mint) 48%, white);
+}
+
+.interactive-term-icon-actions > [data-tooltip]::after {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: calc(100% + 0.38rem);
+  max-width: 10rem;
+  padding: 0.28rem 0.42rem;
+  transform: translateX(-50%) translateY(2px);
+  border-radius: 6px;
+  background: var(--koraz-ink);
+  color: white;
+  content: attr(data-tooltip);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 100ms ease, transform 100ms ease;
+}
+
+.interactive-term-icon-actions > [data-tooltip]:hover::after,
+.interactive-term-icon-actions > [data-tooltip]:focus-visible::after {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.term-unlink-button {
+  margin-right: auto;
+  color: #a33a3a !important;
+  border-color: color-mix(in srgb, #b34a4a 30%, #cbd5e1) !important;
+}
+
+.term-unlink-button:hover {
+  background: color-mix(in srgb, #fff1f1 78%, white) !important;
+}
+
+@media (max-width: 760px) {
+  .interactive-term-icon-actions > [data-tooltip]::after {
+    display: none;
+  }
+}
