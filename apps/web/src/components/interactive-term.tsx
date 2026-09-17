@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowSquareOut, BookOpen, X } from "@phosphor-icons/react";
+import { ArrowSquareOut, BookOpen, Columns, X } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { RelatedGuidePanel } from "./related-guide-panel";
 import styles from "./interactive-term.module.css";
 
 export type InteractiveTermSummary = {
@@ -34,6 +35,7 @@ export function InteractiveTerm({
   term: InteractiveTermSummary;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
   const descriptionId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const href = relatedHref(term);
@@ -49,23 +51,36 @@ export function InteractiveTerm({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [mobileOpen]);
 
-  const detail = (
+  const details = (descriptionIdOverride?: string) => (
     <>
-      <div className={styles.heading}>
-        <div>
+      <span className={styles.heading}>
+        <span>
           <strong>{term.name}</strong>
           {term.category ? <span>{term.category}</span> : null}
-        </div>
-      </div>
-      <p id={descriptionId}>{term.shortDefinition}</p>
-      {href ? (
-        <div className={styles.actions}>
+        </span>
+      </span>
+      <span className={styles.definition} id={descriptionIdOverride}>
+        {term.shortDefinition}
+      </span>
+      {href && term.link ? (
+        <span className={styles.actions}>
           <Link href={href} className={styles.primaryAction}>
             <BookOpen aria-hidden="true" size={16} />
             Ver en profundidad
           </Link>
+          <button
+            className={styles.secondaryAction}
+            onClick={() => {
+              setMobileOpen(false);
+              setSplitOpen(true);
+            }}
+            type="button"
+          >
+            <Columns aria-hidden="true" size={16} />
+            Comparar
+          </button>
           <a
-            aria-label={`Abrir ${term.link?.title ?? term.name} en otra pestaña`}
+            aria-label={`Abrir ${term.link.title} en otra pestaña`}
             className={styles.iconAction}
             href={href}
             rel="noopener noreferrer"
@@ -73,7 +88,7 @@ export function InteractiveTerm({
           >
             <ArrowSquareOut aria-hidden="true" size={17} />
           </a>
-        </div>
+        </span>
       ) : null}
     </>
   );
@@ -91,7 +106,7 @@ export function InteractiveTerm({
         {children}
       </button>
       <span className={styles.desktopPopover} role="tooltip">
-        {detail}
+        {details(descriptionId)}
       </span>
       {mobileOpen && typeof document !== "undefined"
         ? createPortal(
@@ -106,7 +121,6 @@ export function InteractiveTerm({
                 type="button"
               />
               <section
-                aria-describedby={descriptionId}
                 aria-label={term.name}
                 aria-modal="true"
                 className={styles.sheet}
@@ -124,12 +138,20 @@ export function InteractiveTerm({
                 >
                   <X aria-hidden="true" size={18} />
                 </button>
-                {detail}
+                {details()}
               </section>
             </div>,
             document.body,
           )
         : null}
+      {splitOpen && term.link ? (
+        <RelatedGuidePanel
+          anchor={term.link.anchor}
+          onClose={() => setSplitOpen(false)}
+          slug={term.link.slug}
+          title={term.link.title}
+        />
+      ) : null}
     </span>
   );
 }
