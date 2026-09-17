@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowSquareOut, ArrowsLeftRight, X } from "@phosphor-icons/react";
+import { ArrowSquareOut, ArrowsLeftRight, BookOpen, X } from "@phosphor-icons/react";
 import { createPortal } from "react-dom";
 import {
   useEffect,
@@ -233,22 +233,35 @@ export function InteractiveTerm({
       </div>
       <p id={descriptionId}>{summary.shortDefinition}</p>
       {destination && destinationHref ? (
-        <div className="interactive-term-actions">
-          <Link href={destinationHref} onClick={() => close(false)} prefetch={false}>
-            <span>Ver en profundidad</span>
-            <ArrowSquareOut aria-hidden="true" size={15} />
+        <div className="interactive-term-actions interactive-term-icon-actions">
+          <Link
+            aria-label="Ver en profundidad"
+            data-tooltip="Ver en profundidad"
+            href={destinationHref}
+            onClick={() => close(false)}
+            prefetch={false}
+            title="Ver en profundidad"
+          >
+            <BookOpen aria-hidden="true" size={18} />
           </Link>
-          <button onClick={openComparison} type="button">
-            <ArrowsLeftRight aria-hidden="true" size={15} />
-            <span>{mobile ? "Abrir vista relacionada" : "Vista dividida"}</span>
+          <button
+            aria-label={mobile ? "Abrir vista relacionada" : "Vista dividida"}
+            data-tooltip={mobile ? "Vista relacionada" : "Vista dividida"}
+            onClick={openComparison}
+            title={mobile ? "Abrir vista relacionada" : "Vista dividida"}
+            type="button"
+          >
+            <ArrowsLeftRight aria-hidden="true" size={18} />
           </button>
           <a
             aria-label={`Abrir ${destination.guideTitle} en una pestaña nueva`}
+            data-tooltip="Nueva pestaña"
             href={destinationHref}
             rel="noopener noreferrer"
             target="_blank"
+            title="Nueva pestaña"
           >
-            Nueva pestaña
+            <ArrowSquareOut aria-hidden="true" size={18} />
           </a>
         </div>
       ) : null}
