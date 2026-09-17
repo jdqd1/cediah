@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { getCurrentUser } from "@/lib/server/current-user";
 import { AccessProvider } from "./access-context";
 import { AuthenticatedShellSession } from "./platform-frame";
+import { InteractiveTermEditorBridge } from "./interactive-term-editor-bridge";
 
 type AuthenticatedAppLayoutProps = {
   children: ReactNode;
@@ -28,6 +29,7 @@ export async function AuthenticatedAppLayout({
         roles={current.roles}
         viewer={{ email: current.user.email }}
       />
+      <InteractiveTermEditorBridge />
       {children}
     </AccessProvider>
   );
