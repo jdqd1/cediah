@@ -70,7 +70,7 @@
   margin-bottom: 0.45rem;
 }
 
-.heading div {
+.heading > span {
   display: grid;
   gap: 0.12rem;
 }
@@ -82,19 +82,18 @@
   line-height: 1.25;
 }
 
-.heading span {
+.heading span span {
   color: color-mix(in srgb, currentColor 58%, transparent);
   font-size: 0.72rem;
   letter-spacing: 0.02em;
   line-height: 1.3;
 }
 
-.desktopPopover p,
-.sheet p {
+.definition {
   color: color-mix(in srgb, currentColor 82%, transparent);
+  display: block;
   font-size: 0.84rem;
   line-height: 1.48;
-  margin: 0;
 }
 
 .actions {
@@ -107,6 +106,7 @@
 }
 
 .primaryAction,
+.secondaryAction,
 .iconAction {
   align-items: center;
   color: inherit;
@@ -114,10 +114,20 @@
   text-decoration: none;
 }
 
-.primaryAction {
+.primaryAction,
+.secondaryAction {
   font-size: 0.78rem;
   font-weight: 600;
   gap: 0.35rem;
+}
+
+.secondaryAction {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
 }
 
 .iconAction {
@@ -127,8 +137,10 @@
 }
 
 .primaryAction:hover,
+.secondaryAction:hover,
 .iconAction:hover,
 .primaryAction:focus-visible,
+.secondaryAction:focus-visible,
 .iconAction:focus-visible {
   opacity: 0.72;
   outline: none;
