@@ -19,8 +19,107 @@ jobs:
       - name: Patch published guide edit flow
         shell: bash
         run: |
-          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpiYXNlX3BhdGggPSBQYXRoKCJhcHBzL3dlYi9zcmMvY29tcG9uZW50cy9ndWlkZS1lZGl0b3Itc2NyZWVuLWJhc2UudHN4IikKYmFzZSA9IGJhc2VfcGF0aC5yZWFkX3RleHQoKQoKb2xkID0gJycnICBvbkxlYXZlLAogIG9uU2F2ZSwKICBzdGF0dXMgPSAiZHJhZnQiLAp9OiB7JycnCm5ldyA9ICcnJyAgb25MZWF2ZSwKICBvblByZXBhcmVFZGl0LAogIG9uU2F2ZSwKICBzdGF0dXMgPSAiZHJhZnQiLAp9OiB7JycnCmlmIG9sZCBub3QgaW4gYmFzZToKICAgIHJhaXNlIFN5c3RlbUV4aXQoImJhc2UgZGVzdHJ1Y3R1cmluZyBhbmNob3Igbm90IGZvdW5kIikKYmFzZSA9IGJhc2UucmVwbGFjZShvbGQsIG5ldywgMSkKCm9sZCA9ICcnJyAgb25MZWF2ZTogKGRpc2NhcmQ6IGJvb2xlYW4pID0+IHZvaWQ7CiAgb25EaXNtaXNzTm90aWNlOiAoKSA9PiB2b2lkOwogIG9uU2F2ZTogKCkgPT4gUHJvbWlzZTxib29sZWFuPjsKICBzdGF0dXM/OiBDb250ZW50U3RhdHVzOycnJwpuZXcgPSAnJycgIG9uTGVhdmU6IChkaXNjYXJkOiBib29sZWFuKSA9PiB2b2lkOwogIG9uRGlzbWlzc05vdGljZTogKCkgPT4gdm9pZDsKICBvblByZXBhcmVFZGl0OiAoKSA9PiBQcm9taXNlPGJvb2xlYW4+OwogIG9uU2F2ZTogKCkgPT4gUHJvbWlzZTxib29sZWFuPjsKICBzdGF0dXM/OiBDb250ZW50U3RhdHVzOycnJwppZiBvbGQgbm90IGluIGJhc2U6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJiYXNlIHByb3AgdHlwZSBhbmNob3Igbm90IGZvdW5kIikKYmFzZSA9IGJhc2UucmVwbGFjZShvbGQsIG5ldywgMSkKCm9sZCA9ICcnJyAgICAgICAgICAgICAgICAgIDogc3RhdHVzID09PSAicHVibGlzaGVkIgogICAgICAgICAgICAgICAgICAgID8gIkFyY2hpdmEgbGEgZ3XDrWEgYW50ZXMgZGUgZWRpdGFybGEiCiAgICAgICAgICAgICAgICAgICAgOiAiTm8gdGllbmVzIHBlcm1pc29zIHBhcmEgZWRpdGFyIGVzdGEgZ3XDrWEiJycnCm5ldyA9ICcnJyAgICAgICAgICAgICAgICAgIDogc3RhdHVzID09PSAicHVibGlzaGVkIgogICAgICAgICAgICAgICAgICAgID8gIkVkaXRhciBndcOtYSAoc2UgYXJjaGl2YXLDoSBhdXRvbcOhdGljYW1lbnRlKSIKICAgICAgICAgICAgICAgICAgICA6ICJObyB0aWVuZXMgcGVybWlzb3MgcGFyYSBlZGl0YXIgZXN0YSBndcOtYSInJycKaWYgb2xkIG5vdCBpbiBiYXNlOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiYmFzZSB0aXRsZSBhbmNob3Igbm90IGZvdW5kIikKYmFzZSA9IGJhc2UucmVwbGFjZShvbGQsIG5ldywgMSkKCm9sZCA9ICcnRyAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gewogICAgICAgICAgICAgICAgaWYgKCFjYW5FZGl0RG9jdW1lbnQpIHsKICAgICAgICAgICAgICAgICAgc2V0SW50ZXJhY3Rpb25Ob3RpY2UoewogICAgICAgICAgICAgICAgICAgICAgdGV4dDogc3RhdHVzID09PSAicHVibGlzaGVkIgogICAgICAgICAgICAgICAgICAgICAgPyAiTm8gcHVlZGVzIGVkaXRhciBlbCBkb2N1bWVudG8gbWllbnRyYXMgbGEgZ3XDrWEgZXN0w6EgcHVibGljYWRhLiBQYXJhIHNvbHVjaW9uYXJsbywgdnVlbHZlIGFsIHBhbmVsLCBhcmNow612YWxhIHkgYWJyZSBlbCBlZGl0b3IgZGUgbnVldm8uIgogICAgICAgICAgICAgICAgICAgICAgOiAiTm8gcHVlZGVzIGVkaXRhciBlc3RhIGd1w61hIGNvbiBsb3MgcGVybWlzb3MgYWN0dWFsZXMuIFBhcmEgc29sdWNpb25hcmxvLCBwaWRlIGEgY29vcmRpbmFjacOzbiBvIGFkbWluaXN0cmFjacOzbiBxdWUgdGUgYXNpZ25lIGFjY2VzbyBkZSBlZGljacOzbi4iLAogICAgICAgICAgICAgICAgICAgIHRvbmU6ICJ3YXJuaW5nIiwKICAgICAgICAgICAgICAgICAgfSk7CiAgICAgICAgICAgICAgICAgIHJldHVybjsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIHNldEludGVyYWN0aW9uTm90aWNlKG51bGwpOwogICAgICAgICAgICAgICAgc2V0RWRpdE1vZGUodHJ1ZSk7CiAgICAgICAgICAgICAgICBlZGl0b3I/LnNldEVkaXRhYmxlKHRydWUpOwogICAgICAgICAgICAgICAgd2luZG93LnJlcXVlc3RBbmltYXRpb25GcmFtZSgoKSA9PiBlZGl0b3I/LmNvbW1hbmRzLmZvY3VzKCJlbmQiKSk7CiAgICAgICAgICAgICAgfX0nJycKbmV3ID0gJycnICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiB7CiAgICAgICAgICAgICAgICB2b2lkIChhc3luYyAoKSA9PiB7CiAgICAgICAgICAgICAgICAgIGlmIChzdGF0dXMgPT09ICJwdWJsaXNoZWQiKSB7CiAgICAgICAgICAgICAgICAgICAgY29uc3QgcmVhZHkgPSBhd2FpdCBvblByZXBhcmVFZGl0KCk7CiAgICAgICAgICAgICAgICAgICAgaWYgKCFyZWFkeSkgcmV0dXJuOwogICAgICAgICAgICAgICAgICB9IGVsc2UgaWYgKCFjYW5FZGl0RG9jdW1lbnQpIHsKICAgICAgICAgICAgICAgICAgICBzZXRJbnRlcmFjdGlvbk5vdGljZSh7CiAgICAgICAgICAgICAgICAgICAgICB0ZXh0OiAiTm8gcHVlZGVzIGVkaXRhciBlc3RhIGd1w61hIGNvbiBsb3MgcGVybWlzb3MgYWN0dWFsZXMuIFBhcmEgc29sdWNpb25hcmxvLCBwaWRlIGEgY29vcmRpbmFjacOzbiBvIGFkbWluaXN0cmFjacOzbiBxdWUgdGUgYXNpZ25lIGFjY2VzbyBkZSBlZGljacOzbi4iLAogICAgICAgICAgICAgICAgICAgICAgdG9uZTogIndhcm5pbmciLAogICAgICAgICAgICAgICAgICAgIH0pOwogICAgICAgICAgICAgICAgICAgIHJldHVybjsKICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICBzZXRJbnRlcmFjdGlvbk5vdGljZShudWxsKTsKICAgICAgICAgICAgICAgICAgc2V0RWRpdE1vZGUodHJ1ZSk7CiAgICAgICAgICAgICAgICAgIGVkaXRvcj8uc2V0RWRpdGFibGUodHJ1ZSk7CiAgICAgICAgICAgICAgICAgIHdpbmRvdy5yZXF1ZXN0QW5pbWF0aW9uRnJhbWUoKCkgPT4gZWRpdG9yPy5jb21tYW5kcy5mb2N1cygiZW5kIikpOwogICAgICAgICAgICAgICAgfSkoKTsKICAgICAgICAgICAgICB9fScnJwppZiBvbGQgbm90IGluIGJhc2U6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJiYXNlIGVkaXQgY2xpY2sgYW5jaG9yIG5vdCBmb3VuZCIpCmJhc2UgPSBiYXNlLnJlcGxhY2Uob2xkLCBuZXcsIDEpCmJhc2VfcGF0aC53cml0ZV90ZXh0KGJhc2UpCgpzdHVkaW9fcGF0aCA9IFBhdGgoImFwcHMvd2ViL3NyYy9jb21wb25lbnRzL2NvbnRlbnQtc3R1ZGlvLnRzeCIpCnN0dWRpbyA9IHN0dWRpb19wYXRoLnJlYWRfdGV4dCgpCgphbmNob3IgPSAnJycgIGFzeW5jIGZ1bmN0aW9uIHJlbW92ZUNvbnRlbnQoKSB7CicnJwppbnNlcnQgPSAnJycgIGFzeW5jIGZ1bmN0aW9uIHByZXBhcmVHdWlkZUVkaXQoKTogUHJvbWlzZTxib29sZWFuPiB7CiAgICBpZiAoIWl0ZW0gfHwgaXRlbS5raW5kICE9PSAiZ3VpZGUiKSByZXR1cm4gZmFsc2U7CiAgICBpZiAoaXRlbS5zdGF0dXMgIT09ICJwdWJsaXNoZWQiKSByZXR1cm4gdHJ1ZTsKICAgIGlmICghY2FwYWJpbGl0aWVzLmNhblB1Ymxpc2ggfHwgYnVzeSkgewogICAgICBzZXROb3RpY2UoewogICAgICAgIHRleHQ6ICJObyBwdWVkZXMgZWRpdGFyIGVzdGEgZ3XDrWEgcHVibGljYWRhIHBvcnF1ZSB0dSBjdWVudGEgbm8gdGllbmUgcGVybWlzbyBwYXJhIGFyY2hpdmFybGEuIiwKICAgICAgICB0b25lOiAiZXJyb3IiLAogICAgICB9KTsKICAgICAgcmV0dXJuIGZhbHNlOwogICAgfQoKICAgIHNldEJ1c3koInRyYW5zaXRpb24iKTsKICAgIHNldE5vdGljZShudWxsKTsKICAgIHRyeSB7CiAgICAgIGNvbnN0IGN1cnJlbnQgPSBhd2FpdCBjb250ZW50SXRlbUpzb24oCiAgICAgICAgYC9hcGkvZWRpdG9yL2NvbnRlbnQvJHtlbmNvZGVVUklDb21wb25lbnQoaXRlbS5pZCl9L3RyYW5zaXRpb25gLAogICAgICAgIHsgYm9keTogSlNPTi5zdHJpbmdpZnkoeyBzdGF0dXM6ICJhcmNoaXZlZCIgfSksIG1ldGhvZDogIlBPU1QiIH0sCiAgICAgICk7CiAgICAgIGlmIChjdXJyZW50LmtpbmQgIT09ICJndWlkZSIgfHwgY3VycmVudC5zdGF0dXMgIT09ICJhcmNoaXZlZCIpIHsKICAgICAgICB0aHJvdyBuZXcgRXJyb3IoZXJyb3JzLmNvbnRlbnRfdW5hdmFpbGFibGUpOwogICAgICB9CiAgICAgIHVwc2VydChjdXJyZW50KTsKICAgICAgc2V0Tm90aWNlKHsKICAgICAgICB0ZXh0OiAiR3XDrWEgYXJjaGl2YWRhIGF1dG9tw6F0aWNhbWVudGUgcGFyYSBlZGl0YXJsYS4iLAogICAgICAgIHRvbmU6ICJzdWNjZXNzIiwKICAgICAgfSk7CiAgICAgIHJldHVybiB0cnVlOwogICAgfSBjYXRjaCAoZXJyb3IpIHsKICAgICAgc2V0Tm90aWNlKHsKICAgICAgICB0ZXh0OiBlcnJvciBpbnN0YW5jZW9mIEVycm9yCiAgICAgICAgICA/IGVycm9yLm1lc3NhZ2UKICAgICAgICAgIDogIk5vIHNlIHB1ZG8gYXJjaGl2YXIgbGEgZ3XDrWEgYXV0b23DoXRpY2FtZW50ZSBhbnRlcyBkZSBlZGl0YXJsYS4iLAogICAgICAgIHRvbmU6ICJlcnJvciIsCiAgICAgIH0pOwogICAgICByZXR1cm4gZmFsc2U7CiAgICB9IGZpbmFsbHkgewogICAgICBzZXRCdXN5KG51bGwpOwogICAgfQogIH0KCiAgYXN5bmMgZnVuY3Rpb24gcmVtb3ZlQ29udGVudCgpIHsKJycnCmlmIGFuY2hvciBub3QgaW4gc3R1ZGlvOgogICAgcmFpc2UgU3lzdGVtRXhpdCgic3R1ZGlvIHJlbW92ZUNvbnRlbnQgYW5jaG9yIG5vdCBmb3VuZCIpCnN0dWRpbyA9IHN0dWRpby5yZXBsYWNlKGFuY2hvciwgaW5zZXJ0LCAxKQoKb2xkID0gJycnICAgICAgICAgIG9uTGVhdmU9e2xlYXZlR3VpZGVFZGl0b3J9CiAgICAgICAgICBvblNhdmU9eygpID0+IHNhdmUoKX0nJycKbmV3ID0gJycnICAgICAgICAgIG9uTGVhdmU9e2xlYXZlR3VpZGVFZGl0b3J9CiAgICAgICAgICBvblByZXBhcmVFZGl0PXtwcmVwYXJlR3VpZGVFZGl0fQogICAgICAgICAgb25TYXZlPXsoKSA9PiBzYXZlKCl9JycnCmlmIG9sZCBub3QgaW4gc3R1ZGlvOgogICAgcmFpc2UgU3lzdGVtRXhpdCgic3R1ZGlvIEd1aWRlRWRpdG9yU2NyZWVuIHByb3BzIGFuY2hvciBub3QgZm91bmQiKQpzdHVkaW8gPSBzdHVkaW8ucmVwbGFjZShvbGQsIG5ldywgMSkKCnN0dWRpb19wYXRoLndyaXRlX3RleHQoc3R1ZGlvKQo=' | base64 -d > /tmp/patch.py
-          python /tmp/patch.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          base_path = Path("apps/web/src/components/guide-editor-screen-base.tsx")
+          base = base_path.read_text()
+
+          base = base.replace(
+              '  onLeave,\n  onSave,\n  status = "draft",',
+              '  onLeave,\n  onPrepareEdit,\n  onSave,\n  status = "draft",',
+              1,
+          )
+          base = base.replace(
+              '  onDismissNotice: () => void;\n  onSave: () => Promise<boolean>;',
+              '  onDismissNotice: () => void;\n  onPrepareEdit: () => Promise<boolean>;\n  onSave: () => Promise<boolean>;',
+              1,
+          )
+          base = base.replace(
+              '"Archiva la guía antes de editarla"',
+              '"Editar guía (se archivará automáticamente)"',
+              1,
+          )
+
+          marker = 'text: status === "published"'
+          marker_index = base.index(marker)
+          click_start = base.rfind('              onClick={() => {', 0, marker_index)
+          click_end = base.index('              }}', marker_index) + len('              }}')
+          replacement = '''              onClick={() => {
+                void (async () => {
+                  if (status === "published") {
+                    const ready = await onPrepareEdit();
+                    if (!ready) return;
+                  } else if (!canEditDocument) {
+                    setInteractionNotice({
+                      text: "No puedes editar esta guía con los permisos actuales. Para solucionarlo, pide a coordinación o administración que te asigne acceso de edición.",
+                      tone: "warning",
+                    });
+                    return;
+                  }
+                  setInteractionNotice(null);
+                  setEditMode(true);
+                  editor?.setEditable(true);
+                  window.requestAnimationFrame(() => editor?.commands.focus("end"));
+                })();
+              }}'''
+          base = base[:click_start] + replacement + base[click_end:]
+          base_path.write_text(base)
+
+          studio_path = Path("apps/web/src/components/content-studio.tsx")
+          studio = studio_path.read_text()
+          anchor = '  async function removeContent() {\n'
+          function = '''  async function prepareGuideEdit(): Promise<boolean> {
+            if (!item || item.kind !== "guide") return false;
+            if (item.status !== "published") return true;
+            if (!capabilities.canPublish || busy) {
+              setNotice({
+                text: "No puedes editar esta guía publicada porque tu cuenta no tiene permiso para archivarla.",
+                tone: "error",
+              });
+              return false;
+            }
+
+            setBusy("transition");
+            setNotice(null);
+            try {
+              const current = await contentItemJson(
+                `/api/editor/content/${encodeURIComponent(item.id)}/transition`,
+                { body: JSON.stringify({ status: "archived" }), method: "POST" },
+              );
+              if (current.kind !== "guide" || current.status !== "archived") {
+                throw new Error(errors.content_unavailable);
+              }
+              upsert(current);
+              setNotice({
+                text: "Guía archivada automáticamente para editarla.",
+                tone: "success",
+              });
+              return true;
+            } catch (error) {
+              setNotice({
+                text: error instanceof Error
+                  ? error.message
+                  : "No se pudo archivar la guía automáticamente antes de editarla.",
+                tone: "error",
+              });
+              return false;
+            } finally {
+              setBusy(null);
+            }
+          }
+
+          '''
+          if anchor not in studio:
+              raise SystemExit("content-studio removeContent anchor not found")
+          studio = studio.replace(anchor, function + anchor, 1)
+          studio = studio.replace(
+              '          onLeave={leaveGuideEditor}\n          onSave={() => save()}',
+              '          onLeave={leaveGuideEditor}\n          onPrepareEdit={prepareGuideEdit}\n          onSave={() => save()}',
+              1,
+          )
+          studio_path.write_text(studio)
+          PY
       - name: Remove temporary workflow
         run: rm .github/workflows/temp-auto-archive-inner-guide-edit.yml
       - name: Commit patch
