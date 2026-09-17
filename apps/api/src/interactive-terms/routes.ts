@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { sql } from "kysely";
 import { z } from "zod";
 import type { DatabaseClient } from "../db/database.js";
@@ -16,8 +16,11 @@ type CompactOccurrence = {
   t: string;
 };
 
-function unavailable(reply: Parameters<Parameters<FastifyInstance["get"]>[1]>[1]) {
-  return reply.status(503).header("Cache-Control", "no-store").send({ error: "interactive_terms_unavailable" });
+function unavailable(reply: FastifyReply) {
+  return reply
+    .status(503)
+    .header("Cache-Control", "no-store")
+    .send({ error: "interactive_terms_unavailable" });
 }
 
 export function registerInteractiveTermRoutes(
@@ -27,11 +30,15 @@ export function registerInteractiveTermRoutes(
   app.get<{ Params: { slug: string } }>("/v1/guide-terms/:slug", async (request, reply) => {
     if (!database) return unavailable(reply);
     const params = GuideSlugParamsSchema.safeParse(request.params);
-    if (!params.success) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    if (!params.success) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    }
 
     try {
       const contentId = await ensurePublishedGuideManifest(database, params.data.slug);
-      if (!contentId) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      if (!contentId) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
 
       const [manifestResult, sectionsResult, termsResult] = await Promise.all([
         sql<{
@@ -130,7 +137,9 @@ export function registerInteractiveTermRoutes(
   app.get<{ Params: { termId: string } }>("/v1/terms/:termId", async (request, reply) => {
     if (!database) return unavailable(reply);
     const params = TermIdParamsSchema.safeParse(request.params);
-    if (!params.success) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    if (!params.success) {
+      return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+    }
 
     try {
       const termResult = await sql<{
@@ -146,7 +155,9 @@ export function registerInteractiveTermRoutes(
         limit 1
       `.execute(database);
       const term = termResult.rows[0];
-      if (!term) return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      if (!term) {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
 
       const links = await sql<{
         guide_slug: string;
