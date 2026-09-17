@@ -4,12 +4,24 @@ import {
   noStoreContentJson,
   readContentJson,
 } from "@/lib/server/editor-content-route";
+import { requestContentApi } from "@/lib/server/content-api";
 
 export const dynamic = "force-dynamic";
 
 type ContentTransitionRouteProps = {
   params: Promise<{ contentId: string }>;
 };
+
+async function warmInteractiveTerms(contentId: string) {
+  // Publication is the normal compilation point. The public endpoint keeps its
+  // lazy stale-snapshot fallback for resilience, but readers should almost
+  // always hit a precompiled annotation snapshot.
+  await requestContentApi({
+    method: "GET",
+    path: `/v1/content/${encodeURIComponent(contentId)}/interactive-terms`,
+    timeoutMs: 10_000,
+  });
+}
 
 export async function POST(
   request: Request,
@@ -32,12 +44,16 @@ export async function POST(
     "/transition";
 
   if (transition.data.status !== "approved") {
-    return forwardEditorContentRequest({
+    const response = await forwardEditorContentRequest({
       body: transition.data,
       method: "POST",
       path,
       responseSchema: ContentItemSchema,
     });
+    if (response.ok && transition.data.status === "published") {
+      await warmInteractiveTerms(contentId);
+    }
+    return response;
   }
 
   // Reviewers and publishers are currently the same platform roles. Keep the
@@ -51,10 +67,14 @@ export async function POST(
   });
   if (!approvalResponse.ok) return approvalResponse;
 
-  return forwardEditorContentRequest({
+  const publicationResponse = await forwardEditorContentRequest({
     body: { status: "published" },
     method: "POST",
     path,
     responseSchema: ContentItemSchema,
   });
+  if (publicationResponse.ok) {
+    await warmInteractiveTerms(contentId);
+  }
+  return publicationResponse;
 }
