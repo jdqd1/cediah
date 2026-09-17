@@ -15,6 +15,10 @@ import {
   type InteractiveTermAdmin,
   type InteractiveTermAdminDraft,
 } from "@/lib/interactive-term-admin";
+import {
+  isContentSearchResponse,
+  type ContentSearchResult,
+} from "@/lib/content-search";
 import { GuideTermManifestSchema, type GuideTermOccurrence } from "@/lib/guide-terms";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useAccessRoles } from "./access-context";
@@ -24,6 +28,7 @@ import styles from "./interactive-term-editor-bridge.module.css";
 type Point = { left: number; top: number };
 type EditorSelection = { point: Point; text: string };
 type SimpleTermDraft = { name: string; shortDefinition: string };
+type RelatedGuide = { guideSlug: string; guideTitle: string; topic: string };
 type PreviewLeaf = { path: string; section: string; text: string };
 type PreviewSource = {
   leaves: PreviewLeaf[];
@@ -128,6 +133,43 @@ function termToDraft(term: InteractiveTermAdmin): InteractiveTermAdminDraft {
     shortDefinition: term.shortDefinition,
     slug: term.slug,
   };
+}
+
+function relatedGuideFromTerm(term: InteractiveTermAdmin): RelatedGuide | null {
+  const destination = term.destinations.find((item) => item.primary) ?? term.destinations[0];
+  return destination
+    ? {
+        guideSlug: destination.guideSlug,
+        guideTitle: destination.guideTitle,
+        topic: destination.sectionHeading ?? "",
+      }
+    : null;
+}
+
+function relatedGuideFromSearch(result: ContentSearchResult): RelatedGuide | null {
+  if (result.kind !== "guide") return null;
+  const match = result.href.match(/^\/guias\/([^/?#]+)/);
+  if (!match?.[1]) return null;
+  try {
+    return {
+      guideSlug: decodeURIComponent(match[1]),
+      guideTitle: result.title,
+      topic: result.topic,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function destinationForGuide(guide: RelatedGuide | null) {
+  return guide
+    ? [{
+        guideSlug: guide.guideSlug,
+        primary: true,
+        priority: 0,
+        sectionAnchor: null,
+      }]
+    : [];
 }
 
 function highlightRegistry(): HighlightRegistry | null {
@@ -242,6 +284,96 @@ function notifyTermsChanged() {
   window.dispatchEvent(new CustomEvent(termsChangedEvent));
 }
 
+function RelatedGuidePicker({
+  busy,
+  onClear,
+  onQueryChange,
+  onSearch,
+  onSelect,
+  query,
+  results,
+  selected,
+}: {
+  busy: boolean;
+  onClear: () => void;
+  onQueryChange: (value: string) => void;
+  onSearch: () => void;
+  onSelect: (guide: RelatedGuide) => void;
+  query: string;
+  results: ContentSearchResult[];
+  selected: RelatedGuide | null;
+}) {
+  return (
+    <div className={styles.field}>
+      <span>Artículo relacionado <small>(opcional)</small></span>
+      {selected ? (
+        <div className={styles.selection}>
+          <span>Ver en profundidad llevará a</span>
+          <strong>{selected.guideTitle}</strong>
+          {selected.topic ? <small>{selected.topic}</small> : null}
+          <button
+            className={styles.textButton}
+            disabled={busy}
+            type="button"
+            onClick={onClear}
+          >
+            <X aria-hidden="true" size={14} /> Quitar artículo
+          </button>
+        </div>
+      ) : (
+        <>
+          <form
+            className={styles.searchRow}
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSearch();
+            }}
+          >
+            <input
+              aria-label="Buscar artículo relacionado"
+              className={styles.input}
+              disabled={busy}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Buscar una guía de Koras"
+              value={query}
+            />
+            <button className={styles.searchButton} disabled={busy || query.trim().length < 2} type="submit">
+              <MagnifyingGlass aria-hidden="true" size={15} />
+              {busy ? "Buscando…" : "Buscar"}
+            </button>
+          </form>
+          {results.length > 0 ? (
+            <div className={styles.results}>
+              {results.map((result) => {
+                const guide = relatedGuideFromSearch(result);
+                if (!guide) return null;
+                return (
+                  <button
+                    className={styles.termButton}
+                    disabled={busy}
+                    key={result.id}
+                    type="button"
+                    onClick={() => onSelect(guide)}
+                  >
+                    <span>
+                      <strong>{result.title}</strong>
+                      <small>{result.topic || result.excerpt}</small>
+                    </span>
+                    <span>Vincular</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </>
+      )}
+      <p className={styles.smartNote}>
+        Al tocar las acciones del término, el estudiante podrá abrir esta guía sin tener que buscarla.
+      </p>
+    </div>
+  );
+}
+
 export function InteractiveTermEditorBridge() {
   const roles = useAccessRoles();
   const administrator = roles.includes("administrator");
@@ -253,6 +385,10 @@ export function InteractiveTermEditorBridge() {
   const [showSearch, setShowSearch] = useState(false);
   const [editingExisting, setEditingExisting] = useState(false);
   const [busy, setBusy] = useState<"search" | "save" | null>(null);
+  const [articleBusy, setArticleBusy] = useState(false);
+  const [articleQuery, setArticleQuery] = useState("");
+  const [articleResults, setArticleResults] = useState<ContentSearchResult[]>([]);
+  const [selectedGuide, setSelectedGuide] = useState<RelatedGuide | null>(null);
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [draft, setDraft] = useState<SimpleTermDraft>({ name: "", shortDefinition: "" });
   const [existingDraft, setExistingDraft] = useState<SimpleTermDraft>({ name: "", shortDefinition: "" });
@@ -275,6 +411,10 @@ export function InteractiveTermEditorBridge() {
     );
   }, [exactTerm, normalizedSelection]);
   const canUnlink = removableAliasIds.size > 0;
+  const currentRelatedGuide = useMemo(
+    () => exactTerm ? relatedGuideFromTerm(exactTerm) : null,
+    [exactTerm],
+  );
 
   useBodyScrollLock(open);
 
@@ -389,6 +529,13 @@ export function InteractiveTermEditorBridge() {
 
   if (!administrator) return null;
 
+  function resetArticlePicker(guide: RelatedGuide | null = null) {
+    setArticleBusy(false);
+    setArticleQuery("");
+    setArticleResults([]);
+    setSelectedGuide(guide);
+  }
+
   function resetDialog() {
     setOpen(false);
     setMessage(null);
@@ -396,6 +543,7 @@ export function InteractiveTermEditorBridge() {
     setQuery("");
     setShowSearch(false);
     setEditingExisting(false);
+    resetArticlePicker();
     setSelection("");
     setPoint(null);
   }
@@ -432,6 +580,30 @@ export function InteractiveTermEditorBridge() {
     }
   }
 
+  async function searchArticles() {
+    const trimmed = articleQuery.trim();
+    if (articleBusy || trimmed.length < 2) return;
+    setArticleBusy(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/search?query=${encodeURIComponent(trimmed)}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("No fue posible buscar guías en este momento.");
+      const body: unknown = await response.json();
+      if (!isContentSearchResponse(body)) throw new Error("No fue posible leer los resultados de búsqueda.");
+      setArticleResults(body.guides);
+      if (body.guides.length === 0) {
+        setMessage({ tone: "error", text: "No encontré una guía publicada con esa búsqueda." });
+      }
+    } catch (error) {
+      setArticleResults([]);
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "No fue posible buscar guías." });
+    } finally {
+      setArticleBusy(false);
+    }
+  }
+
   function openDialog() {
     const text = selection.trim();
     if (!text) return;
@@ -441,6 +613,7 @@ export function InteractiveTermEditorBridge() {
     setQuery(text);
     setShowSearch(false);
     setEditingExisting(false);
+    resetArticlePicker();
     setMessage(null);
     setOpen(true);
     void searchTerms(text);
@@ -532,7 +705,7 @@ export function InteractiveTermEditorBridge() {
           aliases,
           autoMatch: true,
           category: null,
-          destinations: [],
+          destinations: destinationForGuide(selectedGuide),
           isActive: true,
           name,
           occurrencePolicy: "first_per_section",
@@ -570,7 +743,12 @@ export function InteractiveTermEditorBridge() {
     try {
       const current = termToDraft(exactTerm);
       const response = await fetch(`/api/admin/interactive-terms/${exactTerm.id}`, {
-        body: JSON.stringify({ ...current, name, shortDefinition }),
+        body: JSON.stringify({
+          ...current,
+          destinations: destinationForGuide(selectedGuide),
+          name,
+          shortDefinition,
+        }),
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
         method: "PATCH",
@@ -676,6 +854,27 @@ export function InteractiveTermEditorBridge() {
                           onChange={(event) => setExistingDraft((current) => ({ ...current, shortDefinition: event.target.value }))}
                         />
                       </label>
+                      <RelatedGuidePicker
+                        busy={articleBusy || busy !== null}
+                        onClear={() => {
+                          setSelectedGuide(null);
+                          setArticleResults([]);
+                        }}
+                        onQueryChange={(value) => {
+                          setArticleQuery(value);
+                          setArticleResults([]);
+                        }}
+                        onSearch={() => void searchArticles()}
+                        onSelect={(guide) => {
+                          setSelectedGuide(guide);
+                          setArticleQuery("");
+                          setArticleResults([]);
+                          setMessage(null);
+                        }}
+                        query={articleQuery}
+                        results={articleResults}
+                        selected={selectedGuide}
+                      />
                       <div className={styles.actions}>
                         <button
                           className={styles.secondaryButton}
@@ -684,6 +883,7 @@ export function InteractiveTermEditorBridge() {
                           onClick={() => {
                             setEditingExisting(false);
                             setExistingDraft({ name: exactTerm.name, shortDefinition: exactTerm.shortDefinition });
+                            resetArticlePicker(currentRelatedGuide);
                             setMessage(null);
                           }}
                         >
@@ -691,7 +891,7 @@ export function InteractiveTermEditorBridge() {
                         </button>
                         <button
                           className={styles.primaryButton}
-                          disabled={busy !== null}
+                          disabled={busy !== null || articleBusy}
                           type="button"
                           onClick={() => void saveExistingTerm()}
                         >
@@ -702,6 +902,12 @@ export function InteractiveTermEditorBridge() {
                   ) : (
                     <>
                       <p className={styles.definition}>{exactTerm.shortDefinition}</p>
+                      {currentRelatedGuide ? (
+                        <div className={styles.selection}>
+                          <span>Artículo relacionado</span>
+                          <strong>{currentRelatedGuide.guideTitle}</strong>
+                        </div>
+                      ) : null}
                       <p className={styles.smartNote}>Koras ya reconoce esta palabra automáticamente en las guías.</p>
                       <div className={styles.actions}>
                         {canUnlink ? (
@@ -722,6 +928,7 @@ export function InteractiveTermEditorBridge() {
                           type="button"
                           onClick={() => {
                             setExistingDraft({ name: exactTerm.name, shortDefinition: exactTerm.shortDefinition });
+                            resetArticlePicker(currentRelatedGuide);
                             setEditingExisting(true);
                           }}
                         >
@@ -738,7 +945,7 @@ export function InteractiveTermEditorBridge() {
                       <span className={styles.plusIcon}><Plus size={17} weight="bold" /></span>
                       <div>
                         <h3>Crear término</h3>
-                        <p>Solo necesitas el nombre y una explicación corta.</p>
+                        <p>Nombre, explicación y, si quieres, una guía para profundizar.</p>
                       </div>
                     </div>
 
@@ -765,15 +972,36 @@ export function InteractiveTermEditorBridge() {
                           onChange={(event) => setDraft((current) => ({ ...current, shortDefinition: event.target.value }))}
                         />
                       </label>
+                      <RelatedGuidePicker
+                        busy={articleBusy || busy !== null}
+                        onClear={() => {
+                          setSelectedGuide(null);
+                          setArticleResults([]);
+                        }}
+                        onQueryChange={(value) => {
+                          setArticleQuery(value);
+                          setArticleResults([]);
+                        }}
+                        onSearch={() => void searchArticles()}
+                        onSelect={(guide) => {
+                          setSelectedGuide(guide);
+                          setArticleQuery("");
+                          setArticleResults([]);
+                          setMessage(null);
+                        }}
+                        query={articleQuery}
+                        results={articleResults}
+                        selected={selectedGuide}
+                      />
                       <button
                         className={styles.primaryButtonWide}
-                        disabled={busy !== null || !draft.name.trim() || !draft.shortDefinition.trim()}
+                        disabled={busy !== null || articleBusy || !draft.name.trim() || !draft.shortDefinition.trim()}
                         type="button"
                         onClick={() => void createTerm()}
                       >
                         {busy === "save" ? "Creando…" : "Crear término"}
                       </button>
-                      <p className={styles.smartNote}>Se activará y reconocerá automáticamente. No necesitas configurar nada más.</p>
+                      <p className={styles.smartNote}>Se activará y reconocerá automáticamente. No necesitas configurar opciones técnicas.</p>
                     </div>
                   </div>
 
