@@ -56,18 +56,21 @@ export function PersistentAppShell({ children, guidedLearningEnabled = false, vi
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const kind = searchParams.get("tipo");
-  const activeKey = pathname.startsWith("/panel/administracion") ? "roles"
-    : pathname.startsWith("/panel/rutas") ? "learning-editor"
-    : pathname.startsWith("/panel") ? "editor"
-      : pathname.startsWith("/aprendizaje") ? "learning"
-      : pathname.startsWith("/guias") ? "guides"
-        : pathname.startsWith("/contenido") ? kind === "guide" ? "guides" : kind ?? "video"
-          : pathname.startsWith("/asignaturas") ? kind === "guide" ? "guides" : kind ?? "subjects"
-            : pathname.startsWith("/clases") ? "video"
-              : pathname.startsWith("/cursos") ? "courses"
-              : "dashboard";
+  const activeKey = pathname.startsWith("/panel/administracion/terminos") ? "terms"
+    : pathname.startsWith("/panel/administracion") ? "roles"
+      : pathname.startsWith("/panel/rutas") ? "learning-editor"
+        : pathname.startsWith("/panel") ? "editor"
+          : pathname.startsWith("/aprendizaje") ? "learning"
+            : pathname.startsWith("/guias") ? "guides"
+              : pathname.startsWith("/contenido") ? kind === "guide" ? "guides" : kind ?? "video"
+                : pathname.startsWith("/asignaturas") ? kind === "guide" ? "guides" : kind ?? "subjects"
+                  : pathname.startsWith("/clases") ? "video"
+                    : pathname.startsWith("/cursos") ? "courses"
+                    : "dashboard";
   const visibleMainNavigation = getMainNavigation(guidedLearningEnabled);
-  const title = [...visibleMainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koras";
+  const title = activeKey === "terms"
+    ? "Términos interactivos"
+    : [...visibleMainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koras";
   return (
     <PersistentShellContext.Provider value={true}>
       <ShellChrome activeKey={activeKey} guidedLearningEnabled={guidedLearningEnabled} headerTitle={title} includeCourses={activeKey === "courses"} viewer={viewer} profilePending={profilePending}>
@@ -218,7 +221,7 @@ function ShellChrome({
     activeKey === "study" || studyNavigation.some((item) => item.key === activeKey),
   );
   const [adminMenuOpen, setAdminMenuOpen] = useState(
-    activeKey === "editor" || activeKey === "roles",
+    activeKey === "editor" || activeKey === "roles" || activeKey === "terms",
   );
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -258,6 +261,9 @@ function ShellChrome({
       : []),
     ...(showContentManagement
       ? [{ key: "editor", label: "Publicar contenido", href: "/panel/contenido", icon: PencilSimpleLine }]
+      : []),
+    ...(effectiveIsAdministrator
+      ? [{ key: "terms", label: "Términos interactivos", href: "/panel/administracion/terminos", icon: BookOpen }]
       : []),
     ...(showRoleManagement
       ? [{ key: "roles", label: "Roles", href: "/panel/administracion/roles", icon: ShieldCheck }]
