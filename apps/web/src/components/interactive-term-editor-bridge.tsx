@@ -15,15 +15,31 @@ import {
   type InteractiveTermAdmin,
   type InteractiveTermAdminDraft,
 } from "@/lib/interactive-term-admin";
+import { GuideTermManifestSchema, type GuideTermOccurrence } from "@/lib/guide-terms";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useAccessRoles } from "./access-context";
+import { setGuideTermPreviewManifest } from "./guide-term-context";
 import styles from "./interactive-term-editor-bridge.module.css";
 
 type Point = { left: number; top: number };
 type EditorSelection = { point: Point; text: string };
 type SimpleTermDraft = { name: string; shortDefinition: string };
+type PreviewLeaf = { path: string; section: string; text: string };
+type PreviewSource = {
+  leaves: PreviewLeaf[];
+  mode: "editor" | "preview";
+  textNodes: Map<string, Text>;
+};
+
+type HighlightRegistry = {
+  delete(name: string): boolean;
+  set(name: string, highlight: unknown): void;
+};
+type HighlightConstructor = new (...ranges: Range[]) => unknown;
 
 const fallbackError = "No fue posible guardar el término.";
+const editorHighlightName = "koraz-editor-interactive-terms";
+const termsChangedEvent = "koraz:interactive-terms-changed";
 
 const errorMessages: Record<string, string> = {
   forbidden: "Sólo un administrador puede modificar los términos interactivos.",
@@ -114,6 +130,118 @@ function termToDraft(term: InteractiveTermAdmin): InteractiveTermAdminDraft {
   };
 }
 
+function highlightRegistry(): HighlightRegistry | null {
+  if (typeof CSS === "undefined") return null;
+  return (CSS as unknown as { highlights?: HighlightRegistry }).highlights ?? null;
+}
+
+function clearEditorHighlights() {
+  highlightRegistry()?.delete(editorHighlightName);
+}
+
+function applyEditorHighlights(
+  occurrences: readonly GuideTermOccurrence[],
+  textNodes: Map<string, Text>,
+) {
+  const registry = highlightRegistry();
+  const HighlightClass = (globalThis as unknown as { Highlight?: HighlightConstructor }).Highlight;
+  if (!registry || !HighlightClass) return;
+
+  const ranges: Range[] = [];
+  for (const occurrence of occurrences) {
+    const textNode = textNodes.get(occurrence.p);
+    if (!textNode || occurrence.s < 0 || occurrence.e > textNode.data.length || occurrence.e <= occurrence.s) continue;
+    const range = document.createRange();
+    range.setStart(textNode, occurrence.s);
+    range.setEnd(textNode, occurrence.e);
+    ranges.push(range);
+  }
+
+  registry.delete(editorHighlightName);
+  if (ranges.length > 0) registry.set(editorHighlightName, new HighlightClass(...ranges));
+}
+
+function previewSourceFromReader(): PreviewSource | null {
+  const article = document.querySelector<HTMLElement>(
+    ".guide-editor-page .published-rich-guide-article",
+  );
+  if (!article) return null;
+
+  const spans = Array.from(article.querySelectorAll<HTMLElement>("[data-guide-term-path]"));
+  if (spans.length === 0) return null;
+
+  let section = "__root";
+  const leaves: PreviewLeaf[] = [];
+  for (const span of spans) {
+    const path = span.dataset.guideTermPath;
+    if (!path) continue;
+    const heading = span.closest("h1, h2, h3, h4, h5, h6");
+    if (heading) {
+      section = `heading:${path}`;
+      continue;
+    }
+    if (span.querySelector("a.rich-guide-link, code") || span.closest("a.rich-guide-link, code")) continue;
+    leaves.push({ path, section, text: span.textContent ?? "" });
+  }
+
+  return { leaves, mode: "preview", textNodes: new Map() };
+}
+
+function previewSourceFromEditor(): PreviewSource | null {
+  const root = document.querySelector<HTMLElement>(
+    ".guide-editor-canvas .ProseMirror[contenteditable='true']",
+  );
+  if (!root) return null;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const leaves: PreviewLeaf[] = [];
+  const textNodes = new Map<string, Text>();
+  const seenHeadings = new Set<Element>();
+  let section = "__root";
+  let leafIndex = 0;
+  let headingIndex = 0;
+  let current = walker.nextNode();
+
+  while (current) {
+    const textNode = current as Text;
+    const parent = textNode.parentElement;
+    const heading = parent?.closest("h1, h2, h3, h4, h5, h6") ?? null;
+    if (heading) {
+      if (!seenHeadings.has(heading)) {
+        seenHeadings.add(heading);
+        section = `heading:${headingIndex}`;
+        headingIndex += 1;
+      }
+      current = walker.nextNode();
+      continue;
+    }
+    if (!parent || parent.closest("a, code, pre") || !textNode.data) {
+      current = walker.nextNode();
+      continue;
+    }
+
+    const path = `editor:${leafIndex}`;
+    leafIndex += 1;
+    leaves.push({ path, section, text: textNode.data });
+    textNodes.set(path, textNode);
+    current = walker.nextNode();
+  }
+
+  return { leaves, mode: "editor", textNodes };
+}
+
+function currentPreviewSource() {
+  return previewSourceFromReader() ?? previewSourceFromEditor();
+}
+
+function sourceFingerprint(source: PreviewSource) {
+  return `${source.mode}|${source.leaves.map((leaf) => `${leaf.path}\u0000${leaf.section}\u0000${leaf.text}`).join("\u0001")}`;
+}
+
+function notifyTermsChanged() {
+  window.dispatchEvent(new CustomEvent(termsChangedEvent));
+}
+
 export function InteractiveTermEditorBridge() {
   const roles = useAccessRoles();
   const administrator = roles.includes("administrator");
@@ -138,6 +266,15 @@ export function InteractiveTermEditorBridge() {
     () => terms.filter((term) => term.id !== exactTerm?.id).slice(0, 4),
     [exactTerm, terms],
   );
+  const removableAliasIds = useMemo(() => {
+    if (!exactTerm || normalize(exactTerm.name) === normalizedSelection) return new Set<string>();
+    return new Set(
+      exactTerm.aliases
+        .filter((alias) => normalize(alias.alias) === normalizedSelection)
+        .map((alias) => alias.id),
+    );
+  }, [exactTerm, normalizedSelection]);
+  const canUnlink = removableAliasIds.size > 0;
 
   useBodyScrollLock(open);
 
@@ -164,6 +301,81 @@ export function InteractiveTermEditorBridge() {
       window.removeEventListener("scroll", reposition, true);
     };
   }, [administrator, open]);
+
+  useEffect(() => {
+    if (!administrator) {
+      setGuideTermPreviewManifest(null);
+      clearEditorHighlights();
+      return;
+    }
+
+    let timer: number | null = null;
+    let controller: AbortController | null = null;
+    let lastFingerprint = "";
+
+    const synchronize = async (force = false) => {
+      const source = currentPreviewSource();
+      if (!source) {
+        lastFingerprint = "";
+        setGuideTermPreviewManifest(null);
+        clearEditorHighlights();
+        return;
+      }
+      const fingerprint = sourceFingerprint(source);
+      if (!force && fingerprint === lastFingerprint) return;
+      lastFingerprint = fingerprint;
+
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const response = await fetch("/api/admin/interactive-terms/preview", {
+          body: JSON.stringify({ leaves: source.leaves }),
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const parsed = GuideTermManifestSchema.safeParse(await response.json());
+        if (!parsed.success) return;
+
+        if (source.mode === "preview") {
+          clearEditorHighlights();
+          setGuideTermPreviewManifest(parsed.data);
+        } else {
+          setGuideTermPreviewManifest(null);
+          applyEditorHighlights(parsed.data.occurrences, source.textNodes);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          // Preview hints are non-blocking; term creation/editing remains usable.
+        }
+      }
+    };
+
+    const schedule = (force = false) => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        void synchronize(force);
+      }, force ? 0 : 320);
+    };
+
+    const observer = new MutationObserver(() => schedule(false));
+    observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+    const refresh = () => schedule(true);
+    window.addEventListener(termsChangedEvent, refresh);
+    schedule(true);
+
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      controller?.abort();
+      observer.disconnect();
+      window.removeEventListener(termsChangedEvent, refresh);
+      setGuideTermPreviewManifest(null);
+      clearEditorHighlights();
+    };
+  }, [administrator]);
 
   useEffect(() => {
     if (!open) return;
@@ -214,10 +426,7 @@ export function InteractiveTermEditorBridge() {
       if (!parsed.success) throw new Error(fallbackError);
       setTerms(parsed.data.terms);
     } catch (error) {
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : fallbackError,
-      });
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
     } finally {
       setBusy(null);
     }
@@ -265,13 +474,40 @@ export function InteractiveTermEditorBridge() {
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
       setBusy(null);
+      notifyTermsChanged();
       completeAction(`Listo. “${selection}” ahora se reconoce como ${parsed.data.term.name}.`);
     } catch (error) {
       setBusy(null);
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : fallbackError,
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
+    }
+  }
+
+  async function unlinkTerm() {
+    if (!exactTerm || !canUnlink || busy) return;
+    setBusy("save");
+    setMessage(null);
+    try {
+      const current = termToDraft(exactTerm);
+      const response = await fetch(`/api/admin/interactive-terms/${exactTerm.id}`, {
+        body: JSON.stringify({
+          ...current,
+          aliases: exactTerm.aliases
+            .filter((alias) => !removableAliasIds.has(alias.id))
+            .map((alias) => ({ alias: alias.alias, autoMatch: alias.autoMatch })),
+        }),
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
       });
+      if (!response.ok) throw new Error(await readError(response));
+      const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
+      if (!parsed.success) throw new Error(fallbackError);
+      setBusy(null);
+      notifyTermsChanged();
+      completeAction(`“${selection}” dejó de estar vinculado a ${parsed.data.term.name}.`);
+    } catch (error) {
+      setBusy(null);
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
     }
   }
 
@@ -312,13 +548,11 @@ export function InteractiveTermEditorBridge() {
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
       setBusy(null);
+      notifyTermsChanged();
       completeAction(`${parsed.data.term.name} ya es un término interactivo.`);
     } catch (error) {
       setBusy(null);
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : fallbackError,
-      });
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
     }
   }
 
@@ -336,11 +570,7 @@ export function InteractiveTermEditorBridge() {
     try {
       const current = termToDraft(exactTerm);
       const response = await fetch(`/api/admin/interactive-terms/${exactTerm.id}`, {
-        body: JSON.stringify({
-          ...current,
-          name,
-          shortDefinition,
-        }),
+        body: JSON.stringify({ ...current, name, shortDefinition }),
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
         method: "PATCH",
@@ -349,13 +579,11 @@ export function InteractiveTermEditorBridge() {
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
       setBusy(null);
+      notifyTermsChanged();
       completeAction(`${parsed.data.term.name} quedó actualizado.`);
     } catch (error) {
       setBusy(null);
-      setMessage({
-        tone: "error",
-        text: error instanceof Error ? error.message : fallbackError,
-      });
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
     }
   }
 
@@ -476,6 +704,16 @@ export function InteractiveTermEditorBridge() {
                       <p className={styles.definition}>{exactTerm.shortDefinition}</p>
                       <p className={styles.smartNote}>Koras ya reconoce esta palabra automáticamente en las guías.</p>
                       <div className={styles.actions}>
+                        {canUnlink ? (
+                          <button
+                            className={`${styles.secondaryButton} term-unlink-button`}
+                            disabled={busy !== null}
+                            type="button"
+                            onClick={() => void unlinkTerm()}
+                          >
+                            {busy === "save" ? "Desvinculando…" : "Desvincular"}
+                          </button>
+                        ) : null}
                         <button className={styles.secondaryButton} type="button" onClick={closeDialog}>
                           Listo
                         </button>
@@ -483,12 +721,8 @@ export function InteractiveTermEditorBridge() {
                           className={styles.primaryButton}
                           type="button"
                           onClick={() => {
-                            setExistingDraft({
-                              name: exactTerm.name,
-                              shortDefinition: exactTerm.shortDefinition,
-                            });
+                            setExistingDraft({ name: exactTerm.name, shortDefinition: exactTerm.shortDefinition });
                             setEditingExisting(true);
-                            setMessage(null);
                           }}
                         >
                           <PencilSimple aria-hidden="true" size={15} /> Editar
