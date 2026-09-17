@@ -42,6 +42,26 @@ function ensureSlot(builder: HTMLElement, attribute: "guideKeyPointsImportSlot" 
   return slot;
 }
 
+function findKeyPointBuilders() {
+  const builders = new Set<HTMLElement>();
+
+  document.querySelectorAll<HTMLElement>(".guide-companion-panel").forEach((panel) => {
+    const label = panel.querySelector<HTMLElement>("header button")?.textContent?.toLocaleLowerCase("es") ?? "";
+    if (!label.includes("puntos clave")) return;
+    const body = panel.querySelector<HTMLElement>(".guide-companion-body");
+    if (body) builders.add(body);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("button.guide-panel-add").forEach((button) => {
+    const label = button.textContent?.toLocaleLowerCase("es") ?? "";
+    if (!label.includes("punto clave") && !label.includes("añadir selección")) return;
+    const body = button.closest<HTMLElement>(".guide-companion-body");
+    if (body) builders.add(body);
+  });
+
+  return Array.from(builders);
+}
+
 function GuideImportPortals({
   busy,
   draft,
@@ -59,15 +79,7 @@ function GuideImportPortals({
         document.querySelectorAll<HTMLElement>(".guide-quiz-builder"),
       ).map((builder) => ensureSlot(builder, "guideQuizImportSlot"));
 
-      const keyPointBuilders = Array.from(
-        document.querySelectorAll<HTMLElement>(".guide-companion-panel"),
-      ).flatMap((panel) => {
-        const label = panel.querySelector<HTMLElement>(":scope > header button")?.textContent ?? "";
-        if (!label.includes("Puntos clave")) return [];
-        const body = panel.querySelector<HTMLElement>(":scope > .guide-companion-body");
-        return body ? [body] : [];
-      });
-      const keyPointSlots = keyPointBuilders.map((builder) =>
+      const keyPointSlots = findKeyPointBuilders().map((builder) =>
         ensureSlot(builder, "guideKeyPointsImportSlot"),
       );
 
