@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AdminSectionTabs } from "@/components/admin-section-tabs";
 import { RoleManagementScreen } from "@/components/role-management-screen";
 import { getAdminRoleUser } from "@/lib/server/admin-role-api";
 import { getCurrentUser } from "@/lib/server/current-user";
@@ -50,5 +51,10 @@ export default async function RoleManagementPage() {
     );
   }
 
-  return <RoleManagementScreen initialUser={result.user} />;
+  return (
+    <>
+      <AdminSectionTabs />
+      <RoleManagementScreen initialUser={result.user} />
+    </>
+  );
 }
