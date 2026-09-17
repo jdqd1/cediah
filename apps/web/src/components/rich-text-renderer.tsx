@@ -1,5 +1,8 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
-import { Fragment } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { RichTextDocument } from "@cediah/contracts";
 import {
   buildGuideCitationIndex,
@@ -9,17 +12,33 @@ import {
 } from "@/lib/guide-citations";
 import { createStableHeadingIdGenerator } from "@/lib/guide-document";
 import { GuideCitation } from "./guide-citation";
+import { InteractiveTerm, type InteractiveTermSummary } from "./interactive-term";
 
 type JsonObject = Record<string, unknown>;
+
+type InteractiveTermAnnotation = {
+  end: number;
+  path: string;
+  start: number;
+  termId: string;
+};
+
+type InteractiveTermsPayload = {
+  annotations: InteractiveTermAnnotation[];
+  dictionaryVersion: number;
+  terms: InteractiveTermSummary[];
+};
 
 export type RichTextRendererProps = {
   className?: string;
   document: RichTextDocument;
+  interactiveTermsSlug?: string | null;
 };
 
 const MAX_RENDER_DEPTH = 100;
 const ALIGNMENTS = new Set(["left", "center", "right", "justify"]);
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const interactiveTermsCache = new Map<string, Promise<InteractiveTermsPayload | null>>();
 
 function asObject(value: unknown): JsonObject | null {
   return typeof value === "object" && value !== null ? (value as JsonObject) : null;
@@ -139,13 +158,13 @@ function applyMarks(rendered: ReactNode, rawMarks: unknown[]): ReactNode {
   return result;
 }
 
-function renderMarkedText(
-  node: JsonObject,
+function renderCitationAwareText(
+  value: string,
+  marks: unknown[],
   references: Map<number, GuideReference>,
   interactiveCitations: boolean,
+  keyPrefix: string,
 ): ReactNode {
-  const value = typeof node.text === "string" ? node.text : "";
-  const marks = Array.isArray(node.marks) ? node.marks : [];
   const hasUnsafeInteractiveWrapper = marks.some((rawMark) => {
     const mark = asObject(rawMark);
     return mark?.type === "link" || mark?.type === "code";
@@ -162,7 +181,11 @@ function renderMarkedText(
   for (const match of value.matchAll(VANCOUVER_CITATION_PATTERN)) {
     const start = match.index ?? cursor;
     if (start > cursor) {
-      pieces.push(<Fragment key={`text-${citationIndex}-${cursor}`}>{applyMarks(value.slice(cursor, start), marks)}</Fragment>);
+      pieces.push(
+        <Fragment key={`${keyPrefix}-text-${citationIndex}-${cursor}`}>
+          {applyMarks(value.slice(cursor, start), marks)}
+        </Fragment>,
+      );
     }
 
     const label = match[0];
@@ -171,9 +194,19 @@ function renderMarkedText(
     const complete = numbers !== null && resolved.length === numbers.length;
 
     if (complete && resolved.length > 0) {
-      pieces.push(<GuideCitation key={`citation-${citationIndex}-${start}`} label={label} references={resolved} />);
+      pieces.push(
+        <GuideCitation
+          key={`${keyPrefix}-citation-${citationIndex}-${start}`}
+          label={label}
+          references={resolved}
+        />,
+      );
     } else {
-      pieces.push(<Fragment key={`citation-text-${citationIndex}-${start}`}>{applyMarks(label, marks)}</Fragment>);
+      pieces.push(
+        <Fragment key={`${keyPrefix}-citation-text-${citationIndex}-${start}`}>
+          {applyMarks(label, marks)}
+        </Fragment>,
+      );
     }
 
     cursor = start + label.length;
@@ -182,14 +215,147 @@ function renderMarkedText(
 
   if (cursor === 0) return applyMarks(value, marks);
   if (cursor < value.length) {
-    pieces.push(<Fragment key={`text-tail-${cursor}`}>{applyMarks(value.slice(cursor), marks)}</Fragment>);
+    pieces.push(
+      <Fragment key={`${keyPrefix}-text-tail-${cursor}`}>
+        {applyMarks(value.slice(cursor), marks)}
+      </Fragment>,
+    );
   }
   return pieces;
 }
 
-export function RichTextRenderer({ className, document }: RichTextRendererProps) {
+function renderMarkedText(
+  node: JsonObject,
+  path: string,
+  references: Map<number, GuideReference>,
+  interactiveCitations: boolean,
+  annotations: readonly InteractiveTermAnnotation[],
+  terms: ReadonlyMap<string, InteractiveTermSummary>,
+): ReactNode {
+  const value = typeof node.text === "string" ? node.text : "";
+  const marks = Array.isArray(node.marks) ? node.marks : [];
+  const ranges = annotations
+    .filter((annotation) => annotation.start >= 0 && annotation.end <= value.length && annotation.end > annotation.start)
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+
+  if (ranges.length === 0) {
+    return renderCitationAwareText(value, marks, references, interactiveCitations, path);
+  }
+
+  const pieces: ReactNode[] = [];
+  let cursor = 0;
+  for (const range of ranges) {
+    if (range.start < cursor) continue;
+    if (range.start > cursor) {
+      pieces.push(
+        <Fragment key={`${path}-plain-${cursor}`}>
+          {renderCitationAwareText(
+            value.slice(cursor, range.start),
+            marks,
+            references,
+            interactiveCitations,
+            `${path}-plain-${cursor}`,
+          )}
+        </Fragment>,
+      );
+    }
+
+    const term = terms.get(range.termId);
+    const label = value.slice(range.start, range.end);
+    if (term) {
+      pieces.push(
+        <InteractiveTerm key={`${path}-term-${range.start}-${range.termId}`} term={term}>
+          {applyMarks(label, marks)}
+        </InteractiveTerm>,
+      );
+    } else {
+      pieces.push(
+        <Fragment key={`${path}-missing-term-${range.start}`}>
+          {applyMarks(label, marks)}
+        </Fragment>,
+      );
+    }
+    cursor = range.end;
+  }
+
+  if (cursor < value.length) {
+    pieces.push(
+      <Fragment key={`${path}-plain-tail-${cursor}`}>
+        {renderCitationAwareText(
+          value.slice(cursor),
+          marks,
+          references,
+          interactiveCitations,
+          `${path}-plain-tail-${cursor}`,
+        )}
+      </Fragment>,
+    );
+  }
+  return pieces;
+}
+
+function guideSlugFromPathname(pathname: string) {
+  const match = pathname.match(/^\/guias\/([^/?#]+)/);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function loadInteractiveTerms(slug: string) {
+  const cached = interactiveTermsCache.get(slug);
+  if (cached) return cached;
+  const request = fetch(`/api/guides/${encodeURIComponent(slug)}/interactive-terms`, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+  })
+    .then(async (response) => {
+      if (!response.ok) return null;
+      return await response.json() as InteractiveTermsPayload;
+    })
+    .catch(() => null);
+  interactiveTermsCache.set(slug, request);
+  return request;
+}
+
+export function RichTextRenderer({
+  className,
+  document,
+  interactiveTermsSlug,
+}: RichTextRendererProps) {
+  const pathname = usePathname();
+  const pathnameSlug = useMemo(() => guideSlugFromPathname(pathname), [pathname]);
+  const slug = interactiveTermsSlug === undefined ? pathnameSlug : interactiveTermsSlug;
+  const [interactiveTerms, setInteractiveTerms] = useState<InteractiveTermsPayload | null>(null);
   const nextHeadingId = createStableHeadingIdGenerator();
   const citationIndex = buildGuideCitationIndex(document);
+
+  useEffect(() => {
+    let active = true;
+    if (slug) {
+      void loadInteractiveTerms(slug).then((payload) => {
+        if (active) setInteractiveTerms(payload);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  const effectiveInteractiveTerms = slug ? interactiveTerms : null;
+  const annotationsByPath = useMemo(() => {
+    const result = new Map<string, InteractiveTermAnnotation[]>();
+    for (const annotation of effectiveInteractiveTerms?.annotations ?? []) {
+      result.set(annotation.path, [...(result.get(annotation.path) ?? []), annotation]);
+    }
+    return result;
+  }, [effectiveInteractiveTerms]);
+  const termsById = useMemo(
+    () => new Map((effectiveInteractiveTerms?.terms ?? []).map((term) => [term.id, term])),
+    [effectiveInteractiveTerms],
+  );
 
   const renderNode = (rawNode: unknown, path: string, depth: number, inBibliography = false): ReactNode => {
     if (depth > MAX_RENDER_DEPTH) return null;
@@ -197,7 +363,18 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
     if (!node || typeof node.type !== "string") return null;
 
     if (node.type === "text") {
-      return <Fragment key={path}>{renderMarkedText(node, citationIndex.references, !inBibliography)}</Fragment>;
+      return (
+        <Fragment key={path}>
+          {renderMarkedText(
+            node,
+            path,
+            citationIndex.references,
+            !inBibliography,
+            annotationsByPath.get(path) ?? [],
+            termsById,
+          )}
+        </Fragment>
+      );
     }
 
     const renderChildren = () =>
