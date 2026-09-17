@@ -113,9 +113,16 @@ create table public.knowledge_term_targets (
   constraint knowledge_term_targets_section_content_fk
     foreign key (section_id, content_item_id)
     references public.guide_sections (id, content_item_id)
-    on delete cascade,
-  constraint knowledge_term_targets_unique unique (term_id, content_item_id, section_id)
+    on delete cascade
 );
+
+create unique index knowledge_term_targets_section_unique_index
+on public.knowledge_term_targets (term_id, content_item_id, section_id)
+where section_id is not null;
+
+create unique index knowledge_term_targets_guide_unique_index
+on public.knowledge_term_targets (term_id, content_item_id)
+where section_id is null;
 
 create index knowledge_term_targets_term_priority_index
 on public.knowledge_term_targets (term_id, priority desc);
@@ -219,10 +226,14 @@ as $$
 begin
   if new.kind = 'guide' and new.status = 'published' then
     perform public.cediah_enqueue_guide_knowledge(new.id, 'content_changed');
-  elsif old.status = 'published' and (new.status <> 'published' or new.kind <> 'guide') then
+  elsif tg_op = 'UPDATE'
+    and old.status = 'published'
+    and (new.status <> 'published' or new.kind <> 'guide')
+  then
     delete from public.knowledge_reindex_queue where content_item_id = new.id;
     delete from public.guide_term_occurrences where content_item_id = new.id;
-    delete from public.guide_sections where content_item_id = new.id;
+    -- Keep guide_sections: their persistent IDs/anchors survive temporary
+    -- archival and are reconciled if the guide is published again.
   end if;
   return new;
 end;
