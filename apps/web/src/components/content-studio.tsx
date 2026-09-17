@@ -1220,14 +1220,54 @@ export function ContentStudio({ initialWorkspace }: Props) {
     resetFeedback();
   }
 
-  function openGuideEditor() {
-    if (!draft || (draft.kind !== "guide" && draft.kind !== "video")) return;
-    if (draft.kind === "video" && videoLinkedGuide && editingId) {
+  async function openGuideEditor() {
+    if (!draft || (draft.kind !== "guide" && draft.kind !== "video") || busy) return;
+
+    const targetGuide = draft.kind === "video"
+      ? videoLinkedGuide
+      : item?.kind === "guide"
+        ? item
+        : undefined;
+    let guideToEdit = targetGuide;
+    let archivedAutomatically = false;
+
+    if (guideToEdit?.status === "published") {
+      if (!capabilities.canPublish) {
+        setNotice({
+          text: "No puedes editar esta guía publicada porque tu cuenta no tiene permiso para archivarla.",
+          tone: "error",
+        });
+        return;
+      }
+
+      setBusy("transition");
+      setNotice(null);
+      try {
+        guideToEdit = await contentItemJson(
+          `/api/editor/content/${encodeURIComponent(guideToEdit.id)}/transition`,
+          { body: JSON.stringify({ status: "archived" }), method: "POST" },
+        ) as GuideItem;
+        upsert(guideToEdit);
+        archivedAutomatically = true;
+      } catch (error) {
+        setNotice({
+          text: error instanceof Error
+            ? error.message
+            : "No se pudo archivar la guía automáticamente antes de editarla.",
+          tone: "error",
+        });
+        return;
+      } finally {
+        setBusy(null);
+      }
+    }
+
+    if (draft.kind === "video" && guideToEdit && editingId) {
       guideReturnRef.current = { draft: structuredClone(draft), editingId, file, progress };
-      const linkedDraft = itemDraft(videoLinkedGuide);
+      const linkedDraft = itemDraft(guideToEdit);
       guideEntryDraftRef.current = structuredClone(linkedDraft);
       setDraft(linkedDraft);
-      setEditingId(videoLinkedGuide.id);
+      setEditingId(guideToEdit.id);
       setIsNew(false);
       setFile(null);
       setProgress(0);
@@ -1236,7 +1276,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
       guideEntryDraftRef.current = structuredClone(draft);
     }
     setGuideEditing(true);
-    setNotice(null);
+    setNotice(archivedAutomatically
+      ? { text: "Guía archivada automáticamente para editarla.", tone: "success" }
+      : null);
   }
 
   function leaveGuideEditor(discard: boolean) {
