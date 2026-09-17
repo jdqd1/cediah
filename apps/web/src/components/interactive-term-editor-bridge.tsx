@@ -1,6 +1,5 @@
 "use client";
 
-import type { Editor } from "@tiptap/react";
 import { useEffect, useMemo, useState } from "react";
 import {
   InteractiveTermAdminListSchema,
@@ -12,11 +11,6 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useAccessRoles } from "./access-context";
 import styles from "./interactive-term-editor-bridge.module.css";
 
-type Props = {
-  active: boolean;
-  editor: Editor | null;
-};
-
 type Point = { left: number; top: number };
 type Mode = "existing" | "new";
 
@@ -24,6 +18,11 @@ type NewTermDraft = {
   category: string;
   name: string;
   shortDefinition: string;
+};
+
+type EditorSelection = {
+  point: Point;
+  text: string;
 };
 
 const fallbackError = "No fue posible actualizar el diccionario de términos.";
@@ -56,13 +55,45 @@ function normalize(value: string) {
     .trim();
 }
 
+function nodeElement(node: Node | null) {
+  if (!node) return null;
+  return node instanceof Element ? node : node.parentElement;
+}
+
+function readEditorSelection(): EditorSelection | null {
+  const current = window.getSelection();
+  if (!current || current.isCollapsed || current.rangeCount === 0) return null;
+
+  const text = current.toString().replace(/\s+/g, " ").trim();
+  if (!text || text.length > 180) return null;
+
+  const anchorElement = nodeElement(current.anchorNode);
+  const focusElement = nodeElement(current.focusNode);
+  const editorRoot = anchorElement?.closest(".guide-editor-canvas .ProseMirror[contenteditable='true']");
+  if (!editorRoot || !focusElement || !editorRoot.contains(focusElement)) return null;
+
+  const range = current.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  if (!rect.width && !rect.height) return null;
+
+  return {
+    point: {
+      left: Math.max(20, Math.min(window.innerWidth - 20, rect.left + rect.width / 2)),
+      top: Math.max(56, rect.top - 8),
+    },
+    text,
+  };
+}
+
 async function readError(response: Response) {
   const body: unknown = await response.json().catch(() => null);
   const code =
     body && typeof body === "object" && "error" in body && typeof body.error === "string"
       ? body.error
       : null;
-  return code ? errorMessages[code] ?? `${fallbackError} (${response.status})` : `${fallbackError} (${response.status})`;
+  return code
+    ? errorMessages[code] ?? `${fallbackError} (${response.status})`
+    : `${fallbackError} (${response.status})`;
 }
 
 function termToDraft(term: InteractiveTermAdmin): InteractiveTermAdminDraft {
@@ -85,25 +116,9 @@ function termToDraft(term: InteractiveTermAdmin): InteractiveTermAdminDraft {
   };
 }
 
-function selectionPoint(editor: Editor) {
-  const { from, to } = editor.state.selection;
-  if (from === to) return null;
-  try {
-    const start = editor.view.coordsAtPos(from);
-    const end = editor.view.coordsAtPos(to);
-    return {
-      left: Math.max(20, Math.min(window.innerWidth - 20, (start.left + end.right) / 2)),
-      top: Math.max(56, Math.min(start.top, end.top) - 8),
-    } satisfies Point;
-  } catch {
-    return null;
-  }
-}
-
-export function InteractiveTermEditorBridge({ active, editor }: Props) {
+export function InteractiveTermEditorBridge() {
   const roles = useAccessRoles();
   const administrator = roles.includes("administrator");
-  const enabled = active && administrator && Boolean(editor);
   const [selection, setSelection] = useState("");
   const [point, setPoint] = useState<Point | null>(null);
   const [open, setOpen] = useState(false);
@@ -112,48 +127,53 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
   const [terms, setTerms] = useState<InteractiveTermAdmin[]>([]);
   const [busy, setBusy] = useState<"search" | "save" | null>(null);
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
-  const [newTerm, setNewTerm] = useState<NewTermDraft>({ category: "", name: "", shortDefinition: "" });
+  const [newTerm, setNewTerm] = useState<NewTermDraft>({
+    category: "",
+    name: "",
+    shortDefinition: "",
+  });
   const normalizedSelection = useMemo(() => normalize(selection), [selection]);
 
   useBodyScrollLock(open);
 
   useEffect(() => {
-    if (!enabled || !editor) return;
+    if (!administrator || open) return;
 
     const update = () => {
-      const { from, to } = editor.state.selection;
-      const text = from === to ? "" : editor.state.doc.textBetween(from, to, " ").replace(/\s+/g, " ").trim();
-      if (!text || text.length > 180) {
-        setSelection("");
-        setPoint(null);
-        return;
-      }
-      setSelection(text);
-      setPoint(selectionPoint(editor));
+      const current = readEditorSelection();
+      setSelection(current?.text ?? "");
+      setPoint(current?.point ?? null);
     };
 
     const reposition = () => {
-      if (editor.state.selection.from !== editor.state.selection.to) setPoint(selectionPoint(editor));
+      const current = readEditorSelection();
+      setPoint(current?.point ?? null);
     };
 
-    editor.on("selectionUpdate", update);
+    document.addEventListener("selectionchange", update);
     window.addEventListener("resize", reposition);
     window.addEventListener("scroll", reposition, true);
     return () => {
-      editor.off("selectionUpdate", update);
+      document.removeEventListener("selectionchange", update);
       window.removeEventListener("resize", reposition);
       window.removeEventListener("scroll", reposition, true);
     };
-  }, [editor, enabled]);
+  }, [administrator, open]);
 
   useEffect(() => {
-    if (enabled) return;
-    setOpen(false);
-    setSelection("");
-    setPoint(null);
-  }, [enabled]);
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || busy === "save") return;
+      setOpen(false);
+      setMessage(null);
+      setSelection("");
+      setPoint(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [busy, open]);
 
-  if (!enabled || !editor) return null;
+  if (!administrator) return null;
 
   async function searchTerms(searchQuery = query) {
     if (busy) return;
@@ -163,13 +183,18 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
     try {
       const params = new URLSearchParams({ active: "true" });
       if (trimmed) params.set("q", trimmed);
-      const response = await fetch(`/api/admin/interactive-terms?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/interactive-terms?${params.toString()}`, {
+        cache: "no-store",
+      });
       if (!response.ok) throw new Error(await readError(response));
       const parsed = InteractiveTermAdminListSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
       setTerms(parsed.data.terms);
     } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : fallbackError,
+      });
     } finally {
       setBusy(null);
     }
@@ -191,6 +216,8 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
     if (busy === "save") return;
     setOpen(false);
     setMessage(null);
+    setSelection("");
+    setPoint(null);
   }
 
   async function linkToTerm(term: InteractiveTermAdmin) {
@@ -200,7 +227,10 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
       || term.aliases.some((alias) => normalize(alias.alias) === normalizedSelection);
 
     if (alreadyRecognized) {
-      setMessage({ tone: "success", text: `“${selection}” ya está reconocido como ${term.name}.` });
+      setMessage({
+        tone: "success",
+        text: `“${selection}” ya está reconocido como ${term.name}.`,
+      });
       return;
     }
 
@@ -220,10 +250,18 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
       if (!response.ok) throw new Error(await readError(response));
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
-      setTerms((current) => current.map((item) => item.id === parsed.data.term.id ? parsed.data.term : item));
-      setMessage({ tone: "success", text: `“${selection}” quedó vinculado a ${parsed.data.term.name}.` });
+      setTerms((current) => current.map((item) => (
+        item.id === parsed.data.term.id ? parsed.data.term : item
+      )));
+      setMessage({
+        tone: "success",
+        text: `“${selection}” quedó vinculado a ${parsed.data.term.name}.`,
+      });
     } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : fallbackError,
+      });
     } finally {
       setBusy(null);
     }
@@ -266,9 +304,15 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
       setTerms([parsed.data.term]);
-      setMessage({ tone: "success", text: `${parsed.data.term.name} se añadió al diccionario global.` });
+      setMessage({
+        tone: "success",
+        text: `${parsed.data.term.name} se añadió al diccionario global.`,
+      });
     } catch (error) {
-      setMessage({ tone: "error", text: error instanceof Error ? error.message : fallbackError });
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : fallbackError,
+      });
     } finally {
       setBusy(null);
     }
@@ -289,9 +333,13 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
       ) : null}
 
       {open ? (
-        <div className={styles.backdrop} role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeDialog();
-        }}>
+        <div
+          className={styles.backdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeDialog();
+          }}
+        >
           <section
             aria-label="Convertir selección en término interactivo"
             aria-modal="true"
@@ -303,7 +351,15 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                 <h2>Término interactivo</h2>
                 <p>Vincula esta selección al diccionario global sin modificar el contenido de la guía.</p>
               </div>
-              <button aria-label="Cerrar" className={styles.close} disabled={busy === "save"} type="button" onClick={closeDialog}>×</button>
+              <button
+                aria-label="Cerrar"
+                className={styles.close}
+                disabled={busy === "save"}
+                type="button"
+                onClick={closeDialog}
+              >
+                ×
+              </button>
             </header>
 
             <div className={styles.body}>
@@ -315,7 +371,10 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                   className={`${styles.tab} ${mode === "existing" ? styles.tabActive : ""}`.trim()}
                   role="tab"
                   type="button"
-                  onClick={() => { setMode("existing"); setMessage(null); }}
+                  onClick={() => {
+                    setMode("existing");
+                    setMessage(null);
+                  }}
                 >
                   Vincular existente
                 </button>
@@ -324,7 +383,10 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                   className={`${styles.tab} ${mode === "new" ? styles.tabActive : ""}`.trim()}
                   role="tab"
                   type="button"
-                  onClick={() => { setMode("new"); setMessage(null); }}
+                  onClick={() => {
+                    setMode("new");
+                    setMessage(null);
+                  }}
                 >
                   Crear nuevo
                 </button>
@@ -332,7 +394,13 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
 
               {mode === "existing" ? (
                 <>
-                  <form className={styles.searchRow} onSubmit={(event) => { event.preventDefault(); void searchTerms(); }}>
+                  <form
+                    className={styles.searchRow}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void searchTerms();
+                    }}
+                  >
                     <input
                       aria-label="Buscar término existente"
                       className={styles.input}
@@ -365,7 +433,9 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                       </button>
                     ))}
                     {busy !== "search" && terms.length === 0 ? (
-                      <p className={styles.empty}>No se encontraron términos. Puedes crear uno nuevo con esta selección.</p>
+                      <p className={styles.empty}>
+                        No se encontraron términos. Puedes crear uno nuevo con esta selección.
+                      </p>
                     ) : null}
                   </div>
                 </>
@@ -377,7 +447,10 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                       className={styles.input}
                       disabled={busy !== null}
                       maxLength={180}
-                      onChange={(event) => setNewTerm((current) => ({ ...current, name: event.target.value }))}
+                      onChange={(event) => setNewTerm((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))}
                       value={newTerm.name}
                     />
                   </label>
@@ -387,7 +460,10 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                       className={styles.textarea}
                       disabled={busy !== null}
                       maxLength={1200}
-                      onChange={(event) => setNewTerm((current) => ({ ...current, shortDefinition: event.target.value }))}
+                      onChange={(event) => setNewTerm((current) => ({
+                        ...current,
+                        shortDefinition: event.target.value,
+                      }))}
                       placeholder="Descripción académica breve que verá el estudiante."
                       value={newTerm.shortDefinition}
                     />
@@ -398,22 +474,43 @@ export function InteractiveTermEditorBridge({ active, editor }: Props) {
                       className={styles.input}
                       disabled={busy !== null}
                       maxLength={120}
-                      onChange={(event) => setNewTerm((current) => ({ ...current, category: event.target.value }))}
+                      onChange={(event) => setNewTerm((current) => ({
+                        ...current,
+                        category: event.target.value,
+                      }))}
                       placeholder="Anatomía, fisiología, clínica…"
                       value={newTerm.category}
                     />
                   </label>
-                  <p className={styles.note}>Se creará activo, con reconocimiento automático y política “primera aparición por sección”. Puedes afinarlo después en Términos interactivos.</p>
+                  <p className={styles.note}>
+                    Se creará activo, con reconocimiento automático y política “primera aparición por sección”. Puedes afinarlo después en Términos interactivos.
+                  </p>
                   <div className={styles.actions}>
-                    <button className={styles.secondaryButton} disabled={busy === "save"} type="button" onClick={closeDialog}>Cancelar</button>
-                    <button className={styles.primaryButton} disabled={busy !== null} type="button" onClick={() => void createTerm()}>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={busy === "save"}
+                      type="button"
+                      onClick={closeDialog}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className={styles.primaryButton}
+                      disabled={busy !== null}
+                      type="button"
+                      onClick={() => void createTerm()}
+                    >
                       {busy === "save" ? "Creando…" : "Crear término"}
                     </button>
                   </div>
                 </div>
               )}
 
-              {message ? <p className={message.tone === "error" ? styles.error : styles.success}>{message.text}</p> : null}
+              {message ? (
+                <p className={message.tone === "error" ? styles.error : styles.success}>
+                  {message.text}
+                </p>
+              ) : null}
             </div>
           </section>
         </div>
