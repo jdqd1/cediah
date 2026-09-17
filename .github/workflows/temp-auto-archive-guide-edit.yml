@@ -1,0 +1,121 @@
+name: Temporary auto-archive guide edit patch
+
+on:
+  push:
+    branches:
+      - fix/auto-archive-guide-on-edit
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch guide editor launch behavior
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("apps/web/src/components/content-studio.tsx")
+          text = path.read_text()
+          old = '''  function openGuideEditor() {
+    if (!draft || (draft.kind !== "guide" && draft.kind !== "video")) return;
+    if (draft.kind === "video" && videoLinkedGuide && editingId) {
+      guideReturnRef.current = { draft: structuredClone(draft), editingId, file, progress };
+      const linkedDraft = itemDraft(videoLinkedGuide);
+      guideEntryDraftRef.current = structuredClone(linkedDraft);
+      setDraft(linkedDraft);
+      setEditingId(videoLinkedGuide.id);
+      setIsNew(false);
+      setFile(null);
+      setProgress(0);
+    } else {
+      guideReturnRef.current = null;
+      guideEntryDraftRef.current = structuredClone(draft);
+    }
+    setGuideEditing(true);
+    setNotice(null);
+  }
+'''
+          new = '''  async function openGuideEditor() {
+    if (!draft || (draft.kind !== "guide" && draft.kind !== "video") || busy) return;
+
+    const targetGuide = draft.kind === "video"
+      ? videoLinkedGuide
+      : item?.kind === "guide"
+        ? item
+        : undefined;
+    let guideToEdit = targetGuide;
+    let archivedAutomatically = false;
+
+    if (guideToEdit?.status === "published") {
+      if (!capabilities.canPublish) {
+        setNotice({
+          text: "No puedes editar esta guía publicada porque tu cuenta no tiene permiso para archivarla.",
+          tone: "error",
+        });
+        return;
+      }
+
+      setBusy("transition");
+      setNotice(null);
+      try {
+        guideToEdit = await contentItemJson(
+          `/api/editor/content/${encodeURIComponent(guideToEdit.id)}/transition`,
+          { body: JSON.stringify({ status: "archived" }), method: "POST" },
+        ) as GuideItem;
+        upsert(guideToEdit);
+        archivedAutomatically = true;
+      } catch (error) {
+        setNotice({
+          text: error instanceof Error
+            ? error.message
+            : "No se pudo archivar la guía automáticamente antes de editarla.",
+          tone: "error",
+        });
+        return;
+      } finally {
+        setBusy(null);
+      }
+    }
+
+    if (draft.kind === "video" && guideToEdit && editingId) {
+      guideReturnRef.current = { draft: structuredClone(draft), editingId, file, progress };
+      const linkedDraft = itemDraft(guideToEdit);
+      guideEntryDraftRef.current = structuredClone(linkedDraft);
+      setDraft(linkedDraft);
+      setEditingId(guideToEdit.id);
+      setIsNew(false);
+      setFile(null);
+      setProgress(0);
+    } else {
+      guideReturnRef.current = null;
+      guideEntryDraftRef.current = structuredClone(draft);
+    }
+    setGuideEditing(true);
+    setNotice(archivedAutomatically
+      ? { text: "Guía archivada automáticamente para editarla.", tone: "success" }
+      : null);
+  }
+'''
+
+          if old not in text:
+              raise SystemExit("Expected openGuideEditor implementation was not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Remove temporary workflow
+        run: rm .github/workflows/temp-auto-archive-guide-edit.yml
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/src/components/content-studio.tsx .github/workflows/temp-auto-archive-guide-edit.yml
+          git commit -m "fix: archivar guías automáticamente al editarlas"
+          git push origin HEAD:fix/auto-archive-guide-on-edit
