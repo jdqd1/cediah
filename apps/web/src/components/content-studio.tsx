@@ -1582,6 +1582,46 @@ export function ContentStudio({ initialWorkspace }: Props) {
     }
   }
 
+  async function prepareGuideEdit(): Promise<boolean> {
+  if (!item || item.kind !== "guide") return false;
+  if (item.status !== "published") return true;
+  if (!capabilities.canPublish || busy) {
+    setNotice({
+      text: "No puedes editar esta guía publicada porque tu cuenta no tiene permiso para archivarla.",
+      tone: "error",
+    });
+    return false;
+  }
+
+  setBusy("transition");
+  setNotice(null);
+  try {
+    const current = await contentItemJson(
+      `/api/editor/content/${encodeURIComponent(item.id)}/transition`,
+      { body: JSON.stringify({ status: "archived" }), method: "POST" },
+    );
+    if (current.kind !== "guide" || current.status !== "archived") {
+      throw new Error(errors.content_unavailable);
+    }
+    upsert(current);
+    setNotice({
+      text: "Guía archivada automáticamente para editarla.",
+      tone: "success",
+    });
+    return true;
+  } catch (error) {
+    setNotice({
+      text: error instanceof Error
+        ? error.message
+        : "No se pudo archivar la guía automáticamente antes de editarla.",
+      tone: "error",
+    });
+    return false;
+  } finally {
+    setBusy(null);
+  }
+}
+
   async function removeContent() {
     if (!item || !["guide", "video"].includes(item.kind) || !capabilities.canDeleteContent || busy) return;
     const kindLabel = item.kind === "guide" ? "guía" : "video";
@@ -1880,6 +1920,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
             setNotice(null);
           }}
           onLeave={leaveGuideEditor}
+          onPrepareEdit={prepareGuideEdit}
           onSave={() => save()}
         />
       </AppShell>

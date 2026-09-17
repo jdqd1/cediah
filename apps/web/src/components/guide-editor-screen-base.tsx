@@ -823,6 +823,7 @@ export function GuideEditorScreen({
   onDismissNotice,
   onChange,
   onLeave,
+  onPrepareEdit,
   onSave,
   status = "draft",
 }: {
@@ -836,6 +837,7 @@ export function GuideEditorScreen({
   onChange: (draft: EditableGuideDraft) => void;
   onLeave: (discard: boolean) => void;
   onDismissNotice: () => void;
+  onPrepareEdit: () => Promise<boolean>;
   onSave: () => Promise<boolean>;
   status?: ContentStatus;
 }) {
@@ -1486,25 +1488,28 @@ export function GuideEditorScreen({
                 canEditDocument
                   ? "Editar guía"
                   : status === "published"
-                    ? "Archiva la guía antes de editarla"
+                    ? "Editar guía (se archivará automáticamente)"
                     : "No tienes permisos para editar esta guía"
               }
               type="button"
               onClick={() => {
-                if (!canEditDocument) {
-                  setInteractionNotice({
-                      text: status === "published"
-                      ? "No puedes editar el documento mientras la guía está publicada. Para solucionarlo, vuelve al panel, archívala y abre el editor de nuevo."
-                      : "No puedes editar esta guía con los permisos actuales. Para solucionarlo, pide a coordinación o administración que te asigne acceso de edición.",
-                    tone: "warning",
-                  });
-                  return;
-                }
-                setInteractionNotice(null);
-                setEditMode(true);
-                editor?.setEditable(true);
-                window.requestAnimationFrame(() => editor?.commands.focus("end"));
-              }}
+      void (async () => {
+        if (status === "published") {
+          const ready = await onPrepareEdit();
+          if (!ready) return;
+        } else if (!canEditDocument) {
+          setInteractionNotice({
+            text: "No puedes editar esta guía con los permisos actuales. Para solucionarlo, pide a coordinación o administración que te asigne acceso de edición.",
+            tone: "warning",
+          });
+          return;
+        }
+        setInteractionNotice(null);
+        setEditMode(true);
+        editor?.setEditable(true);
+        window.requestAnimationFrame(() => editor?.commands.focus("end"));
+      })();
+    }}
             >
               <NotePencil size={17} /> <span>{isEditing ? "Editando" : "Editar"}</span>
             </button>
