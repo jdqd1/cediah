@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import type { DatabaseClient, JsonValue } from "./db/database.js";
 
@@ -10,6 +11,13 @@ export type KnowledgeTermAnnotation = {
   path: string;
   start: number;
   termId: string;
+};
+
+export type GuideSectionAnchor = {
+  anchorId: string;
+  label: string;
+  level: 1 | 2 | 3;
+  path: string;
 };
 
 export type KnowledgeTermSummary = {
@@ -29,6 +37,7 @@ export type KnowledgeTermSummary = {
 export type ContentKnowledgeTerms = {
   annotations: KnowledgeTermAnnotation[];
   dictionaryVersion: number;
+  sectionAnchors: GuideSectionAnchor[];
   terms: KnowledgeTermSummary[];
 };
 
@@ -52,8 +61,20 @@ type TrieNode = {
   output: MatcherEntry[];
 };
 
+type DraftGuideSection = GuideSectionAnchor & {
+  contextKey: string | null;
+  normalizedLabel: string;
+  ordinal: number;
+};
+
+type StoredGuideSection = DraftGuideSection & {
+  contentVersion: number;
+  rowId: string;
+};
+
 const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
 const MAX_DOCUMENT_DEPTH = 16;
+const MAX_SECTION_CONTEXT_CHARACTERS = 240;
 
 function asObject(value: JsonValue | undefined): JsonObject | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -75,6 +96,258 @@ function hasWordBoundaries(text: string, start: number, end: number) {
 
 function normalizeAlias(value: string) {
   return value.trim().toLocaleLowerCase("es");
+}
+
+function normalizeSectionText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sectionSlug(value: string) {
+  return normalizeSectionText(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 72)
+    .replace(/-+$/g, "") || "seccion";
+}
+
+function nodeText(rawNode: JsonValue, depth = 0): string {
+  if (depth > MAX_DOCUMENT_DEPTH) return "";
+  const node = asObject(rawNode);
+  if (!node) return "";
+  if (node.type === "text") return typeof node.text === "string" ? node.text : "";
+  if (node.type === "hardBreak") return " ";
+  return asArray(node.content)
+    .map((child) => nodeText(child, depth + 1))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sectionContext(children: JsonValue[], headingIndex: number) {
+  const fragments: string[] = [];
+  for (let index = headingIndex + 1; index < children.length; index += 1) {
+    const sibling = asObject(children[index]);
+    if (!sibling) continue;
+    if (sibling.type === "heading") break;
+    const value = nodeText(children[index] as JsonValue);
+    if (value) fragments.push(value);
+    if (fragments.join(" ").length >= MAX_SECTION_CONTEXT_CHARACTERS) break;
+  }
+  const normalized = normalizeSectionText(fragments.join(" "))
+    .slice(0, MAX_SECTION_CONTEXT_CHARACTERS)
+    .trim();
+  return normalized || null;
+}
+
+function collectGuideSections(document: JsonObject): DraftGuideSection[] {
+  const sections: DraftGuideSection[] = [];
+
+  const visitChildren = (children: JsonValue[], parentPath: string, depth: number) => {
+    if (depth > MAX_DOCUMENT_DEPTH) return;
+    children.forEach((rawNode, index) => {
+      const node = asObject(rawNode);
+      if (!node) return;
+      const path = `${parentPath}.${index}`;
+      if (node.type === "heading") {
+        const attrs = asObject(node.attrs);
+        const rawLevel = attrs?.level;
+        const level = typeof rawLevel === "number" && rawLevel >= 1 && rawLevel <= 3
+          ? rawLevel as 1 | 2 | 3
+          : null;
+        const label = nodeText(rawNode).replace(/\s+/g, " ").trim();
+        if (level && label) {
+          sections.push({
+            anchorId: "",
+            contextKey: sectionContext(children, index),
+            label,
+            level,
+            normalizedLabel: normalizeSectionText(label),
+            ordinal: sections.length,
+            path,
+          });
+        }
+      }
+      const nested = asArray(node.content);
+      if (nested.length > 0) visitChildren(nested, path, depth + 1);
+    });
+  };
+
+  visitChildren(asArray(document.content), "root", 0);
+  return sections;
+}
+
+function chooseUniqueStoredSection(
+  stored: StoredGuideSection[],
+  usedRows: Set<string>,
+  predicate: (candidate: StoredGuideSection) => boolean,
+) {
+  const candidates = stored.filter((candidate) => !usedRows.has(candidate.rowId) && predicate(candidate));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function allocateSectionAnchors(
+  draftSections: DraftGuideSection[],
+  storedSections: StoredGuideSection[],
+): DraftGuideSection[] {
+  const usedRows = new Set<string>();
+  const usedAnchors = new Set(storedSections.map((section) => section.anchorId));
+  const resolved = draftSections.map((section) => ({ ...section }));
+
+  const claim = (section: DraftGuideSection, candidate: StoredGuideSection | null) => {
+    if (!candidate) return false;
+    section.anchorId = candidate.anchorId;
+    usedRows.add(candidate.rowId);
+    return true;
+  };
+
+  // Body context survives a heading rename and also survives reordering. This is
+  // the strongest identity signal for an edited section.
+  for (const section of resolved) {
+    if (!section.contextKey) continue;
+    claim(
+      section,
+      chooseUniqueStoredSection(
+        storedSections,
+        usedRows,
+        (candidate) => candidate.level === section.level && candidate.contextKey === section.contextKey,
+      ),
+    );
+  }
+
+  // An unchanged heading can move without losing its anchor.
+  for (const section of resolved.filter((candidate) => !candidate.anchorId)) {
+    claim(
+      section,
+      chooseUniqueStoredSection(
+        storedSections,
+        usedRows,
+        (candidate) =>
+          candidate.level === section.level && candidate.normalizedLabel === section.normalizedLabel,
+      ),
+    );
+  }
+
+  // Final compatibility fallback: a heading renamed in place keeps its identity.
+  for (const section of resolved.filter((candidate) => !candidate.anchorId)) {
+    claim(
+      section,
+      chooseUniqueStoredSection(
+        storedSections,
+        usedRows,
+        (candidate) => candidate.level === section.level && candidate.path === section.path,
+      ),
+    );
+  }
+
+  for (const section of resolved.filter((candidate) => !candidate.anchorId)) {
+    const base = sectionSlug(section.label);
+    let anchorId = `${base}-${randomUUID().slice(0, 8)}`;
+    while (usedAnchors.has(anchorId)) {
+      anchorId = `${base}-${randomUUID().slice(0, 8)}`;
+    }
+    section.anchorId = anchorId;
+    usedAnchors.add(anchorId);
+  }
+
+  return resolved;
+}
+
+async function syncGuideSections(
+  database: DatabaseClient,
+  contentId: string,
+  contentVersion: number,
+  document: JsonObject | null,
+): Promise<GuideSectionAnchor[]> {
+  if (!document) return [];
+  const draftSections = collectGuideSections(document);
+
+  return database.transaction().execute(async (transaction) => {
+    // Two first reads after a publication can arrive together. Serialize only
+    // this guide's tiny reconciliation instead of locking the whole dictionary.
+    await sql`select pg_advisory_xact_lock(hashtext(${contentId}))`.execute(transaction);
+
+    const existingResult = await sql<{
+      anchor_id: string;
+      content_version: number;
+      context_key: string | null;
+      id: string;
+      label: string;
+      level: number;
+      node_path: string;
+      normalized_label: string;
+      ordinal: number;
+    }>`
+      select
+        id,
+        anchor_id,
+        node_path,
+        label,
+        normalized_label,
+        context_key,
+        level,
+        ordinal,
+        content_version
+      from public.guide_sections
+      where content_item_id = ${contentId}
+      order by ordinal asc
+    `.execute(transaction);
+
+    const existing: StoredGuideSection[] = existingResult.rows.map((row) => ({
+      anchorId: row.anchor_id,
+      contentVersion: Number(row.content_version),
+      contextKey: row.context_key,
+      label: row.label,
+      level: row.level as 1 | 2 | 3,
+      nodePath: undefined,
+      normalizedLabel: row.normalized_label,
+      ordinal: Number(row.ordinal),
+      path: row.node_path,
+      rowId: row.id,
+    } as StoredGuideSection));
+
+    if (
+      existing.length === draftSections.length &&
+      existing.every((section) => section.contentVersion === contentVersion)
+    ) {
+      return existing.map(({ anchorId, label, level, path }) => ({ anchorId, label, level, path }));
+    }
+
+    const resolved = allocateSectionAnchors(draftSections, existing);
+    await sql`delete from public.guide_sections where content_item_id = ${contentId}`.execute(transaction);
+
+    for (const section of resolved) {
+      await sql`
+        insert into public.guide_sections (
+          content_item_id,
+          anchor_id,
+          node_path,
+          label,
+          normalized_label,
+          context_key,
+          level,
+          ordinal,
+          content_version
+        ) values (
+          ${contentId},
+          ${section.anchorId},
+          ${section.path},
+          ${section.label},
+          ${section.normalizedLabel},
+          ${section.contextKey},
+          ${section.level},
+          ${section.ordinal},
+          ${contentVersion}
+        )
+      `.execute(transaction);
+    }
+
+    return resolved.map(({ anchorId, label, level, path }) => ({ anchorId, label, level, path }));
+  });
 }
 
 function buildTrie(entries: MatcherEntry[]): TrieNode[] {
@@ -382,7 +655,11 @@ export async function getContentKnowledgeTerms(
   const item = itemResult.rows[0];
   if (!item) return null;
 
-  const currentDictionaryVersion = await dictionaryVersion(database);
+  const document = guideDocumentFromContent(item.kind, item.content);
+  const [currentDictionaryVersion, sectionAnchors] = await Promise.all([
+    dictionaryVersion(database),
+    syncGuideSections(database, contentId, Number(item.version), document),
+  ]);
   const cached = await sql<{
     annotations: KnowledgeTermAnnotation[];
     content_version: number;
@@ -406,7 +683,6 @@ export async function getContentKnowledgeTerms(
     annotations = Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
     termIds = Array.isArray(snapshot.term_ids) ? snapshot.term_ids : [];
   } else {
-    const document = guideDocumentFromContent(item.kind, item.content);
     annotations = document
       ? compileKnowledgeTermAnnotations(document, await matcherEntries(database))
       : [];
@@ -441,6 +717,7 @@ export async function getContentKnowledgeTerms(
   return {
     annotations,
     dictionaryVersion: currentDictionaryVersion,
+    sectionAnchors,
     terms: await termSummaries(database, termIds),
   };
 }
