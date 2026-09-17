@@ -19,9 +19,12 @@ function createQuestionId() {
 function QuizImportPortal({
   busy,
   draft,
+  editable,
   onChange,
-}: Pick<GuideEditorScreenProps, "busy" | "draft" | "onChange">) {
+  status = "draft",
+}: Pick<GuideEditorScreenProps, "busy" | "draft" | "editable" | "onChange" | "status">) {
   const [mountNodes, setMountNodes] = useState<HTMLElement[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const connect = () => {
@@ -49,9 +52,23 @@ function QuizImportPortal({
       });
     };
 
+    const syncEditing = () => {
+      setIsEditing(Boolean(document.querySelector('button[aria-label="Editando la guía"]')));
+    };
+
     connect();
-    const documentObserver = new MutationObserver(connect);
-    documentObserver.observe(document.body, { childList: true, subtree: true });
+    syncEditing();
+
+    const documentObserver = new MutationObserver(() => {
+      connect();
+      syncEditing();
+    });
+    documentObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["aria-label"],
+      childList: true,
+      subtree: true,
+    });
 
     return () => documentObserver.disconnect();
   }, []);
@@ -60,6 +77,11 @@ function QuizImportPortal({
 
   const questions = draft.content.quiz.questions;
   const maxQuestions = Math.max(0, 100 - questions.length);
+  const canEdit = editable && status !== "published";
+
+  function requestEdit() {
+    document.querySelector<HTMLButtonElement>('button[aria-label="Editar la guía"]')?.click();
+  }
 
   function importQuestions(imported: ImportedQuizQuestion[]) {
     const nextQuestions = imported.map((question) =>
@@ -79,9 +101,11 @@ function QuizImportPortal({
       {mountNodes.map((mountNode, index) =>
         createPortal(
           <QuizImportDropzone
-            disabled={busy}
+            disabled={busy || !canEdit}
             maxQuestions={maxQuestions}
             onImport={importQuestions}
+            onRequestEdit={requestEdit}
+            requiresEdit={!isEditing && canEdit && !busy}
           />,
           mountNode,
           `guide-quiz-import-${index}`,
@@ -95,7 +119,13 @@ export function GuideEditorScreen(props: GuideEditorScreenProps) {
   return (
     <>
       <GuideEditorScreenBase {...props} />
-      <QuizImportPortal busy={props.busy} draft={props.draft} onChange={props.onChange} />
+      <QuizImportPortal
+        busy={props.busy}
+        draft={props.draft}
+        editable={props.editable}
+        onChange={props.onChange}
+        status={props.status}
+      />
     </>
   );
 }
