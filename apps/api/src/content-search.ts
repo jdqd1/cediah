@@ -187,7 +187,9 @@ export async function searchPublishedContent(
   const normalizedQuery = normalizedSearchValue(query);
   const tsQuery = tokens.map((token) => `${token}:*`).join(" & ");
   const limitPerKind = Math.min(Math.max(input.limitPerKind ?? 4, 1), 10);
-  const candidateLimit = Math.min(limitPerKind * 3, 24);
+  // Ranking already happens in PostgreSQL. Pulling extra full rich documents only
+  // made the request heavier without changing the final ordering.
+  const candidateLimit = limitPerKind;
 
   const result = await sql<SearchRow>`
     with search_query as (
@@ -201,7 +203,6 @@ export async function searchPublishedContent(
         item.title,
         item.topic,
         item.summary,
-        item.content,
         item.published_at,
         (
           ts_rank_cd(item.search_vector, search_query.query, 32)
@@ -226,11 +227,24 @@ export async function searchPublishedContent(
           order by scored.score desc, scored.published_at desc nulls last, scored.title asc, scored.id asc
         ) as search_position
       from scored
+    ),
+    candidates as (
+      select id, kind, slug, title, topic, summary, score, search_position
+      from ranked
+      where search_position <= ${candidateLimit}
     )
-    select id, kind, slug, title, topic, summary, content, score
-    from ranked
-    where search_position <= ${candidateLimit}
-    order by kind asc, search_position asc
+    select
+      candidate.id,
+      candidate.kind,
+      candidate.slug,
+      candidate.title,
+      candidate.topic,
+      candidate.summary,
+      item.content,
+      candidate.score
+    from candidates as candidate
+    join public.content_items as item on item.id = candidate.id
+    order by candidate.kind asc, candidate.search_position asc
   `.execute(database);
 
   const ranked = result.rows
