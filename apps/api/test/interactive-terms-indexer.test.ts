@@ -29,6 +29,17 @@ describe("interactive-term matcher", () => {
     expect(matches[0]?.e).toBe(31);
   });
 
+  it("does not let a rejected overlap suppress a later valid match", () => {
+    const automaton = interactiveTermTesting.buildAutomaton([
+      entry("aa bb", "first"),
+      entry("bb cc", "overlap"),
+      entry("cc dd", "last"),
+    ]);
+
+    const matches = interactiveTermTesting.findTextMatches("aa bb cc dd", automaton);
+    expect(matches.map((match) => match.t)).toEqual(["first", "last"]);
+  });
+
   it("matches accent-insensitively while preserving source offsets", () => {
     const automaton = interactiveTermTesting.buildAutomaton([
       entry("glucolisis", "glycolysis"),
