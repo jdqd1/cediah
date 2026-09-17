@@ -18,10 +18,12 @@ import { GuideTermProvider } from "./guide-term-context";
 import { RichTextRenderer } from "./rich-text-renderer";
 
 type GuideItem = Extract<ContentItem, { kind: "guide" }>;
+type PanelRole = "original" | "related";
 
 type Panel = {
   item: GuideItem;
   manifest: GuideTermManifest | null;
+  role: PanelRole;
 };
 
 function guideDocument(item: GuideItem) {
@@ -45,8 +47,12 @@ function GuidePanel({ panel }: { panel: Panel }) {
   );
 }
 
-function guideHref(item: GuideItem) {
-  return `/guias/${encodeURIComponent(item.slug)}`;
+function guideHref(item: GuideItem, anchor?: string) {
+  return `/guias/${encodeURIComponent(item.slug)}${anchor ? `#${anchor}` : ""}`;
+}
+
+function panelLabel(panel: Panel) {
+  return panel.role === "original" ? "Original" : "Relacionado";
 }
 
 export function GuideSplitView({
@@ -64,45 +70,86 @@ export function GuideSplitView({
   related: GuideItem;
   relatedManifest: GuideTermManifest | null;
 }) {
-  const [left, setLeft] = useState<Panel | null>({ item: primary, manifest: primaryManifest });
-  const [right, setRight] = useState<Panel | null>({ item: related, manifest: relatedManifest });
+  const [left, setLeft] = useState<Panel | null>({
+    item: primary,
+    manifest: primaryManifest,
+    role: "original",
+  });
+  const [right, setRight] = useState<Panel | null>({
+    item: related,
+    manifest: relatedManifest,
+    role: "related",
+  });
   const [ratio, setRatio] = useState(50);
   const [mobileActive, setMobileActive] = useState<"left" | "right">("right");
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftScrollRef = useRef<HTMLDivElement>(null);
   const rightScrollRef = useRef<HTMLDivElement>(null);
+  const scrollPositionsRef = useRef(new Map<string, number>());
+
+  function rememberScrollPositions() {
+    if (left && leftScrollRef.current) {
+      scrollPositionsRef.current.set(left.item.slug, leftScrollRef.current.scrollTop);
+    }
+    if (right && rightScrollRef.current) {
+      scrollPositionsRef.current.set(right.item.slug, rightScrollRef.current.scrollTop);
+    }
+  }
 
   useEffect(() => {
-    if (!compareAnchor || !right) return;
+    if (!left || !right) return;
     const frame = window.requestAnimationFrame(() => {
-      const root = rightScrollRef.current;
-      if (!root) return;
-      const escaped = typeof CSS !== "undefined" && "escape" in CSS
-        ? CSS.escape(compareAnchor)
-        : compareAnchor.replace(/[^a-zA-Z0-9_-]/g, "");
-      root.querySelector<HTMLElement>(`#${escaped}`)?.scrollIntoView({ block: "start" });
+      const panels = [
+        { panel: left, root: leftScrollRef.current },
+        { panel: right, root: rightScrollRef.current },
+      ];
+      for (const current of panels) {
+        const root = current.root;
+        if (!root) continue;
+        const saved = scrollPositionsRef.current.get(current.panel.item.slug);
+        if (saved !== undefined) {
+          root.scrollTop = saved;
+          continue;
+        }
+        if (current.panel.role !== "related" || !compareAnchor) continue;
+        const escaped = typeof CSS !== "undefined" && "escape" in CSS
+          ? CSS.escape(compareAnchor)
+          : compareAnchor.replace(/[^a-zA-Z0-9_-]/g, "");
+        root.querySelector<HTMLElement>(`#${escaped}`)?.scrollIntoView({ block: "start" });
+      }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [compareAnchor, right]);
+  }, [compareAnchor, left, right]);
 
-  function keepRight() {
-    if (!right) return;
-    setLeft(right);
+  function keepPanel(side: "left" | "right") {
+    const selected = side === "left" ? left : right;
+    if (!selected) return;
+    rememberScrollPositions();
+    setLeft(selected);
     setRight(null);
     setMobileActive("left");
   }
 
   function closeLeft() {
-    if (right) keepRight();
-    else setLeft(null);
+    rememberScrollPositions();
+    if (right) {
+      setLeft(right);
+      setRight(null);
+      setMobileActive("left");
+      return;
+    }
+    setLeft(null);
   }
 
   function closeRight() {
+    rememberScrollPositions();
     setRight(null);
     setMobileActive("left");
   }
 
   function swap() {
     if (!left || !right) return;
+    rememberScrollPositions();
     setLeft(right);
     setRight(left);
     setRatio(100 - ratio);
@@ -145,13 +192,17 @@ export function GuideSplitView({
     <AppShell activeKey="guides" headerTitle="Lectura relacionada" isAdministrator={isAdministrator} mainClassName="guide-split-main">
       <section className="guide-split-shell">
         <header className="guide-split-toolbar">
-          <Link href={left ? guideHref(left.item) : "/guias"}><ArrowLeft size={17} /> Salir de comparación</Link>
+          <Link href={guideHref(primary)}><ArrowLeft size={17} /> Volver a la guía original</Link>
           {left && right ? (
             <>
               <button onClick={swap} type="button"><ArrowsLeftRight size={16} /> Intercambiar</button>
               <span className="guide-split-mobile-switch" role="group" aria-label="Artículo visible">
-                <button aria-pressed={mobileActive === "left"} onClick={() => setMobileActive("left")} type="button">Original</button>
-                <button aria-pressed={mobileActive === "right"} onClick={() => setMobileActive("right")} type="button">Relacionado</button>
+                <button aria-pressed={mobileActive === "left"} onClick={() => setMobileActive("left")} type="button">
+                  {panelLabel(left)}
+                </button>
+                <button aria-pressed={mobileActive === "right"} onClick={() => setMobileActive("right")} type="button">
+                  {panelLabel(right)}
+                </button>
               </span>
             </>
           ) : null}
@@ -160,7 +211,12 @@ export function GuideSplitView({
         {single ? (
           <div className="guide-split-single">
             <div className="guide-split-panel-controls">
-              <a href={guideHref(single.item)} rel="noopener noreferrer" target="_blank"><ArrowSquareOut size={15} /> Nueva pestaña</a>
+              <strong>{panelLabel(single)}</strong>
+              <a
+                href={guideHref(single.item, single.role === "related" ? compareAnchor : undefined)}
+                rel="noopener noreferrer"
+                target="_blank"
+              ><ArrowSquareOut size={15} /> Nueva pestaña</a>
             </div>
             <GuidePanel panel={single} />
           </div>
@@ -174,11 +230,19 @@ export function GuideSplitView({
           >
             <div className={`guide-split-panel${mobileActive === "left" ? " is-mobile-active" : ""}`}>
               <div className="guide-split-panel-controls">
-                <strong>Original</strong>
-                <a aria-label="Abrir guía original en otra pestaña" href={guideHref(left.item)} rel="noopener noreferrer" target="_blank"><ArrowSquareOut size={15} /></a>
-                <button aria-label="Cerrar guía original" onClick={closeLeft} type="button"><X size={16} /></button>
+                <strong>{panelLabel(left)}</strong>
+                {left.role === "related" ? (
+                  <button className="guide-split-keep" onClick={() => keepPanel("left")} type="button">Quedarme aquí</button>
+                ) : null}
+                <a
+                  aria-label={`Abrir guía ${panelLabel(left).toLowerCase()} en otra pestaña`}
+                  href={guideHref(left.item, left.role === "related" ? compareAnchor : undefined)}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                ><ArrowSquareOut size={15} /></a>
+                <button aria-label={`Cerrar guía ${panelLabel(left).toLowerCase()}`} onClick={closeLeft} type="button"><X size={16} /></button>
               </div>
-              <div className="guide-split-scroll"><GuidePanel panel={left} /></div>
+              <div className="guide-split-scroll" ref={leftScrollRef}><GuidePanel panel={left} /></div>
             </div>
 
             <button
@@ -190,10 +254,17 @@ export function GuideSplitView({
 
             <div className={`guide-split-panel${mobileActive === "right" ? " is-mobile-active" : ""}`}>
               <div className="guide-split-panel-controls">
-                <strong>Relacionado</strong>
-                <button className="guide-split-keep" onClick={keepRight} type="button">Quedarme aquí</button>
-                <a aria-label="Abrir guía relacionada en otra pestaña" href={guideHref(right.item)} rel="noopener noreferrer" target="_blank"><ArrowSquareOut size={15} /></a>
-                <button aria-label="Cerrar guía relacionada" onClick={closeRight} type="button"><X size={16} /></button>
+                <strong>{panelLabel(right)}</strong>
+                {right.role === "related" ? (
+                  <button className="guide-split-keep" onClick={() => keepPanel("right")} type="button">Quedarme aquí</button>
+                ) : null}
+                <a
+                  aria-label={`Abrir guía ${panelLabel(right).toLowerCase()} en otra pestaña`}
+                  href={guideHref(right.item, right.role === "related" ? compareAnchor : undefined)}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                ><ArrowSquareOut size={15} /></a>
+                <button aria-label={`Cerrar guía ${panelLabel(right).toLowerCase()}`} onClick={closeRight} type="button"><X size={16} /></button>
               </div>
               <div className="guide-split-scroll" ref={rightScrollRef}><GuidePanel panel={right} /></div>
             </div>
