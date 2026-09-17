@@ -848,6 +848,7 @@ export function GuideEditorScreen({
   const [exitPrompt, setExitPrompt] = useState(false);
   const [preview, setPreview] = useState(false);
   const canEditDocument = editable && status !== "published";
+  // Published guides are archived by the parent flow before edit mode is enabled.
   const [editMode, setEditMode] = useState(() => isNew);
   const [editingTitle, setEditingTitle] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
