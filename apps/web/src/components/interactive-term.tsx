@@ -5,18 +5,33 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowSquareOut, ArrowsLeftRight, X } from "@phosphor-icons/react";
 import {
   createPortal,
-  useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
+  useSyncExternalStore,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { useGuideTermContext } from "./guide-term-context";
 
 const mobileQuery = "(max-width: 760px)";
+
+function subscribeMobileQuery(onStoreChange: () => void) {
+  const media = window.matchMedia(mobileQuery);
+  media.addEventListener("change", onStoreChange);
+  return () => media.removeEventListener("change", onStoreChange);
+}
+
+function getMobileSnapshot() {
+  return window.matchMedia(mobileQuery).matches;
+}
+
+function getMobileServerSnapshot() {
+  return false;
+}
 
 function termHref(slug: string, anchor: string | null) {
   return `/guias/${encodeURIComponent(slug)}${anchor ? `#${anchor}` : ""}`;
@@ -39,84 +54,85 @@ export function InteractiveTerm({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const closeTimerRef = useRef<number | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
-  const [mobile, setMobile] = useState(false);
-  const [position, setPosition] = useState<CSSProperties>({});
+  const mobile = useSyncExternalStore(
+    subscribeMobileQuery,
+    getMobileSnapshot,
+    getMobileServerSnapshot,
+  );
+  useBodyScrollLock(open && mobile);
 
-  const cancelClose = useCallback(() => {
+  function cancelClose() {
     if (closeTimerRef.current !== null) {
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-  }, []);
+  }
 
-  const close = useCallback((restoreFocus = false) => {
+  function close(restoreFocus = false) {
     cancelClose();
     setOpen(false);
     if (restoreFocus) window.requestAnimationFrame(() => triggerRef.current?.focus());
-  }, [cancelClose]);
+  }
 
-  const scheduleClose = useCallback(() => {
+  function scheduleClose() {
     cancelClose();
     closeTimerRef.current = window.setTimeout(() => {
       closeTimerRef.current = null;
       setOpen(false);
     }, 180);
-  }, [cancelClose]);
+  }
 
-  const updatePosition = useCallback(() => {
+  useLayoutEffect(() => {
     if (!open || mobile) return;
     const trigger = triggerRef.current;
     const panel = panelRef.current;
     if (!trigger || !panel) return;
-    const rect = trigger.getBoundingClientRect();
-    const width = Math.min(360, window.innerWidth - 24);
-    const measuredHeight = panel.offsetHeight || 180;
-    const left = Math.min(
-      Math.max(12, rect.left + rect.width / 2 - width / 2),
-      Math.max(12, window.innerWidth - width - 12),
-    );
-    const placeAbove = rect.bottom + 10 + measuredHeight > window.innerHeight - 12;
-    const top = placeAbove
-      ? Math.max(12, rect.top - measuredHeight - 10)
-      : Math.min(window.innerHeight - measuredHeight - 12, rect.bottom + 10);
-    setPosition({ left, top, width });
-  }, [mobile, open]);
 
-  useEffect(() => {
-    setMounted(true);
-    const media = window.matchMedia(mobileQuery);
-    const sync = () => setMobile(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
+    function updatePosition() {
+      const triggerRect = trigger!.getBoundingClientRect();
+      const width = Math.min(360, window.innerWidth - 24);
+      const measuredHeight = panel!.offsetHeight || 180;
+      const left = Math.min(
+        Math.max(12, triggerRect.left + triggerRect.width / 2 - width / 2),
+        Math.max(12, window.innerWidth - width - 12),
+      );
+      const placeAbove = triggerRect.bottom + 10 + measuredHeight > window.innerHeight - 12;
+      const top = placeAbove
+        ? Math.max(12, triggerRect.top - measuredHeight - 10)
+        : Math.min(window.innerHeight - measuredHeight - 12, triggerRect.bottom + 10);
+      panel!.style.left = `${left}px`;
+      panel!.style.top = `${top}px`;
+      panel!.style.width = `${width}px`;
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [mobile, open]);
 
   useEffect(() => {
     if (!open) return;
-    updatePosition();
-    const onChange = () => updatePosition();
-    const onPointerDown = (event: PointerEvent) => {
+    function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
       if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return;
-      close(false);
-    };
-    window.addEventListener("resize", onChange);
-    window.addEventListener("scroll", onChange, true);
+      setOpen(false);
+    }
     document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      window.removeEventListener("resize", onChange);
-      window.removeEventListener("scroll", onChange, true);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [close, open, updatePosition]);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
 
   useEffect(() => {
-    if (open && mobile) window.requestAnimationFrame(() => closeRef.current?.focus());
+    if (!open || !mobile) return;
+    const frame = window.requestAnimationFrame(() => closeRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
   }, [mobile, open]);
 
-  useEffect(() => () => cancelClose(), [cancelClose]);
+  useEffect(() => () => cancelClose(), []);
 
   if (!summary) return <>{children}</>;
 
@@ -124,6 +140,9 @@ export function InteractiveTerm({
   const destinationHref = destination
     ? termHref(destination.guideSlug, destination.sectionAnchor)
     : null;
+  const panelId = `interactive-term-${id}`;
+  const titleId = `interactive-term-title-${id}`;
+  const descriptionId = `interactive-term-description-${id}`;
 
   function openComparison() {
     if (!destination) return;
@@ -144,32 +163,61 @@ export function InteractiveTerm({
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       cancelClose();
-      setOpen((current) => !current);
+      if (open) {
+        close(false);
+        return;
+      }
+      setOpen(true);
+      window.requestAnimationFrame(() => closeRef.current?.focus());
     }
   }
 
-  const panel = open && mounted ? (
+  function onPanelKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close(true);
+      return;
+    }
+    if (!mobile || event.key !== "Tab") return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const controls = Array.from(panel.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), a[href], [tabindex="0"]',
+    )).filter((element) => element.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (!first || !last) {
+      event.preventDefault();
+      panel.focus();
+      return;
+    }
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  const panel = open ? (
     <div
-      aria-label={`Información sobre ${summary.name}`}
+      aria-describedby={descriptionId}
+      aria-labelledby={titleId}
       aria-modal={mobile || undefined}
       className={`interactive-term-panel${mobile ? " is-mobile" : ""}`}
-      id={`interactive-term-${id}`}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          close(true);
-        }
-      }}
+      id={panelId}
+      onKeyDown={onPanelKeyDown}
       onPointerEnter={cancelClose}
       onPointerLeave={mobile ? undefined : scheduleClose}
       ref={panelRef}
       role="dialog"
-      style={mobile ? undefined : position}
+      tabIndex={-1}
     >
       <div className="interactive-term-panel-header">
         <div>
           {summary.category ? <span>{summary.category}</span> : null}
-          <strong>{summary.name}</strong>
+          <strong id={titleId}>{summary.name}</strong>
         </div>
         <button
           aria-label="Cerrar información del término"
@@ -181,7 +229,7 @@ export function InteractiveTerm({
           <X aria-hidden="true" size={16} />
         </button>
       </div>
-      <p>{summary.shortDefinition}</p>
+      <p id={descriptionId}>{summary.shortDefinition}</p>
       {destination && destinationHref ? (
         <div className="interactive-term-actions">
           <Link href={destinationHref} onClick={() => close(false)} prefetch={false}>
@@ -208,7 +256,8 @@ export function InteractiveTerm({
   return (
     <>
       <button
-        aria-controls={open ? `interactive-term-${id}` : undefined}
+        aria-controls={open ? panelId : undefined}
+        aria-describedby={open ? descriptionId : undefined}
         aria-expanded={open}
         aria-haspopup="dialog"
         className="interactive-term-trigger"
@@ -220,10 +269,6 @@ export function InteractiveTerm({
         onClick={() => {
           cancelClose();
           setOpen((current) => !current);
-        }}
-        onFocus={() => {
-          cancelClose();
-          setOpen(true);
         }}
         onKeyDown={onTriggerKeyDown}
         onPointerEnter={() => {
@@ -239,7 +284,15 @@ export function InteractiveTerm({
       </button>
       {panel ? createPortal(
         <>
-          {mobile ? <button aria-label="Cerrar" className="interactive-term-backdrop" onClick={() => close(true)} type="button" /> : null}
+          {mobile ? (
+            <button
+              aria-label="Cerrar información del término"
+              className="interactive-term-backdrop"
+              onClick={() => close(true)}
+              tabIndex={-1}
+              type="button"
+            />
+          ) : null}
           {panel}
         </>,
         document.body,
