@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ArrowSquareOut, ArrowsLeftRight, X } from "@phosphor-icons/react";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RichTextDocument } from "@cediah/contracts";
 import { sectionsToRichTextDocument } from "@/lib/guide-document";
@@ -31,6 +31,7 @@ export function RelatedGuidePanel({
   const [payload, setPayload] = useState<RelatedReaderPayload | null>(null);
   const [side, setSide] = useState<"left" | "right">("right");
   const [width, setWidth] = useState(50);
+  const readerRef = useRef<HTMLDivElement>(null);
   const href = `/guias/${encodeURIComponent(slug)}${anchor ? `#${encodeURIComponent(anchor)}` : ""}`;
 
   useEffect(() => {
@@ -88,6 +89,19 @@ export function RelatedGuidePanel({
     );
   }, [payload]);
 
+  useEffect(() => {
+    if (!guideDocument || !anchor) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = Array.from(readerRef.current?.querySelectorAll<HTMLElement>("[id]") ?? [])
+        .find((element) => element.id === anchor);
+      target?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [anchor, guideDocument]);
+
   if (typeof document === "undefined") return null;
   return createPortal(
     <aside
@@ -133,9 +147,13 @@ export function RelatedGuidePanel({
         />
       </label>
 
-      <div className={styles.reader}>
+      <div className={styles.reader} ref={readerRef}>
         {guideDocument ? (
-          <RichTextRenderer className="published-rich-guide-article" document={guideDocument} />
+          <RichTextRenderer
+            className="published-rich-guide-article"
+            document={guideDocument}
+            interactiveTermsSlug={slug}
+          />
         ) : (
           <p className={styles.loading}>Cargando contenido relacionado…</p>
         )}
