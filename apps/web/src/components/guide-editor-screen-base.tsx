@@ -71,6 +71,7 @@ import {
 import {
   appendDiscoveredGuideKeyPoints,
   extractGuideKeyPoints,
+  normalizeGuideKeyPoint,
 } from "@/lib/guide-key-points";
 import {
   markdownHighlightInputMatch,
@@ -79,6 +80,7 @@ import {
 } from "@/lib/guide-markdown";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { IconBackLink } from "./compact-navigation";
+import { KeyPointsImportDropzone } from "./key-points-import-dropzone";
 import { PlatformToast, type PlatformNotice } from "./platform-toast";
 
 const PublishedGuideReader = dynamic(
@@ -541,6 +543,23 @@ function KeyPointsPanel({
     onChange([...values, selected || ""]);
   }
 
+  function importKeyPoints(imported: string[]) {
+    const existing = new Set(values.map(normalizeGuideKeyPoint).filter(Boolean));
+    const newPoints = imported.filter((point) => !existing.has(normalizeGuideKeyPoint(point)));
+    const maxPoints = Math.max(0, 30 - values.length);
+
+    if (newPoints.length > maxPoints) {
+      return {
+        error: `El archivo contiene ${newPoints.length} puntos nuevos y solo quedan ${maxPoints} espacios.`,
+      };
+    }
+
+    const nextValues = appendDiscoveredGuideKeyPoints(values, imported, 30);
+    const added = nextValues.length - values.length;
+    if (added > 0) onChange(nextValues);
+    return { added };
+  }
+
   return (
     <section className={`guide-companion-panel ${collapsed ? "is-collapsed" : ""}`}>
       <header>
@@ -575,6 +594,11 @@ function KeyPointsPanel({
               </button>
             </div>
           ))}
+          <KeyPointsImportDropzone
+            disabled={disabled}
+            maxPoints={Math.max(0, 30 - values.length)}
+            onImport={importKeyPoints}
+          />
           <button className="guide-panel-add" disabled={disabled || values.length >= 30} type="button" onClick={addSelection}>
             <Plus size={15} /> {editor && !editor.state.selection.empty ? "Añadir selección" : "Añadir punto clave"}
           </button>
