@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ContentStudio } from "@/components/content-studio";
+import { GuideEditorCopyAction } from "@/components/guide-editor-copy-action";
 import { getContentWorkspace } from "@/lib/server/content-api";
 
 export const dynamic = "force-dynamic";
@@ -43,5 +44,10 @@ export default async function ContentStudioPage() {
     );
   }
 
-  return <ContentStudio initialWorkspace={result.workspace} />;
+  return (
+    <>
+      <ContentStudio initialWorkspace={result.workspace} />
+      <GuideEditorCopyAction />
+    </>
+  );
 }
