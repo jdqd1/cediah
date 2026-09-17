@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ArrowSquareOut, ArrowsLeftRight, X } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RichTextDocument } from "@cediah/contracts";
 import { sectionsToRichTextDocument } from "@/lib/guide-document";
@@ -93,7 +93,7 @@ export function RelatedGuidePanel({
     <aside
       aria-label={`Guía relacionada: ${title}`}
       className={`${styles.panel} ${side === "left" ? styles.left : styles.right}`}
-      style={{ "--related-panel-width": `${width}vw` } as React.CSSProperties}
+      style={{ "--related-panel-width": `${width}vw` } as CSSProperties}
     >
       <header className={styles.toolbar}>
         <div className={styles.titleBlock}>
@@ -135,11 +135,7 @@ export function RelatedGuidePanel({
 
       <div className={styles.reader}>
         {guideDocument ? (
-          <RichTextRenderer
-            className="published-rich-guide-article"
-            document={guideDocument}
-            interactiveTermsSlug={slug}
-          />
+          <RichTextRenderer className="published-rich-guide-article" document={guideDocument} />
         ) : (
           <p className={styles.loading}>Cargando contenido relacionado…</p>
         )}
