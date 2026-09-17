@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { sql } from "kysely";
 import { registerPublishedContentSearchRoute } from "./content-search.js";
 import type { DatabaseClient } from "./db/database.js";
 import { registerInteractiveTermAdminRoutes } from "./interactive-terms/admin-routes.js";
@@ -21,7 +22,22 @@ export function registerProductionAuxiliaryRoutes(
   registerInteractiveTermAdminRoutes(app, database);
 
   if (database) {
-    const stopIndexer = startInteractiveTermIndexer(database);
-    app.addHook("onClose", async () => stopIndexer());
+    let stopIndexer: (() => void) | undefined;
+    app.addHook("onClose", async () => stopIndexer?.());
+
+    void (async () => {
+      try {
+        const schema = await sql<{ queue_exists: boolean }>`
+          select to_regclass('public.guide_term_reindex_queue') is not null as queue_exists
+        `.execute(database);
+        if (!schema.rows[0]?.queue_exists) {
+          app.log.error("Interactive term indexer disabled: database migrations are not ready");
+          return;
+        }
+        stopIndexer = startInteractiveTermIndexer(database);
+      } catch (error) {
+        app.log.error({ err: error }, "Interactive term indexer failed to initialize");
+      }
+    })();
   }
 }
