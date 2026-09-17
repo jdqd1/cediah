@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { InteractiveTermAdminScreen } from "@/components/interactive-term-admin-screen";
+import { getInteractiveTermAdminTerms } from "@/lib/server/interactive-term-admin-api";
 import { getCurrentUser } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
@@ -37,5 +38,19 @@ export default async function InteractiveTermAdminPage() {
     );
   }
 
-  return <InteractiveTermAdminScreen viewerEmail={current.user.email} />;
+  const terms = await getInteractiveTermAdminTerms();
+  if (terms.status !== "ready") {
+    return (
+      <main className="studio-gate">
+        <section>
+          <p className="eyebrow dark">Términos interactivos</p>
+          <h1>No pudimos cargar el diccionario.</h1>
+          <p>La sesión sigue protegida. Verifica la API y las migraciones antes de editar términos.</p>
+          <Link href="/panel">Volver al panel</Link>
+        </section>
+      </main>
+    );
+  }
+
+  return <InteractiveTermAdminScreen initialTerms={terms.terms} viewerEmail={current.user.email} />;
 }
