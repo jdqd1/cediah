@@ -11,6 +11,9 @@ import "./auth-paper.css";
 import "./learning.css";
 import "./identity-v3.css";
 import "./guide-citations.css";
+import "./guide-interactive-terms.css";
+import "./interactive-term-admin.css";
+import "./admin-section-tabs.css";
 
 const plusJakartaSans = localFont({
   src: [

@@ -1,0 +1,36 @@
+.admin-section-tabs {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #e6e8f0;
+  display: flex;
+  gap: 8px;
+  min-height: 52px;
+  overflow-x: auto;
+  padding: 8px 30px;
+}
+
+.admin-section-tab {
+  border-radius: 9px;
+  color: #69708a;
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 8px 11px;
+  text-decoration: none;
+}
+
+.admin-section-tab:hover {
+  background: #f5f6fa;
+  color: #303a70;
+}
+
+.admin-section-tab.is-active {
+  background: #eef1fb;
+  color: #34417e;
+}
+
+@media (max-width: 820px) {
+  .admin-section-tabs {
+    padding-inline: 16px;
+  }
+}

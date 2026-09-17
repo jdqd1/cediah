@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { registerPublishedContentSearchRoute } from "./content-search.js";
 import type { DatabaseClient } from "./db/database.js";
+import { registerInteractiveTermAdminRoutes } from "./interactive-terms/admin-routes.js";
+import { startInteractiveTermIndexer } from "./interactive-terms/indexer.js";
+import { registerInteractiveTermRoutes } from "./interactive-terms/routes.js";
 import { registerPublishedStudyCatalogRoutes } from "./study-catalog.js";
 
 /**
@@ -14,4 +17,11 @@ export function registerProductionAuxiliaryRoutes(
 ) {
   registerPublishedContentSearchRoute(app, database);
   registerPublishedStudyCatalogRoutes(app, database);
+  registerInteractiveTermRoutes(app, database);
+  registerInteractiveTermAdminRoutes(app, database);
+
+  if (database) {
+    const stopIndexer = startInteractiveTermIndexer(database);
+    app.addHook("onClose", async () => stopIndexer());
+  }
 }

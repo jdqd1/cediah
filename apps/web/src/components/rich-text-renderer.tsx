@@ -1,6 +1,9 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
 import { Fragment } from "react";
 import type { RichTextDocument } from "@cediah/contracts";
+import type { GuideTermOccurrence } from "@/lib/guide-terms";
 import {
   buildGuideCitationIndex,
   parseVancouverCitationNumbers,
@@ -9,6 +12,8 @@ import {
 } from "@/lib/guide-citations";
 import { createStableHeadingIdGenerator } from "@/lib/guide-document";
 import { GuideCitation } from "./guide-citation";
+import { useGuideTermContext } from "./guide-term-context";
+import { InteractiveTerm } from "./interactive-term";
 
 type JsonObject = Record<string, unknown>;
 
@@ -187,9 +192,64 @@ function renderMarkedText(
   return pieces;
 }
 
+function textNodeWithValue(node: JsonObject, text: string): JsonObject {
+  return { ...node, text };
+}
+
+function renderInteractiveText(
+  node: JsonObject,
+  occurrences: readonly GuideTermOccurrence[],
+  references: Map<number, GuideReference>,
+  interactiveCitations: boolean,
+): ReactNode {
+  const value = typeof node.text === "string" ? node.text : "";
+  if (occurrences.length === 0 || !value) {
+    return renderMarkedText(node, references, interactiveCitations);
+  }
+
+  const valid = occurrences
+    .filter((occurrence) => occurrence.s >= 0 && occurrence.e <= value.length && occurrence.e > occurrence.s)
+    .sort((left, right) => left.s - right.s || left.e - right.e);
+  if (valid.length === 0) return renderMarkedText(node, references, interactiveCitations);
+
+  const pieces: ReactNode[] = [];
+  let cursor = 0;
+  for (const [index, occurrence] of valid.entries()) {
+    if (occurrence.s < cursor) continue;
+    if (occurrence.s > cursor) {
+      const text = value.slice(cursor, occurrence.s);
+      pieces.push(
+        <Fragment key={`term-before-${index}-${cursor}`}>
+          {renderMarkedText(textNodeWithValue(node, text), references, interactiveCitations)}
+        </Fragment>,
+      );
+    }
+    const termText = value.slice(occurrence.s, occurrence.e);
+    pieces.push(
+      <InteractiveTerm key={`term-${occurrence.t}-${occurrence.s}`} termId={occurrence.t}>
+        {renderMarkedText(textNodeWithValue(node, termText), references, interactiveCitations)}
+      </InteractiveTerm>,
+    );
+    cursor = occurrence.e;
+  }
+  if (cursor < value.length) {
+    pieces.push(
+      <Fragment key={`term-tail-${cursor}`}>
+        {renderMarkedText(textNodeWithValue(node, value.slice(cursor)), references, interactiveCitations)}
+      </Fragment>,
+    );
+  }
+  return pieces;
+}
+
+function manifestPath(renderPath: string) {
+  return renderPath === "root" ? "" : renderPath.startsWith("root.") ? renderPath.slice(5) : renderPath;
+}
+
 export function RichTextRenderer({ className, document }: RichTextRendererProps) {
   const nextHeadingId = createStableHeadingIdGenerator();
   const citationIndex = buildGuideCitationIndex(document);
+  const termContext = useGuideTermContext();
 
   const renderNode = (rawNode: unknown, path: string, depth: number, inBibliography = false): ReactNode => {
     if (depth > MAX_RENDER_DEPTH) return null;
@@ -197,7 +257,12 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
     if (!node || typeof node.type !== "string") return null;
 
     if (node.type === "text") {
-      return <Fragment key={path}>{renderMarkedText(node, citationIndex.references, !inBibliography)}</Fragment>;
+      const occurrences = termContext.occurrencesForPath(manifestPath(path));
+      return (
+        <Fragment key={path}>
+          {renderInteractiveText(node, occurrences, citationIndex.references, !inBibliography)}
+        </Fragment>
+      );
     }
 
     const renderChildren = () =>
@@ -233,15 +298,19 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
             : 2;
         const label = textContent(node);
         const id = level >= 1 && level <= 3 ? nextHeadingId(label) : undefined;
+        const stableAnchor = termContext.sectionAnchorForPath(manifestPath(path));
         const headingClass = `rich-guide-heading rich-guide-heading-${level}${alignmentClass(node)}`;
         const content = renderChildren();
+        const anchor = stableAnchor && stableAnchor !== id
+          ? <span aria-hidden="true" className="rich-guide-stable-anchor" id={stableAnchor} />
+          : null;
 
-        if (level === 1) return <h1 className={headingClass} id={id} key={path}>{content}</h1>;
-        if (level === 2) return <h2 className={headingClass} id={id} key={path}>{content}</h2>;
-        if (level === 3) return <h3 className={headingClass} id={id} key={path}>{content}</h3>;
-        if (level === 4) return <h4 className={headingClass} key={path}>{content}</h4>;
-        if (level === 5) return <h5 className={headingClass} key={path}>{content}</h5>;
-        return <h6 className={headingClass} key={path}>{content}</h6>;
+        if (level === 1) return <Fragment key={path}>{anchor}<h1 className={headingClass} id={id ?? stableAnchor ?? undefined}>{content}</h1></Fragment>;
+        if (level === 2) return <Fragment key={path}>{anchor}<h2 className={headingClass} id={id ?? stableAnchor ?? undefined}>{content}</h2></Fragment>;
+        if (level === 3) return <Fragment key={path}>{anchor}<h3 className={headingClass} id={id ?? stableAnchor ?? undefined}>{content}</h3></Fragment>;
+        if (level === 4) return <Fragment key={path}>{anchor}<h4 className={headingClass}>{content}</h4></Fragment>;
+        if (level === 5) return <Fragment key={path}>{anchor}<h5 className={headingClass}>{content}</h5></Fragment>;
+        return <Fragment key={path}>{anchor}<h6 className={headingClass}>{content}</h6></Fragment>;
       }
       case "table":
         return (
