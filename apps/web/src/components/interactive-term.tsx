@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowSquareOut, ArrowsLeftRight, X } from "@phosphor-icons/react";
+import { createPortal } from "react-dom";
 import {
-  createPortal,
   useEffect,
   useId,
   useLayoutEffect,
@@ -132,7 +132,9 @@ export function InteractiveTerm({
     return () => window.cancelAnimationFrame(frame);
   }, [mobile, open]);
 
-  useEffect(() => () => cancelClose(), []);
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+  }, []);
 
   if (!summary) return <>{children}</>;
 
