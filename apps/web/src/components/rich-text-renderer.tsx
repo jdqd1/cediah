@@ -32,6 +32,7 @@ type InteractiveTermsPayload = {
 export type RichTextRendererProps = {
   className?: string;
   document: RichTextDocument;
+  interactiveTermsSlug?: string | null;
 };
 
 const MAX_RENDER_DEPTH = 100;
@@ -319,9 +320,14 @@ function loadInteractiveTerms(slug: string) {
   return request;
 }
 
-export function RichTextRenderer({ className, document }: RichTextRendererProps) {
+export function RichTextRenderer({
+  className,
+  document,
+  interactiveTermsSlug,
+}: RichTextRendererProps) {
   const pathname = usePathname();
-  const slug = useMemo(() => guideSlugFromPathname(pathname), [pathname]);
+  const pathnameSlug = useMemo(() => guideSlugFromPathname(pathname), [pathname]);
+  const slug = interactiveTermsSlug === undefined ? pathnameSlug : interactiveTermsSlug;
   const [interactiveTerms, setInteractiveTerms] = useState<InteractiveTermsPayload | null>(null);
   const nextHeadingId = createStableHeadingIdGenerator();
   const citationIndex = buildGuideCitationIndex(document);
