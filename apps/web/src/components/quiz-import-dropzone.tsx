@@ -15,6 +15,8 @@ type QuizImportDropzoneProps = {
   disabled?: boolean;
   maxQuestions: number;
   onImport: (questions: ImportedQuizQuestion[]) => void;
+  onRequestEdit?: () => void;
+  requiresEdit?: boolean;
 };
 
 type ImportStatus =
@@ -26,24 +28,26 @@ export function QuizImportDropzone({
   disabled = false,
   maxQuestions,
   onImport,
+  onRequestEdit,
+  requiresEdit = false,
 }: QuizImportDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [reading, setReading] = useState(false);
   const [status, setStatus] = useState<ImportStatus>(null);
 
-  const unavailable = disabled || reading || maxQuestions <= 0;
+  const unavailable = disabled || reading || maxQuestions <= 0 || requiresEdit;
 
   async function importFile(file: File) {
     if (unavailable) return;
     setStatus(null);
 
     if (!isQuizImportFile(file)) {
-      setStatus({ kind: "error", message: "Usa un archivo .json con el formato de cuestionario de CEDIAH." });
+      setStatus({ kind: "error", message: "Usa un archivo .json con el formato de cuestionario de Koras." });
       return;
     }
     if (file.size > MAX_QUIZ_IMPORT_FILE_BYTES) {
-      setStatus({ kind: "error", message: "El archivo es demasiado grande. El máximo permitido es 1 MB." });
+      setStatus({ kind: "error", message: "El archivo supera el máximo de 1 MB." });
       return;
     }
 
@@ -53,14 +57,14 @@ export function QuizImportDropzone({
       if (imported.length > maxQuestions) {
         setStatus({
           kind: "error",
-          message: `El archivo contiene ${imported.length} preguntas, pero solo quedan ${maxQuestions} espacios disponibles.`,
+          message: `El archivo contiene ${imported.length} preguntas y solo quedan ${maxQuestions} espacios.`,
         });
         return;
       }
       onImport(imported);
       setStatus({
         kind: "success",
-        message: `${imported.length} ${imported.length === 1 ? "pregunta agregada" : "preguntas agregadas"} correctamente.`,
+        message: `${imported.length} ${imported.length === 1 ? "pregunta agregada" : "preguntas agregadas"}.`,
       });
     } catch (error) {
       setStatus({
@@ -82,14 +86,15 @@ export function QuizImportDropzone({
   }
 
   return (
-    <div>
+    <div className={styles.wrapper}>
       <div
         aria-disabled={unavailable}
         className={[
           styles.dropzone,
           dragging ? styles.dropzoneDragging : "",
-          unavailable ? styles.dropzoneDisabled : "",
+          disabled ? styles.dropzoneDisabled : "",
         ].filter(Boolean).join(" ")}
+        title={requiresEdit ? "Activa el modo de edición para gestionar el cuestionario" : "Arrastra un JSON aquí o selecciónalo"}
         onDragEnter={(event) => {
           event.preventDefault();
           if (!unavailable) setDragging(true);
@@ -104,22 +109,32 @@ export function QuizImportDropzone({
         }}
         onDrop={handleDrop}
       >
-        <span className={styles.icon} aria-hidden="true"><UploadSimple size={17} /></span>
+        <span className={styles.icon} aria-hidden="true"><UploadSimple size={16} /></span>
         <div className={styles.copy}>
-          <strong>{reading ? "Leyendo cuestionario…" : "Importar preguntas"}</strong>
-          <span>Arrastra aquí un JSON o selecciónalo. El archivo se procesa solo en tu navegador.</span>
+          <strong>{reading ? "Leyendo…" : "Importar JSON"}</strong>
+          {!requiresEdit && <span>{maxQuestions} libres</span>}
         </div>
-        <div className={styles.actions}>
+
+        {requiresEdit ? (
+          <button
+            className={styles.selectButton}
+            disabled={disabled}
+            type="button"
+            onClick={onRequestEdit}
+          >
+            Editar
+          </button>
+        ) : (
           <button
             className={styles.selectButton}
             disabled={unavailable}
             type="button"
             onClick={() => inputRef.current?.click()}
           >
-            Seleccionar archivo
+            Seleccionar
           </button>
-          <span className={styles.hint}>JSON · máximo 1 MB · {maxQuestions} espacios disponibles</span>
-        </div>
+        )}
+
         <input
           ref={inputRef}
           accept=".json,application/json"
@@ -133,6 +148,7 @@ export function QuizImportDropzone({
           }}
         />
       </div>
+
       {status && (
         <div
           className={`${styles.status} ${status.kind === "success" ? styles.statusSuccess : styles.statusError}`}
