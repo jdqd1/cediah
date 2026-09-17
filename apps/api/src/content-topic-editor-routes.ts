@@ -27,6 +27,7 @@ import {
   listEditorSubjects,
   listEditorTopics,
 } from "./editor-content-index.js";
+import { registerKnowledgeTermRoutes } from "./knowledge-term-routes.js";
 
 const ContentTopicRenameRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -174,6 +175,8 @@ export async function registerContentTopicEditorRoutes(
     identityProvider: IdentityProvider | undefined;
   },
 ) {
+  await registerKnowledgeTermRoutes(app, dependencies);
+
   app.get("/v1/editor/content-index", async (request, reply) => {
     const editor = await resolveContentEditor(
       request,
