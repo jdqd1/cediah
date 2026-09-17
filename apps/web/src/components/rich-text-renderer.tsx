@@ -257,11 +257,12 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
     if (!node || typeof node.type !== "string") return null;
 
     if (node.type === "text") {
-      const occurrences = termContext.occurrencesForPath(manifestPath(path));
+      const sourcePath = manifestPath(path);
+      const occurrences = termContext.occurrencesForPath(sourcePath);
       return (
-        <Fragment key={path}>
+        <span data-guide-term-path={sourcePath} key={path}>
           {renderInteractiveText(node, occurrences, citationIndex.references, !inBibliography)}
-        </Fragment>
+        </span>
       );
     }
 
