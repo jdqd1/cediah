@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { registerPublishedContentSearchRoute } from "./content-search.js";
 import type { DatabaseClient } from "./db/database.js";
 import { registerInteractiveTermAdminRoutes } from "./interactive-terms/admin-routes.js";
+import { registerInteractiveTermSuggestionRoutes } from "./interactive-terms/admin-suggestions.js";
 import { startInteractiveTermIndexer } from "./interactive-terms/indexer.js";
 import { registerInteractiveTermRoutes } from "./interactive-terms/routes.js";
 import { registerPublishedStudyCatalogRoutes } from "./study-catalog.js";
@@ -20,6 +21,7 @@ export function registerProductionAuxiliaryRoutes(
   registerPublishedStudyCatalogRoutes(app, database);
   registerInteractiveTermRoutes(app, database);
   registerInteractiveTermAdminRoutes(app, database);
+  registerInteractiveTermSuggestionRoutes(app, database);
 
   if (database) {
     let stopIndexer: (() => void) | undefined;
