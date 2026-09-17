@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
+import { GuideKnowledgeShell } from "@/components/guide-knowledge-shell";
 import { subjectContentHref } from "@/lib/content-navigation";
 import { getPublishedContent, getPublishedContentItem, getSubjects } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
+import { getGuideKnowledge } from "@/lib/server/guide-knowledge-api";
+import "../../guide-knowledge.css";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +20,11 @@ function firstSearchValue(value: string | string[] | undefined) {
 
 export default async function GuidePage({ params, searchParams }: GuidePageProps) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const [result, subjectsResult, isAdministrator] = await Promise.all([
+  const [result, subjectsResult, isAdministrator, currentKnowledgeResult] = await Promise.all([
     getPublishedContentItem(slug),
     getSubjects(),
     currentUserIsAdministrator(),
+    getGuideKnowledge(slug),
   ]);
 
   if (result.status === "ready") {
@@ -47,15 +51,31 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
     const linkedGuide = linkedResult?.status === "ready"
       ? linkedResult.catalog.items.find((item) => item.kind === "guide")
       : undefined;
+    const primaryGuide = result.item.kind === "guide"
+      ? result.item
+      : linkedGuide?.kind === "guide"
+        ? linkedGuide
+        : null;
+    const linkedKnowledgeResult = primaryGuide && primaryGuide.slug !== slug
+      ? await getGuideKnowledge(primaryGuide.slug)
+      : null;
+    const knowledge = linkedKnowledgeResult?.status === "ready"
+      ? linkedKnowledgeResult.knowledge
+      : currentKnowledgeResult.status === "ready"
+        ? currentKnowledgeResult.knowledge
+        : null;
+
     return (
-      <ContentDetailScreen
-        guideMode={guideMode}
-        item={result.item}
-        isAdministrator={isAdministrator}
-        linkedGuide={linkedGuide}
-        returnHref={returnHref}
-        returnLabel={returnHref.startsWith("/contenido/") ? "Volver al video" : origin === "asignatura" && topic ? `Volver a ${topic}` : "Volver a guías"}
-      />
+      <GuideKnowledgeShell knowledge={knowledge} primaryGuide={primaryGuide}>
+        <ContentDetailScreen
+          guideMode={guideMode}
+          item={result.item}
+          isAdministrator={isAdministrator}
+          linkedGuide={linkedGuide}
+          returnHref={returnHref}
+          returnLabel={returnHref.startsWith("/contenido/") ? "Volver al video" : origin === "asignatura" && topic ? `Volver a ${topic}` : "Volver a guías"}
+        />
+      </GuideKnowledgeShell>
     );
   }
   if (result.status === "not_found") notFound();
