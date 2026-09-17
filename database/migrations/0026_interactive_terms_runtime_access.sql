@@ -1,4 +1,5 @@
--- Secure interactive-term tables from the Supabase Data API while allowing the dedicated application runtime role.
+-- Keep interactive-term storage private from inherited/browser database roles while
+-- allowing the dedicated application runtime role when the deployment defines it.
 
 alter table public.interactive_terms enable row level security;
 alter table public.interactive_term_aliases enable row level security;
@@ -9,47 +10,73 @@ alter table public.guide_term_manifests enable row level security;
 alter table public.guide_term_usage enable row level security;
 alter table public.guide_term_reindex_queue enable row level security;
 
-revoke all on table public.interactive_terms from anon, authenticated;
-revoke all on table public.interactive_term_aliases from anon, authenticated;
-revoke all on table public.guide_sections from anon, authenticated;
-revoke all on table public.interactive_term_links from anon, authenticated;
-revoke all on table public.interactive_term_dictionary_state from anon, authenticated;
-revoke all on table public.guide_term_manifests from anon, authenticated;
-revoke all on table public.guide_term_usage from anon, authenticated;
-revoke all on table public.guide_term_reindex_queue from anon, authenticated;
+revoke all on public.interactive_terms,
+  public.interactive_term_aliases,
+  public.guide_sections,
+  public.interactive_term_links,
+  public.interactive_term_dictionary_state,
+  public.guide_term_manifests,
+  public.guide_term_usage,
+  public.guide_term_reindex_queue
+from public;
 
-grant select, insert, update, delete on table public.interactive_terms to cediah_runtime;
-grant select, insert, update, delete on table public.interactive_term_aliases to cediah_runtime;
-grant select, insert, update, delete on table public.guide_sections to cediah_runtime;
-grant select, insert, update, delete on table public.interactive_term_links to cediah_runtime;
-grant select, insert, update, delete on table public.interactive_term_dictionary_state to cediah_runtime;
-grant select, insert, update, delete on table public.guide_term_manifests to cediah_runtime;
-grant select, insert, update, delete on table public.guide_term_usage to cediah_runtime;
-grant select, insert, update, delete on table public.guide_term_reindex_queue to cediah_runtime;
+do $$
+declare
+  inherited_grantee text;
+begin
+  -- Revoke provider/default grants without naming vendor-specific roles.
+  for inherited_grantee in
+    select distinct roles.rolname
+    from pg_class as tables
+    cross join lateral aclexplode(tables.relacl) as privileges
+    join pg_roles as roles on roles.oid = privileges.grantee
+    where tables.oid in (
+      'public.interactive_terms'::regclass,
+      'public.interactive_term_aliases'::regclass,
+      'public.guide_sections'::regclass,
+      'public.interactive_term_links'::regclass,
+      'public.interactive_term_dictionary_state'::regclass,
+      'public.guide_term_manifests'::regclass,
+      'public.guide_term_usage'::regclass,
+      'public.guide_term_reindex_queue'::regclass
+    )
+      and privileges.grantee <> tables.relowner
+  loop
+    execute format(
+      'revoke all on public.interactive_terms, public.interactive_term_aliases, public.guide_sections, public.interactive_term_links, public.interactive_term_dictionary_state, public.guide_term_manifests, public.guide_term_usage, public.guide_term_reindex_queue from %I',
+      inherited_grantee
+    );
+  end loop;
 
-grant select, insert, update, delete on table public.interactive_terms to service_role;
-grant select, insert, update, delete on table public.interactive_term_aliases to service_role;
-grant select, insert, update, delete on table public.guide_sections to service_role;
-grant select, insert, update, delete on table public.interactive_term_links to service_role;
-grant select, insert, update, delete on table public.interactive_term_dictionary_state to service_role;
-grant select, insert, update, delete on table public.guide_term_manifests to service_role;
-grant select, insert, update, delete on table public.guide_term_usage to service_role;
-grant select, insert, update, delete on table public.guide_term_reindex_queue to service_role;
+  -- A portable installation may run as the table owner. Production instead uses
+  -- a dedicated least-privilege runtime role when cediah_runtime is present.
+  if exists (select 1 from pg_roles where rolname = 'cediah_runtime') then
+    grant select, insert, update, delete on public.interactive_terms,
+      public.interactive_term_aliases,
+      public.guide_sections,
+      public.interactive_term_links,
+      public.interactive_term_dictionary_state,
+      public.guide_term_manifests,
+      public.guide_term_usage,
+      public.guide_term_reindex_queue
+    to cediah_runtime;
 
-create policy cediah_runtime_all on public.interactive_terms for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.interactive_term_aliases for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.guide_sections for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.interactive_term_links for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.interactive_term_dictionary_state for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.guide_term_manifests for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.guide_term_usage for all to cediah_runtime using (true) with check (true);
-create policy cediah_runtime_all on public.guide_term_reindex_queue for all to cediah_runtime using (true) with check (true);
-
-create policy cediah_deny_data_api on public.interactive_terms for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.interactive_term_aliases for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.guide_sections for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.interactive_term_links for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.interactive_term_dictionary_state for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.guide_term_manifests for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.guide_term_usage for all to anon, authenticated using (false) with check (false);
-create policy cediah_deny_data_api on public.guide_term_reindex_queue for all to anon, authenticated using (false) with check (false);
+    create policy cediah_runtime_all on public.interactive_terms
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.interactive_term_aliases
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.guide_sections
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.interactive_term_links
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.interactive_term_dictionary_state
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.guide_term_manifests
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.guide_term_usage
+      to cediah_runtime using (true) with check (true);
+    create policy cediah_runtime_all on public.guide_term_reindex_queue
+      to cediah_runtime using (true) with check (true);
+  end if;
+end;
+$$;
