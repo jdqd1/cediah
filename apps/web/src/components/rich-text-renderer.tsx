@@ -328,30 +328,27 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
 
   useEffect(() => {
     let active = true;
-    if (!slug) {
-      setInteractiveTerms(null);
-      return () => {
-        active = false;
-      };
+    if (slug) {
+      void loadInteractiveTerms(slug).then((payload) => {
+        if (active) setInteractiveTerms(payload);
+      });
     }
-    void loadInteractiveTerms(slug).then((payload) => {
-      if (active) setInteractiveTerms(payload);
-    });
     return () => {
       active = false;
     };
   }, [slug]);
 
+  const effectiveInteractiveTerms = slug ? interactiveTerms : null;
   const annotationsByPath = useMemo(() => {
     const result = new Map<string, InteractiveTermAnnotation[]>();
-    for (const annotation of interactiveTerms?.annotations ?? []) {
+    for (const annotation of effectiveInteractiveTerms?.annotations ?? []) {
       result.set(annotation.path, [...(result.get(annotation.path) ?? []), annotation]);
     }
     return result;
-  }, [interactiveTerms]);
+  }, [effectiveInteractiveTerms]);
   const termsById = useMemo(
-    () => new Map((interactiveTerms?.terms ?? []).map((term) => [term.id, term])),
-    [interactiveTerms],
+    () => new Map((effectiveInteractiveTerms?.terms ?? []).map((term) => [term.id, term])),
+    [effectiveInteractiveTerms],
   );
 
   const renderNode = (rawNode: unknown, path: string, depth: number, inBibliography = false): ReactNode => {
