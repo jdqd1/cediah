@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminSectionTabs } from "@/components/admin-section-tabs";
 import { InteractiveTermAdminScreen } from "@/components/interactive-term-admin-screen";
+import { InteractiveTermSuggestionsDock } from "@/components/interactive-term-suggestions-dock";
 import { getInteractiveTermAdminTerms } from "@/lib/server/interactive-term-admin-api";
 import { getCurrentUser } from "@/lib/server/current-user";
 
@@ -57,6 +58,7 @@ export default async function InteractiveTermAdminPage() {
     <>
       <AdminSectionTabs />
       <InteractiveTermAdminScreen initialTerms={terms.terms} viewerEmail={current.user.email} />
+      <InteractiveTermSuggestionsDock />
     </>
   );
 }
