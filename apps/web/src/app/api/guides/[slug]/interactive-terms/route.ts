@@ -18,6 +18,12 @@ const ResponseSchema = z.object({
     termId: z.string().uuid(),
   }).strict()),
   dictionaryVersion: z.number().int().positive(),
+  sectionAnchors: z.array(z.object({
+    anchorId: z.string().min(1).max(120),
+    label: z.string().min(1).max(500),
+    level: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    path: z.string().min(1).max(240),
+  }).strict()),
   terms: z.array(z.object({
     category: z.string().nullable(),
     id: z.string().uuid(),
