@@ -1,0 +1,95 @@
+.dropzone {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  padding: 1rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cream) 72%, transparent);
+  text-align: center;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.dropzoneDragging {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 7%, var(--paper));
+  transform: translateY(-1px);
+}
+
+.dropzoneDisabled {
+  opacity: 0.55;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--blue);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.copy strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.copy span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.selectButton {
+  padding: 0.42rem 0.7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.selectButton:hover:not(:disabled) {
+  border-color: var(--muted-light);
+  background: var(--cream);
+}
+
+.hint {
+  color: var(--muted-light);
+  font-size: 0.68rem;
+}
+
+.status {
+  width: 100%;
+  padding: 0.48rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.statusSuccess {
+  background: color-mix(in srgb, var(--green) 9%, var(--paper));
+  color: var(--green);
+}
+
+.statusError {
+  background: color-mix(in srgb, var(--wine) 7%, var(--paper));
+  color: var(--wine);
+}
