@@ -271,12 +271,14 @@ function editorFilterPredicate(
   const statusPredicate = input.status
     ? sql<boolean>`item.status::text = ${input.status}`
     : sql<boolean>`true`;
-  const searchPredicate = tsquery
-    ? sql<boolean>`(
-        coalesce(item.search_vector, ''::tsvector) @@ to_tsquery('simple', ${tsquery})
-        or public.cediah_search_normalize(item.slug) like ${`%${slugNeedle}%`}
-      )`
-    : sql<boolean>`true`;
+  const searchPredicate = input.scope === "publications" && normalizedQuery
+    ? sql<boolean>`public.cediah_search_normalize(item.title) like ${`%${normalizedQuery}%`}`
+    : tsquery
+      ? sql<boolean>`(
+          coalesce(item.search_vector, ''::tsvector) @@ to_tsquery('simple', ${tsquery})
+          or public.cediah_search_normalize(item.slug) like ${`%${slugNeedle}%`}
+        )`
+      : sql<boolean>`true`;
   const scopePredicate = forcePublications || input.scope === "publications"
     ? independentPublicationPredicate(input)
     : sql<boolean>`true`;
