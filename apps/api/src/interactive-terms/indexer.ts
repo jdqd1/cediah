@@ -299,8 +299,14 @@ async function loadDictionary(database: QueryDatabase): Promise<DictionaryCache>
     ) byPattern.set(normalized, candidate);
   }
 
+  const entries = [...byPattern.values()].map((entry): DictionaryEntry => ({
+    normalized: entry.normalized,
+    occurrencePolicy: entry.occurrencePolicy,
+    priority: entry.priority,
+    termId: entry.termId,
+  }));
   dictionaryCache = {
-    automaton: buildAutomaton([...byPattern.values()].map(({ sourceRank: _sourceRank, ...entry }) => entry)),
+    automaton: buildAutomaton(entries),
     revision,
   };
   return dictionaryCache;
@@ -368,16 +374,17 @@ function findTextMatches(value: string, automaton: AutomatonNode[]) {
     }
   }
 
-  return matches
-    .sort((left, right) => left.s - right.s || right.length - left.length || right.priority - left.priority)
-    .filter((candidate, index, all) => {
-      for (let previous = index - 1; previous >= 0; previous -= 1) {
-        const accepted = all[previous]!;
-        if (accepted.s < candidate.s && accepted.e <= candidate.s) break;
-        if (accepted.s <= candidate.s && accepted.e > candidate.s) return false;
-      }
-      return true;
-    });
+  const sorted = matches.sort(
+    (left, right) => left.s - right.s || right.length - left.length || right.priority - left.priority,
+  );
+  const accepted: typeof sorted = [];
+  for (const candidate of sorted) {
+    const overlapsAccepted = accepted.some(
+      (current) => current.s < candidate.e && candidate.s < current.e,
+    );
+    if (!overlapsAccepted) accepted.push(candidate);
+  }
+  return accepted;
 }
 
 function hasUnsafeMarks(node: JsonObject) {
@@ -421,7 +428,7 @@ function collectOccurrences(
 
   const seenGuide = new Set<string>();
   const seenSection = new Set<string>();
-  return occurrences.filter((occurrence) => {
+  const filtered = occurrences.filter((occurrence) => {
     if (occurrence.policy === "all") return true;
     if (occurrence.policy === "first_per_guide") {
       if (seenGuide.has(occurrence.t)) return false;
@@ -432,7 +439,8 @@ function collectOccurrences(
     if (seenSection.has(key)) return false;
     seenSection.add(key);
     return true;
-  }).map(({ policy: _policy, section: _section, ...occurrence }) => occurrence);
+  });
+  return filtered.map(({ e, p, s, t }) => ({ e, p, s, t }));
 }
 
 export async function reindexPublishedGuide(database: QueryDatabase, contentId: string) {
