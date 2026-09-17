@@ -6,6 +6,7 @@ export type KnowledgeMatcherAlias = {
   frequency: KnowledgeMatchFrequency;
   normalizedAlias: string;
   priority: number;
+  sourceAlias: string;
   termId: string;
 };
 
@@ -190,7 +191,8 @@ export class KnowledgeTermMatcher {
         if (startOffset === undefined || endOffset === undefined || endOffset <= startOffset) continue;
         if (alias.caseSensitive) {
           const source = input.slice(startOffset, endOffset).replace(/\s+/g, " ").trim();
-          if (source !== alias.normalizedAlias) continue;
+          const expected = alias.sourceAlias.replace(/\s+/g, " ").trim();
+          if (source !== expected) continue;
         }
         candidates.push({
           aliasId: alias.aliasId,
