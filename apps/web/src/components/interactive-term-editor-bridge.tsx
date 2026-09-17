@@ -166,14 +166,6 @@ export function InteractiveTermEditorBridge() {
   }, [administrator, open]);
 
   useEffect(() => {
-    if (!exactTerm || editingExisting) return;
-    setExistingDraft({
-      name: exactTerm.name,
-      shortDefinition: exactTerm.shortDefinition,
-    });
-  }, [editingExisting, exactTerm]);
-
-  useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || busy === "save") return;
@@ -490,7 +482,14 @@ export function InteractiveTermEditorBridge() {
                         <button
                           className={styles.primaryButton}
                           type="button"
-                          onClick={() => setEditingExisting(true)}
+                          onClick={() => {
+                            setExistingDraft({
+                              name: exactTerm.name,
+                              shortDefinition: exactTerm.shortDefinition,
+                            });
+                            setEditingExisting(true);
+                            setMessage(null);
+                          }}
                         >
                           <PencilSimple aria-hidden="true" size={15} /> Editar
                         </button>
