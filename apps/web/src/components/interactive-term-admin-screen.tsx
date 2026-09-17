@@ -28,7 +28,14 @@ type Props = {
 
 type StatusFilter = "all" | "active" | "inactive";
 
-const occurrencePolicyOptions: { label: string; value: InteractiveTermOccurrencePolicy; description: string }[] = [
+type AliasDraft = InteractiveTermAdminDraft["aliases"][number];
+type DestinationDraft = InteractiveTermAdminDraft["destinations"][number];
+
+const occurrencePolicyOptions: {
+  description: string;
+  label: string;
+  value: InteractiveTermOccurrencePolicy;
+}[] = [
   {
     description: "Marca sólo la primera aparición dentro de cada sección.",
     label: "Primera por sección",
@@ -56,6 +63,8 @@ const errorMessages: Record<string, string> = {
   invalid_interactive_term: "Revisa los campos del término antes de guardar.",
   unauthorized: "La sesión terminó. Vuelve a iniciar sesión.",
 };
+
+const fallbackErrorMessage = "La administración de términos no está disponible.";
 
 function emptyDraft(): InteractiveTermAdminDraft {
   return {
@@ -111,22 +120,29 @@ async function readError(response: Response) {
   return errorMessages[code] ?? `No fue posible completar la operación (${response.status}).`;
 }
 
+function updateAt<T>(items: T[], index: number, updater: (item: T) => T) {
+  return items.map((item, itemIndex) => (itemIndex === index ? updater(item) : item));
+}
+
 export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props) {
+  const firstTerm = initialTerms.at(0) ?? null;
   const [terms, setTerms] = useState(initialTerms);
-  const [selectedId, setSelectedId] = useState<string | null>(initialTerms[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(firstTerm?.id ?? null);
   const [draft, setDraft] = useState<InteractiveTermAdminDraft>(
-    initialTerms[0] ? termToDraft(initialTerms[0]) : emptyDraft(),
+    firstTerm ? termToDraft(firstTerm) : emptyDraft(),
   );
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [notice, setNotice] = useState<PlatformNotice | null>(null);
   const [busy, setBusy] = useState<"search" | "save" | null>(null);
-  const [creating, setCreating] = useState(initialTerms.length === 0);
-  const [slugManual, setSlugManual] = useState(initialTerms.length > 0);
+  const [creating, setCreating] = useState(firstTerm === null);
+  const [slugManual, setSlugManual] = useState(firstTerm !== null);
 
   const selectedTerm = selectedId ? terms.find((term) => term.id === selectedId) ?? null : null;
   const activeCount = terms.filter((term) => term.isActive).length;
   const totalUsages = terms.reduce((sum, term) => sum + term.usageCount, 0);
+  const policyDescription =
+    occurrencePolicyOptions.find((option) => option.value === draft.occurrencePolicy)?.description ?? "";
 
   function selectTerm(term: InteractiveTermAdmin) {
     setSelectedId(term.id);
@@ -142,6 +158,23 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
     setCreating(true);
     setSlugManual(false);
     setNotice(null);
+  }
+
+  function updateAlias(index: number, updater: (alias: AliasDraft) => AliasDraft) {
+    setDraft((current) => ({
+      ...current,
+      aliases: updateAt(current.aliases, index, updater),
+    }));
+  }
+
+  function updateDestination(
+    index: number,
+    updater: (destination: DestinationDraft) => DestinationDraft,
+  ) {
+    setDraft((current) => ({
+      ...current,
+      destinations: updateAt(current.destinations, index, updater),
+    }));
   }
 
   async function search(event?: FormEvent<HTMLFormElement>) {
@@ -161,11 +194,14 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
       });
       if (!response.ok) throw new Error(await readError(response));
       const parsed = InteractiveTermAdminListSchema.safeParse(await response.json());
-      if (!parsed.success) throw new Error(errorMessages.interactive_term_admin_unavailable);
+      if (!parsed.success) throw new Error(fallbackErrorMessage);
+
       setTerms(parsed.data.terms);
-      if (parsed.data.terms.length > 0) {
-        const next = parsed.data.terms.find((term) => term.id === selectedId) ?? parsed.data.terms[0];
-        if (next) selectTerm(next);
+      const next = parsed.data.terms.find((term) => term.id === selectedId)
+        ?? parsed.data.terms.at(0)
+        ?? null;
+      if (next) {
+        selectTerm(next);
       } else {
         setSelectedId(null);
         setDraft(emptyDraft());
@@ -175,7 +211,7 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
     } catch (error) {
       setNotice({
         tone: "error",
-        text: error instanceof Error ? error.message : errorMessages.interactive_term_admin_unavailable,
+        text: error instanceof Error ? error.message : fallbackErrorMessage,
       });
     } finally {
       setBusy(null);
@@ -193,33 +229,36 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
     setBusy("save");
     setNotice(null);
     try {
-      const endpoint = creating || !selectedId
+      const isCreate = creating || !selectedId;
+      const endpoint = isCreate
         ? "/api/admin/interactive-terms"
         : `/api/admin/interactive-terms/${selectedId}`;
       const response = await fetch(endpoint, {
         body: JSON.stringify({
           ...draft,
-          aliases: draft.aliases.filter((alias) => alias.alias.trim()).map((alias) => ({
-            ...alias,
-            alias: alias.alias.trim(),
-          })),
+          aliases: draft.aliases
+            .filter((alias) => alias.alias.trim())
+            .map((alias) => ({ ...alias, alias: alias.alias.trim() })),
           category: draft.category?.trim() || null,
-          destinations: draft.destinations.filter((destination) => destination.guideSlug.trim()).map((destination) => ({
-            ...destination,
-            guideSlug: destination.guideSlug.trim(),
-            sectionAnchor: destination.sectionAnchor?.trim() || null,
-          })),
+          destinations: draft.destinations
+            .filter((destination) => destination.guideSlug.trim())
+            .map((destination) => ({
+              ...destination,
+              guideSlug: destination.guideSlug.trim(),
+              sectionAnchor: destination.sectionAnchor?.trim() || null,
+            })),
           name: draft.name.trim(),
           shortDefinition: draft.shortDefinition.trim(),
           slug: draft.slug.trim(),
         }),
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        method: creating || !selectedId ? "POST" : "PATCH",
+        method: isCreate ? "POST" : "PATCH",
       });
       if (!response.ok) throw new Error(await readError(response));
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
-      if (!parsed.success) throw new Error(errorMessages.interactive_term_admin_unavailable);
+      if (!parsed.success) throw new Error(fallbackErrorMessage);
+
       const saved = parsed.data.term;
       setTerms((current) => {
         const exists = current.some((term) => term.id === saved.id);
@@ -231,11 +270,11 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
       setDraft(termToDraft(saved));
       setCreating(false);
       setSlugManual(true);
-      setNotice({ tone: "success", text: creating ? "Término creado." : "Cambios guardados." });
+      setNotice({ tone: "success", text: isCreate ? "Término creado." : "Cambios guardados." });
     } catch (error) {
       setNotice({
         tone: "error",
-        text: error instanceof Error ? error.message : errorMessages.interactive_term_admin_unavailable,
+        text: error instanceof Error ? error.message : fallbackErrorMessage,
       });
     } finally {
       setBusy(null);
@@ -325,7 +364,9 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                   <option value="inactive">Inactivos</option>
                 </select>
                 <button className="studio-button studio-button-secondary" disabled={busy !== null} type="submit">
-                  {busy === "search" ? <ArrowClockwise className="term-admin-spin" size={17} /> : <MagnifyingGlass size={17} />}
+                  {busy === "search"
+                    ? <ArrowClockwise className="term-admin-spin" size={17} />
+                    : <MagnifyingGlass size={17} />}
                   Buscar
                 </button>
               </div>
@@ -364,7 +405,9 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                 <span>{creating ? "Nuevo término" : "Editando"}</span>
                 <h2>{draft.name || "Concepto sin nombre"}</h2>
                 {!creating && selectedTerm ? (
-                  <p>{selectedTerm.usageCount} apariciones indexadas · actualizado {new Date(selectedTerm.updatedAt).toLocaleDateString("es")}</p>
+                  <p>
+                    {selectedTerm.usageCount} apariciones indexadas · actualizado {new Date(selectedTerm.updatedAt).toLocaleDateString("es")}
+                  </p>
                 ) : (
                   <p>Los cambios de matching reindexarán las guías automáticamente.</p>
                 )}
@@ -450,7 +493,10 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
 
             <section className="term-admin-card" aria-labelledby="term-admin-matching-title">
               <div className="term-admin-card-heading">
-                <div><CheckCircle size={18} aria-hidden="true" /><h3 id="term-admin-matching-title">Reglas de aparición</h3></div>
+                <div>
+                  <CheckCircle size={18} aria-hidden="true" />
+                  <h3 id="term-admin-matching-title">Reglas de aparición</h3>
+                </div>
               </div>
               <div className="term-admin-field-grid">
                 <label className="term-admin-field">
@@ -466,7 +512,7 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
-                  <small>{occurrencePolicyOptions.find((option) => option.value === draft.occurrencePolicy)?.description}</small>
+                  <small>{policyDescription}</small>
                 </label>
                 <label className="term-admin-checkbox-card">
                   <input
@@ -474,7 +520,10 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                     onChange={(event) => setDraft((current) => ({ ...current, autoMatch: event.target.checked }))}
                     type="checkbox"
                   />
-                  <span><strong>Detección automática</strong><small>Permite que el indexador encuentre el nombre canónico en nuevas guías.</small></span>
+                  <span>
+                    <strong>Detección automática</strong>
+                    <small>Permite que el indexador encuentre el nombre canónico en nuevas guías.</small>
+                  </span>
                 </label>
               </div>
             </section>
@@ -489,24 +538,18 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
               {draft.aliases.length ? (
                 <div className="term-admin-repeat-list">
                   {draft.aliases.map((alias, index) => (
-                    <div className="term-admin-alias-row" key={`${index}-${alias.alias}`}>
+                    <div className="term-admin-alias-row" key={`alias-${index}`}>
                       <input
                         aria-label={`Alias ${index + 1}`}
                         maxLength={180}
-                        onChange={(event) => setDraft((current) => ({
-                          ...current,
-                          aliases: current.aliases.map((item, itemIndex) => itemIndex === index ? { ...item, alias: event.target.value } : item),
-                        }))}
+                        onChange={(event) => updateAlias(index, (item) => ({ ...item, alias: event.target.value }))}
                         placeholder="AMS"
                         value={alias.alias}
                       />
                       <label className="term-admin-inline-check">
                         <input
                           checked={alias.autoMatch}
-                          onChange={(event) => setDraft((current) => ({
-                            ...current,
-                            aliases: current.aliases.map((item, itemIndex) => itemIndex === index ? { ...item, autoMatch: event.target.checked } : item),
-                          }))}
+                          onChange={(event) => updateAlias(index, (item) => ({ ...item, autoMatch: event.target.checked }))}
                           type="checkbox"
                         />
                         Auto-detectar
@@ -525,7 +568,11 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                     </div>
                   ))}
                 </div>
-              ) : <p className="term-admin-empty-section">No hay aliases. El nombre canónico seguirá funcionando por sí solo.</p>}
+              ) : (
+                <p className="term-admin-empty-section">
+                  No hay aliases. El nombre canónico seguirá funcionando por sí solo.
+                </p>
+              )}
             </section>
 
             <section className="term-admin-card" aria-labelledby="term-admin-links-title">
@@ -535,17 +582,19 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                   <Plus size={16} aria-hidden="true" />Agregar destino
                 </button>
               </div>
-              <p className="term-admin-card-help">Usa el slug de una guía y, opcionalmente, el anchor estable de una sección. Un único destino puede ser principal.</p>
+              <p className="term-admin-card-help">
+                Usa el slug de una guía y, opcionalmente, el anchor estable de una sección. Un único destino puede ser principal.
+              </p>
               {draft.destinations.length ? (
                 <div className="term-admin-repeat-list">
                   {draft.destinations.map((destination, index) => (
-                    <div className="term-admin-destination-row" key={`${index}-${destination.guideSlug}`}>
+                    <div className="term-admin-destination-row" key={`destination-${index}`}>
                       <label className="term-admin-field">
                         <span>Slug de la guía</span>
                         <input
-                          onChange={(event) => setDraft((current) => ({
-                            ...current,
-                            destinations: current.destinations.map((item, itemIndex) => itemIndex === index ? { ...item, guideSlug: event.target.value } : item),
+                          onChange={(event) => updateDestination(index, (item) => ({
+                            ...item,
+                            guideSlug: event.target.value,
                           }))}
                           placeholder="vascularizacion-intestinal"
                           value={destination.guideSlug}
@@ -554,9 +603,9 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                       <label className="term-admin-field">
                         <span>Anchor de sección</span>
                         <input
-                          onChange={(event) => setDraft((current) => ({
-                            ...current,
-                            destinations: current.destinations.map((item, itemIndex) => itemIndex === index ? { ...item, sectionAnchor: event.target.value || null } : item),
+                          onChange={(event) => updateDestination(index, (item) => ({
+                            ...item,
+                            sectionAnchor: event.target.value || null,
                           }))}
                           placeholder="Opcional"
                           value={destination.sectionAnchor ?? ""}
@@ -567,9 +616,9 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                         <input
                           max={1000}
                           min={-1000}
-                          onChange={(event) => setDraft((current) => ({
-                            ...current,
-                            destinations: current.destinations.map((item, itemIndex) => itemIndex === index ? { ...item, priority: Number(event.target.value) || 0 } : item),
+                          onChange={(event) => updateDestination(index, (item) => ({
+                            ...item,
+                            priority: Number(event.target.value) || 0,
                           }))}
                           type="number"
                           value={destination.priority}
@@ -582,7 +631,9 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                             ...current,
                             destinations: current.destinations.map((item, itemIndex) => ({
                               ...item,
-                              primary: event.target.checked ? itemIndex === index : itemIndex === index ? false : item.primary,
+                              primary: event.target.checked
+                                ? itemIndex === index
+                                : itemIndex === index ? false : item.primary,
                             })),
                           }))}
                           type="checkbox"
@@ -603,7 +654,11 @@ export function InteractiveTermAdminScreen({ initialTerms, viewerEmail }: Props)
                     </div>
                   ))}
                 </div>
-              ) : <p className="term-admin-empty-section">Sin destino vinculado. El término seguirá mostrando su definición breve.</p>}
+              ) : (
+                <p className="term-admin-empty-section">
+                  Sin destino vinculado. El término seguirá mostrando su definición breve.
+                </p>
+              )}
             </section>
           </form>
         </div>
