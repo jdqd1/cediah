@@ -5,6 +5,7 @@ import { subjectContentHref } from "@/lib/content-navigation";
 import { getPublishedContent, getPublishedContentItem, getSubjects } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 import { getGuideKnowledge } from "@/lib/server/guide-knowledge-api";
+import "../../guide-knowledge.css";
 
 export const dynamic = "force-dynamic";
 
