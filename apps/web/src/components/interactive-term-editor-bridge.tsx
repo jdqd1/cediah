@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  CheckCircle,
+  LinkSimple,
+  MagnifyingGlass,
+  PencilSimple,
+  Plus,
+  X,
+} from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import {
   InteractiveTermAdminListSchema,
@@ -12,27 +20,17 @@ import { useAccessRoles } from "./access-context";
 import styles from "./interactive-term-editor-bridge.module.css";
 
 type Point = { left: number; top: number };
-type Mode = "existing" | "new";
+type EditorSelection = { point: Point; text: string };
+type SimpleTermDraft = { name: string; shortDefinition: string };
 
-type NewTermDraft = {
-  category: string;
-  name: string;
-  shortDefinition: string;
-};
-
-type EditorSelection = {
-  point: Point;
-  text: string;
-};
-
-const fallbackError = "No fue posible actualizar el diccionario de términos.";
+const fallbackError = "No fue posible guardar el término.";
 
 const errorMessages: Record<string, string> = {
-  forbidden: "Sólo un administrador puede modificar el diccionario global.",
+  forbidden: "Sólo un administrador puede modificar los términos interactivos.",
   identity_unavailable: "No fue posible validar la sesión.",
-  interactive_term_admin_unavailable: "La administración de términos no está disponible.",
-  interactive_term_conflict: "Ya existe un término o alias que entra en conflicto con esta selección.",
-  invalid_interactive_term: "Revisa los datos del término antes de guardarlo.",
+  interactive_term_admin_unavailable: "Los términos interactivos no están disponibles en este momento.",
+  interactive_term_conflict: "Ese nombre ya está siendo usado por otro término. Prueba vincularlo con el término existente.",
+  invalid_interactive_term: "Revisa el nombre y la definición antes de guardar.",
   unauthorized: "La sesión terminó. Vuelve a iniciar sesión.",
 };
 
@@ -122,17 +120,24 @@ export function InteractiveTermEditorBridge() {
   const [selection, setSelection] = useState("");
   const [point, setPoint] = useState<Point | null>(null);
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("existing");
-  const [query, setQuery] = useState("");
   const [terms, setTerms] = useState<InteractiveTermAdmin[]>([]);
+  const [query, setQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [editingExisting, setEditingExisting] = useState(false);
   const [busy, setBusy] = useState<"search" | "save" | null>(null);
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
-  const [newTerm, setNewTerm] = useState<NewTermDraft>({
-    category: "",
-    name: "",
-    shortDefinition: "",
-  });
+  const [draft, setDraft] = useState<SimpleTermDraft>({ name: "", shortDefinition: "" });
+  const [existingDraft, setExistingDraft] = useState<SimpleTermDraft>({ name: "", shortDefinition: "" });
+
   const normalizedSelection = useMemo(() => normalize(selection), [selection]);
+  const exactTerm = useMemo(() => terms.find((term) => (
+    normalize(term.name) === normalizedSelection
+    || term.aliases.some((alias) => normalize(alias.alias) === normalizedSelection)
+  )) ?? null, [normalizedSelection, terms]);
+  const relatedTerms = useMemo(
+    () => terms.filter((term) => term.id !== exactTerm?.id).slice(0, 4),
+    [exactTerm, terms],
+  );
 
   useBodyScrollLock(open);
 
@@ -161,21 +166,47 @@ export function InteractiveTermEditorBridge() {
   }, [administrator, open]);
 
   useEffect(() => {
+    if (!exactTerm || editingExisting) return;
+    setExistingDraft({
+      name: exactTerm.name,
+      shortDefinition: exactTerm.shortDefinition,
+    });
+  }, [editingExisting, exactTerm]);
+
+  useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || busy === "save") return;
-      setOpen(false);
-      setMessage(null);
-      setSelection("");
-      setPoint(null);
+      closeDialog();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [busy, open]);
+  });
 
   if (!administrator) return null;
 
-  async function searchTerms(searchQuery = query) {
+  function resetDialog() {
+    setOpen(false);
+    setMessage(null);
+    setTerms([]);
+    setQuery("");
+    setShowSearch(false);
+    setEditingExisting(false);
+    setSelection("");
+    setPoint(null);
+  }
+
+  function closeDialog() {
+    if (busy === "save") return;
+    resetDialog();
+  }
+
+  function completeAction(text: string) {
+    setMessage({ tone: "success", text });
+    window.setTimeout(resetDialog, 700);
+  }
+
+  async function searchTerms(searchQuery: string) {
     if (busy) return;
     const trimmed = searchQuery.trim();
     setBusy("search");
@@ -203,21 +234,15 @@ export function InteractiveTermEditorBridge() {
   function openDialog() {
     const text = selection.trim();
     if (!text) return;
-    setQuery(text);
-    setNewTerm({ category: "", name: text, shortDefinition: "" });
+    setDraft({ name: text, shortDefinition: "" });
+    setExistingDraft({ name: "", shortDefinition: "" });
     setTerms([]);
-    setMode("existing");
+    setQuery(text);
+    setShowSearch(false);
+    setEditingExisting(false);
     setMessage(null);
     setOpen(true);
     void searchTerms(text);
-  }
-
-  function closeDialog() {
-    if (busy === "save") return;
-    setOpen(false);
-    setMessage(null);
-    setSelection("");
-    setPoint(null);
   }
 
   async function linkToTerm(term: InteractiveTermAdmin) {
@@ -227,21 +252,18 @@ export function InteractiveTermEditorBridge() {
       || term.aliases.some((alias) => normalize(alias.alias) === normalizedSelection);
 
     if (alreadyRecognized) {
-      setMessage({
-        tone: "success",
-        text: `“${selection}” ya está reconocido como ${term.name}.`,
-      });
+      completeAction(`“${selection}” ya está conectado con ${term.name}.`);
       return;
     }
 
     setBusy("save");
     setMessage(null);
     try {
-      const draft = termToDraft(term);
+      const current = termToDraft(term);
       const response = await fetch(`/api/admin/interactive-terms/${term.id}`, {
         body: JSON.stringify({
-          ...draft,
-          aliases: [...draft.aliases, { alias: selection.trim(), autoMatch: true }],
+          ...current,
+          aliases: [...current.aliases, { alias: selection.trim(), autoMatch: true }],
         }),
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
@@ -250,30 +272,24 @@ export function InteractiveTermEditorBridge() {
       if (!response.ok) throw new Error(await readError(response));
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
-      setTerms((current) => current.map((item) => (
-        item.id === parsed.data.term.id ? parsed.data.term : item
-      )));
-      setMessage({
-        tone: "success",
-        text: `“${selection}” quedó vinculado a ${parsed.data.term.name}.`,
-      });
+      setBusy(null);
+      completeAction(`Listo. “${selection}” ahora se reconoce como ${parsed.data.term.name}.`);
     } catch (error) {
+      setBusy(null);
       setMessage({
         tone: "error",
         text: error instanceof Error ? error.message : fallbackError,
       });
-    } finally {
-      setBusy(null);
     }
   }
 
   async function createTerm() {
     if (busy) return;
-    const name = newTerm.name.trim();
-    const shortDefinition = newTerm.shortDefinition.trim();
+    const name = draft.name.trim();
+    const shortDefinition = draft.shortDefinition.trim();
     const slug = slugify(name);
     if (!name || !shortDefinition || !slug) {
-      setMessage({ tone: "error", text: "Nombre y definición breve son obligatorios." });
+      setMessage({ tone: "error", text: "Escribe un nombre y una definición breve." });
       return;
     }
 
@@ -287,7 +303,7 @@ export function InteractiveTermEditorBridge() {
         body: JSON.stringify({
           aliases,
           autoMatch: true,
-          category: newTerm.category.trim() || null,
+          category: null,
           destinations: [],
           isActive: true,
           name,
@@ -303,18 +319,51 @@ export function InteractiveTermEditorBridge() {
       if (!response.ok) throw new Error(await readError(response));
       const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
       if (!parsed.success) throw new Error(fallbackError);
-      setTerms([parsed.data.term]);
-      setMessage({
-        tone: "success",
-        text: `${parsed.data.term.name} se añadió al diccionario global.`,
-      });
+      setBusy(null);
+      completeAction(`${parsed.data.term.name} ya es un término interactivo.`);
     } catch (error) {
+      setBusy(null);
       setMessage({
         tone: "error",
         text: error instanceof Error ? error.message : fallbackError,
       });
-    } finally {
+    }
+  }
+
+  async function saveExistingTerm() {
+    if (!exactTerm || busy) return;
+    const name = existingDraft.name.trim();
+    const shortDefinition = existingDraft.shortDefinition.trim();
+    if (!name || !shortDefinition) {
+      setMessage({ tone: "error", text: "Escribe un nombre y una definición breve." });
+      return;
+    }
+
+    setBusy("save");
+    setMessage(null);
+    try {
+      const current = termToDraft(exactTerm);
+      const response = await fetch(`/api/admin/interactive-terms/${exactTerm.id}`, {
+        body: JSON.stringify({
+          ...current,
+          name,
+          shortDefinition,
+        }),
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const parsed = InteractiveTermAdminMutationSchema.safeParse(await response.json());
+      if (!parsed.success) throw new Error(fallbackError);
       setBusy(null);
+      completeAction(`${parsed.data.term.name} quedó actualizado.`);
+    } catch (error) {
+      setBusy(null);
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : fallbackError,
+      });
     }
   }
 
@@ -328,6 +377,7 @@ export function InteractiveTermEditorBridge() {
           onMouseDown={(event) => event.preventDefault()}
           onClick={openDialog}
         >
+          <LinkSimple aria-hidden="true" size={14} weight="bold" />
           Término
         </button>
       ) : null}
@@ -341,15 +391,15 @@ export function InteractiveTermEditorBridge() {
           }}
         >
           <section
-            aria-label="Convertir selección en término interactivo"
+            aria-label="Crear o vincular término interactivo"
             aria-modal="true"
             className={styles.dialog}
             role="dialog"
           >
             <header className={styles.header}>
               <div>
-                <h2>Término interactivo</h2>
-                <p>Vincula esta selección al diccionario global sin modificar el contenido de la guía.</p>
+                <h2>Término</h2>
+                <p>Haz que esta selección muestre una explicación al estudiante.</p>
               </div>
               <button
                 aria-label="Cerrar"
@@ -358,156 +408,200 @@ export function InteractiveTermEditorBridge() {
                 type="button"
                 onClick={closeDialog}
               >
-                ×
+                <X aria-hidden="true" size={18} />
               </button>
             </header>
 
             <div className={styles.body}>
-              <p className={styles.selection}>“{selection}”</p>
-
-              <div className={styles.tabs} role="tablist" aria-label="Acción del término">
-                <button
-                  aria-selected={mode === "existing"}
-                  className={`${styles.tab} ${mode === "existing" ? styles.tabActive : ""}`.trim()}
-                  role="tab"
-                  type="button"
-                  onClick={() => {
-                    setMode("existing");
-                    setMessage(null);
-                  }}
-                >
-                  Vincular existente
-                </button>
-                <button
-                  aria-selected={mode === "new"}
-                  className={`${styles.tab} ${mode === "new" ? styles.tabActive : ""}`.trim()}
-                  role="tab"
-                  type="button"
-                  onClick={() => {
-                    setMode("new");
-                    setMessage(null);
-                  }}
-                >
-                  Crear nuevo
-                </button>
+              <div className={styles.selection}>
+                <span>Selección</span>
+                <strong>“{selection}”</strong>
               </div>
 
-              {mode === "existing" ? (
-                <>
-                  <form
-                    className={styles.searchRow}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void searchTerms();
-                    }}
-                  >
-                    <input
-                      aria-label="Buscar término existente"
-                      className={styles.input}
-                      disabled={busy !== null}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Nombre, alias o categoría"
-                      value={query}
-                    />
-                    <button className={styles.searchButton} disabled={busy !== null} type="submit">
-                      {busy === "search" ? "Buscando…" : "Buscar"}
-                    </button>
-                  </form>
+              {busy === "search" && terms.length === 0 ? (
+                <div className={styles.loading} role="status">
+                  <span /> Comprobando si ya existe…
+                </div>
+              ) : exactTerm ? (
+                <div className={styles.existingPanel}>
+                  <div className={styles.existingHeading}>
+                    <span className={styles.statusIcon}><CheckCircle size={19} weight="fill" /></span>
+                    <div>
+                      <small>Ya está conectado</small>
+                      <h3>{exactTerm.name}</h3>
+                    </div>
+                  </div>
 
-                  <div className={styles.results}>
-                    {terms.map((term) => (
+                  {editingExisting ? (
+                    <div className={styles.form}>
+                      <label className={styles.field}>
+                        <span>Nombre</span>
+                        <input
+                          className={styles.input}
+                          disabled={busy !== null}
+                          maxLength={180}
+                          value={existingDraft.name}
+                          onChange={(event) => setExistingDraft((current) => ({ ...current, name: event.target.value }))}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>¿Qué significa?</span>
+                        <textarea
+                          autoFocus
+                          className={styles.textarea}
+                          disabled={busy !== null}
+                          maxLength={1200}
+                          placeholder="Escribe una explicación breve y clara."
+                          value={existingDraft.shortDefinition}
+                          onChange={(event) => setExistingDraft((current) => ({ ...current, shortDefinition: event.target.value }))}
+                        />
+                      </label>
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.secondaryButton}
+                          disabled={busy !== null}
+                          type="button"
+                          onClick={() => {
+                            setEditingExisting(false);
+                            setExistingDraft({ name: exactTerm.name, shortDefinition: exactTerm.shortDefinition });
+                            setMessage(null);
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          className={styles.primaryButton}
+                          disabled={busy !== null}
+                          type="button"
+                          onClick={() => void saveExistingTerm()}
+                        >
+                          {busy === "save" ? "Guardando…" : "Guardar cambios"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className={styles.definition}>{exactTerm.shortDefinition}</p>
+                      <p className={styles.smartNote}>Koras ya reconoce esta palabra automáticamente en las guías.</p>
+                      <div className={styles.actions}>
+                        <button className={styles.secondaryButton} type="button" onClick={closeDialog}>
+                          Listo
+                        </button>
+                        <button
+                          className={styles.primaryButton}
+                          type="button"
+                          onClick={() => setEditingExisting(true)}
+                        >
+                          <PencilSimple aria-hidden="true" size={15} /> Editar
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className={styles.createPanel}>
+                    <div className={styles.panelTitle}>
+                      <span className={styles.plusIcon}><Plus size={17} weight="bold" /></span>
+                      <div>
+                        <h3>Crear término</h3>
+                        <p>Solo necesitas el nombre y una explicación corta.</p>
+                      </div>
+                    </div>
+
+                    <div className={styles.form}>
+                      <label className={styles.field}>
+                        <span>Nombre</span>
+                        <input
+                          className={styles.input}
+                          disabled={busy !== null}
+                          maxLength={180}
+                          value={draft.name}
+                          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>¿Qué significa?</span>
+                        <textarea
+                          autoFocus
+                          className={styles.textarea}
+                          disabled={busy !== null}
+                          maxLength={1200}
+                          placeholder="Ej.: estructura, concepto o definición que el estudiante debe entender de inmediato."
+                          value={draft.shortDefinition}
+                          onChange={(event) => setDraft((current) => ({ ...current, shortDefinition: event.target.value }))}
+                        />
+                      </label>
                       <button
-                        className={styles.termButton}
-                        disabled={busy !== null}
-                        key={term.id}
+                        className={styles.primaryButtonWide}
+                        disabled={busy !== null || !draft.name.trim() || !draft.shortDefinition.trim()}
                         type="button"
-                        onClick={() => void linkToTerm(term)}
+                        onClick={() => void createTerm()}
                       >
-                        <span>
-                          <span className={styles.termName}>{term.name}</span>
-                          <span className={styles.termMeta}>
-                            {term.category || "Sin categoría"} · {term.shortDefinition}
-                          </span>
-                        </span>
-                        <span className={styles.linkLabel}>Vincular selección</span>
+                        {busy === "save" ? "Creando…" : "Crear término"}
                       </button>
-                    ))}
-                    {busy !== "search" && terms.length === 0 ? (
-                      <p className={styles.empty}>
-                        No se encontraron términos. Puedes crear uno nuevo con esta selección.
-                      </p>
-                    ) : null}
+                      <p className={styles.smartNote}>Se activará y reconocerá automáticamente. No necesitas configurar nada más.</p>
+                    </div>
+                  </div>
+
+                  {relatedTerms.length > 0 ? (
+                    <section className={styles.suggestions}>
+                      <div className={styles.suggestionsHeading}>
+                        <strong>¿Quizás ya existe?</strong>
+                        <span>Evita duplicados vinculando la selección con uno de estos términos.</span>
+                      </div>
+                      <div className={styles.results}>
+                        {relatedTerms.map((term) => (
+                          <button
+                            className={styles.termButton}
+                            disabled={busy !== null}
+                            key={term.id}
+                            type="button"
+                            onClick={() => void linkToTerm(term)}
+                          >
+                            <span>
+                              <strong>{term.name}</strong>
+                              <small>{term.shortDefinition}</small>
+                            </span>
+                            <span>Usar este</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  <div className={styles.searchArea}>
+                    {!showSearch ? (
+                      <button className={styles.textButton} type="button" onClick={() => setShowSearch(true)}>
+                        <MagnifyingGlass aria-hidden="true" size={15} /> Buscar un término existente
+                      </button>
+                    ) : (
+                      <form
+                        className={styles.searchRow}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void searchTerms(query);
+                        }}
+                      >
+                        <input
+                          aria-label="Buscar término existente"
+                          className={styles.input}
+                          disabled={busy !== null}
+                          onChange={(event) => setQuery(event.target.value)}
+                          placeholder="Escribe el nombre del término"
+                          value={query}
+                        />
+                        <button className={styles.searchButton} disabled={busy !== null} type="submit">
+                          {busy === "search" ? "Buscando…" : "Buscar"}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </>
-              ) : (
-                <div className={styles.form}>
-                  <label className={styles.field}>
-                    <span>Nombre canónico</span>
-                    <input
-                      className={styles.input}
-                      disabled={busy !== null}
-                      maxLength={180}
-                      onChange={(event) => setNewTerm((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))}
-                      value={newTerm.name}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>Definición breve</span>
-                    <textarea
-                      className={styles.textarea}
-                      disabled={busy !== null}
-                      maxLength={1200}
-                      onChange={(event) => setNewTerm((current) => ({
-                        ...current,
-                        shortDefinition: event.target.value,
-                      }))}
-                      placeholder="Descripción académica breve que verá el estudiante."
-                      value={newTerm.shortDefinition}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>Categoría opcional</span>
-                    <input
-                      className={styles.input}
-                      disabled={busy !== null}
-                      maxLength={120}
-                      onChange={(event) => setNewTerm((current) => ({
-                        ...current,
-                        category: event.target.value,
-                      }))}
-                      placeholder="Anatomía, fisiología, clínica…"
-                      value={newTerm.category}
-                    />
-                  </label>
-                  <p className={styles.note}>
-                    Se creará activo, con reconocimiento automático y política “primera aparición por sección”. Puedes afinarlo después en Términos interactivos.
-                  </p>
-                  <div className={styles.actions}>
-                    <button
-                      className={styles.secondaryButton}
-                      disabled={busy === "save"}
-                      type="button"
-                      onClick={closeDialog}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      className={styles.primaryButton}
-                      disabled={busy !== null}
-                      type="button"
-                      onClick={() => void createTerm()}
-                    >
-                      {busy === "save" ? "Creando…" : "Crear término"}
-                    </button>
-                  </div>
-                </div>
               )}
 
               {message ? (
-                <p className={message.tone === "error" ? styles.error : styles.success}>
+                <p className={message.tone === "error" ? styles.error : styles.success} role="status">
                   {message.text}
                 </p>
               ) : null}
