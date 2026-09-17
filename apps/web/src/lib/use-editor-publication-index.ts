@@ -38,14 +38,9 @@ function filterLocal(items: readonly ContentItem[], filters: PublicationFilters)
   const text = normalizeSearch(filters.query.trim());
   return getIndependentPublications(items)
     .filter((current) => {
-      const regions = current.content.regions.length > 0
-        ? current.content.regions
-        : [current.topic];
-      const haystack = normalizeSearch(
-        `${current.title} ${current.summary} ${current.topic} ${regions.join(" ")} ${current.slug}`,
-      );
+      const title = normalizeSearch(current.title);
       return (
-        (!text || haystack.includes(text)) &&
+        (!text || title.includes(text)) &&
         (filters.kind === "all" || current.kind === filters.kind) &&
         (filters.status === "all" || current.status === filters.status)
       );

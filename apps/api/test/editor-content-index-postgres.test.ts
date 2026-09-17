@@ -206,6 +206,35 @@ describe("PostgreSQL editorial content index", () => {
     expect(response.items.map((item) => item.id)).toEqual([targetGuide]);
   });
 
+  it("searches publications only by title", async () => {
+    const titleMatch = await listEditorContentIndex(database, {
+      actorUserId: author,
+      canEditAll: true,
+      limit: 20,
+      query: "neurov",
+      scope: "publications",
+    });
+    const summaryOnlyMatch = await listEditorContentIndex(database, {
+      actorUserId: author,
+      canEditAll: true,
+      limit: 20,
+      query: "antigua",
+      scope: "publications",
+    });
+    const broadEditorMatch = await listEditorContentIndex(database, {
+      actorUserId: author,
+      canEditAll: true,
+      limit: 20,
+      query: "antigua",
+      scope: "all",
+    });
+
+    expect(titleMatch.items.map((item) => item.id)).toEqual([targetGuide]);
+    expect(summaryOnlyMatch.index.totalPublications).toBe(0);
+    expect(summaryOnlyMatch.items).toEqual([]);
+    expect(broadEditorMatch.items.map((item) => item.id)).toEqual([targetGuide]);
+  });
+
   it("round-trips stable cursors and rejects malformed values", () => {
     const cursor = {
       id: "41000000-0000-4000-8000-000000000123",
