@@ -1,0 +1,139 @@
+.panel {
+  --related-panel-width: 50vw;
+  background: var(--surface, #fff);
+  bottom: 0;
+  box-shadow: 0 0 34px rgb(0 0 0 / 0.12);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  position: fixed;
+  top: 0;
+  width: var(--related-panel-width);
+  z-index: 125;
+}
+
+.right {
+  border-left: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  right: 0;
+}
+
+.left {
+  border-right: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  left: 0;
+}
+
+.toolbar {
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  min-height: 4rem;
+  padding: 0.7rem 0.85rem 0.7rem 1rem;
+}
+
+.titleBlock {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.titleBlock small {
+  color: color-mix(in srgb, currentColor 55%, transparent);
+  font-size: 0.7rem;
+}
+
+.titleBlock strong {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbarActions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+}
+
+.toolbarActions button,
+.toolbarActions a {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.42rem;
+  text-decoration: none;
+}
+
+.toolbarActions button:hover,
+.toolbarActions a:hover,
+.toolbarActions button:focus-visible,
+.toolbarActions a:focus-visible {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  outline: none;
+}
+
+.resizeControl {
+  align-items: center;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 7%, transparent);
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.35rem 0.9rem;
+}
+
+.resizeControl span {
+  color: color-mix(in srgb, currentColor 55%, transparent);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.resizeControl input {
+  flex: 1;
+  min-width: 5rem;
+}
+
+.reader {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.loading {
+  color: color-mix(in srgb, currentColor 58%, transparent);
+  font-size: 0.85rem;
+  margin: 2rem 0;
+}
+
+@media (max-width: 767px) {
+  .panel {
+    inset: 0;
+    width: 100vw;
+    z-index: 145;
+  }
+
+  .resizeControl {
+    display: none;
+  }
+
+  .toolbar {
+    min-height: 3.75rem;
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+    padding-right: max(0.65rem, env(safe-area-inset-right));
+  }
+
+  .reader {
+    padding-bottom: max(3rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    scroll-behavior: auto;
+  }
+}
