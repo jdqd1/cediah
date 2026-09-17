@@ -1,6 +1,13 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
-import { Fragment } from "react";
-import type { RichTextDocument } from "@cediah/contracts";
+import { Fragment, useMemo } from "react";
+import type {
+  GuideKnowledgeIndex,
+  GuideKnowledgeOccurrence,
+  GuideKnowledgeTerm,
+  RichTextDocument,
+} from "@cediah/contracts";
 import {
   buildGuideCitationIndex,
   parseVancouverCitationNumbers,
@@ -9,12 +16,14 @@ import {
 } from "@/lib/guide-citations";
 import { createStableHeadingIdGenerator } from "@/lib/guide-document";
 import { GuideCitation } from "./guide-citation";
+import { InteractiveTerm, useGuideKnowledge } from "./guide-knowledge-context";
 
 type JsonObject = Record<string, unknown>;
 
 export type RichTextRendererProps = {
   className?: string;
   document: RichTextDocument;
+  knowledge?: GuideKnowledgeIndex | null;
 };
 
 const MAX_RENDER_DEPTH = 100;
@@ -104,6 +113,15 @@ function applyMarks(rendered: ReactNode, rawMarks: unknown[]): ReactNode {
       case "strike":
         result = <s className="rich-guide-strike">{result}</s>;
         break;
+      case "code":
+        result = <code className="rich-guide-inline-code">{result}</code>;
+        break;
+      case "subscript":
+        result = <sub>{result}</sub>;
+        break;
+      case "superscript":
+        result = <sup>{result}</sup>;
+        break;
       case "highlight": {
         const color = asObject(mark.attrs)?.color;
         const style: CSSProperties | undefined =
@@ -115,6 +133,13 @@ function applyMarks(rendered: ReactNode, rawMarks: unknown[]): ReactNode {
             {result}
           </mark>
         );
+        break;
+      }
+      case "textStyle": {
+        const color = asObject(mark.attrs)?.color;
+        if (typeof color === "string" && HEX_COLOR.test(color)) {
+          result = <span style={{ color }}>{result}</span>;
+        }
         break;
       }
       case "link": {
@@ -139,21 +164,14 @@ function applyMarks(rendered: ReactNode, rawMarks: unknown[]): ReactNode {
   return result;
 }
 
-function renderMarkedText(
-  node: JsonObject,
+function renderCitationAwareText(
+  value: string,
+  marks: unknown[],
   references: Map<number, GuideReference>,
   interactiveCitations: boolean,
+  keyPrefix: string,
 ): ReactNode {
-  const value = typeof node.text === "string" ? node.text : "";
-  const marks = Array.isArray(node.marks) ? node.marks : [];
-  const hasUnsafeInteractiveWrapper = marks.some((rawMark) => {
-    const mark = asObject(rawMark);
-    return mark?.type === "link" || mark?.type === "code";
-  });
-
-  if (!interactiveCitations || hasUnsafeInteractiveWrapper || references.size === 0) {
-    return applyMarks(value, marks);
-  }
+  if (!interactiveCitations || references.size === 0) return applyMarks(value, marks);
 
   const pieces: ReactNode[] = [];
   let cursor = 0;
@@ -162,18 +180,34 @@ function renderMarkedText(
   for (const match of value.matchAll(VANCOUVER_CITATION_PATTERN)) {
     const start = match.index ?? cursor;
     if (start > cursor) {
-      pieces.push(<Fragment key={`text-${citationIndex}-${cursor}`}>{applyMarks(value.slice(cursor, start), marks)}</Fragment>);
+      pieces.push(
+        <Fragment key={`${keyPrefix}-text-${citationIndex}-${cursor}`}>
+          {applyMarks(value.slice(cursor, start), marks)}
+        </Fragment>,
+      );
     }
 
     const label = match[0];
     const numbers = parseVancouverCitationNumbers(label);
-    const resolved = numbers?.map((number) => references.get(number)).filter((reference): reference is GuideReference => Boolean(reference)) ?? [];
+    const resolved = numbers
+      ?.map((number) => references.get(number))
+      .filter((reference): reference is GuideReference => Boolean(reference)) ?? [];
     const complete = numbers !== null && resolved.length === numbers.length;
 
     if (complete && resolved.length > 0) {
-      pieces.push(<GuideCitation key={`citation-${citationIndex}-${start}`} label={label} references={resolved} />);
+      pieces.push(
+        <GuideCitation
+          key={`${keyPrefix}-citation-${citationIndex}-${start}`}
+          label={label}
+          references={resolved}
+        />,
+      );
     } else {
-      pieces.push(<Fragment key={`citation-text-${citationIndex}-${start}`}>{applyMarks(label, marks)}</Fragment>);
+      pieces.push(
+        <Fragment key={`${keyPrefix}-citation-text-${citationIndex}-${start}`}>
+          {applyMarks(label, marks)}
+        </Fragment>,
+      );
     }
 
     cursor = start + label.length;
@@ -182,14 +216,111 @@ function renderMarkedText(
 
   if (cursor === 0) return applyMarks(value, marks);
   if (cursor < value.length) {
-    pieces.push(<Fragment key={`text-tail-${cursor}`}>{applyMarks(value.slice(cursor), marks)}</Fragment>);
+    pieces.push(
+      <Fragment key={`${keyPrefix}-text-tail-${cursor}`}>
+        {applyMarks(value.slice(cursor), marks)}
+      </Fragment>,
+    );
   }
   return pieces;
 }
 
-export function RichTextRenderer({ className, document }: RichTextRendererProps) {
+function renderMarkedText(
+  node: JsonObject,
+  path: string,
+  references: Map<number, GuideReference>,
+  interactiveCitations: boolean,
+  occurrences: GuideKnowledgeOccurrence[],
+  terms: Map<string, GuideKnowledgeTerm>,
+): ReactNode {
+  const value = typeof node.text === "string" ? node.text : "";
+  const marks = Array.isArray(node.marks) ? node.marks : [];
+  const hasUnsafeInteractiveWrapper = marks.some((rawMark) => {
+    const mark = asObject(rawMark);
+    return mark?.type === "link" || mark?.type === "code";
+  });
+
+  if (hasUnsafeInteractiveWrapper) return applyMarks(value, marks);
+
+  const validOccurrences = occurrences
+    .filter((occurrence) =>
+      occurrence.startOffset >= 0 &&
+      occurrence.endOffset > occurrence.startOffset &&
+      occurrence.endOffset <= value.length &&
+      terms.has(occurrence.termId),
+    )
+    .sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
+
+  if (validOccurrences.length === 0) {
+    return renderCitationAwareText(value, marks, references, interactiveCitations, path);
+  }
+
+  const pieces: ReactNode[] = [];
+  let cursor = 0;
+  for (const occurrence of validOccurrences) {
+    if (occurrence.startOffset < cursor) continue;
+    if (occurrence.startOffset > cursor) {
+      pieces.push(
+        <Fragment key={`${path}-plain-${cursor}`}>
+          {renderCitationAwareText(
+            value.slice(cursor, occurrence.startOffset),
+            marks,
+            references,
+            interactiveCitations,
+            `${path}-${cursor}`,
+          )}
+        </Fragment>,
+      );
+    }
+
+    const term = terms.get(occurrence.termId);
+    if (term) {
+      pieces.push(
+        <InteractiveTerm key={`${path}-term-${occurrence.startOffset}`} term={term}>
+          {applyMarks(value.slice(occurrence.startOffset, occurrence.endOffset), marks)}
+        </InteractiveTerm>,
+      );
+    }
+    cursor = occurrence.endOffset;
+  }
+
+  if (cursor < value.length) {
+    pieces.push(
+      <Fragment key={`${path}-plain-tail-${cursor}`}>
+        {renderCitationAwareText(
+          value.slice(cursor),
+          marks,
+          references,
+          interactiveCitations,
+          `${path}-${cursor}`,
+        )}
+      </Fragment>,
+    );
+  }
+  return pieces;
+}
+
+export function RichTextRenderer({ className, document, knowledge }: RichTextRendererProps) {
+  const context = useGuideKnowledge();
+  const resolvedKnowledge = knowledge === undefined ? context?.knowledge ?? null : knowledge;
   const nextHeadingId = createStableHeadingIdGenerator();
   const citationIndex = buildGuideCitationIndex(document);
+  const knowledgeIndex = useMemo(() => {
+    const occurrences = new Map<string, GuideKnowledgeOccurrence[]>();
+    const terms = new Map<string, GuideKnowledgeTerm>();
+    const sectionAnchors = new Map<string, string>();
+    for (const term of resolvedKnowledge?.terms ?? []) terms.set(term.id, term);
+    for (const occurrence of resolvedKnowledge?.occurrences ?? []) {
+      occurrences.set(occurrence.nodePath, [
+        ...(occurrences.get(occurrence.nodePath) ?? []),
+        occurrence,
+      ]);
+    }
+    for (const section of resolvedKnowledge?.sections ?? []) {
+      sectionAnchors.set(section.nodePath, section.anchor);
+    }
+    return { occurrences, sectionAnchors, terms };
+  }, [resolvedKnowledge]);
 
   const renderNode = (rawNode: unknown, path: string, depth: number, inBibliography = false): ReactNode => {
     if (depth > MAX_RENDER_DEPTH) return null;
@@ -197,7 +328,18 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
     if (!node || typeof node.type !== "string") return null;
 
     if (node.type === "text") {
-      return <Fragment key={path}>{renderMarkedText(node, citationIndex.references, !inBibliography)}</Fragment>;
+      return (
+        <Fragment key={path}>
+          {renderMarkedText(
+            node,
+            path,
+            citationIndex.references,
+            !inBibliography,
+            inBibliography ? [] : knowledgeIndex.occurrences.get(path) ?? [],
+            knowledgeIndex.terms,
+          )}
+        </Fragment>
+      );
     }
 
     const renderChildren = () =>
@@ -232,13 +374,17 @@ export function RichTextRenderer({ className, document }: RichTextRendererProps)
             ? rawLevel
             : 2;
         const label = textContent(node);
-        const id = level >= 1 && level <= 3 ? nextHeadingId(label) : undefined;
+        const legacyId = level >= 1 && level <= 3 ? nextHeadingId(label) : undefined;
+        const stableAnchor = level >= 1 && level <= 3 ? knowledgeIndex.sectionAnchors.get(path) : undefined;
         const headingClass = `rich-guide-heading rich-guide-heading-${level}${alignmentClass(node)}`;
         const content = renderChildren();
+        const compatibilityAnchor = stableAnchor && stableAnchor !== legacyId
+          ? <span aria-hidden="true" className="guide-stable-anchor" id={stableAnchor} />
+          : null;
 
-        if (level === 1) return <h1 className={headingClass} id={id} key={path}>{content}</h1>;
-        if (level === 2) return <h2 className={headingClass} id={id} key={path}>{content}</h2>;
-        if (level === 3) return <h3 className={headingClass} id={id} key={path}>{content}</h3>;
+        if (level === 1) return <Fragment key={path}>{compatibilityAnchor}<h1 className={headingClass} id={legacyId}>{content}</h1></Fragment>;
+        if (level === 2) return <Fragment key={path}>{compatibilityAnchor}<h2 className={headingClass} id={legacyId}>{content}</h2></Fragment>;
+        if (level === 3) return <Fragment key={path}>{compatibilityAnchor}<h3 className={headingClass} id={legacyId}>{content}</h3></Fragment>;
         if (level === 4) return <h4 className={headingClass} key={path}>{content}</h4>;
         if (level === 5) return <h5 className={headingClass} key={path}>{content}</h5>;
         return <h6 className={headingClass} key={path}>{content}</h6>;
