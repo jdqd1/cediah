@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     cachePublic: false,
     method: "GET",
     path: `/v1/content/topic-order?subjectId=${encodeURIComponent(subjectId)}`,
+    timeoutMs: 20_000,
   });
   const parsed = ContentTopicOrdersResponseSchema.safeParse(response.body);
   if (response.status !== 200 || !parsed.success) {
