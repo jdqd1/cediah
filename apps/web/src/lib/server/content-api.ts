@@ -1,4 +1,5 @@
 import "server-only";
+import { z } from "zod";
 import {
   ContentCatalogResponseSchema,
   ContentItemSchema,
@@ -65,6 +66,18 @@ export type SubjectDetailResult =
 export type SubjectStudyCatalogResult =
   | { status: "not_found" | "unavailable" }
   | { status: "ready"; detail: SubjectStudyCatalogResponse };
+
+const ContentTopicOrderResponseSchema = z.object({
+  topicOrder: z.array(z.string().trim().min(1).max(120)).default([]),
+  topics: z.array(z.object({
+    contentIds: z.array(z.string().uuid()),
+    topic: z.string().trim().min(1).max(120),
+  })),
+});
+
+export type ContentTopicOrderResult =
+  | { status: "ready"; order: z.infer<typeof ContentTopicOrderResponseSchema> }
+  | { status: "unavailable" };
 
 export function getContentApiError(value: unknown) {
   if (
@@ -177,6 +190,23 @@ export async function getPublishedStudyCatalog(input: {
   return legacy.status === "ready"
     ? { catalog: { items: legacy.catalog.items.map(summarizeContentItem) }, status: "ready" }
     : { status: "unavailable" };
+}
+
+export async function getContentTopicOrder(subjectId: string): Promise<ContentTopicOrderResult> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await requestContentApi({
+      cachePublic: false,
+      method: "GET",
+      path: "/v1/content/topic-order?subjectId=" + encodeURIComponent(subjectId),
+      timeoutMs: 20_000,
+    });
+    if (response.status === 200) {
+      const parsed = ContentTopicOrderResponseSchema.safeParse(response.body);
+      if (parsed.success) return { status: "ready", order: parsed.data };
+    }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return { status: "unavailable" };
 }
 
 export async function getSubjects(): Promise<SubjectsResult> {
