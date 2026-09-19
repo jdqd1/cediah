@@ -708,9 +708,9 @@ export function TopicSelector({
                             }
                             const preview = event.currentTarget.closest<HTMLElement>("[data-topic-drag-preview='true']");
                             if (preview) {
-                              preview.classList.add(styles.dragPreviewLift);
+                              preview.classList.add(styles.dragPreviewLift!);
                               event.dataTransfer.setDragImage(preview, 28, 24);
-                              requestAnimationFrame(() => preview.classList.remove(styles.dragPreviewLift));
+                              requestAnimationFrame(() => preview.classList.remove(styles.dragPreviewLift!));
                             }
                             setDraggingTopicKey(topicKey);
                             event.dataTransfer.effectAllowed = "move";
