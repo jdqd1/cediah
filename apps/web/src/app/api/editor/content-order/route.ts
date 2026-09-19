@@ -26,5 +26,6 @@ export async function PATCH(request: Request) {
     method: "PATCH",
     path: "/v1/editor/topic-order",
     responseSchema: ContentTopicOrderMutationResponseSchema,
+    timeoutMs: 20_000,
   });
 }
