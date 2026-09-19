@@ -708,9 +708,9 @@ export function TopicItemManager({
                   }
                   const preview = event.currentTarget.closest<HTMLElement>("[data-topic-item-drag-preview='true']");
                   if (preview) {
-                    preview.classList.add(styles.dragPreviewLift);
+                    preview.classList.add(styles.dragPreviewLift!);
                     event.dataTransfer.setDragImage(preview, 24, Math.min(28, preview.offsetHeight / 2));
-                    requestAnimationFrame(() => preview.classList.remove(styles.dragPreviewLift));
+                    requestAnimationFrame(() => preview.classList.remove(styles.dragPreviewLift!));
                   }
                   management.setDraggingItemId(item.id);
                   event.dataTransfer.effectAllowed = "move";
