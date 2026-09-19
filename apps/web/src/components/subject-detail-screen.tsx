@@ -82,10 +82,15 @@ function ResourceList({
 }
 
 export function SubjectDetailScreen({
+  initialContentOrder,
   isAdministrator = false,
   items,
   subject,
 }: {
+  initialContentOrder?: {
+    topicOrder: string[];
+    topics: Array<{ contentIds: string[]; topic: string }>;
+  };
   isAdministrator?: boolean;
   items: StudyCatalogItem[];
   subject: Subject;
@@ -93,8 +98,15 @@ export function SubjectDetailScreen({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [topicOrders, setTopicOrders] = useState<Record<string, string[]>>({});
-  const [topicDisplayOrder, setTopicDisplayOrder] = useState<string[]>([]);
+  const [topicOrders, setTopicOrders] = useState<Record<string, string[]>>(() =>
+    Object.fromEntries((initialContentOrder?.topics ?? []).map((entry) => [
+      normalize(entry.topic),
+      entry.contentIds,
+    ])),
+  );
+  const [topicDisplayOrder, setTopicDisplayOrder] = useState<string[]>(
+    initialContentOrder?.topicOrder ?? [],
+  );
   const requestedKind = searchParams.get("tipo");
   const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
