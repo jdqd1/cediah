@@ -137,12 +137,28 @@ export function TopicSelector({
           return order.map(normalizeRegion);
         })
         .then((serverOrder) => {
-          if (cancelled || !serverOrder || serverOrder.length === 0) return;
-          setTopicOrder(serverOrder);
-          try {
-            window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(serverOrder));
-          } catch {
-            // Browser storage is only a local fallback; server order remains authoritative.
+          if (cancelled || !serverOrder) return;
+          if (serverOrder.length > 0) {
+            setTopicOrder(serverOrder);
+            try {
+              window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(serverOrder));
+            } catch {
+              // Browser storage is only a local fallback; server order remains authoritative.
+            }
+            return;
+          }
+
+          if (fallbackOrder.length > 0) {
+            // Backfill the server once for users who already arranged topics
+            // before ordering became shared with the public Materias view.
+            void Promise.all(subjectIds.map((currentSubjectId) =>
+              fetch("/api/editor/topic-list-order", {
+                body: JSON.stringify({ subjectId: currentSubjectId, topics: fallbackOrder }),
+                cache: "no-store",
+                headers: { "Content-Type": "application/json" },
+                method: "PATCH",
+              }).catch(() => undefined),
+            ));
           }
         })
         .catch(() => undefined);
