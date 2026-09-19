@@ -331,7 +331,7 @@ export async function registerContentTopicEditorRoutes(
         listContentTopicDisplayOrder(dependencies.database, query.data.subjectId),
       ]);
       return reply
-        .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
+        .header("Cache-Control", "no-store")
         .send(ContentTopicOrdersResponseSchema.parse({ topicOrder, topics }));
     } catch (error) {
       request.log.error({ err: error }, "Content topic order lookup failed");
