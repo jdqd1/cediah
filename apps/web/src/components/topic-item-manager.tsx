@@ -151,9 +151,11 @@ type TopicItemManagementContextValue = {
   mutationBusyId: string | null;
   openDelete: (item: TopicItemSummary) => void;
   openRename: (item: TopicItemSummary) => void;
-  orderBusyTopic: string | null;
+  hasPendingOrderChanges: boolean;
+  orderSaveBusy: boolean;
   ordersBySubject: OrdersBySubject;
-  persistOrder: (topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) => Promise<void>;
+  savePendingOrders: () => Promise<void>;
+  stageOrder: (topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) => void;
   renameError: string | null;
   renameInput: string;
   renameItem: () => Promise<void>;
@@ -210,7 +212,8 @@ export function TopicItemManagementProvider({
   );
   const [ordersBySubject, setOrdersBySubject] = useState<OrdersBySubject>({});
   const [localOrders, setLocalOrders] = useState<Record<string, string[]>>({});
-  const [orderBusyTopic, setOrderBusyTopic] = useState<string | null>(null);
+  const [dirtyTopicKeys, setDirtyTopicKeys] = useState<Set<string>>(() => new Set());
+  const [orderSaveBusy, setOrderSaveBusy] = useState(false);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<TopicItemSummary | null>(null);
   const [renameInput, setRenameInput] = useState("");
@@ -383,9 +386,9 @@ export function TopicItemManagementProvider({
     }
   }
 
-  async function persistOrder(topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) {
+  function stageOrder(topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) {
     const topicKey = normalizeRegion(topic);
-    if (!topicKey || orderBusyTopic) return;
+    if (!topicKey || orderSaveBusy) return;
     const topicItemSubjectIds = new Set(topicItems.flatMap((item) => item.subjectIds));
     const relevantSubjectIds = (configuredSubjectIds.length > 0
       ? configuredSubjectIds
@@ -394,54 +397,126 @@ export function TopicItemManagementProvider({
     if (relevantSubjectIds.length === 0) return;
 
     setLocalOrders((current) => ({ ...current, [topicKey]: orderedIds }));
+    setDirtyTopicKeys((current) => new Set(current).add(topicKey));
     for (const subjectId of relevantSubjectIds) {
       const validIds = orderedIds.filter((id) =>
         topicItems.some((item) => item.id === id && item.subjectIds.includes(subjectId)),
       );
       writeStoredItemOrder(subjectId, topicKey, validIds);
     }
-    setOrderBusyTopic(topicKey);
-    try {
-      const responses = await Promise.all(relevantSubjectIds.map(async (subjectId) => {
+  }
+
+  async function savePendingOrders() {
+    if (orderSaveBusy || dirtyTopicKeys.size === 0) return;
+    const dirtyKeys = [...dirtyTopicKeys];
+    const topicByKey = new Map(topics.map((topic) => [normalizeRegion(topic), topic]));
+    const expectedBySubject: OrdersBySubject = {};
+
+    for (const topicKey of dirtyKeys) {
+      const orderedIds = localOrders[topicKey];
+      const topic = topicByKey.get(topicKey);
+      if (!orderedIds || !topic) continue;
+
+      const topicItems = managedItems.filter((item) =>
+        item.topics.some((candidate) => normalizeRegion(candidate) === topicKey),
+      );
+      const topicItemSubjectIds = new Set(topicItems.flatMap((item) => item.subjectIds));
+      const relevantSubjectIds = (configuredSubjectIds.length > 0
+        ? configuredSubjectIds
+        : [...topicItemSubjectIds])
+        .filter((subjectId) => topicItemSubjectIds.has(subjectId));
+
+      for (const subjectId of relevantSubjectIds) {
         const validIds = orderedIds.filter((id) =>
           topicItems.some((item) => item.id === id && item.subjectIds.includes(subjectId)),
         );
-        let lastError: Error | null = null;
-        for (let attempt = 0; attempt < 2; attempt += 1) {
-          const response = await fetch("/api/editor/content-order", {
-            body: JSON.stringify({ contentIds: validIds, subjectId, topic }),
-            cache: "no-store",
-            headers: { "Content-Type": "application/json" },
-            method: "PATCH",
-          });
-          const body: unknown = await response
-            .json()
-            .catch(() => ({ error: "content_unavailable" }));
-          if (response.ok) return { contentIds: validIds, subjectId };
+        expectedBySubject[subjectId] = {
+          ...(expectedBySubject[subjectId] ?? {}),
+          [topicKey]: validIds,
+        };
+      }
+    }
 
-          lastError = new Error(errorMessage(body, `No se pudo guardar el orden (${response.status}).`));
-          if (attempt === 0 && (response.status === 502 || response.status === 503)) {
-            await new Promise((resolve) => setTimeout(resolve, 700));
-            continue;
+    if (Object.keys(expectedBySubject).length === 0) {
+      setDirtyTopicKeys(new Set());
+      return;
+    }
+
+    setOrderSaveBusy(true);
+    try {
+      for (const [subjectId, topicOrders] of Object.entries(expectedBySubject)) {
+        for (const [topicKey, contentIds] of Object.entries(topicOrders)) {
+          const topic = topicByKey.get(topicKey);
+          if (!topic) continue;
+
+          let lastError: Error | null = null;
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            const response = await fetch("/api/editor/content-order", {
+              body: JSON.stringify({ contentIds, subjectId, topic }),
+              cache: "no-store",
+              headers: { "Content-Type": "application/json" },
+              method: "PATCH",
+            });
+            const body: unknown = await response
+              .json()
+              .catch(() => ({ error: "content_unavailable" }));
+            if (response.ok) {
+              lastError = null;
+              break;
+            }
+
+            lastError = new Error(errorMessage(body, `No se pudo guardar el orden (${response.status}).`));
+            if (attempt === 0 && (response.status === 502 || response.status === 503)) {
+              await new Promise((resolve) => setTimeout(resolve, 700));
+              continue;
+            }
+            break;
           }
-          break;
+          if (lastError) throw lastError;
         }
-        throw lastError ?? new Error("No se pudo guardar el nuevo orden.");
-      }));
+      }
+
+      for (const [subjectId, topicOrders] of Object.entries(expectedBySubject)) {
+        const response = await fetch(
+          `/api/content-order?subjectId=${encodeURIComponent(subjectId)}&verify=${Date.now()}`,
+          { cache: "no-store" },
+        );
+        const body: unknown = await response.json().catch(() => ({ topics: [] }));
+        const parsed = orderResponseSchema.safeParse(body);
+        if (!response.ok || !parsed.success) {
+          throw new Error("El servidor no pudo confirmar el nuevo orden. Intenta guardar de nuevo.");
+        }
+        const confirmed = new Map(
+          parsed.data.topics.map((entry) => [normalizeRegion(entry.topic), entry.contentIds]),
+        );
+        for (const [topicKey, expectedIds] of Object.entries(topicOrders)) {
+          const actualIds = confirmed.get(topicKey) ?? [];
+          if (
+            actualIds.length !== expectedIds.length ||
+            actualIds.some((id, index) => id !== expectedIds[index])
+          ) {
+            throw new Error("El servidor no confirmó el nuevo orden. Intenta guardar de nuevo.");
+          }
+        }
+      }
+
       setOrdersBySubject((current) => {
         const next: OrdersBySubject = { ...current };
-        for (const result of responses) {
-          next[result.subjectId] = {
-            ...(next[result.subjectId] ?? {}),
-            [topicKey]: result.contentIds,
+        for (const [subjectId, topicOrders] of Object.entries(expectedBySubject)) {
+          next[subjectId] = {
+            ...(next[subjectId] ?? {}),
+            ...topicOrders,
           };
         }
         return next;
       });
+      setDirtyTopicKeys((current) => {
+        const next = new Set(current);
+        dirtyKeys.forEach((key) => next.delete(key));
+        return next;
+      });
     } finally {
-      // Keep the optimistic local order even if persistence fails. The error is
-      // surfaced below the list and a later successful drag will retry saving it.
-      setOrderBusyTopic(null);
+      setOrderSaveBusy(false);
     }
   }
 
@@ -453,13 +528,15 @@ export function TopicItemManagementProvider({
     draggingItemId,
     enabled,
     items: managedItems,
+    hasPendingOrderChanges: dirtyTopicKeys.size > 0,
     localOrders,
     mutationBusyId,
     openDelete,
     openRename,
-    orderBusyTopic,
+    orderSaveBusy,
     ordersBySubject,
-    persistOrder,
+    savePendingOrders,
+    stageOrder,
     renameError,
     renameInput,
     renameItem,
@@ -522,7 +599,7 @@ export function TopicItemManagementProvider({
   );
 }
 
-function useTopicItemManagement() {
+export function useTopicItemManagement() {
   const context = useContext(TopicItemManagementContext);
   if (!context) throw new Error("TopicItemManager must be used inside TopicItemManagementProvider");
   return context;
@@ -537,6 +614,7 @@ export function TopicItemManager({
 }) {
   const management = useTopicItemManagement();
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const topicKey = normalizeRegion(topic);
   const topicItems = useMemo(() => {
     const filtered = management.items
@@ -554,13 +632,14 @@ export function TopicItemManager({
       .sort((left, right) => right.length - left.length);
     return applyContentIdOrder(filtered, candidateOrders[0] ?? []);
   }, [management.configuredSubjectIds, management.items, management.localOrders, management.ordersBySubject, topicKey]);
-  const busy = disabled || Boolean(management.mutationBusyId) || management.orderBusyTopic === topicKey;
+  const busy = disabled || Boolean(management.mutationBusyId) || management.orderSaveBusy;
   const canReorder = !busy && topicItems.length > 1;
 
-  async function dropOn(targetId: string, event: DragEvent<HTMLDivElement>) {
+  function dropOn(targetId: string, event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     const sourceId = management.draggingItemId || event.dataTransfer.getData("text/plain");
     management.setDraggingItemId(null);
+    setDragOverItemId(null);
     if (!sourceId || sourceId === targetId || !canReorder) return;
     const ids = topicItems.map((item) => item.id);
     const sourceIndex = ids.indexOf(sourceId);
@@ -569,11 +648,7 @@ export function TopicItemManager({
     ids.splice(sourceIndex, 1);
     ids.splice(targetIndex, 0, sourceId);
     setOrderError(null);
-    try {
-      await management.persistOrder(topic, ids, topicItems);
-    } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "No se pudo guardar el nuevo orden.");
-    }
+    management.stageOrder(topic, ids, topicItems);
   }
 
   if (!management.enabled) return null;
@@ -593,14 +668,19 @@ export function TopicItemManager({
         <div className={styles.list}>
           {topicItems.map((item) => (
             <div
-              className={`${styles.item} ${management.draggingItemId === item.id ? styles.itemDragging : ""}`}
+              className={`${styles.item} ${management.draggingItemId === item.id ? styles.itemDragging : ""} ${dragOverItemId === item.id && management.draggingItemId !== item.id ? styles.itemDropTarget : ""}`}
+              data-topic-item-drag-preview="true"
               key={item.id}
+              onDragEnter={() => {
+                if (canReorder && management.draggingItemId !== item.id) setDragOverItemId(item.id);
+              }}
               onDragOver={(event) => {
                 if (!canReorder) return;
                 event.preventDefault();
                 event.dataTransfer.dropEffect = "move";
+                if (management.draggingItemId !== item.id) setDragOverItemId(item.id);
               }}
-              onDrop={(event) => void dropOn(item.id, event)}
+              onDrop={(event) => dropOn(item.id, event)}
             >
               <button
                 aria-label={`Mover ${item.title}`}
@@ -609,11 +689,20 @@ export function TopicItemManager({
                 draggable={canReorder}
                 title={canReorder ? "Arrastra para cambiar el orden" : "Se necesitan al menos dos elementos para reordenar"}
                 type="button"
-                onDragEnd={() => management.setDraggingItemId(null)}
+                onDragEnd={() => {
+                  management.setDraggingItemId(null);
+                  setDragOverItemId(null);
+                }}
                 onDragStart={(event) => {
                   if (!canReorder) {
                     event.preventDefault();
                     return;
+                  }
+                  const preview = event.currentTarget.closest<HTMLElement>("[data-topic-item-drag-preview='true']");
+                  if (preview) {
+                    preview.classList.add(styles.dragPreviewLift);
+                    event.dataTransfer.setDragImage(preview, 24, Math.min(28, preview.offsetHeight / 2));
+                    requestAnimationFrame(() => preview.classList.remove(styles.dragPreviewLift));
                   }
                   management.setDraggingItemId(item.id);
                   event.dataTransfer.effectAllowed = "move";
