@@ -98,6 +98,20 @@ async function subjectIdsForTopic(database: QueryDatabase, topicId: string) {
   return links.rows.map((row) => row.subject_id);
 }
 
+async function contentTopicItemOrderTableExists(database: QueryDatabase) {
+  const result = await sql<{ exists: boolean }>`
+    select to_regclass('public.content_topic_item_order') is not null as exists
+  `.execute(database);
+  return Boolean(result.rows[0]?.exists);
+}
+
+function contentIdsFromAuditMetadata(metadata: JsonValue) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return [];
+  const contentIds = (metadata as Record<string, JsonValue>).contentIds;
+  if (!Array.isArray(contentIds)) return [];
+  return contentIds.filter((value): value is string => typeof value === "string");
+}
+
 export async function listContentTopicItems(database: DatabaseClient): Promise<{
   items: ContentTopicItemSummary[];
   topics: ContentTopicTaxonomySummary[];
@@ -167,16 +181,36 @@ export async function listContentTopicItemOrders(
   database: DatabaseClient,
   subjectId: string,
 ): Promise<ContentTopicItemOrder[]> {
-  const rows = await sql<{ content_item_id: string; position: number; topic_key: string }>`
-    select content_item_id, position, topic_key
-    from public.content_topic_item_order
-    where subject_id = ${subjectId}
-    order by topic_key asc, position asc, content_item_id asc
-  `.execute(database);
   const grouped = new Map<string, string[]>();
-  for (const row of rows.rows) {
-    grouped.set(row.topic_key, [...(grouped.get(row.topic_key) ?? []), row.content_item_id]);
+
+  if (await contentTopicItemOrderTableExists(database)) {
+    const rows = await sql<{ content_item_id: string; position: number; topic_key: string }>`
+      select content_item_id, position, topic_key
+      from public.content_topic_item_order
+      where subject_id = ${subjectId}
+      order by topic_key asc, position asc, content_item_id asc
+    `.execute(database);
+    for (const row of rows.rows) {
+      grouped.set(row.topic_key, [...(grouped.get(row.topic_key) ?? []), row.content_item_id]);
+    }
   }
+
+  const auditRows = await sql<{ metadata: JsonValue; topic_name: string }>`
+    select audit.metadata, topic.name as topic_name
+    from public.audit_log as audit
+    join public.content_topics as topic on topic.id = audit.target_id
+    where audit.action = 'content_topic_items_reordered'
+      and audit.target_type = 'content_topic'
+      and audit.metadata ->> 'subjectId' = ${subjectId}
+    order by audit.occurred_at desc, audit.id desc
+  `.execute(database);
+
+  for (const row of auditRows.rows) {
+    const topicKey = normalizeTopic(row.topic_name);
+    if (!topicKey || grouped.has(topicKey)) continue;
+    grouped.set(topicKey, contentIdsFromAuditMetadata(row.metadata));
+  }
+
   return [...grouped.entries()].map(([topic, contentIds]) => ({ contentIds, topic }));
 }
 
@@ -223,28 +257,30 @@ export async function reorderContentTopicItems(
       }
     }
 
-    await sql`
-      delete from public.content_topic_item_order
-      where subject_id = ${input.subjectId}
-        and topic_key = ${topicKey}
-    `.execute(transaction);
-
-    for (const [position, contentId] of contentIds.entries()) {
+    if (await contentTopicItemOrderTableExists(transaction)) {
       await sql`
-        insert into public.content_topic_item_order (
-          subject_id,
-          topic_key,
-          content_item_id,
-          position,
-          updated_at
-        ) values (
-          ${input.subjectId},
-          ${topicKey},
-          ${contentId},
-          ${position},
-          now()
-        )
+        delete from public.content_topic_item_order
+        where subject_id = ${input.subjectId}
+          and topic_key = ${topicKey}
       `.execute(transaction);
+
+      for (const [position, contentId] of contentIds.entries()) {
+        await sql`
+          insert into public.content_topic_item_order (
+            subject_id,
+            topic_key,
+            content_item_id,
+            position,
+            updated_at
+          ) values (
+            ${input.subjectId},
+            ${topicKey},
+            ${contentId},
+            ${position},
+            now()
+          )
+        `.execute(transaction);
+      }
     }
 
     await transaction
@@ -322,7 +358,7 @@ export async function renameContentTopic(
     }
 
     const nextTopicKey = normalizeTopic(name);
-    if (nextTopicKey !== previous) {
+    if (nextTopicKey !== previous && await contentTopicItemOrderTableExists(transaction)) {
       await sql`
         update public.content_topic_item_order
         set topic_key = ${nextTopicKey}, updated_at = now()
@@ -385,10 +421,12 @@ export async function deleteContentTopic(
     if (inUse) return { status: "in_use" };
 
     const subjectIds = await subjectIdsForTopic(transaction, source.id);
-    await sql`
-      delete from public.content_topic_item_order
-      where topic_key = ${normalized}
-    `.execute(transaction);
+    if (await contentTopicItemOrderTableExists(transaction)) {
+      await sql`
+        delete from public.content_topic_item_order
+        where topic_key = ${normalized}
+      `.execute(transaction);
+    }
     await sql`
       delete from public.content_topic_subjects
       where topic_id = ${source.id}

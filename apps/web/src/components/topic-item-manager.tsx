@@ -339,9 +339,11 @@ export function TopicItemManagementProvider({
   async function persistOrder(topic: string, orderedIds: string[], topicItems: TopicItemSummary[]) {
     const topicKey = normalizeRegion(topic);
     if (!topicKey || orderBusyTopic) return;
-    const relevantSubjectIds = configuredSubjectIds.length > 0
+    const topicItemSubjectIds = new Set(topicItems.flatMap((item) => item.subjectIds));
+    const relevantSubjectIds = (configuredSubjectIds.length > 0
       ? configuredSubjectIds
-      : [...new Set(topicItems.flatMap((item) => item.subjectIds))];
+      : [...topicItemSubjectIds])
+      .filter((subjectId) => topicItemSubjectIds.has(subjectId));
     if (relevantSubjectIds.length === 0) return;
 
     const previousLocal = localOrders[topicKey];
@@ -529,7 +531,7 @@ export function TopicItemManager({
           <strong>Elementos del tema</strong>
           <span>{topicItems.length === 1 ? "1 elemento" : `${topicItems.length} elementos`}</span>
         </div>
-        {topicItems.length > 1 && <small>Arrastra desde “Mover” para reorganizar.</small>}
+        {topicItems.length > 1 && <small>Arrastra el icono de puntos para reorganizar.</small>}
       </header>
       {topicItems.length === 0 ? (
         <p className={styles.empty}>Todavía no hay guías o videos asociados a este tema.</p>
@@ -564,8 +566,7 @@ export function TopicItemManager({
                   event.dataTransfer.setData("text/plain", item.id);
                 }}
               >
-                <DotsSixVertical aria-hidden="true" size={17} weight="bold" />
-                <span>Mover</span>
+                <DotsSixVertical aria-hidden="true" size={18} weight="bold" />
               </button>
               <div className={styles.copy}>
                 <strong>{item.title}</strong>

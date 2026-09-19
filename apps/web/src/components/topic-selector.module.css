@@ -2,6 +2,12 @@
   display: grid;
   min-width: 0;
   gap: 0.12rem;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.topicDragging {
+  opacity: 0.55;
+  transform: scale(0.995);
 }
 
 .topicSearch {
@@ -122,6 +128,33 @@
   gap: 0.28rem;
 }
 
+.topicDragHandle {
+  display: grid;
+  width: 30px;
+  min-height: 42px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #746c69;
+  cursor: grab;
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.topicDragHandle:active {
+  cursor: grabbing;
+}
+
+.topicDragHandle:hover:not(:disabled) {
+  background: #f5f2f1;
+  color: var(--wine);
+}
+
+.topicDragHandle:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
 .topicAction {
   display: grid;
   width: 38px;
@@ -173,5 +206,9 @@
 
   .topicAction {
     width: 36px;
+  }
+
+  .topicDragHandle {
+    width: 28px;
   }
 }

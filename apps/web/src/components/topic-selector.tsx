@@ -1,7 +1,18 @@
 "use client";
 
-import { Check, MagnifyingGlass, NotePencil, Plus, Tag, Trash, X } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import {
+  CaretDown,
+  CaretRight,
+  Check,
+  DotsSixVertical,
+  MagnifyingGlass,
+  NotePencil,
+  Plus,
+  Tag,
+  Trash,
+  X,
+} from "@phosphor-icons/react";
+import { type DragEvent, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { ContentTopicSchema, type ContentItem, type ContentTopic } from "@cediah/contracts";
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
@@ -53,7 +64,14 @@ export function TopicSelector({
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [topicSearch, setTopicSearch] = useState("");
+  const [topicOrder, setTopicOrder] = useState<string[]>([]);
+  const [draggingTopicKey, setDraggingTopicKey] = useState<string | null>(null);
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(() => new Set());
   const deferredTopicSearch = useDeferredValue(topicSearch);
+  const topicOrderStorageKey = useMemo(() => {
+    const key = [...new Set(subjectIds)].sort().join("|");
+    return `cediah:topic-order:${key || "unassigned"}`;
+  }, [subjectIds]);
   const options = useMemo(() => {
     const resolveRenamedTopic = (topic: string) => {
       let current = topic;
@@ -82,11 +100,54 @@ export function TopicSelector({
       ),
     );
   }, [createdTopics, deletedTopics, renamedTopics, subjectIds, suggestions, values]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let nextOrder: string[] = [];
+    try {
+      const stored = window.localStorage.getItem(topicOrderStorageKey);
+      const parsed: unknown = stored ? JSON.parse(stored) : [];
+      nextOrder = Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      nextOrder = [];
+    }
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setTopicOrder(nextOrder);
+      setDraggingTopicKey(null);
+      setExpandedTopics(new Set());
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [topicOrderStorageKey]);
+
+  const orderedOptions = useMemo(() => {
+    const order = new Map(topicOrder.map((key, index) => [key, index]));
+    const base = new Map(options.map((topic, index) => [normalizeRegion(topic), index]));
+    return [...options].sort((left, right) => {
+      const leftKey = normalizeRegion(left);
+      const rightKey = normalizeRegion(right);
+      const leftOrder = order.get(leftKey);
+      const rightOrder = order.get(rightKey);
+      if (leftOrder !== undefined || rightOrder !== undefined) {
+        if (leftOrder === undefined) return 1;
+        if (rightOrder === undefined) return -1;
+        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      }
+      return (base.get(leftKey) ?? 0) - (base.get(rightKey) ?? 0);
+    });
+  }, [options, topicOrder]);
+
   const filteredOptions = useMemo(() => {
     const normalizedSearch = normalizeRegion(deferredTopicSearch);
-    if (!normalizedSearch) return options;
+    if (!normalizedSearch) return orderedOptions;
     const terms = normalizedSearch.split(" ").filter(Boolean);
-    return options
+    return orderedOptions
       .filter((topic) => {
         const normalizedTopic = normalizeRegion(topic);
         return terms.every((term) => normalizedTopic.includes(term));
@@ -99,13 +160,55 @@ export function TopicSelector({
         if (leftStarts !== rightStarts) return leftStarts ? -1 : 1;
         return left.localeCompare(right, "es");
       });
-  }, [deferredTopicSearch, options]);
+  }, [deferredTopicSearch, orderedOptions]);
   const cleanInput = cleanRegion(input);
   const cleanRenameInput = cleanRegion(renameInput);
   const existingTopic = options.find(
     (topic) => normalizeRegion(topic) === normalizeRegion(cleanInput),
   );
   const interactive = !disabled && !busy && subjectSelected;
+  const canReorderTopics =
+    allowCreate && interactive && orderedOptions.length > 1 && !deferredTopicSearch.trim();
+
+  function persistTopicOrder(nextOrder: string[]) {
+    const uniqueOrder = [...new Set(nextOrder.filter(Boolean))];
+    setTopicOrder(uniqueOrder);
+    try {
+      window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(uniqueOrder));
+    } catch {
+      // Reordering still works for the current session when storage is unavailable.
+    }
+  }
+
+  function setTopicExpanded(topic: string, expanded: boolean) {
+    const key = normalizeRegion(topic);
+    setExpandedTopics((current) => {
+      const next = new Set(current);
+      if (expanded) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  function dropTopicOn(targetTopic: string, event: DragEvent<HTMLDivElement>) {
+    const sourceKey =
+      draggingTopicKey || event.dataTransfer.getData("application/x-cediah-topic");
+    if (!sourceKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDraggingTopicKey(null);
+    if (!canReorderTopics) return;
+
+    const targetKey = normalizeRegion(targetTopic);
+    if (!targetKey || sourceKey === targetKey) return;
+    const keys = orderedOptions.map(normalizeRegion);
+    const sourceIndex = keys.indexOf(sourceKey);
+    const targetIndex = keys.indexOf(targetKey);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    keys.splice(sourceIndex, 1);
+    keys.splice(targetIndex, 0, sourceKey);
+    persistTopicOrder(keys);
+  }
 
   function closeDialog() {
     if (busy) return;
@@ -137,6 +240,7 @@ export function TopicSelector({
         ),
         localTopic,
       ]);
+      persistTopicOrder([...topicOrder, normalizeRegion(localTopic.name)]);
       onChange(uniqueRegions([...values, localTopic.name]));
       setDialogOpen(false);
       setInput("");
@@ -172,6 +276,7 @@ export function TopicSelector({
         ),
         parsed.data,
       ]);
+      persistTopicOrder([...topicOrder, normalizeRegion(parsed.data.name)]);
       onChange(uniqueRegions([...values, parsed.data.name]));
       setDialogOpen(false);
       setInput("");
@@ -213,6 +318,15 @@ export function TopicSelector({
       if (!parsed.success) throw new Error(contentUnavailableMessage);
 
       const previousKey = normalizeRegion(renameTarget);
+      const nextKey = normalizeRegion(parsed.data.name);
+      persistTopicOrder(topicOrder.map((key) => key === previousKey ? nextKey : key));
+      setExpandedTopics((current) => {
+        if (!current.has(previousKey)) return current;
+        const next = new Set(current);
+        next.delete(previousKey);
+        next.add(nextKey);
+        return next;
+      });
       setCreatedTopics((current) => [
         ...current.filter((topic) =>
           normalizeRegion(topic.name) !== previousKey &&
@@ -269,8 +383,16 @@ export function TopicSelector({
       );
       if (!parsed.success) throw new Error(contentUnavailableMessage);
 
+      const deletedKey = normalizeRegion(deleteTarget);
+      persistTopicOrder(topicOrder.filter((key) => key !== deletedKey));
+      setExpandedTopics((current) => {
+        if (!current.has(deletedKey)) return current;
+        const next = new Set(current);
+        next.delete(deletedKey);
+        return next;
+      });
       setCreatedTopics((current) => current.filter(
-        (topic) => normalizeRegion(topic.name) !== normalizeRegion(deleteTarget),
+        (topic) => normalizeRegion(topic.name) !== deletedKey,
       ));
       setDeletedTopics((current) => uniqueRegions([...current, parsed.data.name]));
       onChange(values.filter(
@@ -337,11 +459,25 @@ export function TopicSelector({
             role="group"
           >
             {subjectSelected && filteredOptions.length > 0 ? filteredOptions.map((topic) => {
+              const topicKey = normalizeRegion(topic);
               const selected = values.some(
-                (value) => normalizeRegion(value) === normalizeRegion(topic),
+                (value) => normalizeRegion(value) === topicKey,
               );
+              const expanded = expandedTopics.has(topicKey);
               return (
-                <div className={styles.topicBlock} key={normalizeRegion(topic)}>
+                <div
+                  className={`${styles.topicBlock} ${draggingTopicKey === topicKey ? styles.topicDragging : ""}`}
+                  key={topicKey}
+                  onDragOver={(event) => {
+                    if (!canReorderTopics ||
+                      !Array.from(event.dataTransfer.types).includes("application/x-cediah-topic")) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => dropTopicOn(topic, event)}
+                >
                   <div className={styles.topicRow}>
                     <button
                       aria-pressed={selected}
@@ -358,6 +494,43 @@ export function TopicSelector({
                     </button>
                     {allowCreate && (
                       <div className={styles.topicActions}>
+                        <button
+                          aria-label={`Mover tema ${topic}`}
+                          className={styles.topicDragHandle}
+                          disabled={!canReorderTopics}
+                          draggable={canReorderTopics}
+                          title={canReorderTopics
+                            ? "Arrastra para cambiar el orden de los temas"
+                            : deferredTopicSearch.trim()
+                              ? "Limpia la búsqueda para reordenar temas"
+                              : "Se necesitan al menos dos temas para reordenar"}
+                          type="button"
+                          onDragEnd={() => setDraggingTopicKey(null)}
+                          onDragStart={(event) => {
+                            if (!canReorderTopics) {
+                              event.preventDefault();
+                              return;
+                            }
+                            setDraggingTopicKey(topicKey);
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("application/x-cediah-topic", topicKey);
+                          }}
+                        >
+                          <DotsSixVertical aria-hidden="true" size={18} weight="bold" />
+                        </button>
+                        <button
+                          aria-expanded={expanded}
+                          aria-label={expanded ? `Colapsar tema ${topic}` : `Expandir tema ${topic}`}
+                          className={styles.topicAction}
+                          disabled={!interactive}
+                          title={expanded ? "Colapsar tema" : "Expandir tema"}
+                          type="button"
+                          onClick={() => setTopicExpanded(topic, !expanded)}
+                        >
+                          {expanded
+                            ? <CaretDown aria-hidden="true" size={16} />
+                            : <CaretRight aria-hidden="true" size={16} />}
+                        </button>
                         <button
                           aria-label={`Editar nombre del tema ${topic}`}
                           className={styles.topicAction}
@@ -388,7 +561,9 @@ export function TopicSelector({
                       </div>
                     )}
                   </div>
-                  {allowCreate && <TopicItemManager disabled={!interactive} topic={topic} />}
+                  {allowCreate && expanded && (
+                    <TopicItemManager disabled={!interactive} topic={topic} />
+                  )}
                 </div>
               );
             }) : (
