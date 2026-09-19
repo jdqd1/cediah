@@ -102,19 +102,28 @@ export function TopicSelector({
   }, [createdTopics, deletedTopics, renamedTopics, subjectIds, suggestions, values]);
 
   useEffect(() => {
+    let cancelled = false;
+    let nextOrder: string[] = [];
     try {
       const stored = window.localStorage.getItem(topicOrderStorageKey);
       const parsed: unknown = stored ? JSON.parse(stored) : [];
-      setTopicOrder(
-        Array.isArray(parsed)
-          ? parsed.filter((value): value is string => typeof value === "string")
-          : [],
-      );
+      nextOrder = Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
     } catch {
-      setTopicOrder([]);
+      nextOrder = [];
     }
-    setDraggingTopicKey(null);
-    setExpandedTopics(new Set());
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setTopicOrder(nextOrder);
+      setDraggingTopicKey(null);
+      setExpandedTopics(new Set());
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [topicOrderStorageKey]);
 
   const orderedOptions = useMemo(() => {
