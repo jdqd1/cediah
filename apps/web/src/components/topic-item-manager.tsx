@@ -28,6 +28,7 @@ import { StudioNameDialog } from "./studio-name-dialog";
 import styles from "./topic-item-manager.module.css";
 
 const orderResponseSchema = z.object({
+  topicOrder: z.array(z.string().trim().min(1).max(120)).default([]),
   topics: z.array(z.object({
     contentIds: z.array(z.string().uuid()),
     topic: z.string().trim().min(1).max(120),
@@ -107,6 +108,33 @@ function errorMessage(body: unknown, fallback: string) {
     ? body.error
     : "content_unavailable";
   return mutationErrors[code] ?? fallback;
+}
+
+function itemOrderStorageKey(subjectId: string, topicKey: string) {
+  return `cediah:content-order:${subjectId}:${topicKey}`;
+}
+
+function readStoredItemOrder(subjectId: string, topicKey: string) {
+  try {
+    const stored = window.localStorage.getItem(itemOrderStorageKey(subjectId, topicKey));
+    const parsed: unknown = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredItemOrder(subjectId: string, topicKey: string, contentIds: readonly string[]) {
+  try {
+    window.localStorage.setItem(
+      itemOrderStorageKey(subjectId, topicKey),
+      JSON.stringify([...contentIds]),
+    );
+  } catch {
+    // Server persistence remains authoritative; storage only keeps the editor stable offline.
+  }
 }
 
 type OrdersBySubject = Record<string, Record<string, string[]>>;
@@ -221,13 +249,32 @@ export function TopicItemManagementProvider({
       if (cancelled) return;
       const nextOrders: OrdersBySubject = {};
       for (const result of results) {
-        nextOrders[result.subjectId] = Object.fromEntries(
+        const subjectOrders = Object.fromEntries(
           result.topics.map((topic) => [normalizeRegion(topic.topic), topic.contentIds]),
-        );
+        ) as Record<string, string[]>;
+        for (const topicKey of requestedTopicKeys) {
+          const serverOrder = subjectOrders[topicKey] ?? [];
+          if (serverOrder.length > 0) {
+            writeStoredItemOrder(result.subjectId, topicKey, serverOrder);
+            continue;
+          }
+          const storedOrder = readStoredItemOrder(result.subjectId, topicKey);
+          if (storedOrder.length > 0) subjectOrders[topicKey] = storedOrder;
+        }
+        nextOrders[result.subjectId] = subjectOrders;
       }
       setOrdersBySubject(nextOrders);
     }).catch(() => {
-      if (!cancelled) setOrdersBySubject({});
+      if (cancelled) return;
+      const fallback: OrdersBySubject = {};
+      for (const subjectId of orderSubjectKey.split("|")) {
+        fallback[subjectId] = {};
+        for (const topicKey of requestedTopicKeys) {
+          const storedOrder = readStoredItemOrder(subjectId, topicKey);
+          if (storedOrder.length > 0) fallback[subjectId][topicKey] = storedOrder;
+        }
+      }
+      setOrdersBySubject(fallback);
     });
 
     return () => {
@@ -347,6 +394,12 @@ export function TopicItemManagementProvider({
     if (relevantSubjectIds.length === 0) return;
 
     setLocalOrders((current) => ({ ...current, [topicKey]: orderedIds }));
+    for (const subjectId of relevantSubjectIds) {
+      const validIds = orderedIds.filter((id) =>
+        topicItems.some((item) => item.id === id && item.subjectIds.includes(subjectId)),
+      );
+      writeStoredItemOrder(subjectId, topicKey, validIds);
+    }
     setOrderBusyTopic(topicKey);
     try {
       const responses = await Promise.all(relevantSubjectIds.map(async (subjectId) => {
