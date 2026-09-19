@@ -485,26 +485,29 @@ export function TopicItemManagementProvider({
       }
 
       for (const [subjectId, topicOrders] of Object.entries(expectedBySubject)) {
-        const response = await fetch(
-          `/api/content-order?subjectId=${encodeURIComponent(subjectId)}&verify=${Date.now()}`,
-          { cache: "no-store" },
-        );
-        const body: unknown = await response.json().catch(() => ({ topics: [] }));
-        const parsed = orderResponseSchema.safeParse(body);
-        if (!response.ok || !parsed.success) {
-          throw new Error("El servidor no pudo confirmar el nuevo orden. Intenta guardar de nuevo.");
-        }
-        const confirmed = new Map(
-          parsed.data.topics.map((entry) => [normalizeRegion(entry.topic), entry.contentIds]),
-        );
-        for (const [topicKey, expectedIds] of Object.entries(topicOrders)) {
-          const actualIds = confirmed.get(topicKey) ?? [];
-          if (
-            actualIds.length !== expectedIds.length ||
-            actualIds.some((id, index) => id !== expectedIds[index])
-          ) {
-            throw new Error("El servidor no confirmó el nuevo orden. Intenta guardar de nuevo.");
+        let verified = false;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const response = await fetch(
+            `/api/content-order?subjectId=${encodeURIComponent(subjectId)}&verify=${Date.now()}-${attempt}`,
+            { cache: "no-store" },
+          );
+          const body: unknown = await response.json().catch(() => ({ topics: [] }));
+          const parsed = orderResponseSchema.safeParse(body);
+          if (response.ok && parsed.success) {
+            const confirmed = new Map(
+              parsed.data.topics.map((entry) => [normalizeRegion(entry.topic), entry.contentIds]),
+            );
+            verified = Object.entries(topicOrders).every(([topicKey, expectedIds]) => {
+              const actualIds = confirmed.get(topicKey) ?? [];
+              return actualIds.length === expectedIds.length &&
+                actualIds.every((id, index) => id === expectedIds[index]);
+            });
           }
+          if (verified) break;
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+        if (!verified) {
+          throw new Error("El servidor no confirmó el nuevo orden. Intenta guardar de nuevo.");
         }
       }
 
