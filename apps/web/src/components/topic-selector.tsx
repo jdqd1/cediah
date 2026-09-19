@@ -5,6 +5,7 @@ import {
   CaretRight,
   Check,
   DotsSixVertical,
+  FloppyDisk,
   MagnifyingGlass,
   NotePencil,
   Plus,
@@ -17,7 +18,11 @@ import { ContentTopicSchema, type ContentItem, type ContentTopic } from "@cediah
 import { cleanRegion, normalizeRegion, uniqueRegions } from "@/lib/content-regions";
 import { StudioConfirmDialog } from "./studio-confirm-dialog";
 import { StudioNameDialog } from "./studio-name-dialog";
-import { TopicItemManagementProvider, TopicItemManager } from "./topic-item-manager";
+import {
+  TopicItemManagementProvider,
+  TopicItemManager,
+  useTopicItemManagement,
+} from "./topic-item-manager";
 import styles from "./topic-selector.module.css";
 
 const contentUnavailableMessage =
@@ -31,6 +36,68 @@ const topicErrors: Partial<Record<string, string>> = {
   topic_conflict: "Ya existe un tema con ese nombre o no se pudo guardar con las materias seleccionadas.",
   topic_in_use: "No puedes eliminar este tema porque todavía está asociado a contenido. Quita el tema de ese contenido, guarda los cambios y vuelve a intentarlo.",
 };
+
+function OrderingSaveButton({
+  disabled,
+  onError,
+  onSaveTopicOrder,
+  topicOrderDirty,
+  topicOrderSaving,
+}: {
+  disabled: boolean;
+  onError: (message: string | null) => void;
+  onSaveTopicOrder: () => Promise<void>;
+  topicOrderDirty: boolean;
+  topicOrderSaving: boolean;
+}) {
+  const management = useTopicItemManagement();
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const dirty = topicOrderDirty || management.hasPendingOrderChanges;
+  const busy = saving || topicOrderSaving || management.orderSaveBusy;
+
+  const showSaved = saved && !dirty;
+  if (!dirty && !showSaved) return null;
+
+  return (
+    <button
+      className={`studio-entity-create-button ${styles.saveOrderButton} ${showSaved ? styles.saveOrderButtonSaved : ""}`}
+      disabled={disabled || busy || !dirty}
+      type="button"
+      onClick={async () => {
+        if (!dirty || busy) return;
+        setSaving(true);
+        setSaved(false);
+        onError(null);
+        try {
+          const results = await Promise.allSettled([
+            topicOrderDirty ? onSaveTopicOrder() : Promise.resolve(),
+            management.hasPendingOrderChanges
+              ? management.savePendingOrders()
+              : Promise.resolve(),
+          ]);
+          const rejection = results.find(
+            (result): result is PromiseRejectedResult => result.status === "rejected",
+          );
+          if (rejection) throw rejection.reason;
+          setSaved(true);
+          window.setTimeout(() => setSaved(false), 1800);
+        } catch (caught) {
+          onError(
+            caught instanceof Error
+              ? caught.message
+              : "No se pudo guardar el orden. Intenta nuevamente.",
+          );
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <FloppyDisk aria-hidden="true" size={16} weight={saved ? "fill" : "regular"} />
+      {busy ? "Guardando…" : showSaved ? "Orden guardado" : "Guardar orden"}
+    </button>
+  );
+}
 
 export function TopicSelector({
   allowCreate = false,
@@ -65,8 +132,11 @@ export function TopicSelector({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [topicSearch, setTopicSearch] = useState("");
   const [topicOrder, setTopicOrder] = useState<string[]>([]);
+  const [topicOrderDirty, setTopicOrderDirty] = useState(false);
+  const [topicOrderSaving, setTopicOrderSaving] = useState(false);
   const [topicOrderError, setTopicOrderError] = useState<string | null>(null);
   const [draggingTopicKey, setDraggingTopicKey] = useState<string | null>(null);
+  const [dragOverTopicKey, setDragOverTopicKey] = useState<string | null>(null);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(() => new Set());
   const deferredTopicSearch = useDeferredValue(topicSearch);
   const topicOrderStorageKey = useMemo(() => {
@@ -118,8 +188,10 @@ export function TopicSelector({
     queueMicrotask(() => {
       if (cancelled) return;
       setTopicOrder(fallbackOrder);
+      setTopicOrderDirty(false);
       setTopicOrderError(null);
       setDraggingTopicKey(null);
+      setDragOverTopicKey(null);
       setExpandedTopics(new Set());
     });
 
@@ -140,6 +212,7 @@ export function TopicSelector({
           if (cancelled || !serverOrder) return;
           if (serverOrder.length > 0) {
             setTopicOrder(serverOrder);
+            setTopicOrderDirty(false);
             try {
               window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(serverOrder));
             } catch {
@@ -149,16 +222,10 @@ export function TopicSelector({
           }
 
           if (fallbackOrder.length > 0) {
-            // Backfill the server once for users who already arranged topics
-            // before ordering became shared with the public Materias view.
-            void Promise.all(subjectIds.map((currentSubjectId) =>
-              fetch("/api/editor/topic-list-order", {
-                body: JSON.stringify({ subjectId: currentSubjectId, topics: fallbackOrder }),
-                cache: "no-store",
-                headers: { "Content-Type": "application/json" },
-                method: "PATCH",
-              }).catch(() => undefined),
-            ));
+            // Keep the previous local arrangement visible, but require an
+            // explicit save so the editor can confirm it reached the server.
+            setTopicOrder(fallbackOrder);
+            setTopicOrderDirty(true);
           }
         })
         .catch(() => undefined);
@@ -213,59 +280,90 @@ export function TopicSelector({
   const canReorderTopics =
     allowCreate && interactive && orderedOptions.length > 1 && !deferredTopicSearch.trim();
 
-  async function persistTopicOrder(nextOrder: string[]) {
+  function stageTopicOrder(nextOrder: string[]) {
     const uniqueOrder = [...new Set(nextOrder.filter(Boolean))];
     setTopicOrder(uniqueOrder);
+    setTopicOrderDirty(true);
     setTopicOrderError(null);
     try {
       window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(uniqueOrder));
     } catch {
-      // Reordering still works for the current session when storage is unavailable.
+      // The visible order remains staged even when browser storage is unavailable.
     }
+  }
 
-    if (subjectIds.length === 0) return;
+  async function saveTopicOrder() {
+    if (!topicOrderDirty || topicOrderSaving || subjectIds.length === 0) return;
     const topicByKey = new Map(options.map((topic) => [normalizeRegion(topic), topic]));
-    const orderedTopics = uniqueOrder.flatMap((key) => {
+    const orderedTopics = topicOrder.flatMap((key) => {
       const topic = topicByKey.get(key);
       return topic ? [topic] : [];
     });
     for (const topic of options) {
-      if (!uniqueOrder.includes(normalizeRegion(topic))) orderedTopics.push(topic);
+      if (!topicOrder.includes(normalizeRegion(topic))) orderedTopics.push(topic);
     }
 
+    setTopicOrderSaving(true);
+    setTopicOrderError(null);
     try {
-      await Promise.all(subjectIds.map(async (subjectId) => {
+      for (const subjectId of subjectIds) {
         let lastError: Error | null = null;
         for (let attempt = 0; attempt < 2; attempt += 1) {
-          try {
-            const response = await fetch("/api/editor/topic-list-order", {
-              body: JSON.stringify({ subjectId, topics: orderedTopics }),
-              cache: "no-store",
-              headers: { "Content-Type": "application/json" },
-              method: "PATCH",
-            });
-            const body: unknown = await response.json().catch(() => ({ error: "content_unavailable" }));
-            if (response.ok) return;
-            const code = body && typeof body === "object" && "error" in body && typeof body.error === "string"
-              ? body.error
-              : "content_unavailable";
-            if (response.status !== 502 && response.status !== 503) {
-              throw new Error(topicErrors[code] ?? "No se pudo guardar el orden de los temas.");
-            }
-            lastError = new Error(topicErrors[code] ?? "No se pudo guardar el orden de los temas.");
-          } catch (caught) {
-            lastError = caught instanceof Error ? caught : new Error("No se pudo guardar el orden de los temas.");
+          const response = await fetch("/api/editor/topic-list-order", {
+            body: JSON.stringify({ subjectId, topics: orderedTopics }),
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            method: "PATCH",
+          });
+          const body: unknown = await response.json().catch(() => ({ error: "content_unavailable" }));
+          if (response.ok) {
+            lastError = null;
+            break;
           }
-          if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
+          const code = body && typeof body === "object" && "error" in body && typeof body.error === "string"
+            ? body.error
+            : "content_unavailable";
+          lastError = new Error(topicErrors[code] ?? `No se pudo guardar el orden de los temas (${response.status}).`);
+          if (attempt === 0 && (response.status === 502 || response.status === 503)) {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            continue;
+          }
+          break;
         }
-        throw lastError ?? new Error("No se pudo guardar el orden de los temas.");
-      }));
-    } catch (caught) {
-      setTopicOrderError(
-        caught instanceof Error
-          ? caught.message
-          : "El orden cambió en esta vista, pero no se pudo guardarlo todavía.",
-      );
+        if (lastError) throw lastError;
+      }
+
+      const expected = orderedTopics.map(normalizeRegion);
+      for (const subjectId of subjectIds) {
+        const response = await fetch(
+          `/api/content-order?subjectId=${encodeURIComponent(subjectId)}&verify=${Date.now()}`,
+          { cache: "no-store" },
+        );
+        const body: unknown = await response.json().catch(() => null);
+        const confirmed = body && typeof body === "object" && "topicOrder" in body && Array.isArray(body.topicOrder)
+          ? body.topicOrder.filter((value: unknown): value is string => typeof value === "string").map(normalizeRegion)
+          : [];
+        if (
+          !response.ok ||
+          confirmed.length !== expected.length ||
+          confirmed.some((topic, index) => topic !== expected[index])
+        ) {
+          throw new Error("El servidor no confirmó el orden de los temas. Intenta guardar de nuevo.");
+        }
+      }
+
+      setTopicOrder(orderedTopics.map(normalizeRegion));
+      setTopicOrderDirty(false);
+      try {
+        window.localStorage.setItem(
+          topicOrderStorageKey,
+          JSON.stringify(orderedTopics.map(normalizeRegion)),
+        );
+      } catch {
+        // Server persistence already succeeded.
+      }
+    } finally {
+      setTopicOrderSaving(false);
     }
   }
 
@@ -286,6 +384,7 @@ export function TopicSelector({
     event.preventDefault();
     event.stopPropagation();
     setDraggingTopicKey(null);
+    setDragOverTopicKey(null);
     if (!canReorderTopics) return;
 
     const targetKey = normalizeRegion(targetTopic);
@@ -296,7 +395,7 @@ export function TopicSelector({
     if (sourceIndex < 0 || targetIndex < 0) return;
     keys.splice(sourceIndex, 1);
     keys.splice(targetIndex, 0, sourceKey);
-    void persistTopicOrder(keys);
+    stageTopicOrder(keys);
   }
 
   function closeDialog() {
@@ -329,7 +428,7 @@ export function TopicSelector({
         ),
         localTopic,
       ]);
-      void persistTopicOrder([...topicOrder, normalizeRegion(localTopic.name)]);
+      stageTopicOrder([...topicOrder, normalizeRegion(localTopic.name)]);
       onChange(uniqueRegions([...values, localTopic.name]));
       setDialogOpen(false);
       setInput("");
@@ -365,7 +464,7 @@ export function TopicSelector({
         ),
         parsed.data,
       ]);
-      void persistTopicOrder([...topicOrder, normalizeRegion(parsed.data.name)]);
+      stageTopicOrder([...topicOrder, normalizeRegion(parsed.data.name)]);
       onChange(uniqueRegions([...values, parsed.data.name]));
       setDialogOpen(false);
       setInput("");
@@ -408,7 +507,7 @@ export function TopicSelector({
 
       const previousKey = normalizeRegion(renameTarget);
       const nextKey = normalizeRegion(parsed.data.name);
-      void persistTopicOrder(topicOrder.map((key) => key === previousKey ? nextKey : key));
+      stageTopicOrder(topicOrder.map((key) => key === previousKey ? nextKey : key));
       setExpandedTopics((current) => {
         if (!current.has(previousKey)) return current;
         const next = new Set(current);
@@ -473,7 +572,7 @@ export function TopicSelector({
       if (!parsed.success) throw new Error(contentUnavailableMessage);
 
       const deletedKey = normalizeRegion(deleteTarget);
-      void persistTopicOrder(topicOrder.filter((key) => key !== deletedKey));
+      stageTopicOrder(topicOrder.filter((key) => key !== deletedKey));
       setExpandedTopics((current) => {
         if (!current.has(deletedKey)) return current;
         const next = new Set(current);
@@ -555,8 +654,11 @@ export function TopicSelector({
               const expanded = expandedTopics.has(topicKey);
               return (
                 <div
-                  className={`${styles.topicBlock} ${draggingTopicKey === topicKey ? styles.topicDragging : ""}`}
+                  className={`${styles.topicBlock} ${draggingTopicKey === topicKey ? styles.topicDragging : ""} ${dragOverTopicKey === topicKey && draggingTopicKey !== topicKey ? styles.topicDropTarget : ""}`}
                   key={topicKey}
+                  onDragEnter={() => {
+                    if (canReorderTopics && draggingTopicKey !== topicKey) setDragOverTopicKey(topicKey);
+                  }}
                   onDragOver={(event) => {
                     if (!canReorderTopics ||
                       !Array.from(event.dataTransfer.types).includes("application/x-cediah-topic")) {
@@ -564,10 +666,11 @@ export function TopicSelector({
                     }
                     event.preventDefault();
                     event.dataTransfer.dropEffect = "move";
+                    if (draggingTopicKey !== topicKey) setDragOverTopicKey(topicKey);
                   }}
                   onDrop={(event) => dropTopicOn(topic, event)}
                 >
-                  <div className={styles.topicRow}>
+                  <div className={styles.topicRow} data-topic-drag-preview="true">
                     <button
                       aria-pressed={selected}
                       className={`${styles.topicToggle} ${selected ? styles.topicToggleSelected : ""}`}
@@ -594,11 +697,20 @@ export function TopicSelector({
                               ? "Limpia la búsqueda para reordenar temas"
                               : "Se necesitan al menos dos temas para reordenar"}
                           type="button"
-                          onDragEnd={() => setDraggingTopicKey(null)}
+                          onDragEnd={() => {
+                            setDraggingTopicKey(null);
+                            setDragOverTopicKey(null);
+                          }}
                           onDragStart={(event) => {
                             if (!canReorderTopics) {
                               event.preventDefault();
                               return;
+                            }
+                            const preview = event.currentTarget.closest<HTMLElement>("[data-topic-drag-preview='true']");
+                            if (preview) {
+                              preview.classList.add(styles.dragPreviewLift!);
+                              event.dataTransfer.setDragImage(preview, 28, 24);
+                              requestAnimationFrame(() => preview.classList.remove(styles.dragPreviewLift!));
                             }
                             setDraggingTopicKey(topicKey);
                             event.dataTransfer.effectAllowed = "move";
@@ -671,18 +783,27 @@ export function TopicSelector({
             <p className={styles.topicOrderError} role="alert">{topicOrderError}</p>
           )}
           {allowCreate && (
-            <button
-              className={`studio-entity-create-button studio-entity-create-button-primary ${styles.addTopicButton}`}
-              disabled={!interactive}
-              type="button"
-              onClick={() => {
-                setError(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus aria-hidden="true" size={16} />
-              Añadir tema
-            </button>
+            <div className={styles.topicFooterActions}>
+              <button
+                className={`studio-entity-create-button studio-entity-create-button-primary ${styles.addTopicButton}`}
+                disabled={!interactive}
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus aria-hidden="true" size={16} />
+                Añadir tema
+              </button>
+              <OrderingSaveButton
+                disabled={!interactive}
+                topicOrderDirty={topicOrderDirty}
+                topicOrderSaving={topicOrderSaving}
+                onError={setTopicOrderError}
+                onSaveTopicOrder={saveTopicOrder}
+              />
+            </div>
           )}
         </div>
 
