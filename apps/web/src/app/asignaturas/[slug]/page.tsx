@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { SubjectDetailScreen } from "@/components/subject-detail-screen";
-import { getSubjectStudyCatalog } from "@/lib/server/content-api";
+import { getContentTopicOrder, getSubjectStudyCatalog } from "@/lib/server/content-api";
 import { currentUserIsAdministrator } from "@/lib/server/current-user";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +18,10 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
   ]);
 
   if (result.status === "ready") {
+    const contentOrder = await getContentTopicOrder(result.detail.subject.id);
     return (
       <SubjectDetailScreen
+        initialContentOrder={contentOrder.status === "ready" ? contentOrder.order : undefined}
         isAdministrator={isAdministrator}
         items={result.detail.items}
         subject={result.detail.subject}
