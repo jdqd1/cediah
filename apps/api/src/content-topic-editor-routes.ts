@@ -14,10 +14,12 @@ import { getContentCapabilities } from "./content-authorization.js";
 import type { DatabaseClient } from "./db/database.js";
 import {
   deleteContentTopic,
+  listContentTopicDisplayOrder,
   listContentTopicItemOrders,
   listContentTopicItems,
   renameContentTopic,
   reorderContentTopicItems,
+  reorderContentTopics,
 } from "./content-topic-taxonomy.js";
 import {
   decodeEditorContentCursor,
@@ -79,10 +81,23 @@ const ContentTopicOrderRequestSchema = z.object({
 });
 
 const ContentTopicOrdersResponseSchema = z.object({
+  topicOrder: z.array(z.string().trim().min(1).max(120)),
   topics: z.array(z.object({
     contentIds: z.array(z.string().uuid()),
     topic: z.string().trim().min(1).max(120),
   })),
+});
+
+const ContentTopicListOrderRequestSchema = z.object({
+  subjectId: z.string().uuid(),
+  topics: z.array(z.string().trim().min(1).max(120)).max(500),
+});
+
+const ContentTopicListOrderMutationResponseSchema = z.object({
+  order: z.object({
+    subjectId: z.string().uuid(),
+    topics: z.array(z.string().trim().min(1).max(120)),
+  }),
 });
 
 const ContentTopicOrderMutationResponseSchema = z.object({
@@ -311,12 +326,56 @@ export async function registerContentTopicEditorRoutes(
     }
 
     try {
-      const topics = await listContentTopicItemOrders(dependencies.database, query.data.subjectId);
+      const [topics, topicOrder] = await Promise.all([
+        listContentTopicItemOrders(dependencies.database, query.data.subjectId),
+        listContentTopicDisplayOrder(dependencies.database, query.data.subjectId),
+      ]);
       return reply
         .header("Cache-Control", "public, max-age=30, stale-while-revalidate=120")
-        .send(ContentTopicOrdersResponseSchema.parse({ topics }));
+        .send(ContentTopicOrdersResponseSchema.parse({ topicOrder, topics }));
     } catch (error) {
       request.log.error({ err: error }, "Content topic order lookup failed");
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+  });
+
+  app.patch<{ Body: unknown }>("/v1/editor/topic-list-order", async (request, reply) => {
+    const editor = await resolveTaxonomyEditor(
+      request,
+      dependencies.identityProvider,
+      dependencies.contentProvider,
+    );
+    if (editor.kind === "error") {
+      return reply
+        .status(editor.status)
+        .header("Cache-Control", "no-store")
+        .send({ error: editor.error });
+    }
+    if (!dependencies.database) {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
+    }
+
+    const input = ContentTopicListOrderRequestSchema.safeParse(request.body);
+    if (!input.success) {
+      return reply.status(400).header("Cache-Control", "no-store").send({ error: "invalid_topic_order" });
+    }
+
+    try {
+      const result = await reorderContentTopics(dependencies.database, {
+        actorUserId: editor.user.id,
+        ...input.data,
+      });
+      if (result.status === "not_found") {
+        return reply.status(404).header("Cache-Control", "no-store").send({ error: "not_found" });
+      }
+      if (result.status === "conflict") {
+        return reply.status(409).header("Cache-Control", "no-store").send({ error: "topic_order_conflict" });
+      }
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(ContentTopicListOrderMutationResponseSchema.parse({ order: result.value }));
+    } catch (error) {
+      request.log.error({ err: error }, "Content topic list order update failed");
       return reply.status(503).header("Cache-Control", "no-store").send({ error: "content_unavailable" });
     }
   });
