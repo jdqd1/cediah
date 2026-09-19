@@ -346,7 +346,6 @@ export function TopicItemManagementProvider({
       .filter((subjectId) => topicItemSubjectIds.has(subjectId));
     if (relevantSubjectIds.length === 0) return;
 
-    const previousLocal = localOrders[topicKey];
     setLocalOrders((current) => ({ ...current, [topicKey]: orderedIds }));
     setOrderBusyTopic(topicKey);
     try {
@@ -354,19 +353,27 @@ export function TopicItemManagementProvider({
         const validIds = orderedIds.filter((id) =>
           topicItems.some((item) => item.id === id && item.subjectIds.includes(subjectId)),
         );
-        const response = await fetch("/api/editor/content-order", {
-          body: JSON.stringify({ contentIds: validIds, subjectId, topic }),
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          method: "PATCH",
-        });
-        const body: unknown = await response
-          .json()
-          .catch(() => ({ error: "content_unavailable" }));
-        if (!response.ok) {
-          throw new Error(errorMessage(body, `No se pudo guardar el orden (${response.status}).`));
+        let lastError: Error | null = null;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const response = await fetch("/api/editor/content-order", {
+            body: JSON.stringify({ contentIds: validIds, subjectId, topic }),
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            method: "PATCH",
+          });
+          const body: unknown = await response
+            .json()
+            .catch(() => ({ error: "content_unavailable" }));
+          if (response.ok) return { contentIds: validIds, subjectId };
+
+          lastError = new Error(errorMessage(body, `No se pudo guardar el orden (${response.status}).`));
+          if (attempt === 0 && (response.status === 502 || response.status === 503)) {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            continue;
+          }
+          break;
         }
-        return { contentIds: validIds, subjectId };
+        throw lastError ?? new Error("No se pudo guardar el nuevo orden.");
       }));
       setOrdersBySubject((current) => {
         const next: OrdersBySubject = { ...current };
@@ -378,15 +385,9 @@ export function TopicItemManagementProvider({
         }
         return next;
       });
-    } catch (error) {
-      setLocalOrders((current) => {
-        const next = { ...current };
-        if (previousLocal) next[topicKey] = previousLocal;
-        else delete next[topicKey];
-        return next;
-      });
-      throw error;
     } finally {
+      // Keep the optimistic local order even if persistence fails. The error is
+      // surfaced below the list and a later successful drag will retry saving it.
       setOrderBusyTopic(null);
     }
   }
