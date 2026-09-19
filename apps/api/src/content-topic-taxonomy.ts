@@ -105,11 +105,19 @@ async function contentTopicItemOrderTableExists(database: QueryDatabase) {
   return Boolean(result.rows[0]?.exists);
 }
 
-function contentIdsFromAuditMetadata(metadata: JsonValue) {
+function stringArrayFromAuditMetadata(metadata: JsonValue, key: string) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return [];
-  const contentIds = (metadata as Record<string, JsonValue>).contentIds;
-  if (!Array.isArray(contentIds)) return [];
-  return contentIds.filter((value): value is string => typeof value === "string");
+  const values = (metadata as Record<string, JsonValue>)[key];
+  if (!Array.isArray(values)) return [];
+  return values.filter((value): value is string => typeof value === "string");
+}
+
+function contentIdsFromAuditMetadata(metadata: JsonValue) {
+  return stringArrayFromAuditMetadata(metadata, "contentIds");
+}
+
+function topicIdsFromAuditMetadata(metadata: JsonValue) {
+  return stringArrayFromAuditMetadata(metadata, "topicIds");
 }
 
 export async function listContentTopicItems(database: DatabaseClient): Promise<{
@@ -183,18 +191,9 @@ export async function listContentTopicItemOrders(
 ): Promise<ContentTopicItemOrder[]> {
   const grouped = new Map<string, string[]>();
 
-  if (await contentTopicItemOrderTableExists(database)) {
-    const rows = await sql<{ content_item_id: string; position: number; topic_key: string }>`
-      select content_item_id, position, topic_key
-      from public.content_topic_item_order
-      where subject_id = ${subjectId}
-      order by topic_key asc, position asc, content_item_id asc
-    `.execute(database);
-    for (const row of rows.rows) {
-      grouped.set(row.topic_key, [...(grouped.get(row.topic_key) ?? []), row.content_item_id]);
-    }
-  }
-
+  // Audit log is the durable source of truth for manual ordering. It is already
+  // part of the production schema and avoids coupling this editor interaction
+  // to optional taxonomy-order tables during staggered deployments.
   const auditRows = await sql<{ metadata: JsonValue; topic_name: string }>`
     select audit.metadata, topic.name as topic_name
     from public.audit_log as audit
@@ -211,7 +210,109 @@ export async function listContentTopicItemOrders(
     grouped.set(topicKey, contentIdsFromAuditMetadata(row.metadata));
   }
 
+  // Preserve compatibility with orders written by the earlier table-backed
+  // implementation, but never let an older table row override a newer audit order.
+  if (await contentTopicItemOrderTableExists(database)) {
+    const rows = await sql<{ content_item_id: string; position: number; topic_key: string }>`
+      select content_item_id, position, topic_key
+      from public.content_topic_item_order
+      where subject_id = ${subjectId}
+      order by topic_key asc, position asc, content_item_id asc
+    `.execute(database);
+    for (const row of rows.rows) {
+      const topicKey = normalizeTopic(row.topic_key);
+      if (!topicKey || grouped.has(topicKey)) continue;
+      grouped.set(topicKey, [...(grouped.get(topicKey) ?? []), row.content_item_id]);
+    }
+  }
+
   return [...grouped.entries()].map(([topic, contentIds]) => ({ contentIds, topic }));
+}
+
+export async function listContentTopicDisplayOrder(
+  database: DatabaseClient,
+  subjectId: string,
+): Promise<string[]> {
+  const audit = await sql<{ metadata: JsonValue }>`
+    select metadata
+    from public.audit_log
+    where action = 'content_topics_reordered'
+      and target_type = 'subject'
+      and target_id = ${subjectId}
+    order by occurred_at desc, id desc
+    limit 1
+  `.execute(database);
+  const topicIds = topicIdsFromAuditMetadata(audit.rows[0]?.metadata ?? null);
+  if (topicIds.length === 0) return [];
+
+  const topics = await sql<{ id: string; name: string }>`
+    select topic.id, topic.name
+    from public.content_topics as topic
+    join public.content_topic_subjects as link on link.topic_id = topic.id
+    where link.subject_id = ${subjectId}
+  `.execute(database);
+  const byId = new Map(topics.rows.map((topic) => [topic.id, topic.name]));
+  return topicIds.flatMap((topicId) => {
+    const name = byId.get(topicId);
+    return name ? [name] : [];
+  });
+}
+
+export async function reorderContentTopics(
+  database: DatabaseClient,
+  input: {
+    actorUserId: string;
+    subjectId: string;
+    topics: string[];
+  },
+): Promise<
+  | { status: "success"; value: { subjectId: string; topics: string[] } }
+  | { status: "conflict" }
+  | { status: "not_found" }
+> {
+  const names = input.topics.map((topic) => topic.trim()).filter(Boolean);
+  const keys = names.map(normalizeTopic);
+  if (names.length !== input.topics.length || new Set(keys).size !== names.length) {
+    return { status: "conflict" };
+  }
+
+  return database.transaction().execute(async (transaction) => {
+    const subject = await transaction
+      .selectFrom("subjects")
+      .select("id")
+      .where("id", "=", input.subjectId)
+      .executeTakeFirst();
+    if (!subject) return { status: "not_found" };
+
+    const rows = await sql<{ id: string; name: string }>`
+      select topic.id, topic.name
+      from public.content_topics as topic
+      join public.content_topic_subjects as link on link.topic_id = topic.id
+      where link.subject_id = ${input.subjectId}
+    `.execute(transaction);
+    const byKey = new Map(rows.rows.map((row) => [normalizeTopic(row.name), row]));
+    const ordered = names.map((name) => byKey.get(normalizeTopic(name)));
+    if (ordered.some((topic) => !topic)) return { status: "conflict" };
+
+    const topicIds = ordered.flatMap((topic) => topic ? [topic.id] : []);
+    const canonicalNames = ordered.flatMap((topic) => topic ? [topic.name] : []);
+
+    await transaction
+      .insertInto("audit_log")
+      .values({
+        action: "content_topics_reordered",
+        actor_user_id: input.actorUserId,
+        metadata: { subjectId: input.subjectId, topicIds },
+        target_id: input.subjectId,
+        target_type: "subject",
+      })
+      .execute();
+
+    return {
+      status: "success",
+      value: { subjectId: input.subjectId, topics: canonicalNames },
+    };
+  });
 }
 
 export async function reorderContentTopicItems(
@@ -254,32 +355,6 @@ export async function reorderContentTopicItems(
         (candidate) => normalizeTopic(candidate) === topicKey,
       ))) {
         return { status: "conflict" };
-      }
-    }
-
-    if (await contentTopicItemOrderTableExists(transaction)) {
-      await sql`
-        delete from public.content_topic_item_order
-        where subject_id = ${input.subjectId}
-          and topic_key = ${topicKey}
-      `.execute(transaction);
-
-      for (const [position, contentId] of contentIds.entries()) {
-        await sql`
-          insert into public.content_topic_item_order (
-            subject_id,
-            topic_key,
-            content_item_id,
-            position,
-            updated_at
-          ) values (
-            ${input.subjectId},
-            ${topicKey},
-            ${contentId},
-            ${position},
-            now()
-          )
-        `.execute(transaction);
       }
     }
 
