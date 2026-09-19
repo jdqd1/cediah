@@ -1,11 +1,11 @@
 .container {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.5rem;
   margin: 0.42rem 0 0.18rem;
-  border: 1px solid #eee5e1;
-  border-radius: 10px;
-  background: #fcfaf9;
-  padding: 0.65rem;
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.6rem;
 }
 
 .header {
@@ -13,7 +13,7 @@
   align-items: end;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0 0.08rem;
+  padding: 0 0.18rem 0.1rem;
 }
 
 .header > div {
@@ -22,7 +22,7 @@
 }
 
 .header strong {
-  color: #443b38;
+  color: #334155;
   font-size: 0.72rem;
   font-weight: 760;
 }
@@ -36,29 +36,37 @@
 
 .list {
   display: grid;
-  gap: 0.35rem;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 9px;
 }
 
 .item {
   display: grid;
+  min-height: 46px;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
   min-width: 0;
-  border: 1px solid #e7ddda;
-  border-radius: 9px;
-  background: #fff;
-  padding: 0.38rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  border: 0;
+  background: transparent;
+  padding: 0.38rem 0.42rem;
+  transition: background 150ms ease, opacity 150ms ease, box-shadow 150ms ease;
 }
 
-.item:has(.moveButton:not(:disabled)):hover {
-  border-color: #d3beb8;
+.item + .item {
+  border-top: 1px solid #edf1f6;
+}
+
+.item:hover,
+.item:focus-within {
+  background: #f6f8fc;
 }
 
 .itemDragging {
   opacity: 0.58;
-  box-shadow: 0 0 0 2px rgb(116 27 34 / 7%);
+  background: #eef3ff;
+  box-shadow: inset 3px 0 0 #8ea2f7;
 }
 
 .moveButton {
@@ -67,11 +75,12 @@
   min-height: 34px;
   place-items: center;
   border: 0;
-  border-radius: 7px;
+  border-radius: 50%;
   background: transparent;
   padding: 0;
-  color: #746c69;
+  color: #7b8494;
   cursor: grab;
+  transition: background 150ms ease, color 150ms ease;
 }
 
 .moveButton:active {
@@ -79,13 +88,13 @@
 }
 
 .moveButton:hover:not(:disabled) {
-  background: #f5f2f1;
-  color: var(--wine);
+  background: #e9edf5;
+  color: #263a91;
 }
 
 .moveButton:disabled {
   cursor: default;
-  opacity: 0.42;
+  opacity: 0.35;
 }
 
 .copy {
@@ -96,50 +105,56 @@
 
 .copy strong {
   overflow: hidden;
-  color: #312a28;
-  font-size: 0.69rem;
-  font-weight: 720;
+  color: #1f2937;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .copy span {
-  color: var(--muted);
+  color: #7b8494;
   font-size: 0.6rem;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 0.24rem;
+  gap: 0.08rem;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.item:hover .actions,
+.item:focus-within .actions {
+  opacity: 1;
 }
 
 .actions button {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   place-items: center;
-  border: 1px solid #e3d9d5;
-  border-radius: 7px;
-  background: #fff;
-  color: #655b58;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #667085;
+  transition: background 140ms ease, color 140ms ease;
 }
 
 .actions button:hover:not(:disabled) {
-  border-color: #c3aaa5;
-  background: #faf5f3;
-  color: var(--wine);
+  background: #e9edf5;
+  color: #263a91;
 }
 
 .actions .danger:hover:not(:disabled) {
-  border-color: #d8aaa7;
-  background: #fff0f0;
-  color: #9b2d34;
+  background: #fdecec;
+  color: #b4232f;
 }
 
 .actions button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 .empty,
@@ -151,13 +166,19 @@
 }
 
 .empty {
-  background: #fff;
+  background: #f8fafc;
   color: var(--muted);
 }
 
 .error {
   background: #fff1f0;
   color: #9b2d34;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .actions {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 620px) {
