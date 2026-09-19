@@ -56,15 +56,12 @@ function OrderingSaveButton({
   const dirty = topicOrderDirty || management.hasPendingOrderChanges;
   const busy = saving || topicOrderSaving || management.orderSaveBusy;
 
-  useEffect(() => {
-    if (dirty) setSaved(false);
-  }, [dirty]);
-
-  if (!dirty && !saved) return null;
+  const showSaved = saved && !dirty;
+  if (!dirty && !showSaved) return null;
 
   return (
     <button
-      className={`studio-entity-create-button ${styles.saveOrderButton} ${saved ? styles.saveOrderButtonSaved : ""}`}
+      className={`studio-entity-create-button ${styles.saveOrderButton} ${showSaved ? styles.saveOrderButtonSaved : ""}`}
       disabled={disabled || busy || !dirty}
       type="button"
       onClick={async () => {
@@ -97,7 +94,7 @@ function OrderingSaveButton({
       }}
     >
       <FloppyDisk aria-hidden="true" size={16} weight={saved ? "fill" : "regular"} />
-      {busy ? "Guardando…" : saved ? "Orden guardado" : "Guardar orden"}
+      {busy ? "Guardando…" : showSaved ? "Orden guardado" : "Guardar orden"}
     </button>
   );
 }
@@ -658,7 +655,6 @@ export function TopicSelector({
               return (
                 <div
                   className={`${styles.topicBlock} ${draggingTopicKey === topicKey ? styles.topicDragging : ""} ${dragOverTopicKey === topicKey && draggingTopicKey !== topicKey ? styles.topicDropTarget : ""}`}
-                  data-topic-drag-preview="true"
                   key={topicKey}
                   onDragEnter={() => {
                     if (canReorderTopics && draggingTopicKey !== topicKey) setDragOverTopicKey(topicKey);
@@ -674,7 +670,7 @@ export function TopicSelector({
                   }}
                   onDrop={(event) => dropTopicOn(topic, event)}
                 >
-                  <div className={styles.topicRow}>
+                  <div className={styles.topicRow} data-topic-drag-preview="true">
                     <button
                       aria-pressed={selected}
                       className={`${styles.topicToggle} ${selected ? styles.topicToggleSelected : ""}`}
