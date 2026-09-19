@@ -280,7 +280,7 @@ export function TopicItemManagementProvider({
     return () => {
       cancelled = true;
     };
-  }, [enabled, orderSubjectKey]);
+  }, [enabled, orderSubjectKey, requestedTopicKeys]);
 
   function openRename(item: TopicItemSummary) {
     setRenameError(null);
