@@ -2371,7 +2371,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                 <>
                                   <button
                                     aria-label={`Editar nombre de materia ${subject.name}`}
-                                    className="studio-subject-delete"
+                                    className="studio-subject-action"
                                     disabled={busy !== null}
                                     title={`Editar nombre de ${subject.name}`}
                                     type="button"
@@ -2384,7 +2384,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
                                   </button>
                                   <button
                                     aria-label={`Eliminar materia ${subject.name}`}
-                                    className="studio-subject-delete"
+                                    className="studio-subject-action studio-subject-action-danger"
                                     disabled={busy !== null}
                                     title={`Eliminar ${subject.name}`}
                                     type="button"

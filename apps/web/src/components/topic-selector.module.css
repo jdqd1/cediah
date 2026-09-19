@@ -68,35 +68,46 @@
 
 .topicRow {
   display: grid;
+  min-height: 48px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
-  gap: 0.35rem;
+  gap: 0.08rem;
+  border: 1px solid #e1e7f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 0.22rem 0 0;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.topicRow:hover {
+  border-color: #d4dbe7;
+  background: #f8fafc;
+}
+
+.topicRow:has(.topicToggleSelected) {
+  border-color: #9fb0ee;
+  background: #f3f6ff;
+  box-shadow: 0 0 0 2px rgb(55 84 190 / 6%);
 }
 
 .topicToggle {
   display: flex;
   min-width: 0;
-  min-height: 42px;
+  min-height: 46px;
   align-items: center;
-  gap: 0.48rem;
-  border: 1px solid var(--line-strong);
+  gap: 0.5rem;
+  border: 0;
   border-radius: 9px;
-  background: #fff;
-  padding: 0.48rem 0.65rem;
+  background: transparent;
+  padding: 0.5rem 0.65rem;
   color: var(--ink);
   text-align: left;
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
-.topicToggle:hover {
-  border-color: #cdb8b2;
-  background: #fdfaf8;
-}
-
+.topicToggle:hover,
 .topicToggleSelected {
-  border-color: #a86f70;
-  background: #fbf3f1;
-  box-shadow: 0 0 0 2px rgb(116 27 34 / 6%);
+  background: transparent;
+  box-shadow: none;
 }
 
 .topicToggle > span:last-child {
@@ -118,25 +129,27 @@
 }
 
 .topicToggleSelected .topicCheck {
-  border-color: #a86f70;
+  border-color: #7186df;
   background: #fff;
+  color: #2942a5;
 }
 
 .topicActions {
   display: flex;
-  align-items: stretch;
-  gap: 0.28rem;
+  align-items: center;
+  gap: 0.04rem;
 }
 
 .topicDragHandle {
   display: grid;
-  width: 30px;
-  min-height: 42px;
+  width: 32px;
+  height: 32px;
+  align-self: center;
   place-items: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: transparent;
-  color: #746c69;
+  color: #7b8494;
   cursor: grab;
   transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
 }
@@ -146,8 +159,8 @@
 }
 
 .topicDragHandle:hover:not(:disabled) {
-  background: #f5f2f1;
-  color: var(--wine);
+  background: #e9edf5;
+  color: #263a91;
 }
 
 .topicDragHandle:disabled {
@@ -157,32 +170,41 @@
 
 .topicAction {
   display: grid;
-  width: 38px;
-  min-height: 42px;
+  width: 34px;
+  height: 34px;
+  align-self: center;
   place-items: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 9px;
-  background: #fff;
-  color: #655b58;
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #667085;
+  transition: background 160ms ease, color 160ms ease;
 }
 
 .topicAction:hover {
-  border-color: #c3aaa5;
-  background: #faf5f3;
-  color: var(--wine);
+  background: #e9edf5;
+  color: #263a91;
 }
 
 .topicActionDanger:hover {
-  border-color: #d8aaa7;
-  background: #fff0f0;
-  color: #9b2d34;
+  background: #fdecec;
+  color: #b4232f;
 }
 
 .topicAction:disabled,
 .topicToggle:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.topicOrderError {
+  margin: 0;
+  border-radius: 8px;
+  background: #fff1f0;
+  padding: 0.5rem 0.62rem;
+  color: #9b2d34;
+  font-size: 0.66rem;
+  line-height: 1.4;
 }
 
 .addTopicButton {
@@ -205,10 +227,12 @@
   }
 
   .topicAction {
-    width: 36px;
+    width: 32px;
+    height: 32px;
   }
 
   .topicDragHandle {
-    width: 28px;
+    width: 30px;
+    height: 30px;
   }
 }

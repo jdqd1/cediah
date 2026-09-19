@@ -5,11 +5,10 @@ import {
   readContentJson,
 } from "@/lib/server/editor-content-route";
 
-const ContentTopicOrderMutationResponseSchema = z.object({
+const ContentTopicListOrderMutationResponseSchema = z.object({
   order: z.object({
-    contentIds: z.array(z.string().uuid()),
     subjectId: z.string().uuid(),
-    topic: z.string().trim().min(1).max(120),
+    topics: z.array(z.string().trim().min(1).max(120)),
   }),
 });
 
@@ -24,8 +23,8 @@ export async function PATCH(request: Request) {
   return forwardEditorContentRequest({
     body: parsed.body,
     method: "PATCH",
-    path: "/v1/editor/topic-order",
-    responseSchema: ContentTopicOrderMutationResponseSchema,
+    path: "/v1/editor/topic-list-order",
+    responseSchema: ContentTopicListOrderMutationResponseSchema,
     timeoutMs: 20_000,
   });
 }

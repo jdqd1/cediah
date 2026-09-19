@@ -65,6 +65,7 @@ export function TopicSelector({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [topicSearch, setTopicSearch] = useState("");
   const [topicOrder, setTopicOrder] = useState<string[]>([]);
+  const [topicOrderError, setTopicOrderError] = useState<string | null>(null);
   const [draggingTopicKey, setDraggingTopicKey] = useState<string | null>(null);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(() => new Set());
   const deferredTopicSearch = useDeferredValue(topicSearch);
@@ -103,28 +104,70 @@ export function TopicSelector({
 
   useEffect(() => {
     let cancelled = false;
-    let nextOrder: string[] = [];
+    let fallbackOrder: string[] = [];
     try {
       const stored = window.localStorage.getItem(topicOrderStorageKey);
       const parsed: unknown = stored ? JSON.parse(stored) : [];
-      nextOrder = Array.isArray(parsed)
+      fallbackOrder = Array.isArray(parsed)
         ? parsed.filter((value): value is string => typeof value === "string")
         : [];
     } catch {
-      nextOrder = [];
+      fallbackOrder = [];
     }
 
     queueMicrotask(() => {
       if (cancelled) return;
-      setTopicOrder(nextOrder);
+      setTopicOrder(fallbackOrder);
+      setTopicOrderError(null);
       setDraggingTopicKey(null);
       setExpandedTopics(new Set());
     });
 
+    const subjectId = subjectIds[0];
+    if (subjectId) {
+      void fetch(`/api/content-order?subjectId=${encodeURIComponent(subjectId)}`, {
+        cache: "no-store",
+      })
+        .then(async (response) => {
+          const body: unknown = await response.json().catch(() => null);
+          if (!response.ok || !body || typeof body !== "object" || !("topicOrder" in body)) return null;
+          const order = Array.isArray(body.topicOrder)
+            ? body.topicOrder.filter((value: unknown): value is string => typeof value === "string")
+            : [];
+          return order.map(normalizeRegion);
+        })
+        .then((serverOrder) => {
+          if (cancelled || !serverOrder) return;
+          if (serverOrder.length > 0) {
+            setTopicOrder(serverOrder);
+            try {
+              window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(serverOrder));
+            } catch {
+              // Browser storage is only a local fallback; server order remains authoritative.
+            }
+            return;
+          }
+
+          if (fallbackOrder.length > 0) {
+            // Backfill the server once for users who already arranged topics
+            // before ordering became shared with the public Materias view.
+            void Promise.all(subjectIds.map((currentSubjectId) =>
+              fetch("/api/editor/topic-list-order", {
+                body: JSON.stringify({ subjectId: currentSubjectId, topics: fallbackOrder }),
+                cache: "no-store",
+                headers: { "Content-Type": "application/json" },
+                method: "PATCH",
+              }).catch(() => undefined),
+            ));
+          }
+        })
+        .catch(() => undefined);
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [topicOrderStorageKey]);
+  }, [subjectIds, topicOrderStorageKey]);
 
   const orderedOptions = useMemo(() => {
     const order = new Map(topicOrder.map((key, index) => [key, index]));
@@ -170,13 +213,59 @@ export function TopicSelector({
   const canReorderTopics =
     allowCreate && interactive && orderedOptions.length > 1 && !deferredTopicSearch.trim();
 
-  function persistTopicOrder(nextOrder: string[]) {
+  async function persistTopicOrder(nextOrder: string[]) {
     const uniqueOrder = [...new Set(nextOrder.filter(Boolean))];
     setTopicOrder(uniqueOrder);
+    setTopicOrderError(null);
     try {
       window.localStorage.setItem(topicOrderStorageKey, JSON.stringify(uniqueOrder));
     } catch {
       // Reordering still works for the current session when storage is unavailable.
+    }
+
+    if (subjectIds.length === 0) return;
+    const topicByKey = new Map(options.map((topic) => [normalizeRegion(topic), topic]));
+    const orderedTopics = uniqueOrder.flatMap((key) => {
+      const topic = topicByKey.get(key);
+      return topic ? [topic] : [];
+    });
+    for (const topic of options) {
+      if (!uniqueOrder.includes(normalizeRegion(topic))) orderedTopics.push(topic);
+    }
+
+    try {
+      await Promise.all(subjectIds.map(async (subjectId) => {
+        let lastError: Error | null = null;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const response = await fetch("/api/editor/topic-list-order", {
+              body: JSON.stringify({ subjectId, topics: orderedTopics }),
+              cache: "no-store",
+              headers: { "Content-Type": "application/json" },
+              method: "PATCH",
+            });
+            const body: unknown = await response.json().catch(() => ({ error: "content_unavailable" }));
+            if (response.ok) return;
+            const code = body && typeof body === "object" && "error" in body && typeof body.error === "string"
+              ? body.error
+              : "content_unavailable";
+            if (response.status !== 502 && response.status !== 503) {
+              throw new Error(topicErrors[code] ?? "No se pudo guardar el orden de los temas.");
+            }
+            lastError = new Error(topicErrors[code] ?? "No se pudo guardar el orden de los temas.");
+          } catch (caught) {
+            lastError = caught instanceof Error ? caught : new Error("No se pudo guardar el orden de los temas.");
+          }
+          if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
+        }
+        throw lastError ?? new Error("No se pudo guardar el orden de los temas.");
+      }));
+    } catch (caught) {
+      setTopicOrderError(
+        caught instanceof Error
+          ? caught.message
+          : "El orden cambió en esta vista, pero no se pudo guardarlo todavía.",
+      );
     }
   }
 
@@ -207,7 +296,7 @@ export function TopicSelector({
     if (sourceIndex < 0 || targetIndex < 0) return;
     keys.splice(sourceIndex, 1);
     keys.splice(targetIndex, 0, sourceKey);
-    persistTopicOrder(keys);
+    void persistTopicOrder(keys);
   }
 
   function closeDialog() {
@@ -240,7 +329,7 @@ export function TopicSelector({
         ),
         localTopic,
       ]);
-      persistTopicOrder([...topicOrder, normalizeRegion(localTopic.name)]);
+      void persistTopicOrder([...topicOrder, normalizeRegion(localTopic.name)]);
       onChange(uniqueRegions([...values, localTopic.name]));
       setDialogOpen(false);
       setInput("");
@@ -276,7 +365,7 @@ export function TopicSelector({
         ),
         parsed.data,
       ]);
-      persistTopicOrder([...topicOrder, normalizeRegion(parsed.data.name)]);
+      void persistTopicOrder([...topicOrder, normalizeRegion(parsed.data.name)]);
       onChange(uniqueRegions([...values, parsed.data.name]));
       setDialogOpen(false);
       setInput("");
@@ -319,7 +408,7 @@ export function TopicSelector({
 
       const previousKey = normalizeRegion(renameTarget);
       const nextKey = normalizeRegion(parsed.data.name);
-      persistTopicOrder(topicOrder.map((key) => key === previousKey ? nextKey : key));
+      void persistTopicOrder(topicOrder.map((key) => key === previousKey ? nextKey : key));
       setExpandedTopics((current) => {
         if (!current.has(previousKey)) return current;
         const next = new Set(current);
@@ -384,7 +473,7 @@ export function TopicSelector({
       if (!parsed.success) throw new Error(contentUnavailableMessage);
 
       const deletedKey = normalizeRegion(deleteTarget);
-      persistTopicOrder(topicOrder.filter((key) => key !== deletedKey));
+      void persistTopicOrder(topicOrder.filter((key) => key !== deletedKey));
       setExpandedTopics((current) => {
         if (!current.has(deletedKey)) return current;
         const next = new Set(current);
@@ -578,6 +667,9 @@ export function TopicSelector({
               </p>
             )}
           </div>
+          {topicOrderError && (
+            <p className={styles.topicOrderError} role="alert">{topicOrderError}</p>
+          )}
           {allowCreate && (
             <button
               className={`studio-entity-create-button studio-entity-create-button-primary ${styles.addTopicButton}`}

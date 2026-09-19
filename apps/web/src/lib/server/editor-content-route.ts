@@ -27,6 +27,7 @@ export async function forwardEditorContentRequest(input: {
   body?: unknown;
   method: "DELETE" | "GET" | "PATCH" | "POST";
   path: string;
+  timeoutMs?: number;
   responseSchema?: {
     safeParse: (body: unknown) =>
       | { data: unknown; success: true }
@@ -42,6 +43,7 @@ export async function forwardEditorContentRequest(input: {
     body: input.body,
     method: input.method,
     path: input.path,
+    timeoutMs: input.timeoutMs,
   });
   if (response.status >= 400) {
     return noStoreContentJson(

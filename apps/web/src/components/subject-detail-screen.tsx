@@ -94,6 +94,7 @@ export function SubjectDetailScreen({
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [topicOrders, setTopicOrders] = useState<Record<string, string[]>>({});
+  const [topicDisplayOrder, setTopicDisplayOrder] = useState<string[]>([]);
   const requestedKind = searchParams.get("tipo");
   const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
@@ -130,8 +131,16 @@ export function SubjectDetailScreen({
         else groups.set(key, { name, items: [item] });
       }
     }
-    return [...groups.values()].sort((left, right) => left.name.localeCompare(right.name, "es"));
-  }, [filteredItems]);
+    const order = new Map(topicDisplayOrder.map((name, index) => [normalize(name), index]));
+    return [...groups.values()].sort((left, right) => {
+      const leftOrder = order.get(normalize(left.name));
+      const rightOrder = order.get(normalize(right.name));
+      if (leftOrder !== undefined && rightOrder !== undefined) return leftOrder - rightOrder;
+      if (leftOrder !== undefined) return -1;
+      if (rightOrder !== undefined) return 1;
+      return left.name.localeCompare(right.name, "es");
+    });
+  }, [filteredItems, topicDisplayOrder]);
   const ungroupedItems = useMemo(
     () => filteredItems.filter((item) => studyItemTopics(item).length === 0),
     [filteredItems],
@@ -155,7 +164,11 @@ export function SubjectDetailScreen({
             (id: unknown): id is string => typeof id === "string",
           );
         }
+        const displayOrder = "topicOrder" in body && Array.isArray(body.topicOrder)
+          ? body.topicOrder.filter((name: unknown): name is string => typeof name === "string")
+          : [];
         setTopicOrders(next);
+        setTopicDisplayOrder(displayOrder);
       })
       .catch(() => undefined);
 
