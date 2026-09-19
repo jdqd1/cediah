@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requestContentApi } from "@/lib/server/content-api";
 
 const ContentTopicOrdersResponseSchema = z.object({
+  topicOrder: z.array(z.string().trim().min(1).max(120)).default([]),
   topics: z.array(z.object({
     contentIds: z.array(z.string().uuid()),
     topic: z.string().trim().min(1).max(120),
