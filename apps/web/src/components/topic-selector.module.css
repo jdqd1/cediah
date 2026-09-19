@@ -14,7 +14,7 @@
 }
 
 .topicDragging .topicRow,
-.dragPreviewLift .topicRow {
+.topicRow.dragPreviewLift {
   border-color: #bdc8ee;
   background: #fff;
   box-shadow: 0 10px 26px rgb(29 48 112 / 16%), 0 2px 7px rgb(15 23 42 / 8%);
