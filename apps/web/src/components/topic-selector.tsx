@@ -335,19 +335,23 @@ export function TopicSelector({
 
       const expected = orderedTopics.map(normalizeRegion);
       for (const subjectId of subjectIds) {
-        const response = await fetch(
-          `/api/content-order?subjectId=${encodeURIComponent(subjectId)}&verify=${Date.now()}`,
-          { cache: "no-store" },
-        );
-        const body: unknown = await response.json().catch(() => null);
-        const confirmed = body && typeof body === "object" && "topicOrder" in body && Array.isArray(body.topicOrder)
-          ? body.topicOrder.filter((value: unknown): value is string => typeof value === "string").map(normalizeRegion)
-          : [];
-        if (
-          !response.ok ||
-          confirmed.length !== expected.length ||
-          confirmed.some((topic, index) => topic !== expected[index])
-        ) {
+        let confirmed = false;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const response = await fetch(
+            `/api/content-order?subjectId=${encodeURIComponent(subjectId)}&verify=${Date.now()}-${attempt}`,
+            { cache: "no-store" },
+          );
+          const body: unknown = await response.json().catch(() => null);
+          const actual = body && typeof body === "object" && "topicOrder" in body && Array.isArray(body.topicOrder)
+            ? body.topicOrder.filter((value: unknown): value is string => typeof value === "string").map(normalizeRegion)
+            : [];
+          confirmed = response.ok &&
+            actual.length === expected.length &&
+            actual.every((topic, index) => topic === expected[index]);
+          if (confirmed) break;
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 350));
+        }
+        if (!confirmed) {
           throw new Error("El servidor no confirmó el orden de los temas. Intenta guardar de nuevo.");
         }
       }
