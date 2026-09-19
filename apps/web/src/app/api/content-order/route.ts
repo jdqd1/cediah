@@ -13,7 +13,9 @@ const ContentTopicOrdersResponseSchema = z.object({
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const subjectId = new URL(request.url).searchParams.get("subjectId")?.trim() ?? "";
+  const url = new URL(request.url);
+  const subjectId = url.searchParams.get("subjectId")?.trim() ?? "";
+  const verify = url.searchParams.get("verify")?.trim() ?? "";
   if (!z.string().uuid().safeParse(subjectId).success) {
     return NextResponse.json(
       { error: "invalid_subject" },
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
   const response = await requestContentApi({
     cachePublic: false,
     method: "GET",
-    path: `/v1/content/topic-order?subjectId=${encodeURIComponent(subjectId)}`,
+    path: `/v1/content/topic-order?subjectId=${encodeURIComponent(subjectId)}${verify ? `&verify=${encodeURIComponent(verify)}` : ""}`,
     timeoutMs: 20_000,
   });
   const parsed = ContentTopicOrdersResponseSchema.safeParse(response.body);
