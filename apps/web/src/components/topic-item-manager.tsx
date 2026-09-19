@@ -251,6 +251,7 @@ export function TopicItemManagementProvider({
     })).then((results) => {
       if (cancelled) return;
       const nextOrders: OrdersBySubject = {};
+      const fallbackDirtyKeys = new Set<string>();
       for (const result of results) {
         const subjectOrders = Object.fromEntries(
           result.topics.map((topic) => [normalizeRegion(topic.topic), topic.contentIds]),
@@ -262,11 +263,18 @@ export function TopicItemManagementProvider({
             continue;
           }
           const storedOrder = readStoredItemOrder(result.subjectId, topicKey);
-          if (storedOrder.length > 0) subjectOrders[topicKey] = storedOrder;
+          if (storedOrder.length > 0) {
+            subjectOrders[topicKey] = storedOrder;
+            setLocalOrders((current) => ({ ...current, [topicKey]: storedOrder }));
+            fallbackDirtyKeys.add(topicKey);
+          }
         }
         nextOrders[result.subjectId] = subjectOrders;
       }
       setOrdersBySubject(nextOrders);
+      if (fallbackDirtyKeys.size > 0) {
+        setDirtyTopicKeys((current) => new Set([...current, ...fallbackDirtyKeys]));
+      }
     }).catch(() => {
       if (cancelled) return;
       const fallback: OrdersBySubject = {};
