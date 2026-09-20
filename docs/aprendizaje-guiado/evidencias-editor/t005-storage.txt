@@ -1,0 +1,18 @@
+T005 — persistencia de revisiones y clonación
+
+pnpm --filter @cediah/api exec vitest run test/guided-learning-editor-storage.test.ts
+Test Files: 1 passed (1)
+Tests: 4 passed (4)
+EXIT_CODE=0
+
+pnpm --filter @cediah/api exec vitest run test/guided-learning-catalog.test.ts
+Tests: 19 passed, 1 failed.
+Único fallo: misma aserción baseline de history 1,2,3 recibida 2,3,1 en línea 1405.
+EXIT_CODE=1 (fallo previo no atribuible; sin fallos adicionales)
+
+pnpm --filter @cediah/api lint
+EXIT_CODE=0
+
+pnpm --filter @cediah/api typecheck
+Único pendiente: métodos getEditorMaterialDetail/getEditorOptionMaterialDetail asignados a T006.
+EXIT_CODE=1

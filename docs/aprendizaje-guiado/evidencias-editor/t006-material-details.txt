@@ -1,0 +1,14 @@
+T006 — detalles editoriales de materiales
+
+pnpm --filter @cediah/api exec vitest run test/guided-learning-editor-storage.test.ts test/guided-learning-routes.test.ts
+Test Files: 2 passed (2)
+Tests: 18 passed (18)
+EXIT_CODE=0
+
+pnpm --filter @cediah/api exec vitest run test/guided-learning-adapters.test.ts
+Test Files: 1 passed (1)
+Tests: 2 passed (2)
+EXIT_CODE=0
+
+pnpm --filter @cediah/api typecheck
+EXIT_CODE=0

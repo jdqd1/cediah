@@ -1,0 +1,9 @@
+T010 — 19 de septiembre de 2026
+
+PASS
+- route-basics.test.tsx: 4/4 pruebas PASS
+- @cediah/web typecheck: PASS
+- @cediah/web lint: PASS
+
+Comprobado: labels y required, límites 200/2000, ocho portadas, ausencia de inputs técnicos,
+selección de tema solo con una opción, errores relacionados y botón de ayuda Radix sin tooltip hover.

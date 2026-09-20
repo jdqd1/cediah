@@ -1,0 +1,9 @@
+T004 — reducer puro por IDs
+
+pnpm --filter @cediah/web exec vitest run src/components/learning/editor/editor-reducer.test.ts
+Test Files: 1 passed (1)
+Tests: 9 passed (9)
+EXIT_CODE=0
+
+pnpm --filter @cediah/web typecheck
+EXIT_CODE=0

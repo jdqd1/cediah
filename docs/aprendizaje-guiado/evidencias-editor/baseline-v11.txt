@@ -1,0 +1,25 @@
+V11 — dependencias aprobadas
+
+pnpm view radix-ui@1.6.7 version license peerDependencies --json
+version: 1.6.7
+license: MIT
+peers: react/react-dom ^16.8 || ^17 || ^18 || ^19; @types/react y @types/react-dom.
+
+pnpm view @tanstack/react-query@5.102.8 version license peerDependencies --json
+version: 5.102.8
+license: MIT
+peers: react ^18 || ^19.
+
+pnpm view @axe-core/playwright@4.13.0 version license peerDependencies --json
+version: 4.13.0
+license: MPL-2.0
+peers: playwright-core >=1.0.0.
+
+pnpm --filter @cediah/web list radix-ui @tanstack/react-query @axe-core/playwright --depth 0
+dependencies: @tanstack/react-query 5.102.8; radix-ui 1.6.7.
+devDependencies: @axe-core/playwright 4.13.0.
+EXIT_CODE=0
+
+pnpm install --frozen-lockfile
+Lockfile is up to date; Done using pnpm 11.9.0.
+EXIT_CODE=0

@@ -399,7 +399,7 @@ describe("private persistent map", () => {
     });
     if (removed.status === "success") state = removed.value;
   });
-  it("resolves pinned versions, excludes skipped progress and flags missing stable keys after upgrade", async () => {
+  it("keeps v1 map references when an editor removes the unit from v2 and flags it after adoption", async () => {
     const db = harness.database;
     const enrollment = await db.transaction().execute(async (tx) => {
       const row = await tx
@@ -468,10 +468,18 @@ describe("private persistent map", () => {
       .set({ published_version_id: nextVersion })
       .where("id", "=", path)
       .execute();
-    const route = { nodeId, entryId: lessonEntry, unitStableKey: null };
     expect(
-      (await provider.level(user, route))?.selectedLesson?.pathVersionId,
-    ).toBe(version);
+      await db
+        .selectFrom("learning_path_units")
+        .select("stable_key")
+        .where("path_version_id", "=", version)
+        .orderBy("position")
+        .execute(),
+    ).toEqual([{ stable_key: "lesson-0" }, { stable_key: "lesson-1" }]);
+    const route = { nodeId, entryId: lessonEntry, unitStableKey: null };
+    const pinned = await provider.level(user, route);
+    expect(pinned?.selectedLesson?.pathVersionId).toBe(version);
+    expect(pinned?.selectedLesson?.unitStableKey).toBe("lesson-0");
     await db
       .insertInto("learning_enrollment_versions")
       .values({
@@ -488,6 +496,12 @@ describe("private persistent map", () => {
       .execute();
     const upgraded = await provider.level(user, route);
     expect(upgraded?.selectedLesson).toBeNull();
+    expect(upgraded?.items).toEqual([
+      expect.objectContaining({
+        availability: "version_missing",
+        occurrenceId: lessonEntry,
+      }),
+    ]);
     expect(upgraded?.items[0]?.availability).toBe("version_missing");
     expect(upgraded?.containerSummary.progress.percentage).toBeNull();
     await db

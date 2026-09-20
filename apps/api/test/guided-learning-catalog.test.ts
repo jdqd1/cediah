@@ -304,7 +304,10 @@ describe("guided-learning catalog and versioning", () => {
       .toEqual(["video", "guide"]);
 
     const validation = await provider.validatePath({ actorUserId: creatorId, canEditAll: false, pathId: publishedPathId });
-    expect(validation).toEqual({ status: "success", value: { issues: [], ready: true } });
+    expect(validation).toEqual({
+      status: "success",
+      value: { issues: [], ready: true, validatedEditVersion: 1 },
+    });
 
     const inReview = await provider.transitionPath({ actorUserId: creatorId, canPublish: false, canReview: false, expectedVersion: 1, pathId: publishedPathId, status: "in_review" });
     expect(inReview.status).toBe("success");

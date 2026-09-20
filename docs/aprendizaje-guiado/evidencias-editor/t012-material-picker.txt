@@ -1,0 +1,10 @@
+T012 — 19 de septiembre de 2026
+
+PASS
+- editor-query-provider + editor-api + editor-model: 3 archivos, 22/22 pruebas PASS
+- @cediah/web typecheck: PASS
+- @cediah/web lint: PASS
+
+TanStack Query 5.102.8 integrado mediante QueryClientProvider local, useInfiniteQuery y useQuery.
+Claves aisladas por actor/ruta/filtros/detalle; AbortSignal llega al transporte y cerrar cancela el scope.
+El selector Radix conserva selección provisional y solo muta el draft al confirmar.

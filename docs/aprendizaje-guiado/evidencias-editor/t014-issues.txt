@@ -1,0 +1,14 @@
+T014 PASS — 2026-09-19
+
+Checks ejecutados con Node 24.19.0 y pnpm 11.9.0:
+- pnpm --filter @cediah/web typecheck: PASS
+- pnpm --filter @cediah/web exec vitest run src/components/learning/editor/editor-issues.test.ts src/components/learning/editor/unit-card.test.tsx: PASS (2 archivos, 31 tests)
+- pnpm --filter @cediah/web lint: PASS
+
+Cobertura focalizada:
+- tabla de 23 códigos conocidos
+- déficit exacto 3/5
+- prioridad de context sobre path legacy engañoso
+- fallback resource.<revisionId> y rechazo de path no confiable
+- deduplicación con conservación de ubicaciones distintas
+- selector contextual sobre actividad vacía

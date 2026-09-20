@@ -1,0 +1,15 @@
+T016 PASS — 2026-09-19
+
+Checks:
+- pnpm --filter @cediah/web typecheck: PASS
+- pnpm --filter @cediah/web lint: PASS
+- pnpm --filter @cediah/web exec vitest run editor-workflow.test.ts route-preview.test.ts use-route-editor.test.ts: PASS (3 archivos, 11 tests)
+
+Cobertura:
+- matriz de acciones por estado/roles y archivedAt
+- nueva versión solo desde publicada no archivada
+- total usa solo opción recomendada
+- duración parcial nunca se presenta como total exacto
+- guardar→validar usa respuesta confirmada
+
+NO ejecutado: transición/publicación contra datos reales, expresamente fuera de alcance.

@@ -8,6 +8,7 @@ coverage/
 playwright-report/
 test-results/
 .map-test-results/
+.editor-test-results/
 .turbo/
 .vercel/
 *.tsbuildinfo

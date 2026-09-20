@@ -1,0 +1,11 @@
+T017 implementación PASS — 2026-09-20
+Auditoría visual NO VERIFICADO hasta T021.
+
+Checks:
+- pnpm typecheck: PASS (contracts, web, api)
+- pnpm lint: PASS (web, api; cero warnings)
+- rg en flujo editor nuevo: sin window.confirm, sin DTO confirmado, sin overflow-x:hidden
+- learning-route-editor.tsx: solo re-export de fachada nueva
+- learning.css: bloque legacy .learning-editor-* retirado
+
+Restricción respetada: identity-v3.css no fue modificado; conserva dos selectores legacy globales preexistentes sin consumidor.

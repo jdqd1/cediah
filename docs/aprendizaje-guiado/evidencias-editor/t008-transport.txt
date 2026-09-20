@@ -1,0 +1,10 @@
+T008 — 19 de septiembre de 2026
+
+PASS
+- learning-editor-route.test.ts + editor-api.test.ts: 2 archivos, 17/17 pruebas PASS
+- @cediah/web typecheck: PASS
+- @cediah/web lint: PASS
+
+Se comprobaron allowlists BFF, no-store, sesión same-origin heredada, rutas exactas, codificación,
+estados 400/401/403/404/409/422/429/503, schemas de éxito, expectedVersion,
+propagación/cancelación de AbortSignal y errores de consulta seguros.

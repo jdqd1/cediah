@@ -11,10 +11,11 @@ import type {
   JsonValue,
 } from "../db/database.js";
 import { getLearningAdapter } from "./adapters/registry.js";
-import type { LearningRevisionSnapshot } from "./adapters/types.js";
+import type { LearningRevisionSnapshot, LearningSnapshotItem } from "./adapters/types.js";
 import { hashLearningSnapshot } from "./snapshot-hash.js";
 
 type ContentRow = Selectable<ContentItemTable>;
+type LearningContentReader = DatabaseClient | Transaction<CediahDatabase>;
 
 export type ResolvedLearningResource = {
   adapterKey: LearningProjection;
@@ -32,6 +33,23 @@ export type ResolvedLearningResource = {
 export type LearningResourceResolution =
   | { status: "identity_missing" | "not_found" | "resource_changed" }
   | { status: "success"; value: ResolvedLearningResource };
+
+export type CanonicalLearningContentRead =
+  | { status: "identity_missing" | "not_found" }
+  | {
+      status: "success";
+      value: {
+        adapterKey: LearningProjection;
+        adapterVersion: number;
+        catalogVisibility: "catalog" | "guided_only";
+        estimatedMinutes: number | null;
+        items: LearningSnapshotItem[];
+        payload: LearningRevisionSnapshot;
+        sourceContentId: string;
+        sourceVersion: number;
+        studentPayload: unknown;
+      };
+    };
 
 function draftFromRow(row: ContentRow) {
   return ContentDraftSchema.parse({
@@ -106,11 +124,11 @@ function adapterContent(row: ContentRow, projection: LearningProjection): unknow
 }
 
 async function canonicalContentRow(
-  transaction: Transaction<CediahDatabase>,
+  database: LearningContentReader,
   sourceContentId: string,
   projection: LearningProjection,
 ) {
-  let row = await transaction
+  let row = await database
     .selectFrom("content_items")
     .selectAll()
     .where("id", "=", sourceContentId)
@@ -119,7 +137,7 @@ async function canonicalContentRow(
   if (!row) return null;
 
   if (row.kind === "video" && projection !== "video") {
-    const linkedGuide = await transaction
+    const linkedGuide = await database
       .selectFrom("content_items")
       .selectAll()
       .where("kind", "=", "guide")
@@ -140,6 +158,51 @@ async function canonicalContentRow(
   return row;
 }
 
+export async function readCanonicalPublishedLearningContent(
+  database: LearningContentReader,
+  input: {
+    allowGuidedOnly: boolean;
+    projection: LearningProjection;
+    sourceContentId: string;
+  },
+): Promise<CanonicalLearningContentRead> {
+  if (!LearningProjectionSchema.safeParse(input.projection).success) return { status: "not_found" };
+  const row = await canonicalContentRow(database, input.sourceContentId, input.projection);
+  if (!row || (row.catalog_visibility === "guided_only" && !input.allowGuidedOnly)) {
+    return { status: "not_found" };
+  }
+  const adapter = getLearningAdapter(input.projection);
+  const content = adapterContent(row, input.projection);
+  if (content === null) return { status: "not_found" };
+  let parsed: unknown;
+  try {
+    parsed = adapter.parse(content);
+  } catch {
+    return { status: "identity_missing" };
+  }
+  const payload: LearningRevisionSnapshot = {
+    content: parsed,
+    projection: input.projection,
+    sourceContentId: row.id,
+    sourceVersion: row.version,
+    title: row.title,
+  };
+  return {
+    status: "success",
+    value: {
+      adapterKey: adapter.key,
+      adapterVersion: adapter.version,
+      catalogVisibility: row.catalog_visibility,
+      estimatedMinutes: row.estimated_minutes,
+      items: adapter.items(parsed),
+      payload,
+      sourceContentId: row.id,
+      sourceVersion: row.version,
+      studentPayload: adapter.toStudentPayload(parsed),
+    },
+  };
+}
+
 class IdentityConflict extends Error {}
 
 export function createLearningContentResolver(database: DatabaseClient) {
@@ -154,29 +217,12 @@ export function createLearningContentResolver(database: DatabaseClient) {
       }
       try {
         return await database.transaction().execute(async (transaction) => {
-          const row = await canonicalContentRow(
+          const canonical = await readCanonicalPublishedLearningContent(
             transaction,
-            input.sourceContentId,
-            input.projection,
+            input,
           );
-          if (
-            !row ||
-            (row.catalog_visibility === "guided_only" && !input.allowGuidedOnly)
-          ) {
-            return { status: "not_found" };
-          }
-
-          const adapter = getLearningAdapter(input.projection);
-          const content = adapterContent(row, input.projection);
-          if (content === null) return { status: "not_found" };
-          let parsed: unknown;
-          try {
-            parsed = adapter.parse(content);
-          } catch {
-            return { status: "identity_missing" };
-          }
-
-          const items = adapter.items(parsed);
+          if (canonical.status !== "success") return canonical;
+          const { items, payload } = canonical.value;
           for (const item of [...items].sort((left, right) => left.id.localeCompare(right.id))) {
             await transaction
               .insertInto("learning_items")
@@ -184,7 +230,7 @@ export function createLearningContentResolver(database: DatabaseClient) {
                 id: item.id,
                 item_kind: item.kind,
                 memory_version: item.memoryVersion,
-                source_content_id: row.id,
+                source_content_id: canonical.value.sourceContentId,
               })
               .onConflict((conflict) => conflict.column("id").doNothing())
               .execute();
@@ -196,7 +242,7 @@ export function createLearningContentResolver(database: DatabaseClient) {
             if (
               stored.item_kind !== item.kind ||
               stored.memory_version > item.memoryVersion ||
-              stored.source_content_id !== row.id
+              stored.source_content_id !== canonical.value.sourceContentId
             ) {
               throw new IdentityConflict("Canonical learning item identity collision");
             }
@@ -213,13 +259,13 @@ export function createLearningContentResolver(database: DatabaseClient) {
           const resource = await transaction
             .insertInto("learning_resources")
             .values({
-              adapter_key: adapter.key,
+              adapter_key: canonical.value.adapterKey,
               projection: input.projection,
-              source_content_id: row.id,
+              source_content_id: canonical.value.sourceContentId,
             })
             .onConflict((conflict) => conflict
               .columns(["source_content_id", "projection"])
-              .doUpdateSet({ adapter_key: adapter.key }))
+              .doUpdateSet({ adapter_key: canonical.value.adapterKey }))
             .returning(["id", "retired_at"])
             .executeTakeFirstOrThrow();
           if (resource.retired_at) return { status: "not_found" };
@@ -231,20 +277,13 @@ export function createLearningContentResolver(database: DatabaseClient) {
             .forUpdate()
             .executeTakeFirstOrThrow();
 
-          const payload: LearningRevisionSnapshot = {
-            content: parsed,
-            projection: input.projection,
-            sourceContentId: row.id,
-            sourceVersion: row.version,
-            title: row.title,
-          };
           const hash = hashLearningSnapshot(payload);
           let revision = await transaction
             .selectFrom("learning_resource_revisions")
             .select(["id", "revision_number"])
             .where("resource_id", "=", resource.id)
-            .where("source_version", "=", row.version)
-            .where("adapter_version", "=", adapter.version)
+            .where("source_version", "=", canonical.value.sourceVersion)
+            .where("adapter_version", "=", canonical.value.adapterVersion)
             .where("payload_hash", "=", hash)
             .executeTakeFirst();
           if (!revision) {
@@ -256,13 +295,13 @@ export function createLearningContentResolver(database: DatabaseClient) {
             revision = await transaction
               .insertInto("learning_resource_revisions")
               .values({
-                adapter_version: adapter.version,
+                adapter_version: canonical.value.adapterVersion,
                 payload_hash: hash,
                 payload_json: payload as unknown as JsonValue,
                 resource_id: resource.id,
                 revision_number: latest.number + 1,
                 schema_version: 1,
-                source_version: row.version,
+                source_version: canonical.value.sourceVersion,
               })
               .returning(["id", "revision_number"])
               .executeTakeFirstOrThrow();
@@ -271,16 +310,16 @@ export function createLearningContentResolver(database: DatabaseClient) {
           return {
             status: "success",
             value: {
-              adapterKey: adapter.key,
-              adapterVersion: adapter.version,
-              catalogVisibility: row.catalog_visibility,
+              adapterKey: canonical.value.adapterKey,
+              adapterVersion: canonical.value.adapterVersion,
+              catalogVisibility: canonical.value.catalogVisibility,
               payload,
               resourceId: resource.id,
               resourceRevisionId: revision.id,
               revisionNumber: revision.revision_number,
-              sourceContentId: row.id,
-              sourceVersion: row.version,
-              studentPayload: adapter.toStudentPayload(parsed),
+              sourceContentId: canonical.value.sourceContentId,
+              sourceVersion: canonical.value.sourceVersion,
+              studentPayload: canonical.value.studentPayload,
             },
           };
         });

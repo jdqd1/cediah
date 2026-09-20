@@ -1,0 +1,10 @@
+T011 — 19 de septiembre de 2026
+
+PASS (UI y estado local)
+- unit-card.test.tsx + editor-reducer.test.ts: 2 archivos, 12/12 pruebas PASS
+- @cediah/web typecheck: PASS
+- @cediah/web lint: PASS
+
+Integración Radix verificada por implementación: Accordion, DropdownMenu y AlertDialog.
+El reducer prueba eliminación por ID y limpieza de dependencias.
+NO VERIFICADO en esta tarea: PATCH del borrado y conservación de versión publicada; se prueba en T019.

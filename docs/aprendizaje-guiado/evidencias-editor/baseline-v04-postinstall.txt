@@ -1,0 +1,4 @@
+V04 posinstalación — pnpm lint
+apps/api lint: Done
+apps/web lint: Done
+EXIT_CODE=0

@@ -77,6 +77,12 @@ function fakeProvider(): GuidedLearningProvider {
     createVersion: vi.fn(async () => ({ status: "success" as const, value: detail })),
     getAttempt: vi.fn(async () => ({ status: "not_found" as const })),
     getAttemptMedia: vi.fn(async () => ({ status: "not_found" as const })),
+    getEditorMaterialDetail: vi.fn(async () => {
+      throw new Error("getEditorMaterialDetail requires an explicit route fixture");
+    }),
+    getEditorOptionMaterialDetail: vi.fn(async () => {
+      throw new Error("getEditorOptionMaterialDetail requires an explicit route fixture");
+    }),
     getEditorPath: vi.fn(async () => ({ status: "success" as const, value: detail })),
     getEnrollmentProgress: vi.fn(async () => ({ status: "not_found" as const })),
     getEnrollmentUpgradePreview: vi.fn(async () => ({
@@ -128,7 +134,10 @@ function fakeProvider(): GuidedLearningProvider {
     updatePath: vi.fn(async () => ({ status: "success" as const, value: detail })),
     updateStepPreference: vi.fn(async () => ({ status: "not_found" as const })),
     updateTaskOverride: vi.fn(async () => ({ status: "not_found" as const })),
-    validatePath: vi.fn(async () => ({ status: "success" as const, value: { issues: [], ready: true } })),
+    validatePath: vi.fn(async () => ({
+      status: "success" as const,
+      value: { issues: [], ready: true, validatedEditVersion: 1 },
+    })),
   };
 }
 
@@ -534,6 +543,121 @@ describe("guided-learning route registration", () => {
       method: "GET",
       url: "/v1/editor/learning-resources?limit=200",
     })).statusCode).toBe(400);
+    await app.close();
+  });
+
+  it("serves readonly current and fixed editor material details with strict inputs", async () => {
+    const provider = fakeProvider();
+    provider.getEditorMaterialDetail = vi.fn(async () => ({
+      status: "success" as const,
+      value: {
+        currentSourceVersion: 3,
+        estimatedMinutes: 10,
+        explanationCoverage: "complete" as const,
+        items: [{ id: optionId, kind: "question" as const, prompt: "Pregunta" }],
+        projection: "quiz" as const,
+        resourceRevisionId: null,
+        sourceContentId: topicId,
+        sourceVersion: 3,
+        status: "ready" as const,
+        title: "Cuestionario",
+      },
+    }));
+    provider.getEditorOptionMaterialDetail = vi.fn(async () => ({
+      status: "success" as const,
+      value: {
+        currentSourceVersion: 4,
+        estimatedMinutes: 10,
+        explanationCoverage: "complete" as const,
+        items: [{ id: optionId, kind: "question" as const, prompt: "Pregunta fijada" }],
+        projection: "quiz" as const,
+        resourceRevisionId: versionId,
+        sourceContentId: topicId,
+        sourceVersion: 3,
+        status: "ready" as const,
+        title: "Cuestionario fijado",
+      },
+    }));
+    const creatorRoles = { getRoles: vi.fn(async () => ["content_creator" as const]) } as unknown as ContentProvider;
+    const app = await buildApp(environment, { contentProvider: creatorRoles, guidedLearningProvider: provider, identityProvider });
+
+    const current = await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "GET",
+      url: `/v1/editor/learning-resources/${topicId}?projection=quiz`,
+    });
+    expect(current.statusCode).toBe(200);
+    expect(current.headers["cache-control"]).toBe("private, no-store");
+    expect(current.json()).toMatchObject({ resourceRevisionId: null, status: "ready" });
+    expect(provider.getEditorMaterialDetail).toHaveBeenCalledWith({
+      actorUserId: userId,
+      canEditAll: false,
+      contentId: topicId,
+      projection: "quiz",
+    });
+
+    const fixed = await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "GET",
+      url: `/v1/editor/learning-paths/${pathId}/materials/${optionId}`,
+    });
+    expect(fixed.statusCode).toBe(200);
+    expect(fixed.headers["cache-control"]).toBe("private, no-store");
+    expect(fixed.json()).toMatchObject({ resourceRevisionId: versionId, sourceVersion: 3, status: "ready" });
+    expect(provider.getEditorOptionMaterialDetail).toHaveBeenCalledWith({
+      actorUserId: userId,
+      canEditAll: false,
+      optionId,
+      pathId,
+    });
+
+    expect((await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "GET",
+      url: `/v1/editor/learning-resources/${topicId}?projection=unknown`,
+    })).statusCode).toBe(400);
+    expect((await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "GET",
+      url: `/v1/editor/learning-paths/${pathId}/materials/not-a-uuid`,
+    })).statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("validates a strict saved version and returns safe field destinations", async () => {
+    const provider = fakeProvider();
+    const creatorRoles = { getRoles: vi.fn(async () => ["content_creator" as const]) } as unknown as ContentProvider;
+    const app = await buildApp(environment, { contentProvider: creatorRoles, guidedLearningProvider: provider, identityProvider });
+
+    const invalid = await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "POST",
+      payload: { expectedVersion: 1, injected: "not returned" },
+      url: `/v1/editor/learning-paths/${pathId}/validate`,
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json()).toEqual({
+      error: "invalid_request",
+      fieldErrors: [{ code: "unrecognized_keys", path: "" }],
+    });
+    expect(JSON.stringify(invalid.json())).not.toContain("not returned");
+    expect(provider.validatePath).not.toHaveBeenCalled();
+
+    const valid = await app.inject({
+      headers: { authorization: "Bearer valid" },
+      method: "POST",
+      payload: { expectedVersion: 1 },
+      url: `/v1/editor/learning-paths/${pathId}/validate`,
+    });
+    expect(valid.statusCode).toBe(200);
+    expect(valid.headers["cache-control"]).toBe("private, no-store");
+    expect(valid.json()).toEqual({ issues: [], ready: true, validatedEditVersion: 1 });
+    expect(provider.validatePath).toHaveBeenCalledWith({
+      actorUserId: userId,
+      canEditAll: false,
+      expectedVersion: 1,
+      pathId,
+    });
     await app.close();
   });
 });

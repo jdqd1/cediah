@@ -1,0 +1,9 @@
+T013 — 19 de septiembre de 2026
+
+PASS
+- editor-reducer + editor-model + editor-query-provider: 3 archivos, 18/18 pruebas PASS
+- @cediah/web typecheck: PASS
+- @cediah/web lint: PASS
+
+Radix Accordion/Collapsible integrado. El detalle fijado/actual usa TanStack Query y signal.
+Pruebas confirman cambios cosméticos y mappings sin reconstruir snapshot/config/recompensas.

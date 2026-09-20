@@ -1,0 +1,10 @@
+V07 — pnpm test
+apps/web: 20 files passed; 92 tests passed.
+apps/api: 23 files passed, 1 failed; 174 tests passed, 1 failed.
+
+Fallo:
+guided-learning-catalog.test.ts > guided-learning catalog and versioning > upgrades versions voluntarily, preserves history and transfers only valid equivalences
+Línea 1405. El test esperaba history con versiones 1,2,3 y recibió 2,3,1. Los mismos tres registros estaban presentes; falló el orden.
+
+Este resultado se capturó antes de instalar dependencias o modificar código de aplicación.
+EXIT_CODE=1

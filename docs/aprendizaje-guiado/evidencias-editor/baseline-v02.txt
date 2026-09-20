@@ -1,0 +1,3 @@
+V02 — pnpm --filter @cediah/contracts build
+$ tsc -p tsconfig.json
+EXIT_CODE=0
