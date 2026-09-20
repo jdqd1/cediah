@@ -1,0 +1,46 @@
+T022 — cierre final
+Fecha local: 2026-09-20
+HEAD de inicio documentado: c7df680accfeb751f612c95b2577527a0fa6b6d9
+Base analizada indicada por el paquete: 1b3b6c8b11796aa070047c38057e6ab36940dcb0
+
+V11 PASS
+- radix-ui 1.6.7 (dependency, MIT)
+- @tanstack/react-query 5.102.8 (dependency, MIT)
+- @axe-core/playwright 4.13.0 (devDependency, MPL-2.0)
+- pnpm install --frozen-lockfile: Already up to date, exit 0.
+- Imports efectivos: Radix en componentes de UI; Query en provider/catálogo/detalles; Axe en pruebas/captura.
+
+V03 PASS
+- pnpm typecheck: contracts, API y web exit 0.
+
+V04 PASS
+- pnpm lint: API y web exit 0, cero warnings.
+
+V07 PASS
+- Se corrigió la consulta de producción en path-upgrade.ts: orden principal por version_number y adopted_at como desempate; el test no se modificó.
+- guided-learning-catalog.test.ts: 20/20 pruebas PASS.
+- Web: 34/34 archivos, 197/197 pruebas PASS.
+- API: 28/28 archivos, 201/201 pruebas PASS.
+- Una corrida raíz previa bajo carga concurrente agotó dos timeouts de 5 s; la API aislada y la repetición raíz inmediata pasaron sin tocar esos tests ni sus timeouts.
+
+V08 PASS
+- Contracts tsc PASS; API build PASS; Next 16.3.5 producción compiló, validó tipos, generó 20/20 páginas y finalizó exit 0.
+
+V09 PASS
+- Playwright editor: 30/30 en 5.0 min; desktop/mobile, reflow, teclado, recuperación y Axe.
+
+V10 PASS
+- git diff --check exit 0.
+- No hay cambios en database/migrations.
+- Solo tres dependencias directas nuevas, todas autorizadas.
+- next-env.d.ts y archivos AGENTS/CLAUDE generados por Next dev se retiraron del diff.
+- HANDOFF-EDITOR-INTUITIVO.md y PLAN-MAESTRO-EDITOR-INTUITIVO.md eran modificaciones previas registradas en baseline; no fueron editados por la implementación.
+
+Alcance
+- No se desplegó, no se publicó ninguna ruta, no se inició la API contra una base real y no se cambió infraestructura.
+- Persistencia/permisos: PGlite y Fastify inject locales; no prueba producción.
+- UI: fixture determinista en memoria; no prueba integración de producción extremo a extremo.
+
+Resultado formal
+- La implementación del editor y sus checks específicos están PASS.
+- D01–D16 y Q01–Q41 están PASS. No quedan criterios obligatorios FAIL o NO VERIFICADO; la entrega se declara terminada dentro del alcance local especificado.

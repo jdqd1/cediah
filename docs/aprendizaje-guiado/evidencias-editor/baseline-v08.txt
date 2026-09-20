@@ -1,0 +1,5 @@
+V08 — pnpm build
+packages/contracts build: Done
+apps/api build: Done
+apps/web build: compiled successfully; TypeScript, page data and 20 static pages completed.
+EXIT_CODE=0

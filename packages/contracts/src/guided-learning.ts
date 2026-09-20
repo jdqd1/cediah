@@ -74,10 +74,12 @@ export const LearningPathOptionDraftSchema = z.strictObject({
   completionRule: LearningCompletionRuleSchema.optional(),
   config: LearningOptionConfigSchema.default({ objectiveMappings: [], selectedItemIds: [] }),
   estimatedMinutes: z.number().int().min(1).max(600).nullable().default(null),
+  expectedSourceVersion: z.number().int().positive().optional(),
   id: z.string().uuid().optional(),
   isDefault: z.boolean().default(false),
   label: z.string().trim().min(1).max(120),
   projection: LearningProjectionSchema,
+  refreshResource: z.boolean().default(false).optional(),
   rewardIdentity: z.string().uuid(),
   rewardVersion: z.number().int().min(1).max(1_000_000).default(1),
   sourceContentId: z.string().uuid(),
@@ -139,15 +141,32 @@ export const LearningPathCreateVersionRequestSchema = z.strictObject({
   releaseNotes: z.string().trim().max(4_000).default(""),
 });
 
+export const LearningPathValidationContextSchema = z.strictObject({
+  actualCount: z.number().int().nonnegative().optional(),
+  objectiveId: z.string().uuid().optional(),
+  optionId: z.string().uuid().optional(),
+  requiredCount: z.number().int().nonnegative().optional(),
+  sourceContentId: z.string().uuid().optional(),
+  stepId: z.string().uuid().optional(),
+  stepStableKey: StableKeySchema.optional(),
+  unitId: z.string().uuid().optional(),
+  unitStableKey: StableKeySchema.optional(),
+});
+
 export const LearningPathValidationIssueSchema = z.strictObject({
   code: z.string().trim().min(1).max(80),
+  context: LearningPathValidationContextSchema.optional(),
   message: z.string().trim().min(1).max(500),
   path: z.string().trim().min(1).max(500),
   severity: z.enum(["error", "warning"]),
 });
+export const LearningPathValidateRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().positive().optional(),
+});
 export const LearningPathValidationResponseSchema = z.strictObject({
   issues: z.array(LearningPathValidationIssueSchema),
   ready: z.boolean(),
+  validatedEditVersion: z.number().int().positive().optional(),
 });
 
 export const LearningPathOptionSchema = z.strictObject({
@@ -290,6 +309,33 @@ export const LearningEditorResourceCatalogResponseSchema = z.strictObject({
     title: z.string().trim().min(1).max(200),
   })).max(500),
 });
+
+export const LearningEditorMaterialItemSchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: z.enum(["question", "flashcard"]),
+  prompt: z.string().min(1).max(10_000),
+});
+
+export const LearningEditorMaterialDetailSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    currentSourceVersion: z.number().int().positive().nullable(),
+    estimatedMinutes: z.number().int().min(1).max(600).nullable(),
+    explanationCoverage: z.enum(["complete", "partial", "missing", "not_applicable"]),
+    items: z.array(LearningEditorMaterialItemSchema).max(500),
+    projection: LearningProjectionSchema,
+    resourceRevisionId: z.string().uuid().nullable(),
+    sourceContentId: z.string().uuid(),
+    sourceVersion: z.number().int().positive(),
+    status: z.literal("ready"),
+    title: z.string().trim().min(1).max(240),
+  }),
+  z.strictObject({
+    reason: z.enum(["retired", "not_published", "invalid_revision"]),
+    sourceContentId: z.string().uuid(),
+    status: z.literal("unavailable"),
+    title: z.string().trim().min(1).max(240),
+  }),
+]);
 
 export const LearningEnrollmentCreateRequestSchema = z.strictObject({
   pathId: z.string().uuid(),
@@ -773,6 +819,8 @@ export type LearningEnrollmentUpgradeResponse = z.infer<typeof LearningEnrollmen
 export type LearningEnrollmentVersionHistory = z.infer<typeof LearningEnrollmentVersionHistorySchema>;
 export type LearningEditorResource = z.infer<typeof LearningEditorResourceSchema>;
 export type LearningEditorResourceCatalogResponse = z.infer<typeof LearningEditorResourceCatalogResponseSchema>;
+export type LearningEditorMaterialDetail = z.infer<typeof LearningEditorMaterialDetailSchema>;
+export type LearningEditorMaterialItem = z.infer<typeof LearningEditorMaterialItemSchema>;
 export type LearningEvidenceState = z.infer<typeof LearningEvidenceStateSchema>;
 export type LearningHome = z.infer<typeof LearningHomeSchema>;
 export type LearningHomeTask = z.infer<typeof LearningHomeTaskSchema>;
@@ -803,7 +851,10 @@ export type LearningStepProgressState = z.infer<typeof LearningStepProgressState
 export type LearningPathUnit = z.infer<typeof LearningPathUnitSchema>;
 export type LearningPathUnitDraft = z.infer<typeof LearningPathUnitDraftSchema>;
 export type LearningPathUpdateRequest = z.infer<typeof LearningPathUpdateRequestSchema>;
+export type LearningPathValidateRequest = z.infer<typeof LearningPathValidateRequestSchema>;
+export type LearningPathValidationContext = z.infer<typeof LearningPathValidationContextSchema>;
 export type LearningPathValidationIssue = z.infer<typeof LearningPathValidationIssueSchema>;
+export type LearningPathValidationResponse = z.infer<typeof LearningPathValidationResponseSchema>;
 
 export type GuidedLearningFailure =
   | "active_attempt"
@@ -871,6 +922,18 @@ export interface GuidedLearningProvider {
     userId: string;
   }): Promise<LearningHome>;
   getPreferences(input: { userId: string }): Promise<LearningPreferences>;
+  getEditorMaterialDetail(input: {
+    actorUserId: string;
+    canEditAll: boolean;
+    contentId: string;
+    projection: LearningProjection;
+  }): Promise<GuidedLearningResult<LearningEditorMaterialDetail>>;
+  getEditorOptionMaterialDetail(input: {
+    actorUserId: string;
+    canEditAll: boolean;
+    optionId: string;
+    pathId: string;
+  }): Promise<GuidedLearningResult<LearningEditorMaterialDetail>>;
   getEditorPath(input: {
     actorUserId: string;
     canEditAll: boolean;
@@ -963,6 +1026,7 @@ export interface GuidedLearningProvider {
   validatePath(input: {
     actorUserId: string;
     canEditAll: boolean;
+    expectedVersion?: number;
     pathId: string;
-  }): Promise<GuidedLearningResult<{ issues: LearningPathValidationIssue[]; ready: boolean }>>;
+  }): Promise<GuidedLearningResult<LearningPathValidationResponse>>;
 }

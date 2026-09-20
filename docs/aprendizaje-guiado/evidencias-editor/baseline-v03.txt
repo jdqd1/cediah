@@ -1,0 +1,6 @@
+V03 — pnpm typecheck
+Scope: all 4 workspace projects
+packages/contracts typecheck: Done
+apps/api typecheck: Done
+apps/web typecheck: Done
+EXIT_CODE=0

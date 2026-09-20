@@ -1,0 +1,19 @@
+T018 PASS — 2026-09-20
+
+Checks automatizados:
+- editor-fixtures.test.ts + use-material-catalog.test.ts: PASS (2 archivos, 17 tests)
+- pnpm --filter @cediah/web typecheck: PASS
+- pnpm --filter @cediah/web lint: PASS
+
+Comprobación local (Next dev 127.0.0.1:3100, API real apagada):
+- ready 200
+- new 200
+- errors 200
+- limited 200
+- legacy 200
+- published 200
+- archived 200
+- empty-catalog 200
+- long 200
+
+El proceso local se cerró tras la comprobación. Las fixtures solo mutan memoria; no se desplegaron ni publicaron rutas.

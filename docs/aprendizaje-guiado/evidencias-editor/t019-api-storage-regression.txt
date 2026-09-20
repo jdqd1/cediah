@@ -1,0 +1,28 @@
+T019 PASS de alcance — 2026-09-20
+
+Checks ejecutados:
+- V02 `pnpm --filter @cediah/contracts build`: PASS.
+- V06 exacto: 3 archivos, 21 pruebas, 21 PASS.
+- Validación + regresión de mapa focalizadas: 2 archivos, 15 pruebas, 15 PASS.
+- V03 `pnpm typecheck`: PASS en contracts/api/web.
+- V04 `pnpm lint`: PASS en api/web, cero warnings.
+
+Persistencia demostrada con proveedor real sobre una base PGlite descartable:
+- PATCH lógico de una nueva v2 elimina la unidad; GET editorial vuelve a leer cero unidades.
+- La v1 publicada conserva `unidad-torax`, su revisión fijada y la matrícula histórica sigue apuntando a v1.
+- Los conteos de `learning_attempts`, `learning_enrollments` y `learning_rewards` son idénticos antes/después de clonar y editar v2.
+- GET actual/fijado no crea revisiones ni ítems; la retirada devuelve `unavailable/retired` sin reconstruir el snapshot.
+- Ediciones cosméticas y clonado conservan config, completionRule, revisiones y rewardIdentity.
+- Un fallo inducido por clave duplicada revierte metadata, definición y audit log.
+- Draft obsoleto devuelve conflicto de versión; revisión/publicación son inmutables y una ruta archivada no se clona.
+- Una optionId de otra ruta y un editor ajeno no exponen detalle; el resolver no se invoca antes del acceso.
+
+Límite de la evidencia:
+- PGlite y Fastify inject validan persistencia/permisos locales; no son comprobación de producción.
+- No se desplegó, no se publicó una ruta real y no se usó DATABASE_URL.
+
+V07 `pnpm test`:
+- web: 34 archivos PASS, 195 pruebas PASS.
+- api: 27 archivos PASS y 1 FAIL; 200 pruebas PASS y 1 FAIL.
+- Fallo único: `guided-learning-catalog.test.ts`, historial esperado 1,2,3 y recibido 2,3,1. Es el mismo fallo intermitente capturado en el baseline T001 antes de la implementación; los tres registros están presentes. No se cambió la expectativa ni el test antiguo para ocultarlo.
+- EXIT_CODE=1 por ese fallo heredado.

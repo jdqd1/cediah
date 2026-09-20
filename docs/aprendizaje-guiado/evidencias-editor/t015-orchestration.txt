@@ -1,0 +1,14 @@
+T015 PASS — 2026-09-19
+
+Checks:
+- pnpm --filter @cediah/web exec vitest run src/components/learning/editor: PASS (10 archivos, 81 tests)
+- pnpm typecheck: PASS (contracts, web, api)
+- pnpm --filter @cediah/web lint: PASS
+
+Casos focalizados:
+- save fallido 503 => validate no invocado
+- save editVersion 9 => validate(pathId, 9)
+- validatedEditVersion 8 o ausente => outdated_validation
+- error de validate no reinterpretado como éxito
+- recovery incompleto válido, schema estricto, TTL 24 h, baseVersion y claves por actor/ruta
+- navegación y doble acción quedan además cubiertas extremo a extremo en T020

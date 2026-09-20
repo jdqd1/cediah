@@ -1,0 +1,30 @@
+T020 — Playwright, reflow, teclado y axe
+Fecha local: 2026-09-20
+
+PASS — V09 integral
+- Configuración: Chromium, proyectos desktop 1440x900 y mobile 390x844, 1 worker.
+- Resultado: 30/30 pruebas pasaron en 2.5 min.
+- Transporte: fixture determinista en memoria; no se inició la API ni se tocaron datos reales.
+- Reflow: 320x800, 390x844, 768x1024, 1024x768 y 1440x900 en ambos proyectos; scrollWidth === clientWidth y CTA visible.
+
+PASS — accesibilidad automática
+- @axe-core/playwright ejecutó wcag2a, wcag2aa, wcag21a, wcag21aa y wcag22aa.
+- Estados por proyecto: Datos, unidad expandida, selector abierto, Revisión con errores y confirmación de eliminación.
+- Resultado: 0 violations en las 10 auditorías. Los informes JSON quedaron adjuntos al resultado Playwright.
+- La auditoría espera a que terminen las animaciones documentales antes de medir el estado estable; no excluye reglas ni nodos del editor.
+
+PASS — interacción y regresión focalizada
+- Selector, ayuda y eliminación por teclado/restauración de foco: 2/2 desktop/mobile.
+- Vitest editor: 13 archivos, 102/102 pruebas.
+- Typecheck web: exit 0.
+- Lint web: exit 0.
+
+Defectos concretos encontrados y resueltos durante T020
+- Un fallo de save se reinterpretaba como fallo de validate: ahora la etapa se discrimina y no se inicia validate.
+- La recuperación podía perderse por el ciclo de efecto de Strict Mode: la marca se confirma dentro de la aplicación diferida.
+- Dialog y AlertDialog controlados no devolvían foco al disparador: se conserva el destino antes del cierre y Radix ejecuta onCloseAutoFocus.
+- El fixture con viewer divergía entre SSR/cliente: se retiró el dato inestable del fixture.
+- Se añadió el caso de material fijado fuera de la primera página y paginación posterior sin perder selección.
+
+Alcance explícito
+- Estas pruebas acreditan la UI contra fixture simulado. Persistencia y permisos se comprobaron separadamente en T019 mediante PGlite y Fastify inject local; ninguna de las dos evidencias comprueba producción.

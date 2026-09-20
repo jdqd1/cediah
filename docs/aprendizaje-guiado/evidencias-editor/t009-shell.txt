@@ -1,0 +1,15 @@
+T009 — 19 de septiembre de 2026
+
+PASS
+- @cediah/web build: PASS
+- @cediah/web typecheck: PASS
+- @cediah/web lint: PASS
+- pruebas focalizadas editor/BFF: 5 archivos, 35/35 PASS
+
+Rutas confirmadas por Next build:
+- /panel/rutas
+- /panel/rutas/nueva
+- /panel/rutas/[pathId]
+- /api/editor/learning-resources/[contentId]
+
+Radix Tabs integrado con tres secciones controladas: Datos, Actividades y Revisión.

@@ -1,12 +1,12 @@
 # === HANDOFF PARA MODELO EJECUTOR ===
 
-Paquete completo y autosuficiente. Incluye las quince secciones del plan, las 22 fichas, los contratos, los ejemplos de código y todas las pruebas. Puede entregarse como único documento al implementador junto al repositorio. No depende de la conversación.
+Paquete completo y autosuficiente, revisión 2 actualizada el 19 de septiembre de 2026. Incluye las quince secciones del plan, 22 fichas de tareas, 16 criterios de terminado, 41 comprobaciones finales, 41 casos de prueba, contratos y ejemplos de código. Exige instalar e integrar Radix UI, TanStack Query y axe para Playwright en las versiones y puntos definidos en §8.12. Puede entregarse como único documento al implementador junto al repositorio. No depende de la conversación.
 
 ---
 
 # Plan maestro de ejecución: editor intuitivo de rutas de aprendizaje
 
-Fecha: 14 de septiembre de 2026. Estado: especificación para implementar; implementación NO realizada.
+Fecha del análisis inicial: 14 de septiembre de 2026. Revisión 2 actualizada el 19 de septiembre de 2026: incorporación obligatoria de bibliotecas gratuitas reconocidas, según solicitud del usuario. Estado: especificación para implementar; implementación NO realizada.
 
 Repositorio: `D:\Jose (Datos)\Medicina\CEDIAH\Web`. Base inspeccionada: `1b3b6c8b11796aa070047c38057e6ab36940dcb0`. El árbol estaba limpio al comenzar. No se encontraron archivos AGENTS.md en el repositorio ni en los directorios ascendentes inspeccionados.
 
@@ -49,6 +49,7 @@ Fuera del alcance: rediseñar el panel entero, el mapa espacial o la experiencia
 | D13 | El editor funciona a 320, 390, 768, 1024 y 1440 px; no hay desbordamiento horizontal de página ni acciones inaccesibles. |
 | D14 | Teclado: navegación de secciones, selector, confirmación, ayuda y correcciones funcionan; el foco regresa a una ubicación lógica al cerrar. |
 | D15 | Las comprobaciones obligatorias de T001–T022 están PASS. Todo NO VERIFICADO obligatorio impide declarar la implementación terminada. |
+| D16 | Radix se usa en los componentes indicados, TanStack Query ejecuta las lecturas del catálogo/detalles y axe analiza el editor en Playwright. Las tres versiones están fijadas, sus licencias registradas y sus pruebas PASS; no basta instalarlas. |
 
 ## 3. Requisitos
 
@@ -63,6 +64,7 @@ Fuera del alcance: rediseñar el panel entero, el mapa espacial o la experiencia
 - Ayudas «?» breves y selectivas. No añadir una ayuda al título ni a otros campos evidentes.
 - Conservar compatibilidad con rutas existentes y permisos editoriales.
 - Proporcionar pruebas y evidencias suficientes para que un ejecutor económico pueda verificar el resultado.
+- Instalar e integrar efectivamente Radix UI Primitives, TanStack Query y axe-core para Playwright según §8.12. Reutilizar Zod, Phosphor, Vitest y PGlite existentes. Incluirlos en package.json sin usarlos no cumple este requisito.
 
 ### Deseables
 
@@ -83,7 +85,7 @@ Los deseables no autorizan modificar contratos fuera de este documento ni retras
 
 ### Prohibiciones
 
-- No instalar un nuevo kit visual, gestor de estado, librería de drag-and-drop ni librería de formularios.
+- Las únicas dependencias directas nuevas previstas son `radix-ui`, `@tanstack/react-query` y `@axe-core/playwright`, con las versiones y destinos de §8.12. Sus transitivas son esperables. No incorporar kits visuales adicionales, gestores de borrador, formularios o drag-and-drop sin una necesidad nueva demostrada; los candidatos descartados están explicados en §8.12.
 - No transformar automáticamente `standard` en `limited`, ni ocultar errores para permitir publicar.
 - No regenerar identidades de entidades existentes por cambiar títulos, orden, nombre de campo o sección.
 - No insertar por defecto `resources[0]`; no reconstruir `config` al editar `label` o `isDefault`.
@@ -94,7 +96,7 @@ Los deseables no autorizan modificar contratos fuera de este documento ni retras
 
 ### Preferencias expresas del usuario
 
-Menos campos; entender qué poner y por qué; creación fácil de una ruta de calidad; avisos rojos y amarillos comprensibles; eliminación de unidades; explicación/reorganización de materiales; pocos tooltips; diseño moderno y profesional; funcionamiento móvil; decisiones tomadas de antemano y ejemplos de código operativos. Esta entrega es un plan, no una ejecución del rediseño.
+Menos campos; entender qué poner y por qué; creación fácil de una ruta de calidad; avisos rojos y amarillos comprensibles; eliminación de unidades; explicación/reorganización de materiales; pocos tooltips; diseño moderno y profesional; funcionamiento móvil; decisiones tomadas de antemano y ejemplos de código operativos. El usuario solicita además bibliotecas gratuitas y reconocidas que simplifiquen la ejecución. Esta entrega actualiza el plan; la instalación e implementación quedan encargadas al ejecutor.
 
 ## 4. Decisiones de arquitectura
 
@@ -113,11 +115,11 @@ Menos campos; entender qué poner y por qué; creación fácil de una ruta de ca
 | A11 | Resultados de validación vinculados a `editVersion`. | Mostrar avisos antiguos después de modificar la estructura. | Invalidar resultado tras cada cambio; validar la respuesta contra el borrador guardado. |
 | A12 | Mensajes presentacionales en web por código; API añade contexto estructurado opcional. | Traducir mediante regex el texto técnico recibido o duplicar reglas de calidad en frontend. | Diccionario exhaustivo y parser legacy por paths; el servidor decide severidad y ready. |
 | A13 | Reutilizar revisiones de materiales en cambios cosméticos y al crear versión. Actualizar solo mediante acción explícita. | Resolver siempre la última publicación al guardar cualquier campo. | Cambiar `resolveDefinition` y clonación; agregar `refreshResource` y `expectedSourceVersion` opcionales al request de opción. |
-| A14 | Detalle editorial de material bajo demanda, para revisión actual o material ya vinculado. | Asumir que una página de 24 resultados contiene todos los materiales de una ruta. | Dos GET de detalle, cache local por fuente/formato o ruta/opción/revisión. |
+| A14 | Detalle editorial bajo demanda y TanStack Query para búsqueda, paginación y cache de lecturas. | Cache remoto manual y dependencia de los primeros 24 resultados. | useInfiniteQuery/useQuery con claves de actor/ruta/filtros/revisión; el borrador permanece exclusivamente en el reducer. |
 | A15 | CSS Module local y tokens vigentes de marca. | Rediseño global o estilo genérico de dashboard. | Tocar solo estilos usados por el editor; conservar el shell y el mapa. |
-| A16 | Diálogo nativo `<dialog>` con `showModal()`, etiqueta y bloqueo de scroll. | Reutilizar sin revisar el focus trap actual que omite select/textarea. | Componente local comprobado con teclado; no cambiar el hook compartido del mapa. |
+| A16 | Radix UI Primitives: Dialog/AlertDialog/Tabs/Accordion/DropdownMenu/Popover/Collapsible. | Implementar manualmente foco, teclado y capas; sustituir el diseño por un kit completo. | Wrappers locales con CSS Modules; Radix gestiona interacción y accesibilidad de base. No usar showModal ni focus traps propios para los nuevos modales. |
 | A17 | Índice de rutas separado del formulario de creación. | Mostrar tarjetas de todas las rutas encima de un formulario nuevo largo. | `/panel/rutas` lista; `/panel/rutas/nueva` crea; URLs de edición existentes continúan funcionando. |
-| A18 | Verificación en fixtures locales y API con PGlite. | Depender de contenido o credenciales de producción. | Config de Playwright propia del editor, independiente del mapa. |
+| A18 | Fixtures locales, API con PGlite y accesibilidad automática con @axe-core/playwright. | Depender de producción o asumir accesibilidad solo por usar Radix. | Playwright propio del editor; axe sobre estados finales; revisión visual/teclado sigue siendo obligatoria. |
 
 ## 5. Hechos, inferencias, supuestos y desconocidos
 
@@ -162,19 +164,19 @@ Menos campos; entender qué poner y por qué; creación fácil de una ruta de ca
 
 ## 6. Descomposición del proyecto: fichas T001–T022
 
-Reglas comunes a todas las fichas: los permisos de archivos se interpretan relativos a la raíz; «no modificar» incluye todos los archivos no enumerados salvo imports/exports estrictamente necesarios mencionados por la ficha. No tocar datos reales, dependencias, migraciones, autenticación ni políticas de estudiante. Los tests nuevos se crean junto a cada unidad funcional; T019/T020 completan integración y no posponen todas las pruebas hasta el final. Un check solo cuenta como ejecutado si se registró salida y exit code.
+Reglas comunes a todas las fichas: los permisos de archivos se interpretan relativos a la raíz; «no modificar» incluye todos los archivos no enumerados salvo imports/exports estrictamente necesarios mencionados por la ficha. No tocar datos reales, migraciones, autenticación ni políticas de estudiante. T001 modifica únicamente las dependencias autorizadas de §8.12 y su lockfile; las demás tareas usan esas versiones. Los tests nuevos se crean junto a cada unidad funcional; T019/T020 completan integración y no posponen todas las pruebas hasta el final. Un check solo cuenta como ejecutado si se registró salida y exit code.
 
-### T001 — Registrar baseline y entorno [C]
+### T001 — Registrar baseline e instalar bibliotecas aprobadas [C]
 
-- **Objetivo:** establecer evidencia antes de implementar y confirmar que no se trabajará sobre producción.
-- **Inputs:** este plan; package.json raíz/apps; README; git status y AGENTS aplicables del checkout actual.
-- **Instrucciones:** leer AGENTS de raíz y ancestros; registrar HEAD y cambios existentes; marcar este plan como documentación ya presente. Ejecutar V01. Confirmar Node 24/pnpm 11.9.0; usar el runtime local requerido, sin cambiar engines. Instalar con frozen-lockfile solo si faltan dependencias. Ejecutar V02, V03, V04, V07, V08 secuencialmente. Leer archivos fuente enumerados en §9 y registrar si los símbolos aún existen. No arrancar API con credenciales de entorno.
+- **Objetivo:** establecer baseline, confirmar aislamiento de producción e instalar las tres bibliotecas aprobadas antes de sus integraciones.
+- **Inputs:** este plan, especialmente §8.12; package.json raíz/apps; pnpm-lock.yaml; README; git status y AGENTS aplicables del checkout actual.
+- **Instrucciones:** leer AGENTS de raíz y ancestros; registrar HEAD y cambios existentes; marcar este plan como documentación ya presente. Ejecutar V01. Confirmar Node 24/pnpm 11.9.0; usar el runtime local requerido, sin cambiar engines. Instalar con frozen-lockfile solo si faltan dependencias. Ejecutar V02, V03, V04, V07, V08 secuencialmente. Leer archivos fuente enumerados en §9 y registrar si los símbolos aún existen. No arrancar API con credenciales de entorno. Una vez registrados los checks de baseline, comprobar las versiones/licencias/peers fijados en §8.12 e instalar con sus dos comandos exactos; registrar resultado y mantener las versiones anteriores de dependencias no relacionadas. Ejecutar V11 y V03/V04 tras instalar. No ampliar overrides ni allowBuilds.
 - **Output:** EDITOR-EJECUCION.md con baseline, lista de tareas y resultados reales; logs en evidencias-editor/baseline-*.txt.
 - **Dependencias:** ninguna.
-- **Puede modificar:** documentos EDITOR-EJECUCION.md, EDITOR-VALIDACION.md, evidencias-editor; outputs de build ignorados por git.
-- **No puede modificar:** código de aplicación, lockfile, .env, migraciones ni este plan para cambiar requisitos.
-- **Aceptación:** runtime y HEAD registrados; baseline PASS o fallos previos individualizados; ninguna conexión a base real realizada.
-- **Comprobaciones:** V01–V04/V07/V08, según disponibilidad; registrar NO VERIFICADO con causa si no pueden correr. Los fallos previos no conceden permiso de ignorar una regresión nueva.
+- **Puede modificar:** documentos EDITOR-EJECUCION.md, EDITOR-VALIDACION.md, evidencias-editor; apps/web/package.json exclusivamente para las tres bibliotecas; pnpm-lock.yaml para resolverlas y sus transitivas; outputs de build ignorados por git.
+- **No puede modificar:** código de aplicación, .env, migraciones, pnpm-workspace.yaml, versiones de paquetes existentes ni este plan para cambiar requisitos. La excepción de lockfile está limitada a las bibliotecas aprobadas.
+- **Aceptación:** runtime/HEAD y baseline registrados; tres paquetes fijados en sus categorías correctas, V11 confirma instalación; ninguna conexión a base real realizada. La instalación sola no acredita integración: se verifica en T009–T021.
+- **Comprobaciones:** V01–V04/V07/V08 y V11, según disponibilidad; registrar NO VERIFICADO con causa si no pueden correr. Los fallos previos no conceden permiso de ignorar una regresión nueva.
 - **Errores a evitar:** atribuirse tests no corridos, copiar secretos a logs, usar pnpm update, arrancar dev:api sin revisar destino de base.
 
 ### T002 — Extender contratos editoriales [B]
@@ -259,7 +261,7 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** transportar los contratos nuevos sin exponer la API directamente al navegador.
 - **Inputs:** endpoints y schemas de T006/T007; forwardGuidedLearningRequest; §8.6/8.9.
-- **Instrucciones:** crear BFF learning-resources/[contentId]/route.ts; extender GET catch-all para [pathId,materials,optionId]; conservar resto de rutas. Crear editor-api.ts con métodos save/create/validate/transition/createVersion/search/detail; parsear response con Zod y discriminar éxito/fallo por response.ok. Para validate mandar expectedVersion y verificar schema con nuevo campo. No construir URLs con datos no codificados ni permitir sufijos arbitrarios.
+- **Instrucciones:** crear BFF learning-resources/[contentId]/route.ts; extender GET catch-all para [pathId,materials,optionId]; conservar resto de rutas. Crear editor-api.ts con métodos save/create/validate/transition/createVersion/search/detail; las lecturas aceptan AbortSignal opcional y lo pasan a fetch; parsear response con Zod y discriminar éxito/fallo por response.ok. Crear unwrapEditorReadResult y EditorQueryError según §8.12.4; preservar la cancelación sin convertirla en respuesta vacía. Para validate mandar expectedVersion y verificar schema con nuevo campo. No construir URLs con datos no codificados ni permitir sufijos arbitrarios.
 - **Output:** BFF y adaptador de transporte consumibles por los hooks; tests de enrutamiento y errores.
 - **Dependencias:** T006/T007.
 - **Puede modificar:** dos BFF indicados; guided-learning-api.ts para helper servidor si hace falta; editor-api.ts; tests web `src/lib/learning-editor-route.test.ts` y `editor-api.test.ts`.
@@ -272,7 +274,7 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** separar listado/creación y montar las tres secciones con un estado compartido.
 - **Inputs:** §8.1/8.3/8.11; páginas actuales panel/rutas; modelos T003.
-- **Instrucciones:** convertir `/panel/rutas` en lista con Crear ruta; añadir `/panel/rutas/nueva` con guardas equivalentes. Mantener [pathId] y las mismas capacidades. Pasar actorUserId al editor para recuperación local; no renderizar editor sin identidad autorizada. Extraer editor-shell y usar LearningRouteEditor como fachada. Crear tabs con IDs, paneles y teclado definidos; provisionalmente conectar paneles básicos a modelos sin lógica HTTP duplicada. En [pathId] usar key por path.id. Un único h1 y un main efectivo: revisar shell antes de anidar main.
+- **Instrucciones:** convertir `/panel/rutas` en lista con Crear ruta; añadir `/panel/rutas/nueva` con guardas equivalentes. Mantener [pathId] y las mismas capacidades. Pasar actorUserId al editor para recuperación local; no renderizar editor sin identidad autorizada. Extraer editor-shell y usar LearningRouteEditor como fachada. Crear tabs con Radix Tabs controlado y activationMode="manual", IDs y paneles; Radix resuelve el teclado definido; provisionalmente conectar paneles básicos a modelos sin lógica HTTP duplicada. En [pathId] usar key por path.id. Un único h1 y un main efectivo: revisar shell antes de anidar main.
 - **Output:** navegación de índice/nueva/editar funcional y contenedor de secciones.
 - **Dependencias:** T003.
 - **Puede modificar:** páginas panel/rutas/page.tsx, nueva/page.tsx, [pathId]/page.tsx; learning-route-editor.tsx; editor-shell.tsx; `routes-index.tsx` opcional local.
@@ -285,7 +287,7 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** reducir datos iniciales a información comprensible.
 - **Inputs:** §8.1/8.2; editor-shell; contrato/modelo.
-- **Instrucciones:** crear route-basics con título, tema y descripción; required/maxLength apropiados y errores bajo campos. No mostrar slug/key/evidencia. Tema sin selección silenciosa salvo caso de único tema. Portada en disclosure con ocho opciones actuales, sin imágenes inventadas. Implementar field-help reutilizable con botón click/teclado, Escape y una ayuda abierta; usarlo únicamente en las tres familias autorizadas.
+- **Instrucciones:** crear route-basics con título, tema y descripción; required/maxLength apropiados y errores bajo campos. No mostrar slug/key/evidencia. Tema sin selección silenciosa salvo caso de único tema. Portada en disclosure con ocho opciones actuales, sin imágenes inventadas. Implementar field-help con Radix Popover controlado, botón click/teclado, Escape y una ayuda abierta; usarlo únicamente en las tres familias autorizadas.
 - **Output:** panel Datos terminado y componente de ayuda.
 - **Dependencias:** T009.
 - **Puede modificar:** route-basics.tsx, field-help.tsx; reglas CSS específicas que T017 consolidará.
@@ -298,12 +300,12 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** ofrecer estructura navegable y resolver la eliminación de unidades existentes.
 - **Inputs:** §8.1/8.5/8.11; reducer T004; shell T009.
-- **Instrucciones:** crear unit-card y editor-dialog con dialog.showModal/cleanup/foco. Mostrar todos los objetivos de una unidad, añadir/editar/eliminar con regla de reasignación. Añadir menú de subir/bajar/eliminar unidad. Confirmación informa N actividades y que fuentes se conservan; foco inicial Cancelar. Conectar confirmación a reducer; resolver foco después de eliminar por sucesor lógico. Botones de añadir respetan límites. Si no hay objetivos completos, Añadir actividad enfoca objetivo y explica por qué.
+- **Instrucciones:** crear unit-card con Radix Accordion y editor-dialog con Radix Dialog para selección/vista previa y Radix AlertDialog para confirmación; envolverlos localmente sin implementar focus trap propio. Mostrar todos los objetivos de una unidad, añadir/editar/eliminar con regla de reasignación. Añadir menú de subir/bajar/eliminar unidad con Radix DropdownMenu. Confirmación informa N actividades y que fuentes se conservan; foco inicial Cancelar. Conectar confirmación a reducer; resolver foco después de eliminar por sucesor lógico. Botones de añadir respetan límites. Si no hay objetivos completos, Añadir actividad enfoca objetivo y explica por qué.
 - **Output:** unidades/objetivos operativos, eliminar/cancelar y reordenar.
 - **Dependencias:** T004/T009.
 - **Puede modificar:** unit-card.tsx, editor-dialog.tsx; learning-route-editor.tsx solo cableado; tests reducer si aparece caso faltante.
 - **No puede modificar:** snapshots, migraciones, DELETE de API, componentes del mapa ni focus hook compartido.
-- **Aceptación:** P04/P05/P21/P34/P35; botones incluyen nombre de unidad en aria-label cuando hay varios; cambiar unidad no pierde input.
+- **Aceptación:** P04/P05/P21/P34/P35/P37; botones incluyen nombre de unidad en aria-label cuando hay varios; cambiar unidad no pierde input; menú, accordion y confirmación usan Radix con foco correcto.
 - **Comprobaciones:** V05/V03; E2E de T020 verificará persistencia UI/foco. No declarar completo el defecto de borrado hasta storage T019.
 - **Errores a evitar:** botón de eliminar sin confirmación, guardar implícitamente al borrar, referenciar unitIndex antiguo, menú que no permite teclado.
 
@@ -311,12 +313,12 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** sustituir Materiales por elección comprensible dentro de cada actividad.
 - **Inputs:** §8.5/8.7; API T008; unit-card y dialog.
-- **Instrucciones:** crear use-material-catalog y material-picker con los tres modos exactos. Separar resultados de cache; filtros aplicados/cursor coherentes; request generation y AbortController. Selección provisional en modal, carga del detalle y confirmación explícita; cancelar no modifica draft. Crear nueva actividad solo al confirmar material/formato/objetivo cuando sea necesario. Traducir nombres de formatos; estados empty/loading/failure y enlace a Contenido.
+- **Instrucciones:** crear use-material-catalog y material-picker con los tres modos exactos. Usar TanStack Query: useInfiniteQuery para catálogo y useQuery para detalles, según claves y opciones de §8.12. Derivar resultados desde data.pages, sin segundo cache manual; pasar signal hasta fetch. Mantener filtros aplicados/cursor coherentes y destino de selección local. Selección provisional en modal, carga del detalle y confirmación explícita; cancelar no modifica draft. Crear nueva actividad solo al confirmar material/formato/objetivo cuando sea necesario. Traducir nombres de formatos; estados empty/loading/failure y enlace a Contenido.
 - **Output:** búsqueda, paginación, selección nueva y reemplazo contextual; eliminación de la pestaña Materiales en fachada.
 - **Dependencias:** T006/T008/T011.
-- **Puede modificar:** material-picker.tsx, use-material-catalog.ts, sus tests, cableado de fachada.
+- **Puede modificar:** material-picker.tsx, use-material-catalog.ts, editor-query-provider.tsx, editor-query-keys.ts, editor-query-provider.test.ts, sus tests y cableado de fachada. editor-api.ts solo para propagar signal en lecturas según §8.12.
 - **No puede modificar:** filtros del catálogo público, base de datos desde web, esquemas de contenido, reglas de publicación.
-- **Aceptación:** P02/P08/P09/P18/P27/P33; abrir/cerrar no inserta resources[0]; consulta vieja no reemplaza resultados vigentes.
+- **Aceptación:** P02/P08/P09/P18/P27/P33/P38/P41; abrir/cerrar no inserta resources[0]; consulta vieja no reemplaza resultados vigentes; GET pasa por Query y signal llega al transporte, sin cache manual duplicado.
 - **Comprobaciones:** tests del catálogo/transport; V03; T020 probará modal en móvil.
 - **Errores a evitar:** mezclar cache con resultados, perder source canonical del detalle, impedir selector cuando catálogo inicial está vacío pero una búsqueda puede devolver datos.
 
@@ -324,7 +326,7 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** automatizar el caso simple y conservar capacidad de editar casos existentes complejos.
 - **Inputs:** §8.2/8.5; reducer; selector y detalle de material.
-- **Instrucciones:** crear activity-card/activity-options/objective-mapping-editor. Tarjeta principal con título/material/duración; Más opciones cerrado. Defaults según formato solo al crear. Objetivo único automático; varios por elección explícita con enunciados legibles. Permitir personalizar label, opcionalidad, duración, propósito y recomendado sin reset de config. Cambiar fuente/refresh requiere confirmación si config personalizada. Mostrar alternativas heredadas sin convertirlas; restringir nuevas alternativas a familias definidas. Mostrar dependencias por títulos; representar referencia rota como «Actividad eliminada» con botón Quitar.
+- **Instrucciones:** crear activity-card/activity-options/objective-mapping-editor. Tarjeta principal con título/material/duración; Radix Collapsible para Más opciones inicialmente cerrado; Radix Accordion controlado para desplegar actividad. Defaults según formato solo al crear. Objetivo único automático; varios por elección explícita con enunciados legibles. Permitir personalizar label, opcionalidad, duración, propósito y recomendado sin reset de config. Cambiar fuente/refresh requiere confirmación si config personalizada. Mostrar alternativas heredadas sin convertirlas; restringir nuevas alternativas a familias definidas. Mostrar dependencias por títulos; representar referencia rota como «Actividad eliminada» con botón Quitar.
 - **Output:** actividades y ajustes avanzados completos; materiales fijados visibles por detalle lazy.
 - **Dependencias:** T012 y T004.
 - **Puede modificar:** activity-card.tsx, activity-options.tsx, objective-mapping-editor.tsx; editor-model/reducer solo acciones necesarias ya definidas; tests relacionados.
@@ -350,7 +352,7 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** sincronizar el contenido mostrado, lo guardado y lo validado, con recuperación de errores.
 - **Inputs:** §8.4/8.9; reducer; transporte; copy; props actorUserId.
-- **Instrucciones:** crear use-route-editor con operación única y comandos que retornan respuestas confirmadas. Implementar saveThenValidate exacto; validar Zod antes de enviar, bloqueo de mutaciones, invalidación local y validatedEditVersion. Reemplazar URL al crear sin duplicar POST. Implementar errores 400/401/403/404/409/422/429/5xx. Guardas de enlaces/beforeunload y recuperación sessionStorage con TTL/actor/baseVersion, sin parches del historial ni cola de red. Añadir descarga local de borrador y flujo de conflicto. Transport inyectable por interfaz para fixtures, default real en producción.
+- **Instrucciones:** crear use-route-editor con operación única y comandos que retornan respuestas confirmadas. Implementar saveThenValidate exacto; validar Zod antes de enviar, bloqueo de mutaciones, invalidación local y validatedEditVersion. Reemplazar URL al crear sin duplicar POST. Implementar errores 400/401/403/404/409/422/429/5xx. Guardas de enlaces/beforeunload y recuperación sessionStorage con TTL/actor/baseVersion, sin parches del historial ni cola de red. Añadir descarga local de borrador y flujo de conflicto. Transport inyectable por interfaz para fixtures, default real en producción. TanStack Query administra únicamente GET; save/validate/transition/createVersion siguen esta orquestación con fetch sin reintentos automáticos y jamás se montan como useQuery.
 - **Output:** orquestación completa, barra de guardado y recuperación; viejo save/validate reemplazados.
 - **Dependencias:** T004/T008/T013/T014.
 - **Puede modificar:** use-route-editor.ts, editor-api.ts si requiere tipos de resultado, fachada, editor-shell; helpers `editor-recovery.ts`/tests nuevos locales.
@@ -376,8 +378,8 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** llevar los componentes al aspecto limpio y a las medidas del plan.
 - **Inputs:** §8.1/8.11 y CSS de ejemplo; componentes integrados; identity-v3.css y tokens vigentes.
-- **Instrucciones:** consolidar route-editor.module.css; aplicar medidas, jerarquía y breakpoints exactos; selector modal adaptado a 100dvh móvil; estados focus/hover/disabled/error; barra sticky con padding inferior suficiente; reduced-motion. Eliminar del uso de LearningRouteEditor las clases antiguas; borrar en learning.css únicamente reglas .learning-editor-* que rg confirme sin uso fuera del editor viejo, sin tocar .learning-* de alumnos/mapa.
-- **Output:** UI estilizada sin dependencias nuevas y sin estilos globales que afecten otras pantallas.
+- **Instrucciones:** consolidar route-editor.module.css; aplicar medidas, jerarquía y breakpoints exactos; selector modal adaptado a 100dvh móvil; estados focus/hover/disabled/error y data-state de Radix; definir estilos de portales independientemente del ancestro .editor; barra sticky con padding inferior suficiente; reduced-motion. Eliminar del uso de LearningRouteEditor las clases antiguas; borrar en learning.css únicamente reglas .learning-editor-* que rg confirme sin uso fuera del editor viejo, sin tocar .learning-* de alumnos/mapa.
+- **Output:** UI estilizada sobre Radix ya instalado en T001, sin bibliotecas adicionales ni estilos globales que afecten otras pantallas.
 - **Dependencias:** T010/T013/T016.
 - **Puede modificar:** route-editor.module.css, className dentro de componentes editor, reglas legacy editor en learning.css con comprobación de uso.
 - **No puede modificar:** identity-v3.css, fuentes/global tokens, AppShell, estilos de mapa/estudiante, estructura de datos ni mensajes para acortarlos arbitrariamente.
@@ -388,12 +390,12 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 ### T018 — Crear fixtures y entorno UI aislado [C]
 
 - **Objetivo:** permitir a cualquier ejecutor comprobar la UI sin cuentas ni contenido de producción.
-- **Inputs:** matriz P01–P36; patrón visual-fixtures/mapa; interfaz transport de T015.
+- **Inputs:** matriz P01–P41; patrón visual-fixtures/mapa; interfaz transport de T015.
 - **Instrucciones:** crear editor-fixtures.ts con IDs UUID constantes y estados `new`, `ready`, `errors`, `limited`, `legacy`, `published`, `archived`, `empty-catalog`, `long`. ready contiene 1 unidad, 1 objetivo, 1 guía y 1 cuestionario con 5 IDs distintos y explicación completa. errors contiene objetivo sin comprensión y práctica con 3 ítems. legacy contiene 2 objetivos, config personalizada, alternativas y revision anterior. long incluye títulos de 200/240 caracteres y 30 unidades con contenido colapsado. Implementar transporte fixture en memoria con editVersion, espera configurable y errores deterministas; no importar ese transporte desde rutas de producción. Crear página fixture con NODE_ENV !== development→notFound. Configurar Playwright del editor en puerto 3100 según §11.1.
 - **Output:** fixture accesible localmente, modo por `estado`, sin necesidad de API real.
 - **Dependencias:** T016.
 - **Puede modificar:** editor-fixtures.ts, `editor-fixture-workspace.tsx` local, página visual-fixtures/editor-rutas, playwright.editor.config.ts y gitignore para `.editor-test-results` si es necesario.
-- **No puede modificar:** pruebas/config del mapa, endpoints de producción, sesiones, seeds en base real ni package.json para librerías nuevas.
+- **No puede modificar:** pruebas/config del mapa, endpoints de producción, sesiones, seeds en base real ni package.json para bibliotecas distintas de las ya aprobadas e instaladas en T001.
 - **Aceptación:** fixtures renderizan cada estado; production→404; acciones de fixture mutan solo memoria y nunca envían solicitudes de publicación real.
 - **Comprobaciones:** V03/V08; navegador local en fixture; test que verifica guard de entorno.
 - **Errores a evitar:** mock que siempre responde éxito ignorando expectedVersion, fixture imposible según schemas, insertar contenido sintético en API real.
@@ -414,26 +416,26 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 ### T020 — Verificar interacción mediante E2E [B]
 
 - **Objetivo:** probar el flujo cotidiano y la recuperación desde una interfaz renderizada.
-- **Inputs:** fixtures T018; UI T017; transporte/hook; P01–P36 y Q.
-- **Instrucciones:** crear route-editor.spec.ts; selectores getByRole/getByLabel con nombres de unidad/contexto; no depender de clases de CSS. Implementar secuencia nominal de datos→unidad/objetivo→guía/cuestionario→comprobar→revisión y casos de eliminación, avisos/CTA, errores, requests en orden, doble click, recuperación, modal teclado y largo responsive. Usar rutas interceptadas o transporte fixture determinista y documentar cuál. Crear test de ausencia de requests de estudiante durante preview. Tomar capturas solo en estados estables; no aprobar automáticamente screenshots nuevas sin inspección.
+- **Inputs:** fixtures T018; UI T017; transporte/hook; P01–P41 y Q.
+- **Instrucciones:** crear route-editor.spec.ts; selectores getByRole/getByLabel con nombres de unidad/contexto; no depender de clases de CSS. Implementar secuencia nominal de datos→unidad/objetivo→guía/cuestionario→comprobar→revisión y casos de eliminación, avisos/CTA, errores, requests en orden, doble click, recuperación, modal teclado y largo responsive. Usar rutas interceptadas o transporte fixture determinista y documentar cuál. Crear test de ausencia de requests de estudiante durante preview. Integrar @axe-core/playwright como §8.12 en los estados obligatorios, incluyendo portales; fallar por violations y registrar incomplete para revisión en T021. Tomar capturas solo en estados estables; no aprobar automáticamente screenshots nuevas sin inspección.
 - **Output:** E2E verde en desktop/móvil y captura de fallos si aparecen.
 - **Dependencias:** T017/T018/T019.
 - **Puede modificar:** route-editor.spec.ts, fixtures si falta un estado descrito, playwright.editor.config.ts solo detalles de ejecución coherentes con §11.1.
 - **No puede modificar:** configuración E2E mapa ni código de app para desactivar validación durante tests; no sleep arbitrario como solución de race.
-- **Aceptación:** P02/P04–P06/P08–P13/P18–P21/P25/P29–P36 en UI; tiempos de respuesta tardía reproducibles; roles/labels estables.
+- **Aceptación:** P02/P04–P06/P08–P13/P18–P21/P25/P29–P39/P41 en UI; tiempos de respuesta tardía reproducibles; roles/labels estables; reportes axe conservados y cero violations en el alcance fijado.
 - **Comprobaciones:** V09; documentar separación UI simulada frente a API PGlite.
 - **Errores a evitar:** esperar tiempo fijo en vez de estado, afirmar persistencia de base usando memoria, usar snapshot visual como única prueba de eliminación.
 
 ### T021 — Inspeccionar diseño, contenido y accesibilidad [B]
 
 - **Objetivo:** verificar que el resultado sea comprensible y profesional, no solo funcional.
-- **Inputs:** capturas/fixture final; §8.1/8.2/8.8/8.11; Q28–Q31/P35–P36.
-- **Instrucciones:** abrir fixture final y recorrer caso nominal a teclado. Capturar y examinar estados de §11.3 a los cinco anchos. Comprobar overflow con `scrollWidth <= clientWidth` a nivel de página, además de inspección visual; medir contraste; probar foco/escape y 200% zoom. Revisar copy de todos los códigos, los tres usos de ayuda y ausencia de tecnicismos expuestos. Corregir solo defectos concretos y repetir el caso afectado. No diseñar una alternativa nueva.
+- **Inputs:** capturas/fixture final; §8.1/8.2/8.8/8.11/8.12; Q28–Q31/Q38/Q40, P35–P37/P39 y reportes axe.
+- **Instrucciones:** abrir fixture final y recorrer caso nominal a teclado. Capturar y examinar estados de §11.3 a los cinco anchos. Comprobar overflow con `scrollWidth <= clientWidth` a nivel de página, además de inspección visual; medir contraste; revisar los resultados axe incomplete sin excluir reglas ni nodos del editor; probar foco/escape y 200% zoom. Revisar copy de todos los códigos, los tres usos de ayuda y ausencia de tecnicismos expuestos. Corregir solo defectos concretos y repetir el caso afectado. No diseñar una alternativa nueva.
 - **Output:** EDITOR-VALIDACION.md con evidencias y capturas aceptadas; lista de defectos resueltos o pendientes.
 - **Dependencias:** T020.
 - **Puede modificar:** estilos y copy de componentes editor si corrigen un FAIL del plan, tests afectados y documentos/evidencias.
 - **No puede modificar:** arquitectura, política de evaluación, dependencia de herramientas, alcance de pantallas ni branding global.
-- **Aceptación:** cada captura revisada; Q28–Q31 PASS; todos los problemas y soluciones legibles sin cortar; caso nominal no abre avanzados.
+- **Aceptación:** cada captura revisada; Q28–Q31/Q38/Q40 PASS; cada resultado axe incomplete resuelto por revisión con evidencia; todos los problemas y soluciones legibles sin cortar; caso nominal no abre avanzados.
 - **Comprobaciones:** visual y teclado manual/asistido; V09 solo casos afectados por correcciones; V04/V03 si cambió código.
 - **Errores a evitar:** aprobar solo por screenshot guardada, declarar cumplimiento WCAG total sin auditoría, ocultar mensajes para que quepan, inspeccionar únicamente 1440px.
 
@@ -441,12 +443,12 @@ Reglas comunes a todas las fichas: los permisos de archivos se interpretan relat
 
 - **Objetivo:** entregar cambios verificables y un registro que permita mantenerlos.
 - **Inputs:** resultados T001–T021; definición D y checklist Q.
-- **Instrucciones:** revisar diff contra baseline; verificar que no hay archivos de producción fuera de permisos. Ejecutar V03/V04/V07/V08/V10 finales y V09 si hubo cambios desde la última ejecución completa. Completar todas las filas D/Q con enlaces a evidencia; no sustituir NO VERIFICADO por PASS. Escribir en OPERACION.md solo instrucciones nuevas para crear rutas, corregir avisos, eliminar unidades y actualizar material; conservar documentación histórica. Resumir qué cambió y cómo se probó. Entregar rutas de docs y evidencias, sin desplegar ni publicar.
+- **Instrucciones:** revisar diff contra baseline; verificar que no hay archivos de producción fuera de permisos. Ejecutar V11 y después V03/V04/V07/V08/V10 finales; ejecutar V09 si hubo cambios desde la última ejecución completa. Completar todas las filas D/Q con enlaces a evidencia; no sustituir NO VERIFICADO por PASS. Registrar versiones/licencias y archivos importadores con las pruebas de uso efectivo de §8.12.5 para P40. Escribir en OPERACION.md solo instrucciones nuevas para crear rutas, corregir avisos, eliminar unidades y actualizar material; conservar documentación histórica. Resumir qué cambió y cómo se probó. Entregar rutas de docs y evidencias, sin desplegar ni publicar.
 - **Output:** informe final de implementación, EDITOR-EJECUCION.md, EDITOR-VALIDACION.md y operación actualizada.
 - **Dependencias:** T021.
 - **Puede modificar:** docs de ejecución/validación/evidencias y docs/aprendizaje-guiado/OPERACION.md.
 - **No puede modificar:** código funcional, tests para hacer verde el cierre, infraestructura ni contenido real.
-- **Aceptación:** D01–D15 y Q01–Q36 verificadas; cero regresiones atribuibles pendientes; limitaciones expresas; sin afirmaciones de pruebas de producción no realizadas.
+- **Aceptación:** D01–D16 y Q01–Q41 verificadas; cero regresiones atribuibles pendientes; limitaciones expresas; sin afirmaciones de pruebas de producción no realizadas.
 - **Comprobaciones:** comandos finales indicados y revisión del alcance; cada FAIL funcional vuelve a su tarea responsable.
 - **Errores a evitar:** cerrar solo porque no quedan tokens/tiempo, omitir fallos de build, confundir plan completado con implementación completada, terminar con una oferta de implementar lo que ya estaba autorizado.
 
@@ -516,7 +518,7 @@ Barra inferior sticky: estado de guardado a la izquierda y «Guardar borrador» 
 | rewardIdentity/rewardVersion/pedagogyVersion | Internos. | UUID compartido por alternativas de una actividad; versiones 1 para nuevos; conservar existentes. |
 | recommendedAfter | «Orden recomendado» en Más opciones, con títulos de actividades. | Nuevas: []; orden visual por arrays. No fabricar dependencias a partir de posición. |
 
-Ayudas «?» permitidas: objetivos, alternativas equivalentes y modalidad de práctica. Máximo tres familias de ayuda, una abierta a la vez. Un botón de 44×44 con `aria-expanded` muestra texto breve asociado con `aria-controls`; Escape lo cierra. Preferir ayuda en línea para instrucciones necesarias. Ninguna decisión esencial queda oculta detrás de «?».
+Ayudas «?» permitidas: objetivos, alternativas equivalentes y modalidad de práctica. Máximo tres familias de ayuda, una abierta a la vez. Usar Radix Popover con Trigger asChild sobre un botón de 44×44; mantener sus relaciones ARIA generadas y Escape para cerrar. No sustituir por Tooltip de hover: la ayuda se debe poder abrir con un toque. Preferir ayuda en línea para instrucciones necesarias. Ninguna decisión esencial queda oculta detrás de «?».
 
 ### 8.3 Estructura de archivos
 
@@ -535,7 +537,9 @@ apps/web/src/components/learning/
     review-panel.tsx
     issue-card.tsx
     route-preview.tsx
-    editor-dialog.tsx
+    editor-dialog.tsx                    # Radix Dialog y AlertDialog
+    editor-query-provider.tsx           # QueryClientProvider local
+    editor-query-keys.ts                 # claves de consulta tipadas
     field-help.tsx
     use-route-editor.ts
     use-material-catalog.ts
@@ -631,7 +635,7 @@ function removeUnit(draft: LearningPathCreateRequest, unitId: string) {
 }
 ```
 
-**Reordenar:** botones Subir/Bajar por unidad y actividad; deshabilitados en extremos. Solo permutar arrays. No añadir drag-and-drop en esta entrega. Las dependencias explícitas heredadas se preservan al reordenar y se validan; si son incompatibles/cíclicas el panel «Orden recomendado» permite corregirlas por títulos.
+**Reordenar:** botones Subir/Bajar por unidad y actividad; deshabilitados en extremos. Solo permutar arrays. No añadir drag-and-drop en esta entrega, porque no resuelve un requisito adicional del usuario. Las dependencias explícitas heredadas se preservan al reordenar y se validan; si son incompatibles/cíclicas el panel «Orden recomendado» permite corregirlas por títulos.
 
 ### 8.6 Contratos y API: cambios exactos
 
@@ -712,10 +716,10 @@ Modos tipados: `{kind:'new-activity',unitId}`, `{kind:'replace',unitId,stepId,op
 - Elegir una fila carga detalle; si tiene varios formatos, escoger uno explícitamente. En creación no preseleccionar una fila ni añadirla con un click accidental sobre toda la tarjeta.
 - CTA final explícito, deshabilitado hasta tener detalle válido y elección completa. Con un formato, se preselecciona ese formato. Guía/video sin preguntas no se muestran como «material sin calidad» por no tener práctica.
 - «No encontramos materiales con estos filtros. Prueba otro título o quita los filtros» y botón «Limpiar filtros». Si no hay publicaciones: «Todavía no hay materiales publicados. Crea y publica uno en Contenido para añadirlo aquí» y enlace a `/panel/contenido` en otra pestaña.
-- La selección de materiales retenidos se guarda en cache aparte. Separar `resultIds` de `detailsByKey`; los resultados visibles solo son los de la consulta aplicada. Nunca colar material seleccionado que no cumple los filtros dentro del listado filtrado.
-- Abortar peticiones antiguas con AbortController y número monotónico de consulta. Respuestas antiguas no reemplazan cursor/resultados ni el destino después de cerrar/reabrir el selector.
+- El cache de TanStack Query almacena catálogo y detalles en claves distintas; la selección provisional vive en state local. Derivar resultados exclusivamente de las páginas de la query activa. No mantener resultIds/detailsByKey mutables que dupliquen el cache ni colar seleccionados ajenos al filtro.
+- Consumir el AbortSignal que TanStack Query entrega a queryFn y pasarlo hasta fetch. Cancelar queries del selector al cerrarlo/cambiar de destino; cada conjunto de filtros usa una queryKey distinta. Respuestas antiguas no reemplazan cursor/resultados ni el destino después de cerrar/reabrir; no añadir contador de consultas ni AbortController paralelos a TanStack Query.
 - Deduplicar páginas por fuente canónica/formato según resultado; no multiplicar la misma pregunta al seleccionar quiz y tarjetas derivadas.
-- Cache de detalle actual: clave sourceContentId+projection+sourceVersion conocida. Detalle fijado: pathId+optionId+resourceRevisionId; conservarlo aunque cambie la búsqueda. Cargar solo actividades abiertas, no 1800 actividades al montar.
+- Claves de cache de detalle actual y fijado según §8.12, siempre con actor/ruta. Incluir sourceVersion conocida en selección actual y resourceRevisionId en fijados; un refetch de lectura nunca reemplaza config del borrador. Cargar solo actividades abiertas, no 1800 actividades al montar.
 - Al cambiar material y volver a abrir un borrador, obtener detalle fijado aunque esa fuente no aparezca en la primera página del catálogo.
 
 ### 8.8 Validación comprensible y catálogo de mensajes
@@ -884,11 +888,165 @@ Desktop ≥1024: datos en dos columnas, descripción a todo ancho; unidades en u
 
 Completar estilos de estado disabled/hover/error y del diálogo; el ejemplo fija la dirección, no sustituye T017. No usar overflow-x:hidden para ocultar un fallo de anchura. Texto largo con overflow-wrap:anywhere cuando corresponda; no truncar títulos de errores ni soluciones.
 
-Tabs: role=tablist/tab/tabpanel, aria-selected, aria-controls, ids estables, un tabIndex=0; flechas izquierda/derecha y Home/End recorren secciones, Enter/Espacio activa. No capturar flechas cuando se escribe en inputs. Patrón de referencia: [W3C APG Tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+Tabs: Radix Tabs controlado con activationMode="manual" genera role=tablist/tab/tabpanel y relaciones ARIA; verificar flechas izquierda/derecha, Home/End y Enter/Espacio. No volver a implementar esos handlers ni sobrescribir IDs accesibles sin necesidad. No capturar flechas cuando se escribe en inputs. Patrón de referencia: [W3C APG Tabs](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
 
-Diálogo: al abrir mover foco dentro, impedir foco/interacción con fondo, Tab/Shift+Tab contenidos, Escape y Cerrar, restituir foco al disparador o sucesor lógico si fue eliminado. En eliminación enfocar Cancelar. Usar showModal en un effect con cleanup; no pasar solo atributo open porque eso no crea modal. No meter formularios anidados. Referencia: [W3C APG Dialog](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+Diálogo: al abrir mover foco dentro, impedir foco/interacción con fondo, Tab/Shift+Tab contenidos, Escape y Cerrar, restituir foco al disparador o sucesor lógico si fue eliminado. En eliminación enfocar Cancelar. Usar Radix Dialog modal/AlertDialog con Root controlado, Portal, Content, Title y Description; no combinarlo con dialog.showModal ni un segundo focus trap. Implementar onCloseAutoFocus solo para el caso en que el disparador desaparezca y deba enfocarse un sucesor lógico. No meter formularios anidados. Referencia: [W3C APG Dialog](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
 
 Errores locales con aria-invalid y aria-describedby; resumen anunciado una vez en role=status aria-live=polite, no un role=alert por cada incidencia. Corregir debe dar una sugerencia accionable cuando se conoce: [W3C Error Suggestion](https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html). Contraste de texto normal ≥4.5:1 y controles/foco distinguibles; comprobar con medición, no inferir de una captura. Objetivo de accesibilidad de este proyecto: operación completa a teclado, reflow a 320 px y zoom 200%, sin afirmar certificación WCAG completa.
+
+### 8.12 Bibliotecas gratuitas: selección e integración obligatorias
+
+Esta revisión incorpora la instrucción posterior del usuario de usar bibliotecas reconocidas y gratuitas. **El ejecutor debe instalarlas e integrarlas en los puntos indicados.** Sustituye la prohibición general de dependencias de la primera revisión. Se mantienen la arquitectura de datos, las tres secciones, el reducer del borrador y las reglas de publicación.
+
+Se consultaron documentación oficial y metadatos del registro npm el 14 de septiembre de 2026. Las versiones de la tabla eran las estables marcadas latest en esa consulta; su existencia, licencias y peers se volvieron a verificar mediante sus manifiestos exactos el 19 de septiembre de 2026. Sus requisitos declarados son compatibles con React 19 del proyecto; axe declara compatibilidad con playwright-core >=1.0.0. No se ha instalado ni compilado ninguna biblioteca durante esta planificación: la compatibilidad ejecutada se demuestra en T001–T021, no se presume a partir del manifiesto.
+
+#### 8.12.1 Paquetes elegidos y por qué
+
+| Biblioteca | Versión exacta / categoría | Licencia declarada | Uso obligatorio | Qué trabajo evita |
+|---|---|---|---|---|
+| Radix UI Primitives, `radix-ui` | 1.6.7; dependencies de @cediah/web | MIT | Dialog, AlertDialog, Tabs, Accordion, DropdownMenu, Popover y Collapsible. | Escribir desde cero interacción de modales, navegación de pestañas, apertura de menús y gestión de foco. |
+| TanStack Query, `@tanstack/react-query` | 5.102.8; dependencies de @cediah/web | MIT | useInfiniteQuery en catálogo; useQuery en detalle actual/fijado; QueryClientProvider local al editor. | Duplicar cache de GET, paginación y lógica de cancelación de consultas. |
+| axe para Playwright, `@axe-core/playwright` | 4.13.0; devDependencies de @cediah/web | MPL-2.0 | Análisis automatizado de accesibilidad en los estados definidos en §8.12.5. | Mantener detectores propios de fallos de accesibilidad que axe ya comprueba. |
+
+Son bibliotecas open source utilizables sin suscripción ni API de pago. Registrar y conservar los avisos de sus licencias distribuidas; no eliminar LICENSE/NOTICE de paquetes. Se utiliza únicamente axe-core y su integración local, no servicios comerciales de Deque. Fuentes de las versiones y licencias: [manifiesto radix-ui 1.6.7](https://registry.npmjs.org/radix-ui/1.6.7), [manifiesto TanStack Query 5.102.8](https://registry.npmjs.org/@tanstack/react-query/5.102.8), [manifiesto axe para Playwright 4.13.0](https://registry.npmjs.org/@axe-core/playwright/4.13.0).
+
+Radix ofrece primitivas sin estilos y permite aplicar el CSS Module propio. Adoptar el paquete unificado `radix-ui` con imports nombrados; no instalar además todos los paquetes individuales ni Radix Themes. [Documentación oficial de Radix](https://www.radix-ui.com/primitives/docs/overview/introduction).
+
+Reutilizar sin reinstalar ni actualizar: `zod@4.4.3` para contratos y errores de campo, `@phosphor-icons/react@2.1.7` para iconos, `vitest@4.1.11` y `@playwright/test@1.63.0` para pruebas, `@electric-sql/pglite@0.5.8` en API para persistencia de prueba. React y CSS Modules siguen cubriendo el estado local y los estilos. Las versiones existentes se verificaron en los package.json del repositorio; no se está indicando que deban reemplazarse por latest.
+
+**Alternativas evaluadas y descartadas en este alcance:** React Hook Form 7.88.0 y @hookform/resolvers 5.9.1 son candidatos válidos (MIT; peers consultados compatibles con React 19 y Zod 4), pero aquí introducirían otra representación del formulario junto al reducer jerárquico y la recuperación del borrador. Se conserva el estado local único. La función de la biblioteca se puede consultar en su [repositorio oficial](https://github.com/react-hook-form/react-hook-form); esta exclusión es una decisión arquitectónica para este proyecto, no una afirmación de incompatibilidad. No añadir shadcn/Tailwind, un kit visual completo, otra biblioteca de iconos, notificaciones flotantes ni drag-and-drop: ninguna de esas piezas es necesaria para implementar las interacciones ya especificadas. No añadir Axios: fetch ya existe y admite la cancelación necesaria.
+
+#### 8.12.2 Instalación y archivos autorizados
+
+T001 debe ejecutar, desde la raíz y después de capturar baseline:
+
+```powershell
+pnpm --filter @cediah/web add --save-exact radix-ui@1.6.7 @tanstack/react-query@5.102.8
+pnpm --filter @cediah/web add --save-dev --save-exact @axe-core/playwright@4.13.0
+pnpm --filter @cediah/web list radix-ui @tanstack/react-query @axe-core/playwright --depth 0
+pnpm install --frozen-lockfile
+```
+
+Autorizar cambios de instalación solo en apps/web/package.json y pnpm-lock.yaml. No modificar pnpm-workspace.yaml, engines, minimumReleaseAgeExclude, overrides o allowBuilds para forzar la instalación. Los paquetes transitivos de las tres bibliotecas son esperables; no confundirlos con dependencias directas elegidas por el ejecutor. No usar @latest en comandos de instalación ni actualizar versiones ya presentes del proyecto.
+
+Antes de instalar, consultar `pnpm view PAQUETE@VERSION version license peerDependencies --json` para cada par fijado y registrar el resultado en `EDITOR-EJECUCION.md`. Si una versión no existe, ha sido retirada o produce un conflicto real con los peers del checkout, detener solo la instalación y documentar el conflicto exacto; no cambiar React/Next ni usar --force. Resolver primero errores triviales de acceso al registro; escalar la selección de una versión sustitutiva solo si la incompatibilidad está demostrada. No abrir una nueva búsqueda de bibliotecas por preferencia personal.
+
+#### 8.12.3 Radix: componentes concretos y reglas de composición
+
+| Archivo / superficie | Primitiva obligatoria | Instrucción |
+|---|---|---|
+| editor-shell.tsx | Tabs | Root controlado por section, activationMode="manual". Los tres paneles leen el estado único del editor. |
+| unit-card.tsx y actividad desplegable | Accordion | Root type="single" collapsible; value es el ID abierto, no un índice. Usar Header/Trigger/Content. |
+| Más opciones / ajustes de evaluación | Collapsible | Controlado cuando una incidencia deba abrirlo; cerrado al entrar por primera vez. |
+| editor-dialog.tsx, selector y preview | Dialog | Root modal controlado, Portal, Overlay, Content, Title, Description y Close. |
+| Confirmación de eliminación/publicación/salida | AlertDialog | Cancel enfocado inicialmente, Action para aceptar; no cerrar por un click accidental en el fondo. |
+| Acciones de unidad y actividad | DropdownMenu | Trigger, Content e Item con disabled real en extremos de orden. |
+| field-help.tsx | Popover | Trigger asChild sobre botón «?», Content con texto breve y Close accesible. Se abre por toque/teclado; máximo una ayuda abierta. |
+
+Mantener inputs, textarea y selects HTML nativos para título, tema y filtros simples; no reemplazarlos por un componente complejo sin necesidad. Los botones de borrar/menú deben ser hermanos del Accordion.Trigger, nunca botones anidados dentro del trigger. Los componentes personalizados usados con asChild deben pasar props y ref al elemento DOM final; preferir un button nativo como hijo para evitar ese trabajo.
+
+Radix gestiona el foco y el teclado de sus primitivas. El código propio solo decide destino, datos, apertura/cierre y el foco alternativo cuando desaparece el disparador. No combinar sus modales con showModal, useDialogFocus, focus traps locales o listeners globales de Escape. No desactivar el comportamiento modal para que un test pase. [Dialog](https://www.radix-ui.com/primitives/docs/components/dialog), [Alert Dialog](https://www.radix-ui.com/primitives/docs/components/alert-dialog), [Tabs](https://www.radix-ui.com/primitives/docs/components/tabs), [Accordion](https://www.radix-ui.com/primitives/docs/components/accordion) y [Popover](https://www.radix-ui.com/primitives/docs/components/popover).
+
+Para diálogo abierto desde DropdownMenu.Item: guardar el destino en el estado padre, cerrar primero el menú y abrir la confirmación en el siguiente commit, usando estado/effect y no un timeout. Registrar como foco de retorno el botón del menú; al confirmar eliminación usar el sucesor lógico del plan. No abrir simultáneamente dos capas que compitan por foco. Para operaciones remotas de publicación/salida, AlertDialog controlado permanece abierto y muestra error si falla la operación; onClick del Action usa preventDefault y el hook cierra solo tras éxito. El borrado de una unidad es local y puede cerrar después de aplicar el reducer.
+
+Los portales se renderizan fuera del contenedor principal: aplicar sus className del CSS Module directamente a Content/Overlay. Definir overlay z-index 100, diálogo 110 y contenido de Popover/DropdownMenu dentro de un diálogo 120; todos quedan por encima de la barra sticky z-index 25. No depender de `.editor .dialog` para estilos ni selectores de pruebas. Añadir `data-editor-surface` a raíz, contenido de diálogo y contenido de ayuda/menú.
+
+Ejemplo de composición para el selector; el contenido y los botones de selección siguen las reglas de §8.7:
+
+```tsx
+import { Dialog } from 'radix-ui';
+
+<Dialog.Root open={pickerOpen} onOpenChange={setPickerOpen}>
+  <Dialog.Trigger asChild>
+    <button type="button">Añadir actividad</button>
+  </Dialog.Trigger>
+  <Dialog.Portal>
+    <Dialog.Overlay className={styles.dialogOverlay} />
+    <Dialog.Content className={styles.dialog} data-editor-surface>
+      <Dialog.Title>Añadir actividad a {unit.title}</Dialog.Title>
+      <Dialog.Description>
+        Elige un material publicado de la biblioteca.
+      </Dialog.Description>
+      {pickerContents}
+      <Dialog.Close asChild>
+        <button type="button">Cancelar</button>
+      </Dialog.Close>
+    </Dialog.Content>
+  </Dialog.Portal>
+</Dialog.Root>
+```
+
+El ejemplo no autoriza pasar un modal completo como pickerContents ni renderizar formularios anidados. Si la apertura está gestionada por otro elemento de la lista, el wrapper admite ausencia de Trigger y recibe ref de retorno; probar el cierre en ese modo. Cancelar descarta solo la selección provisional.
+
+#### 8.12.4 TanStack Query: lecturas separadas del borrador
+
+Crear `editor-query-provider.tsx` client component. Instanciar QueryClient una vez mediante useState; montar este provider dentro del editor con key por actorUserId+pathSessionId, donde pathSessionId es pathId o `new:[creationId]`. No ponerlo como singleton de módulo ni reemplazar providers globales. Al cambiar actor o ruta se crea una instancia distinta; las claves también incluyen esa identidad. No persistir el cache de Query en localStorage/sessionStorage ni enviarlo a otros tabs. Solo el borrador usa la recuperación de §8.9.
+
+Opciones fijadas para GET: staleTime=30000, gcTime=300000, retry=false, refetchOnWindowFocus=false, refetchOnReconnect=false, networkMode="always". El modo de red hace que un intento offline produzca el error de conexión visible, sin dejarlo pausado para ejecutarse después. Abrir un selector o pulsar Buscar/Reintentar puede solicitar datos de forma explícita; un retorno de foco no debe modificar lo que el usuario está seleccionando. Estas son decisiones del proyecto frente a los [defaults documentados de TanStack Query](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults).
+
+Las queryKey se crean exclusivamente mediante editor-query-keys.ts:
+
+```ts
+const scope = ['route-editor', actorUserId, pathSessionId] as const;
+const catalogKey = [...scope, 'catalog', { q, projection, topic }] as const;
+const currentDetailKey = [...scope, 'current-material', sourceContentId,
+  projection, expectedSourceVersion ?? null] as const;
+const fixedDetailKey = [...scope, 'fixed-material', optionId, resourceRevisionId] as const;
+```
+
+q se normaliza con trim al aplicar búsqueda; los campos de texto aún no aplicados no cambian la key. TanStack separa cache por clave, por lo que una respuesta de otro filtro no sustituye la consulta vigente. [Query Keys](https://tanstack.com/query/latest/docs/framework/react/guides/query-keys).
+
+Catálogo: useInfiniteQuery, initialPageParam=null, getNextPageParam=lastPage.nextCursor ?? undefined, enabled mientras el selector esté abierto. El API acepta cursor opcional: omitirlo cuando pageParam es null. limit=24. Mostrar pages.flatMap(page=>page.items), deduplicando por item.id; no guardar otro array mutable de resultados. Cargar más solo si hasNextPage y !isFetching. No usar keepPreviousData/placeholderData para presentar resultados del filtro anterior como si pertenecieran al nuevo. Si se aprovechan initialResources, inyectar initialData una vez y únicamente para la key sin filtros, con `{pages:[respuestaCompleta],pageParams:[null]}`; no resembrarlo al borrar filtros. [Infinite Queries](https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries).
+
+queryFn recibe signal y el adaptador editor-api lo pasa a fetch. Al cerrar selector cancelar las queries de catálogo/detalle actual de ese scope; al desmontarse una actividad cancelar su lectura fijada pendiente si ya no se usa. No abortar ni cancelar PATCH/POST por cerrar una ayuda. Consumir AbortSignal permite a TanStack cancelar también la petición subyacente; no atraparlo y convertirlo en un catálogo vacío. [Query Cancellation](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation).
+
+En T008 crear helper tipado `unwrapEditorReadResult`: recibe el resultado discriminado del adaptador, devuelve value en éxito y lanza EditorQueryError con status/errorCode seguros si falló. No lanzar texto crudo del backend ni considerar `{ok:false}` un resultado exitoso de TanStack. Los errores se convierten en el copy ya definido; una respuesta vacía válida se distingue de una falla. Aplicar el mismo signal y la misma semántica en el transporte fixture.
+
+Ejemplo de configuración; implementar los tipos de filtros/adapter con los contratos de §8.6:
+
+```ts
+const catalogQuery = useInfiniteQuery({
+  queryKey: catalogKey,
+  initialPageParam: null as string | null,
+  queryFn: async ({ pageParam, signal }) => unwrapEditorReadResult(
+    await api.search({
+      q: appliedFilters.q,
+      projection: appliedFilters.projection || undefined,
+      topic: appliedFilters.topic || undefined,
+      cursor: pageParam ?? undefined,
+      limit: 24,
+    }, signal),
+  ),
+  getNextPageParam: page => page.nextCursor ?? undefined,
+  enabled: pickerOpen,
+});
+```
+
+useQuery obtiene detalle actual solo para material/formato elegido y detalle fijado solo para actividad visible. La revisión fija tiene key distinta de la fuente actual; nunca copiar automáticamente la segunda sobre la primera. Un resultado disponible no inserta actividad: la confirmación usa la selección provisional y verifica que el destino siga existiendo.
+
+La secuencia guardar→comprobar→transición permanece en use-route-editor, con su bloqueo y expectedVersion. No usar useQuery para POST/PATCH ni un effect que publique al recibir ready=true. No introducir useMutation en este alcance: no aporta nada a la orquestación definida. Después de save con cambio de fuente/revisión, usar los nuevos IDs confirmados como keys y retirar del cache las keys de opciones eliminadas; la respuesta del guardado sigue siendo la fuente de verdad del borrador. Una invalidación de GET nunca recalcula config ni limpia dirty.
+
+#### 8.12.5 axe y verificación de adopción
+
+Extender `route-editor.spec.ts` con pruebas cuyo nombre incluya «accesibilidad». Ejecutar axe después de render estable en Datos, unidad expandida, selector abierto, revisión con errores y confirmación de eliminación, en desktop y móvil. Usar include sobre `[data-editor-surface]`, que debe existir también en los portales de Radix. No excluir elementos del editor para ocultar fallos. El shell ajeno a este alcance mantiene sus checks existentes.
+
+```ts
+import AxeBuilder from '@axe-core/playwright';
+
+const report = await new AxeBuilder({ page })
+  .include('[data-editor-surface]')
+  .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+  .analyze();
+await testInfo.attach('accesibilidad-editor', {
+  body: Buffer.from(JSON.stringify(report, null, 2)),
+  contentType: 'application/json',
+});
+expect(report.violations).toEqual([]);
+```
+
+Registrar `incomplete` como revisión manual pendiente en T021; no interpretarlo como PASS automático. Mantener pruebas de teclado/foco/zoom y revisión visual porque un análisis automático no comprueba toda la accesibilidad. Referencia y mecanismo de integración: [Playwright: accessibility testing](https://playwright.dev/docs/accessibility-testing).
+
+**Prueba de uso efectivo:** T022 registra archivos importadores y tests que demuestran cada adopción: Radix en siete familias de interacción, useInfiniteQuery/useQuery en GET reales a través del BFF y AxeBuilder ejecutado en la suite. No aceptar imports sin uso, wrappers que siguen implementando un focus trap propio ni TanStack instalado mientras fetch+cache manual continúa en paralelo. El número de bibliotecas es deliberadamente pequeño para reducir código propio sin duplicar responsabilidades.
 
 ## 9. Fuente de verdad y resolución de contradicciones
 
@@ -948,8 +1106,13 @@ Crear `EDITOR-VALIDACION.md` con columnas ID, resultado, evidencia y observació
 | Q32 | ¿Pasan typecheck, lint, tests de API/web, build y E2E del editor? |
 | Q33 | ¿Las pruebas existentes del mapa y estudiante no muestran regresiones relacionadas? |
 | Q34 | ¿Los fixtures están inaccesibles fuera de development y no se tocaron datos/infraestructura de producción? |
-| Q35 | ¿No hay cambios fuera de archivos permitidos, secretos, migraciones editadas ni dependencias nuevas? |
+| Q35 | ¿No hay cambios fuera de archivos permitidos, secretos, migraciones editadas ni dependencias directas distintas de las aprobadas en §8.12? |
 | Q36 | ¿La documentación declara con exactitud PASS/FAIL/NO VERIFICADO y limita las afirmaciones a lo probado? |
+| Q37 | ¿Las tres bibliotecas tienen versión exacta/categoría correctas, licencia registrada y lockfile reproducible, sin modificar versiones ajenas? |
+| Q38 | ¿Las primitivas Radix indicadas se usan efectivamente y no coexisten con focus traps/handlers de teclado redundantes? |
+| Q39 | ¿TanStack Query ejecuta catálogo y detalles con claves aisladas, signal propagado y sin un segundo cache de esos GET? |
+| Q40 | ¿AxeBuilder se ejecutó sobre todos los estados obligatorios, incluidos portales, con cero violations y los incomplete revisados? |
+| Q41 | ¿Cambiar de actor/ruta, cerrar el selector o recibir una respuesta tardía conserva borrador y no mezcla materiales de otra consulta? |
 
 ## 11. Pruebas
 
@@ -969,6 +1132,7 @@ Ejecutar desde la raíz del repositorio, salvo que se indique otro cwd. Guardar 
 | V08 | `pnpm build`: build completo. |
 | V09 | `pnpm --filter @cediah/web exec playwright test --config=playwright.editor.config.ts`: interacciones y diseño editor. |
 | V10 | `git diff --check` y revisión de `git diff --stat`: alcance y formato. |
+| V11 | `pnpm --filter @cediah/web list radix-ui @tanstack/react-query @axe-core/playwright --depth 0` y `pnpm install --frozen-lockfile`: verificar versiones instaladas y reproducibilidad de las dependencias autorizadas. |
 
 T001 ejecuta V01–V04/V07/V08 como baseline, si dependencies ya están disponibles. Si faltan, `pnpm install --frozen-lockfile` con el runtime requerido; no actualizar el lockfile para eludir problemas. No iniciar `pnpm dev:api` con DATABASE_URL existente sin verificar que sea una base local descartable: la API puede aplicar migraciones al arrancar. Para este trabajo PGlite es suficiente. Ninguna comprobación de UI se considera PASS por el hecho de que V08 pase.
 
@@ -1016,6 +1180,11 @@ Proyectos de E2E: desktop 1440×900 y mobile 390×844, Chromium. Casos de reflow
 | P34 | Títulos vacíos, solo espacios, acentos/emoji, límites y límite+1; 30 unidades/60 pasos/12 opciones/500 ítems. | Errores locales en campo, límites visibles al llegar; rechazos API equivalentes; sin silencioso truncado de contenido del usuario. Unit+contract. |
 | P35 | Teclado en selector con input/select/textarea y diálogo de eliminación. | Tab/Escape/foco correctos; botones con nombre; no foco en fondo. UI. |
 | P36 | Viewports definidos, zoom 200%, textos largos, teclado móvil, unidades extensas. | Sin overflow de página ni CTA tapado; espacios/jerarquía conforme §8.11. UI+inspección visual. |
+| P37 | Abrir menú Radix, elegir Eliminar, cancelar/confirmar; abrir y cerrar la ayuda de objetivos; recorrer pestañas/accordion y el selector modal. | Una capa modal activa, teclado/foco correctos, cancelación no muta draft y confirmación enfoca sucesor. UI, incluidas capas portaleadas; no añadir ayudas fuera de las tres familias permitidas para satisfacer esta prueba. |
+| P38 | Query A lenta, filtros B, cierre y reapertura con otro destino; desmontar editor y cambiar actor/ruta. | Signal aborta lecturas obsoletas, keys separadas, no inserción automática ni mezcla de datos; ninguna mutación editorial reintentada. UI+tests de keys/adapter. |
+| P39 | Ejecutar axe en cinco estados obligatorios, desktop y móvil. | Cero violations bajo tags fijados; incomplete y reporte JSON conservados para revisión; no excepciones que oculten nodos del editor. UI+revisión T021. |
+| P40 | Revisar instalación, imports efectivos y build. | Paquetes exactos, gratuitos según licencias registradas, solo tres altas directas; Radix/Query usados en app y axe únicamente en tests; sin cambios al branding/global providers. Build+revisión de diff. |
+| P41 | GET falla con 503, catálogo responde vacío válido, vuelve foco a ventana y un guardado queda pendiente. | 503 es error, vacío es estado vacío, foco no dispara refetch, no retry automático ni pérdida de dirty; abort no se presenta como éxito vacío. UI+adapter. |
 
 Si un caso requiere un fixture adicional, incorporarlo en `editor-fixtures.ts` y citar cuál usa el test. No etiquetar como «datos reales» las fixtures. No medir velocidad humana de creación con una prueba automatizada y presentarla como estudio de usabilidad.
 
@@ -1074,12 +1243,12 @@ Decisiones obligatorias: tres secciones Datos/Actividades/Revisión; selector de
 
 No elimines campos de base para ocultarlos en UI. El umbral de cinco ítems distintos sigue vigente en standard; limited mantiene warning sin bloqueo y solo se selecciona explícitamente como práctica introductoria. Nunca inventes preguntas/objetivos o cambies modalidad para conseguir ready.
 
-Implementa el estado puro por IDs y la orquestación guardar→validar→transición usando respuestas confirmadas y expectedVersion. Conserva snapshots en ediciones cosméticas y clonado de versión. Los dos GET editoriales nuevos de §8.6 permiten mostrar detalle de selección y detalle fijado sin crear revisiones desde un GET. Mantén permisos Fastify, BFF same-origin y no-store. No añadas dependencias ni migraciones.
+Implementa el estado puro por IDs y la orquestación guardar→validar→transición usando respuestas confirmadas y expectedVersion. Conserva snapshots en ediciones cosméticas y clonado de versión. Los dos GET editoriales nuevos de §8.6 permiten mostrar detalle de selección y detalle fijado sin crear revisiones desde un GET. Mantén permisos Fastify, BFF same-origin y no-store. Instala e integra obligatoriamente radix-ui@1.6.7, @tanstack/react-query@5.102.8 y @axe-core/playwright@4.13.0 según §8.12. No añadas otras dependencias directas ni migraciones.
 
 UI: CSS Module local, tokens `--koraz-*`, ancho 1120, inputs 16 px, controles ≥44, tarjetas 16 px de radio. Unidades/actividades desplegables. Selector modal con foco, Escape, destino y confirmación. No uses `window.confirm`, tablas técnicas de cinco columnas ni pestaña Materiales. Los códigos de §8.8 se convierten a problema+ubicación+solución+acción. No imprimir path ni DTO.
 
-Empieza ejecutando T001 y T002, después T003–T022 en orden numérico si trabajas solo. Las capacidades están en §14; no hay tarea A normal. Usa los archivos, límites y checks de cada ficha. Tras cada tarea registra PASS/FAIL/NO VERIFICADO, archivos y evidencia en EDITOR-EJECUCION.md. No pases a dependientes de una tarea fallida. Escala únicamente riesgos estructurales de §12.
+Empieza ejecutando T001 y T002, después T003–T022 en orden numérico si trabajas solo. Las capacidades están en §14; no hay tarea A normal. Usa los archivos, límites y checks de cada ficha. T001 instala las bibliotecas; T009/T010/T011/T013 usan Radix, T012 integra TanStack Query y T020/T021 usan axe. No entregues dependencias instaladas sin su integración. Tras cada tarea registra PASS/FAIL/NO VERIFICADO, archivos y evidencia en EDITOR-EJECUCION.md. No pases a dependientes de una tarea fallida. Escala únicamente riesgos estructurales de §12.
 
-Comprueba los casos P01–P36 y checklist Q01–Q36. Las pruebas actuales no se ejecutaron durante la planificación; no hay auditoría visual porque localhost:3000 estaba apagado. Debes generar fixtures locales, ejecutar pruebas UI y revisar las capturas finales. Persistencia/permisos se prueban con PGlite y Fastify; no atribuyas a esos tests una comprobación en producción.
+Comprueba los casos P01–P41 y checklist Q01–Q41. Las pruebas actuales no se ejecutaron durante la planificación; no hay auditoría visual porque localhost:3000 estaba apagado. Debes generar fixtures locales, ejecutar pruebas UI y revisar las capturas finales. Persistencia/permisos se prueban con PGlite y Fastify; no atribuyas a esos tests una comprobación en producción.
 
 Entrega final del ejecutor: editor operativo; informe de cambios por comportamiento; resultados de pruebas y capturas; limitaciones NO VERIFICADO expresas; documentos de ejecución/validación. No afirmar «terminado» si falta un criterio obligatorio de §2. No abras un nuevo proceso de diseño: implementa las decisiones de este paquete.

@@ -1,4 +1,5 @@
 import {
+  LearningEditorMaterialDetailSchema,
   LearningPathDetailSchema,
   LearningPathValidationResponseSchema,
 } from "@cediah/contracts";
@@ -20,6 +21,19 @@ export async function GET(request: Request, context: RouteContext) {
   }
   if (parts.length === 2 && Uuid.test(parts[0] ?? "") && parts[1] === "preview") {
     return forwardGuidedLearningRequest({ apiPath: `/v1/editor/learning-paths/${parts[0]}/preview`, method: "GET", request, responseSchema: LearningPathDetailSchema });
+  }
+  if (
+    parts.length === 3
+    && Uuid.test(parts[0] ?? "")
+    && parts[1] === "materials"
+    && Uuid.test(parts[2] ?? "")
+  ) {
+    return forwardGuidedLearningRequest({
+      apiPath: `/v1/editor/learning-paths/${encodeURIComponent(parts[0]!)}/materials/${encodeURIComponent(parts[2]!)}`,
+      method: "GET",
+      request,
+      responseSchema: LearningEditorMaterialDetailSchema,
+    });
   }
   return Response.json({ error: "not_found" }, { status: 404 });
 }

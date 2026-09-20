@@ -34,6 +34,10 @@ import {
   createLearningContentResolver,
   type LearningContentResolver,
 } from "../guided-learning/content-resolver.js";
+import {
+  readCurrentEditorMaterialDetail,
+  readFixedEditorMaterialDetail,
+} from "../guided-learning/editor-material-details.js";
 import { defaultCompletionRule, guidedLearningPolicyV1 } from "../guided-learning/policies.js";
 import { hashLearningSnapshot } from "../guided-learning/snapshot-hash.js";
 import {
@@ -76,6 +80,7 @@ type ResolvedDefinition = Omit<LearningPathDefinition, "units"> & {
     }>;
   }>;
 };
+type StoredPathOption = LearningPathDetail["version"]["units"][number]["steps"][number]["options"][number];
 
 function toIso(value: Date | string) {
   return (value instanceof Date ? value : new Date(value)).toISOString();
@@ -132,21 +137,48 @@ async function writeAudit(
 async function resolveDefinition(
   resolver: LearningContentResolver,
   definition: LearningPathDefinition,
+  existingOptions: ReadonlyMap<string, StoredPathOption> = new Map(),
 ): Promise<GuidedLearningResult<ResolvedDefinition>> {
   const units: ResolvedDefinition["units"] = [];
-  for (const unit of definition.units) {
+  for (let unitIndex = 0; unitIndex < definition.units.length; unitIndex += 1) {
+    const unit = definition.units[unitIndex]!;
     const steps: ResolvedDefinition["units"][number]["steps"] = [];
-    for (const step of unit.steps) {
+    for (let stepIndex = 0; stepIndex < unit.steps.length; stepIndex += 1) {
+      const step = unit.steps[stepIndex]!;
       const options: ResolvedOption[] = [];
       for (let optionPosition = 0; optionPosition < step.options.length; optionPosition += 1) {
         const option = step.options[optionPosition]!;
+        const existing = option.id ? existingOptions.get(option.id) : undefined;
+        if (
+          existing
+          && existing.sourceContentId === option.sourceContentId
+          && existing.projection === option.projection
+          && option.refreshResource !== true
+        ) {
+          options.push({
+            ...option,
+            completionRule: option.completionRule ?? existing.completionRule,
+            itemIds: existing.config.selectedItemIds,
+            resourceRevisionId: existing.resourceRevisionId,
+            sourceContentId: existing.sourceContentId,
+          });
+          continue;
+        }
         const resolution = await resolver.resolvePublishedRevision({
           allowGuidedOnly: true,
           projection: option.projection,
           sourceContentId: option.sourceContentId,
         });
         if (resolution.status === "not_found") return { status: "not_found" };
-        if (resolution.status !== "success") return { status: "resource_changed" };
+        if (resolution.status !== "success") {
+          return resourceChangedDuringEdit(unit, step, option, unitIndex, stepIndex, optionPosition);
+        }
+        if (
+          option.expectedSourceVersion !== undefined
+          && option.expectedSourceVersion !== resolution.value.sourceVersion
+        ) {
+          return resourceChangedDuringEdit(unit, step, option, unitIndex, stepIndex, optionPosition);
+        }
         const adapter = getLearningAdapter(option.projection);
         const items = adapter.items(resolution.value.payload.content);
         options.push({
@@ -162,6 +194,86 @@ async function resolveDefinition(
     units.push({ ...unit, steps });
   }
   return { status: "success", value: { ...definition, units } };
+}
+
+function resourceChangedDuringEdit(
+  unit: LearningPathDefinition["units"][number],
+  step: LearningPathDefinition["units"][number]["steps"][number],
+  option: LearningPathOptionDraft,
+  unitIndex: number,
+  stepIndex: number,
+  optionIndex: number,
+): GuidedLearningResult<ResolvedDefinition> {
+  return {
+    issues: [{
+      code: "resource_changed",
+      context: {
+        ...(option.id ? { optionId: option.id } : {}),
+        sourceContentId: option.sourceContentId,
+        ...(step.id ? { stepId: step.id } : {}),
+        stepStableKey: step.stableKey,
+        ...(unit.id ? { unitId: unit.id } : {}),
+        unitStableKey: unit.stableKey,
+      },
+      message: "El material cambió mientras se editaba. Revísalo y vuelve a seleccionarlo.",
+      path: `version.units.${unitIndex}.steps.${stepIndex}.options.${optionIndex}`,
+      severity: "error",
+    }],
+    status: "not_ready",
+  };
+}
+
+function existingOptionsById(detail: LearningPathDetail) {
+  return new Map(detail.version.units.flatMap((unit) => unit.steps)
+    .flatMap((step) => step.options)
+    .map((option) => [option.id, option] as const));
+}
+
+function cloneResolvedDefinition(detail: LearningPathDetail, releaseNotes: string): ResolvedDefinition {
+  return {
+    evidenceLevel: detail.version.evidenceLevel,
+    policyVersion: detail.version.policyVersion,
+    releaseNotes,
+    units: detail.version.units.map((unit) => ({
+      objectives: unit.objectives.map((objective) => ({ ...objective })),
+      pedagogyVersion: unit.pedagogyVersion,
+      stableKey: unit.stableKey,
+      steps: unit.steps.map((step) => ({
+        isEssential: step.isEssential,
+        objectiveIds: [...step.objectiveIds],
+        options: step.options.map((option) => ({
+          completionRule: option.completionRule,
+          config: {
+            ...option.config,
+            guideSectionIndexes: option.config.guideSectionIndexes
+              ? [...option.config.guideSectionIndexes]
+              : undefined,
+            objectiveMappings: option.config.objectiveMappings.map((mapping) => ({
+              itemId: mapping.itemId,
+              objectiveIds: [...mapping.objectiveIds],
+            })),
+            selectedItemIds: [...option.config.selectedItemIds],
+            videoRange: option.config.videoRange ? { ...option.config.videoRange } : undefined,
+          },
+          estimatedMinutes: option.estimatedMinutes,
+          isDefault: option.isDefault,
+          itemIds: [...option.config.selectedItemIds],
+          label: option.label,
+          projection: option.projection,
+          resourceRevisionId: option.resourceRevisionId,
+          rewardIdentity: option.rewardIdentity,
+          rewardVersion: option.rewardVersion,
+          sourceContentId: option.sourceContentId,
+        })),
+        pedagogyVersion: step.pedagogyVersion,
+        purpose: step.purpose,
+        recommendedAfter: [...step.recommendedAfter],
+        stableKey: step.stableKey,
+        title: step.title,
+      })),
+      title: unit.title,
+    })),
+  };
 }
 
 async function insertDefinition(
@@ -355,34 +467,49 @@ async function storedValidation(
         content: unknown;
         projection: "video" | "guide" | "quiz" | "flashcards";
       };
-      const adapter = getLearningAdapter(snapshot.projection);
-      const items = adapter.items(snapshot.content);
-      const questions = snapshot.projection === "quiz"
-        ? (snapshot.content as { questions?: Array<{ explanation?: string; id?: string }> }).questions ?? []
-        : [];
-      resourceItems.set(revision.id, items.map((item) => ({
-        explanation: questions.find((question) => question.id === item.id)?.explanation,
-        id: item.id,
-        kind: item.kind,
-      })));
-      if (revision.retired_at || revision.source_status !== "published") {
-        resourceItems.delete(revision.id);
-      }
-      if (hashLearningSnapshot(revision.payload_json) !== revision.payload_hash) {
+      if (
+        revision.retired_at
+        || revision.source_status !== "published"
+        || hashLearningSnapshot(revision.payload_json) !== revision.payload_hash
+      ) continue;
+      try {
+        const adapter = getLearningAdapter(snapshot.projection);
+        const parsed = adapter.parse(snapshot.content);
+        const items = adapter.items(parsed);
+        const questions = snapshot.projection === "quiz"
+          ? (parsed as { questions?: Array<{ explanation?: string; id?: string }> }).questions ?? []
+          : [];
+        resourceItems.set(revision.id, items.map((item) => ({
+          explanation: questions.find((question) => question.id === item.id)?.explanation,
+          id: item.id,
+          kind: item.kind,
+        })));
+      } catch {
         resourceItems.delete(revision.id);
       }
     }
   }
 
   const issues = validateLearningPathDefinition(path, resourceItems);
-  for (const revisionId of revisionIds) {
-    if (!resourceItems.has(revisionId)) {
-      issues.push({
-        code: "resource_unavailable",
-        message: "El recurso está retirado, archivado o su snapshot no es válido.",
-        path: `resource.${revisionId}`,
-        severity: "error",
-      });
+  for (const unit of path.version.units) {
+    for (const step of unit.steps) {
+      for (const option of step.options) {
+        if (resourceItems.has(option.resourceRevisionId)) continue;
+        issues.push({
+          code: "resource_unavailable",
+          context: {
+            optionId: option.id,
+            sourceContentId: option.sourceContentId,
+            stepId: step.id,
+            stepStableKey: step.stableKey,
+            unitId: unit.id,
+            unitStableKey: unit.stableKey,
+          },
+          message: "El recurso está retirado, archivado o su snapshot no es válido.",
+          path: `resource.${option.resourceRevisionId}`,
+          severity: "error",
+        });
+      }
     }
   }
   const topic = await database.selectFrom("content_items")
@@ -392,46 +519,13 @@ async function storedValidation(
   if (!topic || topic.kind !== "topic" || topic.status !== "published") {
     issues.push({
       code: "topic_unavailable",
+      context: { sourceContentId: path.topic.id },
       message: "La ruta necesita un tema publicado.",
       path: "topicContentId",
       severity: "error",
     });
   }
   return issues;
-}
-
-function toDefinition(detail: LearningPathDetail, releaseNotes?: string): LearningPathDefinition {
-  return {
-    evidenceLevel: detail.version.evidenceLevel,
-    policyVersion: detail.version.policyVersion,
-    releaseNotes: releaseNotes ?? detail.version.releaseNotes,
-    units: detail.version.units.map((unit) => ({
-      objectives: unit.objectives,
-      pedagogyVersion: unit.pedagogyVersion,
-      stableKey: unit.stableKey,
-      steps: unit.steps.map((step) => ({
-        isEssential: step.isEssential,
-        objectiveIds: step.objectiveIds,
-        options: step.options.map((option) => ({
-          completionRule: option.completionRule,
-          config: option.config,
-          estimatedMinutes: option.estimatedMinutes,
-          isDefault: option.isDefault,
-          label: option.label,
-          projection: option.projection,
-          rewardIdentity: option.rewardIdentity,
-          rewardVersion: option.rewardVersion,
-          sourceContentId: option.sourceContentId,
-        })),
-        pedagogyVersion: step.pedagogyVersion,
-        purpose: step.purpose,
-        recommendedAfter: step.recommendedAfter,
-        stableKey: step.stableKey,
-        title: step.title,
-      })),
-      title: unit.title,
-    })),
-  };
 }
 
 function explanationCoverage(questions: Array<{ explanation?: string }>) {
@@ -646,14 +740,23 @@ export function createPostgresGuidedLearningProvider(
       if (access.status !== "success") return access;
       const path = access.value;
       if (path.version.status !== "published" || path.archivedAt) return { status: "conflict" };
-      const definition = toDefinition(path, input.releaseNotes);
-      const resolved = await resolveDefinition(resolver, definition);
-      if (resolved.status !== "success") return resolved;
+      const definition = cloneResolvedDefinition(path, input.releaseNotes);
       try {
         const version = await database.transaction().execute(async (transaction) => {
           const lockedPath = await transaction.selectFrom("learning_paths").selectAll()
             .where("id", "=", path.id).forUpdate().executeTakeFirstOrThrow();
-          if (lockedPath.published_version_id !== path.version.id) return null;
+          if (
+            lockedPath.published_version_id !== path.version.id
+            || lockedPath.archived_at
+            || (!input.canEditAll && lockedPath.created_by !== input.actorUserId)
+          ) return null;
+          const sourceVersion = await transaction.selectFrom("learning_path_versions")
+            .select(["id", "status"])
+            .where("id", "=", path.version.id)
+            .where("path_id", "=", path.id)
+            .forUpdate()
+            .executeTakeFirst();
+          if (!sourceVersion || sourceVersion.status !== "published") return null;
           const existingDraft = await transaction.selectFrom("learning_path_versions").select("id")
             .where("path_id", "=", path.id).where("status", "!=", "published")
             .where("status", "!=", "archived").executeTakeFirst();
@@ -662,13 +765,13 @@ export function createPostgresGuidedLearningProvider(
             path_id: path.id,
             policy_json: {
               ...guidedLearningPolicyV1,
-              evidenceLevel: resolved.value.evidenceLevel,
+              evidenceLevel: definition.evidenceLevel,
             } as unknown as JsonValue,
-            policy_version: resolved.value.policyVersion,
-            release_notes: resolved.value.releaseNotes,
+            policy_version: definition.policyVersion,
+            release_notes: definition.releaseNotes,
             version_number: path.version.number + 1,
           }).returningAll().executeTakeFirstOrThrow();
-          await insertDefinition(transaction, created.id, resolved.value);
+          await insertDefinition(transaction, created.id, definition);
           await writeAudit(transaction, {
             action: "learning_path_version_created",
             actorUserId: input.actorUserId,
@@ -685,6 +788,23 @@ export function createPostgresGuidedLearningProvider(
         if (failure) return { status: failure };
         throw error;
       }
+    },
+
+    async getEditorMaterialDetail(input) {
+      return readCurrentEditorMaterialDetail(database, {
+        contentId: input.contentId,
+        projection: input.projection,
+      });
+    },
+
+    async getEditorOptionMaterialDetail(input) {
+      const access = await editorPath(input);
+      if (access.status !== "success") return access;
+      const detail = await readFixedEditorMaterialDetail(database, {
+        optionId: input.optionId,
+        pathVersionId: access.value.version.id,
+      });
+      return detail ? { status: "success", value: detail } : { status: "not_found" };
     },
 
     getEditorPath: editorPath,
@@ -1150,7 +1270,26 @@ export function createPostgresGuidedLearningProvider(
     },
 
     async updatePath(input) {
-      const resolved = await resolveDefinition(resolver, input.update.definition);
+      const access = await editorPath(input);
+      if (access.status !== "success") return access;
+      if (!(["draft", "changes_requested"] as const).includes(
+        access.value.version.status as "draft" | "changes_requested",
+      )) return { status: "conflict" };
+      if (access.value.version.editVersion !== input.update.expectedVersion) {
+        return { status: "version_conflict" };
+      }
+      const existingOptions = existingOptionsById(access.value);
+      const incomingOptionIds = input.update.definition.units.flatMap((unit) => unit.steps)
+        .flatMap((step) => step.options)
+        .flatMap((option) => option.id && !existingOptions.has(option.id) ? [option.id] : []);
+      if (incomingOptionIds.length > 0) {
+        const conflictingIds = await database.selectFrom("learning_step_options")
+          .select("id")
+          .where("id", "in", incomingOptionIds)
+          .execute();
+        if (conflictingIds.length > 0) return { status: "not_found" };
+      }
+      const resolved = await resolveDefinition(resolver, input.update.definition, existingOptions);
       if (resolved.status !== "success") return resolved;
       try {
         const updated = await database.transaction().execute(async (transaction) => {
@@ -1207,10 +1346,24 @@ export function createPostgresGuidedLearningProvider(
     async validatePath(input) {
       const access = await editorPath(input);
       if (access.status !== "success") return access;
+      if (input.expectedVersion !== undefined && input.expectedVersion !== access.value.version.editVersion) {
+        return { status: "version_conflict" };
+      }
       const issues = await storedValidation(database, access.value);
+      const confirmedVersion = await database.selectFrom("learning_path_versions")
+        .select(["edit_version"])
+        .where("id", "=", access.value.version.id)
+        .executeTakeFirst();
+      if (!confirmedVersion || confirmedVersion.edit_version !== access.value.version.editVersion) {
+        return { status: "version_conflict" };
+      }
       return {
         status: "success",
-        value: { issues, ready: !issues.some((entry) => entry.severity === "error") },
+        value: {
+          issues,
+          ready: !issues.some((entry) => entry.severity === "error"),
+          validatedEditVersion: confirmedVersion.edit_version,
+        },
       };
     },
   };

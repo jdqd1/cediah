@@ -1,18 +1,25 @@
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { LearningRouteEditor } from "@/components/learning/learning-route-editor";
+import { LearningPathsEditorIndex } from "@/components/learning/editor/learning-paths-editor-index";
+import styles from "@/components/learning/editor/route-editor.module.css";
 import { getCurrentUser } from "@/lib/server/current-user";
-import { getLearningEditorResources, getLearningEditorWorkspace } from "@/lib/server/guided-learning-api";
+import { getLearningEditorWorkspace } from "@/lib/server/guided-learning-api";
 
 export const dynamic = "force-dynamic";
 
 export default async function LearningPathsEditorPage() {
   const current = await getCurrentUser();
-  if (current.status === "authenticated" && !current.features.guidedLearning) notFound();
-  const [paths, resources] = await Promise.all([getLearningEditorWorkspace(), getLearningEditorResources()]);
-  if (paths.status !== "ready" || resources.status !== "ready") {
-    return <main className="studio-gate"><section><p className="eyebrow dark">Editor de rutas</p><h1>No pudimos abrir el espacio editorial.</h1><p>{paths.status === "forbidden" || resources.status === "forbidden" ? "Esta cuenta no tiene permisos editoriales." : "La sesión está protegida; intenta actualizar en unos minutos."}</p><Link href="/panel">Volver al panel</Link></section></main>;
+  if (current.status === "anonymous") redirect("/acceder?next=/panel/rutas");
+  if (current.status !== "authenticated") return <EditorGate title="No pudimos confirmar tu sesión" />;
+  if (!current.features.guidedLearning) notFound();
+  const paths = await getLearningEditorWorkspace();
+  if (paths.status !== "ready") {
+    return <EditorGate title={paths.status === "forbidden" ? "Esta cuenta no tiene permisos editoriales" : "No pudimos abrir tus rutas"} />;
   }
-  const roles = current.status === "authenticated" ? current.roles : [];
-  return <LearningRouteEditor canPublish={roles.includes("coordinator") || roles.includes("administrator")} canReview={roles.includes("coordinator") || roles.includes("administrator")} initialResources={resources.items} paths={paths.items} resourceNextCursor={resources.nextCursor} resourceTopics={resources.resourceTopics} routeTopics={resources.topics} />;
+
+  return <LearningPathsEditorIndex paths={paths.items} />;
+}
+
+function EditorGate({ title }: { title: string }) {
+  return <main className={styles.editor}><section className={styles.card}><h1>{title}</h1><p>La sesión sigue protegida. Vuelve al panel o intenta actualizar más tarde.</p><Link href="/panel">Volver al panel</Link></section></main>;
 }

@@ -1,0 +1,15 @@
+T002 — contratos editoriales
+
+pnpm --filter @cediah/contracts build
+$ tsc -p tsconfig.json
+EXIT_CODE=0
+
+pnpm --filter @cediah/api exec vitest run test/guided-learning-editor-contract.test.ts test/guided-learning-routes.test.ts
+Test Files: 2 passed (2)
+Tests: 18 passed (18)
+EXIT_CODE=0
+
+pnpm --filter @cediah/api typecheck
+TS2739 en postgres-guided-learning.ts: faltan getEditorMaterialDetail y getEditorOptionMaterialDetail.
+Es el pendiente explícito previsto para T005/T006; no hay otros errores de tipos y no se añadieron implementaciones ficticias.
+EXIT_CODE=1

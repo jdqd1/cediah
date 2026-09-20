@@ -1,0 +1,19 @@
+T007 — 19 de septiembre de 2026
+
+PASS
+- vitest focalizado: guided-learning-editor-validation, guided-learning-editor-storage y guided-learning-routes
+- Resultado: 3 archivos, 23 pruebas, 23 PASS
+- @cediah/api typecheck: PASS
+- @cediah/api lint: PASS
+
+Cobertura demostrada:
+- conteo distinto de ítems canónicos (3 compartidos entre quiz/tarjetas = 3)
+- severidad standard/limited intacta y contexto actualCount/requiredCount
+- localización estable por unidad/actividad/opción
+- expectedVersion obsoleto y validatedEditVersion confirmado con PGlite
+- request estricto y fieldErrors sin reflejar valores con Fastify
+- resource_changed contextual sin escritura parcial
+
+Regresión de catálogo:
+- 19/20 PASS
+- único fallo: el mismo fallo baseline registrado en T001/T005, orden del historial recibido 2,3,1 frente a 1,2,3.
