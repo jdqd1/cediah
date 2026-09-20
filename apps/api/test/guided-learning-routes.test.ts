@@ -73,6 +73,7 @@ function fakeProvider(): GuidedLearningProvider {
       },
     })),
     createPath: vi.fn(async () => ({ status: "success" as const, value: detail })),
+    deletePath: vi.fn(async () => ({ status: "success" as const, value: { id: pathId } })),
     createReviewSession: vi.fn(async () => ({ status: "not_found" as const })),
     createVersion: vi.fn(async () => ({ status: "success" as const, value: detail })),
     getAttempt: vi.fn(async () => ({ status: "not_found" as const })),

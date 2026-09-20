@@ -1,5 +1,6 @@
 import {
   LearningEditorMaterialDetailSchema,
+  LearningPathDeleteResponseSchema,
   LearningPathDetailSchema,
   LearningPathValidationResponseSchema,
 } from "@cediah/contracts";
@@ -42,6 +43,19 @@ export async function PATCH(request: Request, context: RouteContext) {
   const parts = await pathParts(context);
   if (parts.length === 1 && Uuid.test(parts[0] ?? "")) {
     return forwardGuidedLearningRequest({ apiPath: `/v1/editor/learning-paths/${parts[0]}`, method: "PATCH", request, responseSchema: LearningPathDetailSchema });
+  }
+  return Response.json({ error: "not_found" }, { status: 404 });
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  const parts = await pathParts(context);
+  if (parts.length === 1 && Uuid.test(parts[0] ?? "")) {
+    return forwardGuidedLearningRequest({
+      apiPath: `/v1/editor/learning-paths/${parts[0]}`,
+      method: "DELETE",
+      request,
+      responseSchema: LearningPathDeleteResponseSchema,
+    });
   }
   return Response.json({ error: "not_found" }, { status: 404 });
 }

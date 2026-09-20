@@ -387,6 +387,16 @@ export function createEditorFixtureRuntime(mode: EditorFixtureMode, failure: Edi
       stored = { ...structuredClone(stored), version: { ...structuredClone(stored.version), editVersion: 1, id: fixtureId(9_999), number: stored.version.number + 1, publishedAt: null, releaseNotes, status: "draft" } };
       return ok(structuredClone(stored), 201);
     },
+    async deletePath(requestPathId, expectedVersion) {
+      record(`delete:${expectedVersion}`);
+      await wait();
+      if (!stored || stored.id !== requestPathId) return fail(404, "not_found");
+      if (expectedVersion !== stored.version.editVersion) return fail(409, "version_conflict");
+      if (stored.version.status === "published") return fail(409, "conflict");
+      const id = stored.id;
+      stored = null;
+      return ok({ id });
+    },
     async currentDetail(sourceContentId, projection, signal) {
       record("current-detail");
       await wait(signal);

@@ -56,6 +56,22 @@ describe("editor visual fixtures", () => {
     expect(runtime.requests).toEqual(["save:99", "save:1"]);
   });
 
+  it("deletes only the matching mutable fixture version", async () => {
+    const runtime = createEditorFixtureRuntime("ready");
+    const initial = runtime.getPath()!;
+    expect(await runtime.transport.deletePath(initial.id, initial.version.editVersion + 1))
+      .toMatchObject({ errorCode: "version_conflict", ok: false, status: 409 });
+    expect(await runtime.transport.deletePath(initial.id, initial.version.editVersion))
+      .toEqual({ ok: true, status: 200, value: { id: initial.id } });
+    expect(runtime.getPath()).toBeNull();
+    expect(runtime.requests).toEqual(["delete:2", "delete:1"]);
+
+    const published = createEditorFixtureRuntime("published");
+    const publishedPath = published.getPath()!;
+    expect(await published.transport.deletePath(publishedPath.id, publishedPath.version.editVersion))
+      .toMatchObject({ errorCode: "conflict", ok: false, status: 409 });
+  });
+
   it("provides deterministic failures and stale validation without blind retries", async () => {
     const failed = createEditorFixtureRuntime("ready", "save-503");
     const initial = failed.getPath()!;

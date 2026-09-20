@@ -97,6 +97,16 @@ function fixtureProvider() {
     createPath: vi.fn(async () => ({ status: "success" as const, value: current })),
     createVersion: vi.fn(async (input: { actorUserId: string; canEditAll: boolean }) =>
       canRead(input) ? { status: "success" as const, value: current } : { status: "not_found" as const }),
+    deletePath: vi.fn(async (input: {
+      actorUserId: string;
+      canEditAll: boolean;
+      expectedVersion: number;
+    }) => {
+      if (!canRead(input)) return { status: "not_found" as const };
+      if (input.expectedVersion !== current.version.editVersion) return { status: "version_conflict" as const };
+      if (current.version.status === "published") return { status: "conflict" as const };
+      return { status: "success" as const, value: { id: current.id } };
+    }),
     getEditorMaterialDetail: vi.fn(async (input: { contentId: string }) =>
       input.contentId === contentId
         ? {
@@ -296,6 +306,57 @@ describe("guided-learning editor Fastify routes", () => {
     });
     expect(immutable.statusCode).toBe(409);
     expect(immutable.json()).toEqual({ error: "conflict" });
+    await app.close();
+  });
+
+  it("deletes an owned unpublished route with version checks and protected access", async () => {
+    const fixture = fixtureProvider();
+    const app = await buildApp(environment, {
+      contentProvider,
+      guidedLearningProvider: fixture.provider,
+      identityProvider,
+    });
+
+    const foreign = await app.inject({
+      headers: { authorization: "Bearer foreign" },
+      method: "DELETE",
+      payload: { expectedVersion: 1 },
+      url: `/v1/editor/learning-paths/${pathId}`,
+    });
+    expect(foreign.statusCode).toBe(404);
+
+    const stale = await app.inject({
+      headers: creatorHeaders,
+      method: "DELETE",
+      payload: { expectedVersion: 2 },
+      url: `/v1/editor/learning-paths/${pathId}`,
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toEqual({ error: "version_conflict" });
+
+    const invalid = await app.inject({
+      headers: creatorHeaders,
+      method: "DELETE",
+      payload: { expectedVersion: 1, actorUserId: foreignCreatorId },
+      url: `/v1/editor/learning-paths/${pathId}`,
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const deleted = await app.inject({
+      headers: creatorHeaders,
+      method: "DELETE",
+      payload: { expectedVersion: 1 },
+      url: `/v1/editor/learning-paths/${pathId}`,
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.headers["cache-control"]).toBe("private, no-store");
+    expect(deleted.json()).toEqual({ id: pathId });
+    expect(fixture.provider.deletePath).toHaveBeenLastCalledWith({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: 1,
+      pathId,
+    });
     await app.close();
   });
 

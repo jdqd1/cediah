@@ -7,6 +7,8 @@ import {
   LearningEditorResourceQuerySchema,
   LearningPathCreateRequestSchema,
   LearningPathCreateVersionRequestSchema,
+  LearningPathDeleteRequestSchema,
+  LearningPathDeleteResponseSchema,
   LearningPathDetailSchema,
   LearningPathTransitionRequestSchema,
   LearningPathUpdateRequestSchema,
@@ -248,6 +250,33 @@ export async function registerGuidedLearningEditorRoutes(
       return reply.header("Cache-Control", "private, no-store").send(LearningPathDetailSchema.parse(result.value));
     } catch {
       request.log.error("Learning-path update failed");
+      return reply.status(503).send({ error: "learning_unavailable" });
+    }
+  });
+
+  app.delete<{ Body: unknown; Params: { pathId: string } }>("/v1/editor/learning-paths/:pathId", async (request, reply) => {
+    const editor = await editorContext(request, dependencies);
+    if (editor.kind !== "authenticated") return editor.kind === "content_unavailable" ? reply.status(503).send({ error: "learning_unavailable" }) : sendGuidedUserError(editor, reply);
+    if (!editor.capabilities.canCreate && !editor.capabilities.canEditAll) return reply.status(403).send({ error: "forbidden" });
+    if (!dependencies.provider) return reply.status(503).send({ error: "learning_unavailable" });
+    const params = PathParamsSchema.safeParse(request.params);
+    const body = LearningPathDeleteRequestSchema.safeParse(request.body);
+    if (!params.success) return reply.status(404).send({ error: "not_found" });
+    if (!body.success) {
+      return reply.status(400).send({ error: "invalid_request", fieldErrors: validationFieldErrors(body.error) });
+    }
+    try {
+      const result = await dependencies.provider.deletePath({
+        actorUserId: editor.user.id,
+        canEditAll: editor.capabilities.canEditAll,
+        expectedVersion: body.data.expectedVersion,
+        pathId: params.data.pathId,
+      });
+      if (result.status !== "success") return sendFailure(result, reply);
+      return reply.header("Cache-Control", "private, no-store")
+        .send(LearningPathDeleteResponseSchema.parse(result.value));
+    } catch {
+      request.log.error("Learning-path deletion failed");
       return reply.status(503).send({ error: "learning_unavailable" });
     }
   });

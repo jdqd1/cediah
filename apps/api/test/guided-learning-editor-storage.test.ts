@@ -215,6 +215,9 @@ beforeAll(async () => {
   await applyMigration("0011_guided_learning_attempts.sql");
   await applyMigration("0012_guided_learning_evidence.sql");
   await applyMigration("0013_guided_learning_rewards.sql");
+  await applyMigration("0014_guided_learning_observability.sql");
+  await applyMigration("0015_guided_learning_foreign_key_indexes.sql");
+  await applyMigration("0016_learning_maps.sql");
   const normalized = await pg.query<{ content: { quiz: { questions: Array<{ id: string }> } } }>(
     "select content from content_items where id = $1",
     [materialId],
@@ -273,6 +276,57 @@ async function publish(detail: LearningPathDetail) {
 }
 
 describe("guided-learning editor snapshot storage", () => {
+  it("deletes an owned unpublished route without deleting shared materials", async () => {
+    const created = await createReadyPath("storage-delete-draft");
+    expect(await provider.deletePath({
+      actorUserId: otherCreatorId,
+      canEditAll: false,
+      expectedVersion: created.version.editVersion,
+      pathId: created.id,
+    })).toEqual({ status: "not_found" });
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: created.version.editVersion + 1,
+      pathId: created.id,
+    })).toEqual({ status: "version_conflict" });
+
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: created.version.editVersion,
+      pathId: created.id,
+    })).toEqual({ status: "success", value: { id: created.id } });
+    expect(await provider.getEditorPath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      pathId: created.id,
+    })).toEqual({ status: "not_found" });
+    expect((await pg.query<{ count: string }>(
+      "select count(*)::text as count from content_items where id = $1",
+      [materialId],
+    )).rows[0]!.count).toBe("1");
+    expect((await pg.query<{ action: string }>(
+      "select action from audit_log where target_id = $1 order by occurred_at desc limit 1",
+      [created.id],
+    )).rows[0]!.action).toBe("learning_path_deleted");
+  });
+
+  it("does not delete a route after it has been published", async () => {
+    const published = await publish(await createReadyPath("storage-delete-published"));
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: published.version.editVersion,
+      pathId: published.id,
+    })).toEqual({ status: "conflict" });
+    expect((await provider.getEditorPath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      pathId: published.id,
+    })).status).toBe("success");
+  });
+
   it("reads current and fixed material details without creating revisions or items", async () => {
     const countsBefore = await pg.query<{ items: string; revisions: string }>(
       `select

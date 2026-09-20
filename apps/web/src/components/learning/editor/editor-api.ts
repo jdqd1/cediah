@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   LearningEditorMaterialDetailSchema,
   LearningEditorResourceCatalogResponseSchema,
+  LearningPathDeleteResponseSchema,
   LearningPathDetailSchema,
   LearningPathValidationIssueSchema,
   LearningPathValidationResponseSchema,
@@ -9,6 +10,7 @@ import {
   type LearningEditorResourceCatalogResponse,
   type LearningPathCreateRequest,
   type LearningPathDetail,
+  type LearningPathDeleteResponse,
   type LearningPathUpdateRequest,
   type LearningPathValidationResponse,
 } from "@cediah/contracts";
@@ -76,7 +78,7 @@ async function readJson(response: Response): Promise<unknown> {
 export function createEditorApi(fetcher: EditorFetch = fetch) {
   async function request<T>(input: {
     body?: unknown;
-    method?: "GET" | "PATCH" | "POST";
+    method?: "DELETE" | "GET" | "PATCH" | "POST";
     path: string;
     schema: z.ZodType<T>;
     signal?: AbortSignal;
@@ -125,6 +127,14 @@ export function createEditorApi(fetcher: EditorFetch = fetch) {
         method: "POST",
         path: `/api/editor/learning-paths/${encodeURIComponent(pathId)}/versions`,
         schema: LearningPathDetailSchema,
+      });
+    },
+    deletePath(pathId: string, expectedVersion: number) {
+      return request({
+        body: { expectedVersion },
+        method: "DELETE",
+        path: `/api/editor/learning-paths/${encodeURIComponent(pathId)}`,
+        schema: LearningPathDeleteResponseSchema,
       });
     },
     currentDetail(sourceContentId: string, projection: Projection, signal?: AbortSignal) {
@@ -187,6 +197,7 @@ export function createEditorApi(fetcher: EditorFetch = fetch) {
 
 export type EditorApi = ReturnType<typeof createEditorApi>;
 export type EditorCreateResult = EditorApiResult<LearningPathDetail>;
+export type EditorDeleteResult = EditorApiResult<LearningPathDeleteResponse>;
 export type EditorMaterialDetailResult = EditorApiResult<LearningEditorMaterialDetail>;
 export type EditorResourceCatalogResult = EditorApiResult<LearningEditorResourceCatalogResponse>;
 export type EditorValidationResult = EditorApiResult<LearningPathValidationResponse>;

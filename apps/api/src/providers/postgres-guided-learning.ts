@@ -735,6 +735,57 @@ export function createPostgresGuidedLearningProvider(
       }
     },
 
+    async deletePath(input) {
+      try {
+        const deleted = await database.transaction().execute(async (transaction) => {
+          const path = await transaction.selectFrom("learning_paths").selectAll()
+            .where("id", "=", input.pathId).forUpdate().executeTakeFirst();
+          if (!path || (!input.canEditAll && path.created_by !== input.actorUserId)) {
+            return { kind: "not_found" as const };
+          }
+          const version = await latestVersion(transaction, path.id);
+          if (!version) return { kind: "not_found" as const };
+          if (version.edit_version !== input.expectedVersion) {
+            return { kind: "version_conflict" as const };
+          }
+
+          const publishedVersion = path.published_version_id
+            ? { id: path.published_version_id }
+            : await transaction.selectFrom("learning_path_versions").select("id")
+              .where("path_id", "=", path.id).where("status", "=", "published")
+              .executeTakeFirst();
+          if (publishedVersion) return { kind: "conflict" as const };
+
+          const enrollment = await transaction.selectFrom("learning_enrollments").select("id")
+            .where("path_id", "=", path.id).executeTakeFirst();
+          const mapEntry = await transaction.selectFrom("learning_map_entries").select("id")
+            .where("path_id", "=", path.id).executeTakeFirst();
+          if (enrollment || mapEntry) return { kind: "conflict" as const };
+
+          await writeAudit(transaction, {
+            action: "learning_path_deleted",
+            actorUserId: input.actorUserId,
+            metadata: { versionId: version.id, versionNumber: version.version_number },
+            pathId: path.id,
+          });
+          await transaction.deleteFrom("learning_path_versions")
+            .where("path_id", "=", path.id).execute();
+          const removedPath = await transaction.deleteFrom("learning_paths")
+            .where("id", "=", path.id).returning("id").executeTakeFirst();
+          return removedPath
+            ? { id: removedPath.id, kind: "success" as const }
+            : { kind: "version_conflict" as const };
+        });
+        return deleted.kind === "success"
+          ? { status: "success", value: { id: deleted.id } }
+          : { status: deleted.kind };
+      } catch (error) {
+        const failure = asFailure(error);
+        if (failure) return { status: failure };
+        throw error;
+      }
+    },
+
     async createVersion(input) {
       const access = await editorPath(input);
       if (access.status !== "success") return access;

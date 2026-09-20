@@ -1041,7 +1041,7 @@
 
 .summaryList span,
 .routeList small,
-.routeList a > span:last-child {
+.routeLink > span:last-child {
   color: var(--koraz-slate);
 }
 
@@ -1058,7 +1058,14 @@
   text-decoration: none;
 }
 
-.routeList a {
+.routeListItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.routeLink {
   display: flex;
   min-height: 72px;
   align-items: center;
@@ -1072,10 +1079,20 @@
   text-decoration: none;
 }
 
-.routeList a > span:first-child {
+.routeLink > span:first-child {
   display: grid;
   min-width: 0;
   gap: 4px;
+}
+
+.routeDeleteButton {
+  min-width: 112px;
+}
+
+.routeListMessage {
+  margin: 0 0 16px;
+  color: var(--koraz-slate);
+  font-weight: 700;
 }
 
 .reviewMessage {
@@ -1362,9 +1379,17 @@
   .header,
   .sectionHeading,
   .summaryList li,
-  .routeList a {
+  .routeLink {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .routeListItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .routeDeleteButton {
+    width: 100%;
   }
 
   .card {

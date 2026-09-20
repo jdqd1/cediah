@@ -14,7 +14,7 @@ function json(body: unknown, status = 200) {
 
 export async function forwardGuidedLearningRequest(input: {
   apiPath: string;
-  method: "GET" | "PATCH" | "POST";
+  method: "DELETE" | "GET" | "PATCH" | "POST";
   request: Request;
   responseSchema?: ResponseSchema;
 }) {

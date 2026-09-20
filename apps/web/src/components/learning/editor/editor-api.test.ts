@@ -144,4 +144,18 @@ describe("editor API", () => {
     expect(fetcher.mock.calls[0]![1]).toMatchObject({ body: JSON.stringify({ releaseNotes: "Notas" }) });
     expect(fetcher.mock.calls[1]![1]).toMatchObject({ body: JSON.stringify({ expectedVersion: 7, status: "in_review" }) });
   });
+
+  it("sends a version-checked route deletion", async () => {
+    const fetcher = vi.fn(async () => json({ id: pathId }));
+    const api = createEditorApi(fetcher as typeof fetch);
+    await expect(api.deletePath(pathId, 7)).resolves.toEqual({
+      ok: true,
+      status: 200,
+      value: { id: pathId },
+    });
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/editor/learning-paths/${pathId}`,
+      expect.objectContaining({ body: JSON.stringify({ expectedVersion: 7 }), method: "DELETE" }),
+    );
+  });
 });

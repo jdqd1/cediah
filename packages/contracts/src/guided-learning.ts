@@ -132,6 +132,14 @@ export const LearningPathUpdateRequestSchema = z.strictObject({
   expectedVersion: z.number().int().min(1),
 });
 
+export const LearningPathDeleteRequestSchema = z.strictObject({
+  expectedVersion: z.number().int().min(1),
+});
+
+export const LearningPathDeleteResponseSchema = z.strictObject({
+  id: z.string().uuid(),
+});
+
 export const LearningPathTransitionRequestSchema = z.strictObject({
   expectedVersion: z.number().int().min(1),
   status: z.enum(["in_review", "changes_requested", "approved", "published", "archived"]),
@@ -839,6 +847,8 @@ export type LearningObjective = z.infer<typeof LearningObjectiveSchema>;
 export type LearningOptionConfig = z.infer<typeof LearningOptionConfigSchema>;
 export type LearningPathCard = z.infer<typeof LearningPathCardSchema>;
 export type LearningPathCreateRequest = z.infer<typeof LearningPathCreateRequestSchema>;
+export type LearningPathDeleteRequest = z.infer<typeof LearningPathDeleteRequestSchema>;
+export type LearningPathDeleteResponse = z.infer<typeof LearningPathDeleteResponseSchema>;
 export type LearningPathDefinition = z.infer<typeof LearningPathDefinitionSchema>;
 export type LearningPathDetail = z.infer<typeof LearningPathDetailSchema>;
 export type LearningPathOption = z.infer<typeof LearningPathOptionSchema>;
@@ -890,6 +900,12 @@ export interface GuidedLearningProvider {
     actorUserId: string;
     draft: LearningPathCreateRequest;
   }): Promise<GuidedLearningResult<LearningPathDetail>>;
+  deletePath(input: {
+    actorUserId: string;
+    canEditAll: boolean;
+    expectedVersion: number;
+    pathId: string;
+  }): Promise<GuidedLearningResult<LearningPathDeleteResponse>>;
   createReviewSession(input: {
     idempotencyKey: string;
     request: LearningReviewSessionCreateRequest;
