@@ -1098,12 +1098,17 @@ export function createPostgresGuidedLearningProvider(
         pathId: input.pathId,
       });
       if (access.status !== "success") return access;
+      if (access.value.archivedAt) return { status: "conflict" };
       if (!canTransitionLearningPath({
         actorUserId: input.actorUserId,
         canPublish: input.canPublish,
         canReview: input.canReview,
         createdBy: access.value.createdBy,
         currentStatus: access.value.version.status,
+        hasPublishedVersion: Boolean((await database.selectFrom("learning_paths")
+          .select("published_version_id")
+          .where("id", "=", input.pathId)
+          .executeTakeFirst())?.published_version_id),
         targetStatus: input.status,
       })) return { status: "forbidden" };
       if (access.value.version.editVersion !== input.expectedVersion) return { status: "version_conflict" };
@@ -1121,6 +1126,7 @@ export function createPostgresGuidedLearningProvider(
           if (!version) return null;
           const path = await transaction.selectFrom("learning_paths").selectAll()
             .where("id", "=", input.pathId).forUpdate().executeTakeFirstOrThrow();
+          if (path.archived_at) return null;
           if (input.status === "archived") {
             const archivedPath = await transaction.updateTable("learning_paths")
               .set({ archived_at: new Date() }).where("id", "=", path.id)

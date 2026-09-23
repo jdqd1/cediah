@@ -176,6 +176,7 @@ export function EditorShell({
     if (action === "send-review") return editor.transition("in_review");
     if (action === "changes-requested") return editor.transition("changes_requested");
     if (action === "approve") return editor.transition("approved");
+    if (action === "archive") return editor.transition("archived");
     return editor.transition("published");
   }
 
@@ -316,6 +317,7 @@ export function EditorShell({
             detail={state.savedPath}
             draft={state.draft}
             editable={editable}
+            hasUnsavedChanges={state.dirty}
             message={editor.notice}
             onCheck={() => void saveThenValidate()}
             onCreateVersion={editor.createVersion}

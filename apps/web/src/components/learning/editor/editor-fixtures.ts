@@ -392,7 +392,7 @@ export function createEditorFixtureRuntime(mode: EditorFixtureMode, failure: Edi
       await wait();
       if (!stored || stored.id !== requestPathId) return fail(404, "not_found");
       if (expectedVersion !== stored.version.editVersion) return fail(409, "version_conflict");
-      if (stored.version.status === "published") return fail(409, "conflict");
+      if (stored.version.status === "published" || stored.version.number > 1 || stored.archivedAt) return fail(409, "conflict");
       const id = stored.id;
       stored = null;
       return ok({ id });
@@ -442,7 +442,9 @@ export function createEditorFixtureRuntime(mode: EditorFixtureMode, failure: Edi
         const issues = validateDetail(stored);
         if (issues.some((entry) => entry.severity === "error")) return { errorCode: "not_ready", issues, ok: false, status: 422 };
       }
-      stored = { ...stored, version: { ...stored.version, editVersion: stored.version.editVersion + 1, publishedAt: status === "published" ? new Date(0).toISOString() : stored.version.publishedAt, status } };
+      stored = status === "archived"
+        ? { ...stored, archivedAt: new Date(0).toISOString() }
+        : { ...stored, version: { ...stored.version, editVersion: stored.version.editVersion + 1, publishedAt: status === "published" ? new Date(0).toISOString() : stored.version.publishedAt, status } };
       return ok(structuredClone(stored));
     },
     async validate(requestPathId, expectedVersion) {

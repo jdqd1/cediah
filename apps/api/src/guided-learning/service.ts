@@ -191,9 +191,13 @@ export function canTransitionLearningPath(input: {
   canReview: boolean;
   createdBy: string;
   currentStatus: LearningPathStatus;
+  hasPublishedVersion: boolean;
   roles?: PlatformRole[];
   targetStatus: "in_review" | "changes_requested" | "approved" | "published" | "archived";
 }) {
+  if (input.targetStatus === "archived") {
+    return input.currentStatus !== "archived" && input.hasPublishedVersion && input.canPublish;
+  }
   if (input.targetStatus === "in_review") {
     return (
       (input.currentStatus === "draft" || input.currentStatus === "changes_requested") &&
@@ -206,5 +210,5 @@ export function canTransitionLearningPath(input: {
   if (input.targetStatus === "published") {
     return input.currentStatus === "approved" && input.canPublish;
   }
-  return input.currentStatus === "published" && input.canPublish;
+  return false;
 }

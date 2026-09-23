@@ -68,6 +68,14 @@ async function auditEditor(page: Page, testInfo: TestInfo, state: string) {
 }
 
 test.describe("editor cotidiano con transporte fixture en memoria", () => {
+  test("el índice distingue un borrador nuevo de una ruta con publicación previa", async ({ page }) => {
+    await page.goto("/visual-fixtures/editor-rutas?estado=legacy&vista=indice");
+    await expect(page.getByRole("heading", { name: "Rutas de aprendizaje" })).toBeVisible();
+    await expect(page.getByText("Borrador de ruta publicada", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Archivar ruta/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Eliminar ruta/ })).toHaveCount(0);
+  });
+
   test("crea la ruta nominal y respeta guardar → validar → enviar", async ({ page }) => {
     await openFixture(page, "new");
     await expect(page.getByRole("tab")).toHaveCount(3);
@@ -300,8 +308,10 @@ test.describe("editor cotidiano con transporte fixture en memoria", () => {
     await expect(page.getByLabel("Título de la ruta")).toBeDisabled();
     await expect(page.getByRole("button", { name: "Guardar borrador" })).toBeDisabled();
     await selectSection(page, "Revisión");
+    await expect(page.getByRole("button", { name: "Archivar ruta" })).toBeVisible();
     await page.getByRole("button", { name: "Crear nueva versión para editar" }).click();
     await expect(page.getByText("Borrador", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Archivar ruta" })).toBeVisible();
     await selectSection(page, "Datos");
     await expect(page.getByLabel("Título de la ruta")).toBeEnabled();
 

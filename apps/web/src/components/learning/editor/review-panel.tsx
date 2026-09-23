@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CaretDown, CheckCircle } from "@phosphor-icons/react";
+import { Archive, CaretDown, CheckCircle } from "@phosphor-icons/react";
 import { AlertDialog, Collapsible } from "radix-ui";
 import type { LearningPathDetail } from "@cediah/contracts";
 import type { EditorDraft, ValidationStamp } from "./editor-model";
@@ -19,6 +19,7 @@ export function ReviewPanel({
   detail,
   draft,
   editable,
+  hasUnsavedChanges,
   message,
   onCheck,
   onCreateVersion,
@@ -33,6 +34,7 @@ export function ReviewPanel({
   detail: LearningPathDetail | null;
   draft: EditorDraft;
   editable: boolean;
+  hasUnsavedChanges: boolean;
   message: string;
   onCheck: () => void;
   onCreateVersion: (releaseNotes: string) => Promise<{ ok: boolean }>;
@@ -44,6 +46,7 @@ export function ReviewPanel({
   const focusRegistry = useEditorFocusRegistry();
   const [evaluationOpen, setEvaluationOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const issues = detail && validation ? presentIssues(validation.issues, detail) : [];
   const errors = issues.filter((issue) => issue.severity === "error");
@@ -74,6 +77,7 @@ export function ReviewPanel({
           {actions.includes("approve") ? <button className={styles.primaryAction} disabled={busy} onClick={() => void onTransition("approve")} type="button">Aprobar</button> : null}
           {actions.includes("publish") ? <button className={styles.primaryAction} disabled={busy} onClick={() => setPublishOpen(true)} type="button">Publicar versión</button> : null}
           {actions.includes("create-version") ? <button className={styles.primaryAction} disabled={busy} onClick={() => void onCreateVersion(draft.definition.releaseNotes)} type="button">Crear nueva versión para editar</button> : null}
+          {actions.includes("archive") ? <button className={styles.dangerButton} disabled={busy} onClick={() => setArchiveOpen(true)} type="button"><Archive aria-hidden size={18} /> Archivar ruta</button> : null}
         </div>
       </div>
 
@@ -105,6 +109,20 @@ export function ReviewPanel({
             <div className={styles.dialogActions}>
               <AlertDialog.Cancel asChild><button className={styles.secondaryButton} type="button">Cancelar</button></AlertDialog.Cancel>
               <AlertDialog.Action asChild><button className={styles.primaryAction} disabled={busy} onClick={async (event) => { event.preventDefault(); const result = await onTransition("publish"); if (result.ok) setPublishOpen(false); }} type="button">Publicar versión</button></AlertDialog.Action>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
+
+      <AlertDialog.Root onOpenChange={setArchiveOpen} open={archiveOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className={styles.dialogOverlay} />
+          <AlertDialog.Content className={styles.dialog} data-editor-surface>
+            <AlertDialog.Title className={styles.dialogTitle}>¿Archivar esta ruta?</AlertDialog.Title>
+            <AlertDialog.Description className={styles.dialogDescription}>Dejará de estar disponible para nuevos estudiantes. La versión publicada y el progreso existente se conservarán.{hasUnsavedChanges ? " Los cambios sin guardar se descartarán." : ""}</AlertDialog.Description>
+            <div className={styles.dialogActions}>
+              <AlertDialog.Cancel asChild><button className={styles.secondaryButton} type="button">Cancelar</button></AlertDialog.Cancel>
+              <AlertDialog.Action asChild><button className={styles.dangerButton} disabled={busy} onClick={async (event) => { event.preventDefault(); const result = await onTransition("archive"); if (result.ok) setArchiveOpen(false); }} type="button">Archivar ruta</button></AlertDialog.Action>
             </div>
           </AlertDialog.Content>
         </AlertDialog.Portal>

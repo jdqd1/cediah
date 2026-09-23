@@ -17,7 +17,8 @@ export default async function LearningPathsEditorPage() {
     return <EditorGate title={paths.status === "forbidden" ? "Esta cuenta no tiene permisos editoriales" : "No pudimos abrir tus rutas"} />;
   }
 
-  return <LearningPathsEditorIndex paths={paths.items} />;
+  const canArchive = current.roles.includes("coordinator") || current.roles.includes("administrator");
+  return <LearningPathsEditorIndex canArchive={canArchive} paths={paths.items} />;
 }
 
 function EditorGate({ title }: { title: string }) {

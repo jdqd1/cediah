@@ -312,14 +312,64 @@ describe("guided-learning editor snapshot storage", () => {
     )).rows[0]!.action).toBe("learning_path_deleted");
   });
 
-  it("does not delete a route after it has been published", async () => {
+  it("does not delete a route after publication and can archive it from a later draft", async () => {
     const published = await publish(await createReadyPath("storage-delete-published"));
+    const enrollment = await provider.createEnrollment({
+      pathId: published.id,
+      userId: otherCreatorId,
+    });
+    expect(enrollment.status).toBe("success");
     expect(await provider.deletePath({
       actorUserId: creatorId,
       canEditAll: false,
       expectedVersion: published.version.editVersion,
       pathId: published.id,
     })).toEqual({ status: "conflict" });
+    const draft = await provider.createVersion({
+      actorUserId: creatorId,
+      canEditAll: false,
+      pathId: published.id,
+      releaseNotes: "Borrador posterior",
+    });
+    expect(draft.status).toBe("success");
+    if (draft.status !== "success") return;
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: draft.value.version.editVersion,
+      pathId: published.id,
+    })).toEqual({ status: "conflict" });
+
+    const archived = await provider.transitionPath({
+      actorUserId: creatorId,
+      canPublish: true,
+      canReview: true,
+      expectedVersion: draft.value.version.editVersion,
+      pathId: published.id,
+      status: "archived",
+    });
+    expect(archived).toMatchObject({
+      status: "success",
+      value: { archivedAt: expect.any(String), version: { number: 2, status: "draft" } },
+    });
+    expect(await provider.transitionPath({
+      actorUserId: creatorId,
+      canPublish: true,
+      canReview: true,
+      expectedVersion: draft.value.version.editVersion,
+      pathId: published.id,
+      status: "archived",
+    })).toEqual({ status: "conflict" });
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: draft.value.version.editVersion,
+      pathId: published.id,
+    })).toEqual({ status: "conflict" });
+    expect((await pg.query<{ path_version_id: string }>(
+      "select path_version_id from learning_enrollments where user_id = $1 and path_id = $2",
+      [otherCreatorId, published.id],
+    )).rows).toEqual([{ path_version_id: published.version.id }]);
     expect((await provider.getEditorPath({
       actorUserId: creatorId,
       canEditAll: false,
