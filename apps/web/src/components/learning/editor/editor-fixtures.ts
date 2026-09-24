@@ -392,7 +392,6 @@ export function createEditorFixtureRuntime(mode: EditorFixtureMode, failure: Edi
       await wait();
       if (!stored || stored.id !== requestPathId) return fail(404, "not_found");
       if (expectedVersion !== stored.version.editVersion) return fail(409, "version_conflict");
-      if (stored.version.status === "published" || stored.version.number > 1 || stored.archivedAt) return fail(409, "conflict");
       const id = stored.id;
       stored = null;
       return ok({ id });

@@ -5,7 +5,7 @@ import { Archive, Trash } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type RefObject } from "react";
-import { editorApi } from "./editor-api";
+import { editorApi, type EditorApi } from "./editor-api";
 import { EditorAlertDialog } from "./editor-dialog";
 import styles from "./route-editor.module.css";
 
@@ -24,13 +24,6 @@ type RouteActionTarget = {
   returnFocusRef: RefObject<HTMLButtonElement | null>;
 };
 
-function hasPublishedHistory(path: LearningPathDetail) {
-  return path.version.number > 1
-    || path.version.status === "published"
-    || path.version.status === "archived"
-    || path.archivedAt !== null;
-}
-
 function visibleStatus(path: LearningPathDetail) {
   if (path.archivedAt) return "Archivada";
   if (path.version.status === "draft" && path.version.number > 1) return "Borrador de ruta publicada";
@@ -42,7 +35,7 @@ function deleteFailureMessage(errorCode: string, status: number) {
     return "La ruta cambió mientras intentabas borrarla. Actualiza la página y vuelve a intentarlo.";
   }
   if (status === 409) {
-    return "Esta ruta ya fue publicada o está en uso y no se puede borrar. Puedes archivarla desde su editor.";
+    return "La ruta cambió o tiene referencias pendientes. Actualiza la página y vuelve a intentarlo.";
   }
   if (status === 403) return "No tienes permiso para borrar esta ruta.";
   if (status === 404) return "La ruta ya no existe o no está disponible para tu cuenta.";
@@ -59,7 +52,15 @@ function archiveFailureMessage(errorCode: string, status: number) {
   return "No pudimos archivar la ruta. No se cambió ningún dato; inténtalo de nuevo.";
 }
 
-export function LearningPathsEditorIndex({ canArchive = false, paths: initialPaths }: { canArchive?: boolean; paths: LearningPathDetail[] }) {
+export function LearningPathsEditorIndex({
+  canArchive = false,
+  paths: initialPaths,
+  transport = editorApi,
+}: {
+  canArchive?: boolean;
+  paths: LearningPathDetail[];
+  transport?: Pick<EditorApi, "deletePath" | "transition">;
+}) {
   const router = useRouter();
   const [paths, setPaths] = useState(initialPaths);
   const [actionTarget, setActionTarget] = useState<RouteActionTarget | null>(null);
@@ -73,16 +74,16 @@ export function LearningPathsEditorIndex({ canArchive = false, paths: initialPat
     setBusyId(selected.id);
     setMessage("");
     if (action === "delete") {
-      const result = await editorApi.deletePath(selected.id, selected.version.editVersion);
+      const result = await transport.deletePath(selected.id, selected.version.editVersion);
       if (result.ok) {
         setPaths((current) => current.filter((path) => path.id !== selected.id));
-        setMessage(`Se eliminó la ruta «${selected.title}».`);
+        setMessage(`Se eliminó la ruta «${selected.title}» y su progreso de las cuentas inscritas.`);
         router.refresh();
       } else {
         setMessage(deleteFailureMessage(result.errorCode, result.status));
       }
     } else {
-      const result = await editorApi.transition(selected.id, selected.version.editVersion, "archived");
+      const result = await transport.transition(selected.id, selected.version.editVersion, "archived");
       if (result.ok) {
         setPaths((current) => current.map((path) => path.id === selected.id ? result.value : path));
         setMessage(`Se archivó la ruta «${selected.title}». El progreso existente se conserva.`);
@@ -107,41 +108,49 @@ export function LearningPathsEditorIndex({ canArchive = false, paths: initialPat
       ) : (
         <ul className={styles.routeList}>
           {paths.map((path) => {
-            const publishedHistory = hasPublishedHistory(path);
-            const action = !publishedHistory ? "delete" : canArchive && !path.archivedAt ? "archive" : null;
-            const actionLabel = action === "delete" ? "Eliminar" : "Archivar";
-            const busyLabel = action === "delete" ? "Eliminando…" : "Archivando…";
+            const actions: RouteActionTarget["action"][] = canArchive && !path.archivedAt
+              && (path.version.number > 1 || path.version.status === "published")
+              ? ["archive", "delete"]
+              : ["delete"];
             return (
               <li className={styles.routeListItem} key={path.id}>
                 <Link className={styles.routeLink} href={`/panel/rutas/${path.id}`}>
                   <span><strong>{path.title}</strong><small>{path.topic.title} · {path.version.units.length} unidades</small></span>
                   <span>{visibleStatus(path)}</span>
                 </Link>
-                {action ? (
-                  <button
-                    aria-label={`${actionLabel} ruta ${path.title}`}
-                    className={`${styles.dangerButton} ${styles.routeDeleteButton}`}
-                    disabled={busyId !== null}
-                    onClick={() => {
-                      setMessage("");
-                      setActionTarget({
-                        action,
-                        path,
-                        returnFocusRef: {
-                          get current() { return actionButtonRefs.current.get(path.id) ?? null; },
-                        },
-                      });
-                    }}
-                    ref={(node) => {
-                      if (node) actionButtonRefs.current.set(path.id, node);
-                      else actionButtonRefs.current.delete(path.id);
-                    }}
-                    type="button"
-                  >
-                    {action === "delete" ? <Trash aria-hidden size={18} /> : <Archive aria-hidden size={18} />}
-                    {busyId === path.id ? busyLabel : actionLabel}
-                  </button>
-                ) : null}
+                <div className={styles.routeActions}>
+                  {actions.map((action) => {
+                    const actionLabel = action === "delete" ? "Eliminar" : "Archivar";
+                    const busyLabel = action === "delete" ? "Eliminando…" : "Archivando…";
+                    const actionKey = `${action}:${path.id}`;
+                    return (
+                      <button
+                        aria-label={`${actionLabel} ruta ${path.title}`}
+                        className={`${action === "delete" ? styles.dangerButton : styles.secondaryButton} ${styles.routeDeleteButton}`}
+                        disabled={busyId !== null}
+                        key={action}
+                        onClick={() => {
+                          setMessage("");
+                          setActionTarget({
+                            action,
+                            path,
+                            returnFocusRef: {
+                              get current() { return actionButtonRefs.current.get(actionKey) ?? null; },
+                            },
+                          });
+                        }}
+                        ref={(node) => {
+                          if (node) actionButtonRefs.current.set(actionKey, node);
+                          else actionButtonRefs.current.delete(actionKey);
+                        }}
+                        type="button"
+                      >
+                        {action === "delete" ? <Trash aria-hidden size={18} /> : <Archive aria-hidden size={18} />}
+                        {busyId === path.id && actionTarget?.action === action ? busyLabel : actionLabel}
+                      </button>
+                    );
+                  })}
+                </div>
               </li>
             );
           })}
@@ -152,8 +161,8 @@ export function LearningPathsEditorIndex({ canArchive = false, paths: initialPat
         description={actionTarget?.action === "archive"
           ? `«${actionTarget.path.title}» dejará de estar disponible para nuevos estudiantes. La versión publicada y el progreso existente se conservarán.`
           : actionTarget
-            ? `Se borrará «${actionTarget.path.title}» junto con su borrador. Los materiales publicados que utiliza no se eliminarán. Esta acción no se puede deshacer.`
-            : "La ruta y su borrador se eliminarán de forma permanente."}
+            ? `Se borrará «${actionTarget.path.title}» con todas sus versiones, inscripciones y progreso de los usuarios. También desaparecerá de sus mapas de aprendizaje. Los materiales publicados que utiliza se conservarán. Esta acción no se puede deshacer.`
+            : "La ruta, sus inscripciones y el progreso de los usuarios se eliminarán de forma permanente."}
         onConfirm={() => { void performSelectedAction(); }}
         onOpenChange={(open) => { if (!open && !busyId) setActionTarget(null); }}
         open={Boolean(actionTarget)}

@@ -19,7 +19,6 @@ import {
   type MapItemAction,
 } from "./nodes/learning-map-item";
 import {
-  initialLayout,
   reconcileLayout,
   resolveDropOverlap,
   type Positions,
@@ -35,6 +34,7 @@ const nodeTypes = { node: LearningNode, block: BlockNode, lesson: LessonNode };
 export default function LearningMapCanvas({
   level,
   account,
+  iconColors,
   queue,
   onOpen,
   onAction,
@@ -44,12 +44,12 @@ export default function LearningMapCanvas({
   organizing,
   phase,
   direction,
-  organizeToken,
   movingId,
   onMoveFinished,
 }: {
   level: LearningMapLevelResponse;
   account: string;
+  iconColors: Record<string, string>;
   queue: MapLayoutQueue;
   onOpen: (item: MapItem) => void;
   onAction: (item: MapItem, action: MapItemAction) => void;
@@ -59,7 +59,6 @@ export default function LearningMapCanvas({
   organizing: boolean;
   phase: string;
   direction: "forward" | "back";
-  organizeToken: number;
   movingId: string | null;
   onMoveFinished: () => void;
 }) {
@@ -79,7 +78,7 @@ export default function LearningMapCanvas({
     const box = wrapper.current;
     if (!box) return;
     const measure = () => {
-      setMobile(box.clientWidth < 768);
+      setMobile(window.matchMedia("(max-width: 767px)").matches);
       setCanvasSize((size) => size.width === box.clientWidth && size.height === box.clientHeight
         ? size
         : { width: box.clientWidth, height: box.clientHeight });
@@ -130,27 +129,14 @@ export default function LearningMapCanvas({
     },
     [cardHeight, flow, level.items, level.levelKey, mobile],
   );
-  const [undo, setUndo] = useState<{
-    positions: Positions;
-    expires: number;
-  } | null>(null);
-  useEffect(() => {
-    if (!undo) return;
-    const timer = setTimeout(
-      () => setUndo(null),
-      Math.max(0, undo.expires - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [undo]);
-  const previousOrganize = useRef(organizeToken),
-    movingOriginal = useRef<Positions | null>(null);
+  const movingOriginal = useRef<Positions | null>(null);
   const snapshotKey = useCallback(
     () =>
       spatialKey(
         account,
         level.mapId,
         level.levelKey,
-        (wrapper.current?.clientWidth ?? 1000) < 768,
+        window.matchMedia("(max-width: 767px)").matches,
       ),
     [account, level.mapId, level.levelKey],
   );
@@ -223,6 +209,7 @@ export default function LearningMapCanvas({
         focusable: false,
         data: {
           item,
+          iconColor: iconColors[item.occurrenceId],
           mobile,
           selected: selected.includes(item.occurrenceId),
           selecting,
@@ -260,6 +247,7 @@ export default function LearningMapCanvas({
     onOpen,
     onAction,
     onPrefetch,
+    iconColors,
     flow,
     snapshotKey,
     cardHeight,
@@ -283,26 +271,6 @@ export default function LearningMapCanvas({
       })),
     );
   }, []);
-  useEffect(() => {
-    if (previousOrganize.current === organizeToken) return;
-    previousOrganize.current = organizeToken;
-    const positions = initialLayout(
-      level.items.map((i) => i.occurrenceId),
-      wrapper.current?.clientWidth ?? 900,
-      level.levelKey === "root",
-      cardHeight,
-    );
-    setUndo({ positions: points.current, expires: Date.now() + 30_000 });
-    updatePoints(positions);
-    if (Object.keys(positions).length) queue.enqueue(level.levelKey, positions);
-  }, [
-    organizeToken,
-    level.items,
-    level.levelKey,
-    queue,
-    updatePoints,
-    cardHeight,
-  ]);
   useEffect(() => {
     if (!movingId) {
       movingOriginal.current = null;
@@ -363,18 +331,25 @@ export default function LearningMapCanvas({
     [],
   );
   const edges = useMemo(
-    () =>
-      level.edges.map((e, index) => ({
+    () => {
+      const connected = new Set(level.edges.map((edge) => `${edge.sourceOccurrenceId}:${edge.targetOccurrenceId}`));
+      const sequence = level.items.slice(0, -1).flatMap((item, index) => {
+        const next = level.items[index + 1]!;
+        return connected.has(`${item.occurrenceId}:${next.occurrenceId}`)
+          ? []
+          : [{ sourceOccurrenceId: item.occurrenceId, targetOccurrenceId: next.occurrenceId }];
+      });
+      return [...level.edges, ...sequence].map((e, index) => ({
         id: `${index}:${e.sourceOccurrenceId}:${e.targetOccurrenceId}`,
         source: e.sourceOccurrenceId,
         target: e.targetOccurrenceId,
-        type: "smoothstep",
-        pathOptions: { borderRadius: 20 },
-        style: { stroke: "#BACBC5", strokeWidth: 1.25 },
+        type: "straight",
+        style: { stroke: "#b9c2d9", strokeWidth: 1.5 },
         focusable: false,
         selectable: false,
-      })),
-    [level.edges],
+      }));
+    },
+    [level.edges, level.items],
   );
   const contentHeight = mobile
     ? Math.max(canvasSize.height, ...nodes.map((n) => n.position.y + cardHeight + 60))
@@ -434,6 +409,7 @@ export default function LearningMapCanvas({
             "controls.zoomOut.ariaLabel": "Alejar",
             "controls.fitView.ariaLabel": "Ajustar vista",
           }}
+          proOptions={{ hideAttribution: true }}
         >
           {level.items.length > 24 && outside && mini ? (
             <MiniMap pannable zoomable nodeColor="#d5e3da" />
@@ -483,18 +459,6 @@ export default function LearningMapCanvas({
             onClick={() => setMini(!mini)}
           >
             <MapTrifold size={18} />
-          </button>
-        ) : null}
-        {undo ? (
-          <button
-            className={styles.button}
-            onClick={() => {
-              updatePoints(undo.positions);
-              queue.enqueue(level.levelKey, undo.positions);
-              setUndo(null);
-            }}
-          >
-            Deshacer orden
           </button>
         ) : null}
       </div>

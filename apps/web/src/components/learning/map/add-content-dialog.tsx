@@ -177,8 +177,8 @@ export function MapEditDialog({
         </header>
         {mode === "add" && !targetNodeId ? (
           <div className={styles.dialogModeTabs} role="tablist" aria-label="Qué quieres añadir">
-            <button role="tab" aria-selected={activeTab === "existing"} onClick={() => setActiveTab("existing")}>Contenido existente</button>
-            <button role="tab" aria-selected={activeTab === "node"} onClick={() => setActiveTab("node")}>Crear nodo</button>
+            <button role="tab" aria-selected={activeTab === "existing"} onClick={() => { setActiveTab("existing"); requestAnimationFrame(() => input.current?.focus()); }}>Contenido existente</button>
+            <button role="tab" aria-selected={activeTab === "node"} onClick={() => { setActiveTab("node"); requestAnimationFrame(() => input.current?.focus()); }}>Personalizado</button>
           </div>
         ) : null}
         {addingExisting ? (
@@ -316,7 +316,7 @@ export function MapEditDialog({
         ) : (
           <>
             <label>
-              Nombre del nodo
+              Nombre
               <input
                 ref={input}
                 value={title}
@@ -324,7 +324,7 @@ export function MapEditDialog({
                 onChange={(e) => setTitle(e.target.value)}
               />
             </label>
-            {mode !== "rename" ? (
+            {mode === "group" ? (
               <label>
                 Icono
                 <select

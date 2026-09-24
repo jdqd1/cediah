@@ -30,7 +30,7 @@ export function EditorFixtureWorkspace({
   if (view === "index") {
     return (
       <AppShell activeKey="learning" guidedLearningEnabled headerTitle="Editor de rutas">
-        <LearningPathsEditorIndex canArchive={fixture.canPublish} paths={fixture.initialPath ? [fixture.initialPath] : []} />
+        <LearningPathsEditorIndex canArchive={fixture.canPublish} paths={fixture.initialPath ? [fixture.initialPath] : []} transport={runtime.transport} />
       </AppShell>
     );
   }

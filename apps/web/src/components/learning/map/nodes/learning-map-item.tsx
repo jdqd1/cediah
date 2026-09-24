@@ -5,9 +5,10 @@ import { DotsThree, DotsSixVertical } from "@phosphor-icons/react";
 import type { MapItem } from "@cediah/contracts";
 import { MedicalMapIcon } from "../medical-map-icon";
 import styles from "../learning-map.module.css";
-export type MapItemAction = "info" | "select" | "rename" | "add" | "remove" | "move";
+export type MapItemAction = "info" | "select" | "rename" | "add" | "remove" | "move" | "color";
 export type ItemData = {
   item: MapItem;
+  iconColor?: string;
   mobile?: boolean;
   selected: boolean;
   selecting: boolean;
@@ -97,6 +98,7 @@ export const LearningMapItem = memo(function LearningMapItem({
             [
               "info",
               "select",
+              "color",
               ...(item.kind === "node" ? ["rename", "add"] : []),
               "move",
               ...(item.occurrenceId.startsWith("lesson:") ? [] : ["remove"]),
@@ -114,6 +116,7 @@ export const LearningMapItem = memo(function LearningMapItem({
                 {
                   info: "Ver información",
                   select: data.selected ? "Deseleccionar" : "Seleccionar",
+                  color: "Cambiar color del icono",
                   rename: "Renombrar",
                   add: "Agregar contenido",
                   remove: "Quitar del mapa",
@@ -145,7 +148,7 @@ export const LearningMapItem = memo(function LearningMapItem({
         {data.selecting ? (
           <span aria-hidden="true">{data.selected ? "☑" : "☐"}</span>
         ) : null}
-        <span className={styles.iconWell}>
+        <span className={styles.iconWell} style={data.iconColor ? { color: data.iconColor } : undefined}>
           <MedicalMapIcon iconKey={item.iconKey} />
         </span>
         <strong title={item.title}>{item.title}</strong>

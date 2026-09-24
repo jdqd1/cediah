@@ -1,6 +1,5 @@
 "use client";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -8,11 +7,9 @@ import {
   ArrowLeft,
   CaretRight,
   Plus,
-  List,
+  ListBullets,
   MapTrifold,
   X,
-  ArrowsOutCardinal,
-  CaretDown,
 } from "@phosphor-icons/react";
 import type {
   MapItem,
@@ -21,6 +18,7 @@ import type {
   MapIconKey,
   LearningMapSuggestionsResponse,
   LearningMapMutationResponse,
+  LearningMapSummaryResponse,
 } from "@cediah/contracts";
 import { MapWorkspaceProvider, useMapWorkspace } from "./map-provider";
 import type { MapClient } from "./map-client";
@@ -30,6 +28,8 @@ import { MedicalMapIcon } from "./medical-map-icon";
 import { LessonDetailPanel } from "./lesson-detail-panel";
 import { MapMobileSheet } from "./map-mobile-sheet";
 import { MapEditDialog } from "./add-content-dialog";
+import { MapIconColorDialog } from "./map-icon-color-dialog";
+import { MapQuickPanel } from "./map-quick-panel";
 import styles from "./learning-map.module.css";
 const Canvas = dynamic(() => import("./learning-map-canvas"), {
   ssr: false,
@@ -40,6 +40,7 @@ type Dialog = {
   item?: MapItem;
   initialTab?: "existing" | "node";
 };
+type QuickTab = "hoy" | "rutas" | "progreso";
 
 function Workspace() {
   const {
@@ -62,12 +63,16 @@ function Workspace() {
   const [wide, setWide] = useState(false),
     [list, setList] = useState(false),
     [organizing, setOrganizing] = useState(false),
-    [organizeToken, setOrganizeToken] = useState(0),
     [movingId, setMovingId] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false),
     [selection, setSelection] = useState<string[]>([]),
     [dialog, setDialog] = useState<Dialog | null>(null),
-    [info, setInfo] = useState<MapItem | "container" | null>(null);
+    [info, setInfo] = useState<MapItem | "container" | null>(null),
+    [quickTab, setQuickTab] = useState<QuickTab | null>(null),
+    [quickSummary, setQuickSummary] = useState<LearningMapSummaryResponse | null>(null),
+    [quickError, setQuickError] = useState(false),
+    [colorItem, setColorItem] = useState<MapItem | null>(null),
+    [iconColors, setIconColors] = useState<Record<string, string>>({});
   const [suggestions, setSuggestions] =
       useState<LearningMapSuggestionsResponse | null>(null),
     [suggestionError, setSuggestionError] = useState(false),
@@ -94,7 +99,7 @@ function Workspace() {
       );
     };
     const observer = new ResizeObserver((entries) => {
-      setWide(entries[0]!.contentRect.width >= 1180);
+      setWide(entries[0]!.contentRect.width >= 768);
       size();
     });
     observer.observe(el);
@@ -106,6 +111,36 @@ function Workspace() {
     };
   }, []);
   const currentLevelKey = level?.levelKey;
+  const mapId = level?.mapId;
+  useEffect(() => {
+    if (!mapId) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(`map-icon-colors:${account}:${mapId}`);
+        setIconColors(saved ? JSON.parse(saved) as Record<string, string> : {});
+      } catch { setIconColors({}); }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [account, mapId]);
+  const rootSummary: LearningMapSummaryResponse | null = level?.levelKey === "root"
+    ? {
+      map: { id: level.mapId },
+      nodes: level.items,
+      progress: level.containerSummary.progress,
+      structuralVersion: level.structuralVersion,
+    } : null;
+  const displayedSummary = rootSummary ?? quickSummary;
+  const quickLoading = Boolean(quickTab && !displayedSummary && !quickError);
+  useEffect(() => {
+    if (!quickTab || displayedSummary || quickError || !level) return;
+    const controller = new AbortController();
+    void client.summary().then((summary) => {
+      if (!controller.signal.aborted) setQuickSummary(summary);
+    }).catch(() => {
+      if (!controller.signal.aborted) setQuickError(true);
+    });
+    return () => controller.abort();
+  }, [client, displayedSummary, level, quickError, quickTab]);
   useEffect(() => {
     if (currentLevelKey) heading.current?.focus({ preventScroll: true });
   }, [currentLevelKey]);
@@ -157,6 +192,7 @@ function Workspace() {
         return;
       }
       setInfo(null);
+      setQuickTab(null);
       navigate(routeFor(item));
     },
     [navigate, routeFor, selecting],
@@ -176,7 +212,12 @@ function Workspace() {
       return;
     }
     if (action === "info") {
+      setQuickTab(null);
       setInfo(item);
+      return;
+    }
+    if (action === "color") {
+      setColorItem(item);
       return;
     }
     setDialog({
@@ -189,13 +230,34 @@ function Workspace() {
     (item: MapItem) => prefetch(routeFor(item)),
     [prefetch, routeFor],
   );
-  const moveFinished = useCallback(() => setMovingId(null), []);
+  const moveFinished = useCallback(() => {
+    setMovingId(null);
+    setOrganizing(false);
+  }, []);
   const closePanel = useCallback(() => {
+    if (quickTab) {
+      setQuickTab(null);
+      return;
+    }
     setInfo(null);
     if (level?.selectedLesson) back();
     else if (detail && level)
       window.history.replaceState(null, "", buildMapHref(level.route));
-  }, [back, detail, level]);
+  }, [back, detail, level, quickTab]);
+  const showTab = (tab: QuickTab) => {
+    setInfo(null);
+    setQuickError(false);
+    setQuickTab((current) => current === tab ? null : tab);
+  };
+  const saveIconColor = (item: MapItem, color: string | null) => {
+    if (!level) return;
+    const next = { ...iconColors };
+    if (color) next[item.occurrenceId] = color;
+    else delete next[item.occurrenceId];
+    setIconColors(next);
+    try { localStorage.setItem(`map-icon-colors:${account}:${level.mapId}`, JSON.stringify(next)); } catch { /* Keep this session's choice. */ }
+    setColorItem(null);
+  };
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
       if (
@@ -342,7 +404,21 @@ function Workspace() {
         item.kind === "lesson" &&
         item.availability !== "available",
     );
-  const panel = unavailableSelection ? (
+  const panel = quickTab ? (
+    <MapQuickPanel
+      tab={quickTab}
+      summary={displayedSummary}
+      loading={quickLoading}
+      error={quickError}
+      onTab={setQuickTab}
+      onClose={() => setQuickTab(null)}
+      onRetry={() => setQuickError(false)}
+      onOpen={(item) => {
+        setQuickTab(null);
+        navigate({ nodeId: item.occurrenceId, entryId: null, unitStableKey: null });
+      }}
+    />
+  ) : unavailableSelection ? (
     <aside className={styles.panel} aria-label="Lección no disponible">
       <header className={styles.panelHeader}>
         <h2>Lección no disponible</h2>
@@ -485,33 +561,23 @@ function Workspace() {
               <h1 ref={heading} tabIndex={-1}>
                 {level?.containerSummary.title ?? "Mi mapa de aprendizaje"}
               </h1>
-              {level ? (
+              {level?.containerSummary.progress.percentage !== null && level ? (
                 <span className={styles.status}>
-                  {level.containerSummary.progress.percentage === null
-                    ? "Sin avance disponible"
-                    : `${level.containerSummary.progress.percentage} % · ${level.containerSummary.progress.completedEssentialSteps}/${level.containerSummary.progress.totalEssentialSteps} esenciales`}
+                  {`${level.containerSummary.progress.percentage} % · ${level.containerSummary.progress.completedEssentialSteps}/${level.containerSummary.progress.totalEssentialSteps} esenciales`}
                 </span>
               ) : null}
             </div>
           </div>
           <div className={styles.headerActions}>
-            <nav className={styles.viewSwitcher} aria-label="Vistas de aprendizaje">
-              <span aria-current="page">Mapa</span>
-              <Link href="/aprendizaje?tab=hoy">Hoy</Link>
-              <Link href="/aprendizaje?tab=rutas">Rutas</Link>
-              <Link href="/aprendizaje?tab=progreso">Progreso</Link>
-            </nav>
-            <details className={styles.mobileViewsMenu}>
-              <summary><MapTrifold size={18} /> Mapa <CaretDown size={14} /></summary>
-              <nav aria-label="Otras vistas de aprendizaje">
-                <Link href="/aprendizaje?tab=hoy">Hoy</Link>
-                <Link href="/aprendizaje?tab=rutas">Rutas</Link>
-                <Link href="/aprendizaje?tab=progreso">Progreso</Link>
-              </nav>
-            </details>
             <button className={styles.primary} aria-label="Nuevo nodo o agregar contenido" title="Nuevo nodo o agregar contenido" onClick={() => setDialog({ mode: "add", initialTab: "node" })} disabled={!level}>
               <Plus size={18} />
               <span>Nodo</span>
+            </button>
+            <button className={`${styles.button} ${styles.summaryToggle}`} aria-label="Abrir resumen de aprendizaje" aria-pressed={Boolean(quickTab)} onClick={() => showTab(quickTab ?? "hoy")}>
+              <MapTrifold size={18} /> <span>Resumen</span>
+            </button>
+            <button className={styles.mobileViewsMenu} aria-label="Abrir resumen de aprendizaje" aria-pressed={Boolean(quickTab)} onClick={() => showTab(quickTab ?? "hoy")}>
+              <MapTrifold size={18} /> <span>Vistas</span>
             </button>
             {selecting ? (
               <>
@@ -522,33 +588,12 @@ function Workspace() {
                   <X size={18} />
                 </button>
               </>
-            ) : (
-              <>
-              <button
-                className={styles.button}
-                aria-pressed={organizing}
-                aria-label={organizing ? "Terminar organización" : "Organizar"}
-                title={organizing ? "Terminar organización" : "Organizar"}
-                onClick={() => setOrganizing(!organizing)}
-              >
-                <ArrowsOutCardinal size={18} />
-                <span className={styles.actionLabel}>{organizing ? "Terminar organización" : "Organizar"}</span>
-              </button>
-              {organizing && !list ? (
-                <button
-                  className={styles.button}
-                  onClick={() => setOrganizeToken((n) => n + 1)}
-                >
-                  Ordenar este nivel
-                </button>
-              ) : null}
-              </>
-            )}
+            ) : null}
             <span className={styles.status} role="status">
               {loading ? "Abriendo…" : queue.state === "saving" ? "Guardando…" : queue.state === "saved" ? "" : "Posiciones pendientes"}
             </span>
             <button className={`${styles.button} ${styles.viewToggle}`} aria-label={list ? "Vista de mapa" : "Vista de lista"} onClick={() => setList(!list)}>
-              {list ? <MapTrifold size={18} /> : <List size={18} />}
+              {list ? <MapTrifold size={18} /> : <ListBullets size={18} />}
               <span>{list ? "Mapa" : "Lista"}</span>
             </button>
           </div>
@@ -653,6 +698,7 @@ function Workspace() {
                   key={item.occurrenceId}
                   data={{
                     item,
+                    iconColor: iconColors[item.occurrenceId],
                     selected: selected.includes(item.occurrenceId),
                     selecting,
                     organizing: false,
@@ -667,6 +713,7 @@ function Workspace() {
             <Canvas
               level={level}
               account={account}
+              iconColors={iconColors}
               queue={queue}
               onOpen={open}
               onAction={action}
@@ -676,7 +723,6 @@ function Workspace() {
               organizing={organizing}
               phase={phase}
               direction={direction}
-              organizeToken={organizeToken}
               movingId={movingId}
               onMoveFinished={moveFinished}
             />
@@ -712,6 +758,14 @@ function Workspace() {
           }}
           suggestions={suggestions}
           suggestionError={suggestionError}
+        />
+      ) : null}
+      {colorItem ? (
+        <MapIconColorDialog
+          item={colorItem}
+          color={iconColors[colorItem.occurrenceId] ?? null}
+          onChoose={(color) => saveIconColor(colorItem, color)}
+          onClose={() => setColorItem(null)}
         />
       ) : null}
     </main>

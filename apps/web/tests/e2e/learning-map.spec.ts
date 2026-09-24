@@ -11,6 +11,32 @@ test("selecting starts from a card menu", async ({ page }) => {
   await page.getByRole("button", { name: "Cancelar selección" }).click();
   await expect(page.getByRole("button", { name: "Crear nodo (1)" })).toHaveCount(0);
 });
+test("quick views stay in the map and card colors persist locally", async ({ page }, testInfo) => {
+  await page.goto(root);
+  await expect(page.getByRole("button", { name: "Abrir Anatomía" })).toBeVisible();
+  const initialUrl = page.url();
+  await page.getByRole("button", { name: "Abrir resumen de aprendizaje" }).click();
+  await expect(page.getByRole("complementary", { name: "Resumen de aprendizaje" })).toBeVisible();
+  await page.getByRole("tab", { name: "Rutas" }).click();
+  await expect(page.getByRole("heading", { name: /Mis rutas/ })).toBeVisible();
+  if (testInfo.project.name === "desktop") {
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(page.locator('[data-mobile="false"]')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.screenshot({ path: testInfo.outputPath("quick-routes.png"), fullPage: true });
+  await page.getByRole("tab", { name: "Progreso" }).click();
+  await expect(page.getByRole("heading", { name: "Tu progreso" })).toBeVisible();
+  expect(page.url()).toBe(initialUrl);
+  await page.getByRole("button", { name: "Cerrar resumen" }).click();
+  await page.getByLabel("Opciones de Anatomía", { exact: true }).click();
+  await page.getByRole("button", { name: "Cambiar color del icono" }).click();
+  await page.getByRole("dialog", { name: "Color de Anatomía" }).getByRole("button", { name: "Coral" }).click();
+  const icon = page.locator("article", { has: page.getByRole("button", { name: "Abrir Anatomía" }) }).locator("[class*=iconWell]");
+  await expect(icon).toHaveCSS("color", "rgb(196, 94, 75)");
+  await page.reload();
+  await expect(icon).toHaveCSS("color", "rgb(196, 94, 75)");
+});
 test("routes use a horizontal row on desktop and a vertical scroll on mobile", async ({ page, isMobile }) => {
   await page.goto(`${root}?estado=large`);
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
@@ -36,6 +62,7 @@ test("routes use a horizontal row on desktop and a vertical scroll on mobile", a
   await page.goto(`${root}?node=${node}&item=${block}`);
   await expect(page.locator(".react-flow__edge-path").first()).toHaveAttribute("d", /M/);
   expect(await page.locator(".react-flow__edge path[marker-end]").count()).toBe(0);
+  expect(await page.locator(".react-flow__edge").count()).toBeGreaterThan(0);
 });
 test("six visual states and responsive widths remain readable", async ({
   page,
@@ -159,6 +186,12 @@ test("hierarchy, deep links, back/forward and lesson panel", async ({
   await expect(
     page.getByText("13 % · 1/8 esenciales", { exact: false }),
   ).toBeVisible();
+  if (!isMobile) {
+    await page.getByRole("button", { name: "Abrir resumen de aprendizaje" }).click();
+    await expect(page.getByRole("complementary", { name: "Resumen de aprendizaje" })).toBeVisible();
+    await page.getByRole("button", { name: "Cerrar resumen" }).click();
+    await expect(page.getByRole("button", { name: "Cerrar lección" })).toBeVisible();
+  }
   await page.screenshot({
     path: testInfo.outputPath("lesson.png"),
     fullPage: true,
@@ -199,10 +232,11 @@ test("list, keyboard dialog and document reflow", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Nuevo nodo o agregar contenido", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Nuevo nodo o agregar contenido" })).toBeVisible();
-  await page.getByRole("tab", { name: "Crear nodo" }).click();
+  await page.getByRole("tab", { name: "Personalizado" }).click();
   await expect(
-    page.getByRole("textbox", { name: "Nombre del nodo" }),
+    page.getByRole("textbox", { name: "Nombre" }),
   ).toBeFocused();
+  await expect(page.getByRole("combobox", { name: "Icono" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(

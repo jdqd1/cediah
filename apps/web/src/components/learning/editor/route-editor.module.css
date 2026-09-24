@@ -1089,6 +1089,11 @@
   min-width: 112px;
 }
 
+.routeActions {
+  display: flex;
+  gap: 8px;
+}
+
 .routeListMessage {
   margin: 0 0 16px;
   color: var(--koraz-slate);
@@ -1390,6 +1395,11 @@
 
   .routeDeleteButton {
     width: 100%;
+    min-width: 0;
+  }
+
+  .routeActions > button {
+    flex: 1;
   }
 
   .card {

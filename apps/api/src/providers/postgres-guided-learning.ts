@@ -749,18 +749,34 @@ export function createPostgresGuidedLearningProvider(
             return { kind: "version_conflict" as const };
           }
 
-          const publishedVersion = path.published_version_id
-            ? { id: path.published_version_id }
-            : await transaction.selectFrom("learning_path_versions").select("id")
-              .where("path_id", "=", path.id).where("status", "=", "published")
-              .executeTakeFirst();
-          if (publishedVersion) return { kind: "conflict" as const };
-
-          const enrollment = await transaction.selectFrom("learning_enrollments").select("id")
-            .where("path_id", "=", path.id).executeTakeFirst();
-          const mapEntry = await transaction.selectFrom("learning_map_entries").select("id")
-            .where("path_id", "=", path.id).executeTakeFirst();
-          if (enrollment || mapEntry) return { kind: "conflict" as const };
+          // The path lock excludes new enrollments while its student data is removed.
+          await transaction.updateTable("learning_paths")
+            .set({ published_version_id: null })
+            .where("id", "=", path.id).execute();
+          const mapEntries = await transaction.selectFrom("learning_map_entries")
+            .select(["id", "kind", "map_id"])
+            .where("path_id", "=", path.id).execute();
+          if (mapEntries.length) {
+            await transaction.deleteFrom("learning_map_entries")
+              .where("path_id", "=", path.id).execute();
+            const blockLevelKeys = mapEntries
+              .filter((entry) => entry.kind === "block")
+              .map((entry) => `block:${entry.id}`);
+            if (blockLevelKeys.length) {
+              await transaction.deleteFrom("learning_map_layouts")
+                .where("level_key", "in", blockLevelKeys).execute();
+            }
+            await transaction.updateTable("learning_maps")
+              .set({ row_version: sql<number>`row_version + 1` })
+              .where("id", "in", [...new Set(mapEntries.map((entry) => entry.map_id))])
+              .execute();
+          }
+          // Enrollment deletion cascades to attempts, progress, events, rewards,
+          // and map-related user preferences before the published steps disappear.
+          await transaction.deleteFrom("learning_enrollments")
+            .where("path_id", "=", path.id).execute();
+          await sql`select set_config('cediah.deleting_learning_path_id', ${path.id}, true)`
+            .execute(transaction);
 
           await writeAudit(transaction, {
             action: "learning_path_deleted",

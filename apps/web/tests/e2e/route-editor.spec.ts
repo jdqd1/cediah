@@ -73,7 +73,13 @@ test.describe("editor cotidiano con transporte fixture en memoria", () => {
     await expect(page.getByRole("heading", { name: "Rutas de aprendizaje" })).toBeVisible();
     await expect(page.getByText("Borrador de ruta publicada", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Archivar ruta/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Eliminar ruta/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Eliminar ruta/ })).toBeVisible();
+    await page.getByRole("button", { name: /Eliminar ruta/ }).click();
+    await expect(page.getByRole("alertdialog")).toContainText("progreso de los usuarios");
+    await page.getByRole("button", { name: "Cancelar" }).click();
+    await page.getByRole("button", { name: /Eliminar ruta/ }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Eliminar ruta" }).click();
+    await expect(page.getByText("Aún no hay rutas")).toBeVisible();
   });
 
   test("crea la ruta nominal y respeta guardar → validar → enviar", async ({ page }) => {

@@ -218,6 +218,7 @@ beforeAll(async () => {
   await applyMigration("0014_guided_learning_observability.sql");
   await applyMigration("0015_guided_learning_foreign_key_indexes.sql");
   await applyMigration("0016_learning_maps.sql");
+  await applyMigration("0017_delete_guided_learning_paths.sql");
   const normalized = await pg.query<{ content: { quiz: { questions: Array<{ id: string }> } } }>(
     "select content from content_items where id = $1",
     [materialId],
@@ -312,19 +313,13 @@ describe("guided-learning editor snapshot storage", () => {
     )).rows[0]!.action).toBe("learning_path_deleted");
   });
 
-  it("does not delete a route after publication and can archive it from a later draft", async () => {
+  it("can archive a route after publication and delete it with its later draft", async () => {
     const published = await publish(await createReadyPath("storage-delete-published"));
     const enrollment = await provider.createEnrollment({
       pathId: published.id,
       userId: otherCreatorId,
     });
     expect(enrollment.status).toBe("success");
-    expect(await provider.deletePath({
-      actorUserId: creatorId,
-      canEditAll: false,
-      expectedVersion: published.version.editVersion,
-      pathId: published.id,
-    })).toEqual({ status: "conflict" });
     const draft = await provider.createVersion({
       actorUserId: creatorId,
       canEditAll: false,
@@ -333,13 +328,6 @@ describe("guided-learning editor snapshot storage", () => {
     });
     expect(draft.status).toBe("success");
     if (draft.status !== "success") return;
-    expect(await provider.deletePath({
-      actorUserId: creatorId,
-      canEditAll: false,
-      expectedVersion: draft.value.version.editVersion,
-      pathId: published.id,
-    })).toEqual({ status: "conflict" });
-
     const archived = await provider.transitionPath({
       actorUserId: creatorId,
       canPublish: true,
@@ -360,12 +348,6 @@ describe("guided-learning editor snapshot storage", () => {
       pathId: published.id,
       status: "archived",
     })).toEqual({ status: "conflict" });
-    expect(await provider.deletePath({
-      actorUserId: creatorId,
-      canEditAll: false,
-      expectedVersion: draft.value.version.editVersion,
-      pathId: published.id,
-    })).toEqual({ status: "conflict" });
     expect((await pg.query<{ path_version_id: string }>(
       "select path_version_id from learning_enrollments where user_id = $1 and path_id = $2",
       [otherCreatorId, published.id],
@@ -375,6 +357,100 @@ describe("guided-learning editor snapshot storage", () => {
       canEditAll: false,
       pathId: published.id,
     })).status).toBe("success");
+    if (archived.status !== "success") return;
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: archived.value.version.editVersion,
+      pathId: published.id,
+    })).toEqual({ status: "success", value: { id: published.id } });
+    expect((await pg.query("select id from learning_path_versions where path_id = $1", [published.id])).rows).toEqual([]);
+    expect((await pg.query("select id from learning_enrollments where path_id = $1", [published.id])).rows).toEqual([]);
+  });
+
+  it("deletes a published route from an enrolled user's map, progress, attempts and rewards", async () => {
+    const published = await publish(await createReadyPath("storage-delete-enrolled"));
+    await expect(pg.query(
+      "update learning_path_versions set release_notes = 'No permitido' where id = $1",
+      [published.version.id],
+    )).rejects.toThrow("published learning path versions are immutable");
+    const enrollment = await provider.createEnrollment({ pathId: published.id, userId: otherCreatorId });
+    expect(enrollment.status).toBe("success");
+    if (enrollment.status !== "success") return;
+    const firstStep = published.version.units[0]!.steps[0]!;
+    const firstOption = firstStep.options[0]!;
+    const map = await pg.query<{ id: string; row_version: number }>(
+      "insert into learning_maps (user_id) values ($1) on conflict (user_id) do update set row_version = learning_maps.row_version returning id, row_version",
+      [otherCreatorId],
+    );
+    const node = await pg.query<{ id: string }>(
+      "insert into learning_map_nodes (map_id, title, icon_key, sort_order) values ($1, 'Test', 'folder', 0) returning id",
+      [map.rows[0]!.id],
+    );
+    const entry = await pg.query<{ id: string }>(
+      "insert into learning_map_entries (map_id, node_id, kind, path_id, sort_order) values ($1, $2, 'block', $3, 0) returning id",
+      [map.rows[0]!.id, node.rows[0]!.id, published.id],
+    );
+    await pg.query(
+      "insert into learning_map_layouts (map_id, level_key) values ($1, $2)",
+      [map.rows[0]!.id, `block:${entry.rows[0]!.id}`],
+    );
+    await pg.query(
+      `insert into learning_preferences (user_id, pinned_enrollment_id) values ($1, $2)
+       on conflict (user_id) do update set pinned_enrollment_id = excluded.pinned_enrollment_id`,
+      [otherCreatorId, enrollment.value.enrollment.id],
+    );
+    await pg.query(
+      "insert into learning_task_overrides (user_id, task_key, enrollment_id, action) values ($1, $2, $3, 'dismiss')",
+      [otherCreatorId, `delete-route:${published.id}`, enrollment.value.enrollment.id],
+    );
+    const attempt = await pg.query<{ id: string }>(
+      `insert into learning_attempts
+        (user_id, client_attempt_id, enrollment_id, path_version_id, step_id,
+         step_option_id, purpose, projection, manifest_json)
+       values ($1, '81000000-0000-4000-8000-000000000090', $2, $3, $4, $5,
+         'understand', 'video', '{}'::jsonb) returning id`,
+      [otherCreatorId, enrollment.value.enrollment.id, published.version.id, firstStep.id, firstOption.id],
+    );
+    const event = await pg.query<{ id: string }>(
+      `insert into learning_events (user_id, event_type, semantic_key, attempt_id, enrollment_id)
+       values ($1, 'activity_understand', $2, $3, $4) returning id`,
+      [otherCreatorId, `delete-route:${published.id}`, attempt.rows[0]!.id, enrollment.value.enrollment.id],
+    );
+    await pg.query(
+      `insert into learning_rewards (user_id, award_key, reward_kind, xp, event_id, local_date)
+       values ($1, $2, 'activity_understand', 10, $3, current_date)`,
+      [otherCreatorId, `delete-route:${published.id}`, event.rows[0]!.id],
+    );
+
+    expect(await provider.deletePath({
+      actorUserId: creatorId,
+      canEditAll: false,
+      expectedVersion: published.version.editVersion,
+      pathId: published.id,
+    })).toEqual({ status: "success", value: { id: published.id } });
+    for (const [table, column, id] of [
+      ["learning_paths", "id", published.id],
+      ["learning_path_versions", "path_id", published.id],
+      ["learning_enrollments", "path_id", published.id],
+      ["learning_map_entries", "path_id", published.id],
+      ["learning_attempts", "enrollment_id", enrollment.value.enrollment.id],
+      ["learning_step_progress", "enrollment_id", enrollment.value.enrollment.id],
+      ["learning_objective_progress", "enrollment_id", enrollment.value.enrollment.id],
+      ["learning_task_overrides", "enrollment_id", enrollment.value.enrollment.id],
+      ["learning_events", "enrollment_id", enrollment.value.enrollment.id],
+      ["learning_rewards", "event_id", event.rows[0]!.id],
+    ]) {
+      const result = await pg.query(`select count(*)::text as count from ${table} where ${column} = $1`, [id]);
+      expect(result.rows[0]).toEqual({ count: "0" });
+    }
+    expect((await pg.query("select level_key from learning_map_layouts where level_key = $1", [`block:${entry.rows[0]!.id}`])).rows).toEqual([]);
+    expect((await pg.query<{ pinned_enrollment_id: string | null }>(
+      "select pinned_enrollment_id from learning_preferences where user_id = $1", [otherCreatorId],
+    )).rows[0]!.pinned_enrollment_id).toBeNull();
+    expect((await pg.query<{ row_version: number }>("select row_version from learning_maps where id = $1", [map.rows[0]!.id])).rows[0]!.row_version)
+      .toBe(map.rows[0]!.row_version + 1);
+    expect((await pg.query("select id from content_items where id = $1", [materialId])).rows).toHaveLength(1);
   });
 
   it("reads current and fixed material details without creating revisions or items", async () => {
