@@ -12,6 +12,9 @@ import {
   MapTrifold,
   X,
   ArrowsOutCardinal,
+  Lightbulb,
+  CheckSquare,
+  Info,
 } from "@phosphor-icons/react";
 import type {
   MapItem,
@@ -47,6 +50,7 @@ function Workspace() {
     loading,
     error,
     phase,
+    direction,
     queue,
     navigate,
     back,
@@ -439,7 +443,7 @@ function Workspace() {
         )}
       </div>
     </aside>
-  ) : wide || showSuggestions ? (
+  ) : showSuggestions ? (
     <aside className={styles.panel} aria-label="Sugerencias">
       <header className={styles.panelHeader}>
         <div>
@@ -513,7 +517,7 @@ function Workspace() {
     </aside>
   ) : null;
   return (
-    <div className={styles.workspace} ref={root}>
+    <main className={styles.workspace} ref={root}>
       <div
         data-map-background
         style={{
@@ -523,7 +527,11 @@ function Workspace() {
           minHeight: 0,
         }}
       >
-        <div className={styles.toolbar}>
+        <div className={`${styles.toolbar} ${styles.topbar}`}>
+          <Link className={styles.brand} href="/dashboard" aria-label="Koras, volver al inicio">
+            <MapTrifold size={22} weight="duotone" />
+            <span>KORAS</span>
+          </Link>
           <nav className={styles.breadcrumbs} aria-label="Ruta del mapa">
             {level?.route.nodeId ? (
               <button
@@ -556,15 +564,14 @@ function Workspace() {
               </span>
             ))}
           </nav>
-          <Link className={styles.button} href="/aprendizaje?tab=hoy">
-            Hoy
-          </Link>
-          <Link className={styles.button} href="/aprendizaje?tab=rutas">
-            Rutas
-          </Link>
-          <Link className={styles.button} href="/aprendizaje?tab=progreso">
-            Progreso
-          </Link>
+          <details className={styles.viewsMenu}>
+            <summary className={styles.button}>Vistas <CaretRight size={14} /></summary>
+            <nav aria-label="Vistas de aprendizaje">
+              <Link href="/aprendizaje?tab=hoy">Hoy</Link>
+              <Link href="/aprendizaje?tab=rutas">Rutas</Link>
+              <Link href="/aprendizaje?tab=progreso">Progreso</Link>
+            </nav>
+          </details>
           <button
             className={styles.primary}
             aria-label="Agregar contenido"
@@ -576,9 +583,6 @@ function Workspace() {
           </button>
         </div>
         <header className={styles.header}>
-          <span className={styles.iconWell}>
-            <MedicalMapIcon iconKey="folder" size={48} />
-          </span>
           <div className={styles.headerText}>
             <h1 ref={heading} tabIndex={-1}>
               {level?.containerSummary.title ?? "Mi mapa de aprendizaje"}
@@ -595,48 +599,41 @@ function Workspace() {
               </span>
             ) : null}
           </div>
-          <button
-            className={styles.iconButton}
-            aria-label={list ? "Vista de mapa" : "Vista de lista"}
-            onClick={() => setList(!list)}
-          >
-            {list ? <MapTrifold size={20} /> : <List size={20} />}
-          </button>
-          <button
-            className={styles.button}
-            onClick={() => setInfo("container")}
-          >
-            Información
-          </button>
-        </header>
-        <div className={styles.toolbar}>
-          {!wide ? (
+          <div className={styles.headerActions}>
             <button
               className={styles.button}
+              aria-label="Sugerencias"
+              title="Sugerencias"
               onClick={() => {
                 setInfo(null);
                 setShowSuggestions(true);
               }}
             >
-              Sugerencias
+              <Lightbulb size={18} />
+              <span className={styles.actionLabel}>Sugerencias</span>
             </button>
-          ) : null}
           <button
             className={styles.button}
+            aria-label="Nuevo nodo"
+            title="Nuevo nodo"
             onClick={() => setDialog({ mode: "create" })}
             disabled={!level}
           >
-            Nuevo nodo
+            <Plus size={18} />
+            <span className={styles.actionLabel}>Nuevo nodo</span>
           </button>
           <button
             className={styles.button}
             aria-pressed={selecting}
+            aria-label={selecting ? "Terminar selección" : "Seleccionar contenidos"}
+            title={selecting ? "Terminar selección" : "Seleccionar contenidos"}
             onClick={() => {
               setSelecting(!selecting);
               setSelection([]);
             }}
           >
-            {selecting ? "Terminar selección" : "Seleccionar contenidos"}
+            <CheckSquare size={18} />
+            <span className={styles.actionLabel}>{selecting ? "Terminar selección" : "Seleccionar contenidos"}</span>
           </button>
           {selecting ? (
             <button
@@ -651,10 +648,12 @@ function Workspace() {
               <button
                 className={styles.button}
                 aria-pressed={organizing}
+                aria-label={organizing ? "Terminar organización" : "Organizar"}
+                title={organizing ? "Terminar organización" : "Organizar"}
                 onClick={() => setOrganizing(!organizing)}
               >
                 <ArrowsOutCardinal size={18} />
-                {organizing ? "Terminar organización" : "Organizar"}
+                <span className={styles.actionLabel}>{organizing ? "Terminar organización" : "Organizar"}</span>
               </button>
               {organizing && !list ? (
                 <button
@@ -675,7 +674,18 @@ function Workspace() {
                   ? "Posiciones guardadas"
                   : "Posiciones pendientes"}
           </span>
-        </div>
+          <button
+            className={styles.iconButton}
+            aria-label={list ? "Vista de mapa" : "Vista de lista"}
+            onClick={() => setList(!list)}
+          >
+            {list ? <MapTrifold size={20} /> : <List size={20} />}
+          </button>
+          <button className={styles.iconButton} aria-label="Información" title="Información" onClick={() => setInfo("container")}>
+            <Info size={18} />
+          </button>
+          </div>
+        </header>
         {movingId ? (
           <div className={styles.notice}>
             Mover con flechas · Enter guarda · Escape restaura.
@@ -798,6 +808,7 @@ function Workspace() {
               selected={selected}
               organizing={organizing}
               phase={phase}
+              direction={direction}
               organizeToken={organizeToken}
               movingId={movingId}
               onMoveFinished={moveFinished}
@@ -827,7 +838,7 @@ function Workspace() {
           onAdd={add}
         />
       ) : null}
-    </div>
+    </main>
   );
 }
 export function LearningMapWorkspace({

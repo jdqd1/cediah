@@ -5,11 +5,11 @@ import {
   MiniMap,
   applyNodeChanges,
   useReactFlow,
-  MarkerType,
+  PanOnScrollMode,
   type NodeChange,
   type Viewport,
 } from "@xyflow/react";
-import { ArrowsOut, Minus, Plus, MapTrifold } from "@phosphor-icons/react";
+import { ArrowsOut, Minus, Plus, MapTrifold, CaretLeft, CaretRight } from "@phosphor-icons/react";
 import type { LearningMapLevelResponse, MapItem } from "@cediah/contracts";
 import {
   LearningNode,
@@ -43,6 +43,7 @@ export default function LearningMapCanvas({
   selected,
   organizing,
   phase,
+  direction,
   organizeToken,
   movingId,
   onMoveFinished,
@@ -57,6 +58,7 @@ export default function LearningMapCanvas({
   selected: string[];
   organizing: boolean;
   phase: string;
+  direction: "forward" | "back";
   organizeToken: number;
   movingId: string | null;
   onMoveFinished: () => void;
@@ -71,6 +73,22 @@ export default function LearningMapCanvas({
   const [nodes, setNodes] = useState<FlowMapNode[]>([]),
     [zoom, setZoom] = useState(1),
     [mini, setMini] = useState(false);
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const box = wrapper.current;
+    if (!box) return;
+    const measure = () => {
+      setMobile(box.clientWidth < 768);
+      setCanvasSize((size) => size.width === box.clientWidth && size.height === box.clientHeight
+        ? size
+        : { width: box.clientWidth, height: box.clientHeight });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    measure();
+    return () => observer.disconnect();
+  }, []);
   const [outside, setOutside] = useState(false);
   const points = useRef<Positions>({});
   const fitLevel = useCallback(
@@ -78,6 +96,10 @@ export default function LearningMapCanvas({
       const box = wrapper.current?.querySelector(".react-flow");
       const positions = Object.values(points.current);
       if (!box || !positions.length) return;
+      if (mobile) {
+        wrapper.current?.scrollTo({ top: 0, behavior: "smooth" });
+        return flow.setViewport({ x: 0, y: 0, zoom: 1 });
+      }
       const width = level.levelKey === "root" ? 168 : 156;
       const height = Math.max(220, cardHeight);
       const extentX =
@@ -106,7 +128,7 @@ export default function LearningMapCanvas({
       }
       return flow.fitView({ padding: 0.18, minZoom: 0.65, maxZoom });
     },
-    [cardHeight, flow, level.items, level.levelKey],
+    [cardHeight, flow, level.items, level.levelKey, mobile],
   );
   const [undo, setUndo] = useState<{
     positions: Positions;
@@ -188,7 +210,7 @@ export default function LearningMapCanvas({
     );
     for (const item of level.items)
       initialized.current.add(`${level.levelKey}:${item.occurrenceId}`);
-    if (Object.keys(missing).length) queue.enqueue(level.levelKey, missing);
+    if (width >= 768 && Object.keys(missing).length) queue.enqueue(level.levelKey, missing);
     setNodes(
       level.items.map((item) => ({
         id: item.occurrenceId,
@@ -201,6 +223,7 @@ export default function LearningMapCanvas({
         focusable: false,
         data: {
           item,
+          mobile,
           selected: selected.includes(item.occurrenceId),
           selecting,
           organizing,
@@ -211,9 +234,11 @@ export default function LearningMapCanvas({
       })),
     );
     if (changed) {
+      if (mobile) wrapper.current?.scrollTo(0, 0);
       const snapshot = readSpatialSnapshot(snapshotKey());
       requestAnimationFrame(() => {
-        if (snapshot && Math.abs(width / snapshot.containerWidth - 1) <= 0.2)
+        if (mobile) void flow.setViewport({ x: 0, y: 0, zoom: 1 });
+        else if (snapshot && Math.abs(width / snapshot.containerWidth - 1) <= 0.2)
           void flow.setViewport(snapshot.viewport);
         else if (snapshot) {
           const p =
@@ -239,7 +264,16 @@ export default function LearningMapCanvas({
     snapshotKey,
     cardHeight,
     fitLevel,
+    mobile,
   ]);
+  useEffect(() => {
+    if (!mobile) return;
+    const frame = requestAnimationFrame(() => {
+      wrapper.current?.scrollTo(0, 0);
+      void flow.setViewport({ x: 0, y: 0, zoom: 1 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [flow, level.levelKey, mobile]);
   const updatePoints = useCallback((next: Positions) => {
     points.current = { ...points.current, ...next };
     setNodes((current) =>
@@ -337,23 +371,31 @@ export default function LearningMapCanvas({
         type: "smoothstep",
         pathOptions: { borderRadius: 20 },
         style: { stroke: "#BACBC5", strokeWidth: 1.25 },
-        markerEnd:
-          e.kind === "sequence"
-            ? {
-                type: MarkerType.ArrowClosed,
-                color: "#BACBC5",
-                width: 12,
-                height: 12,
-              }
-            : undefined,
         focusable: false,
         selectable: false,
       })),
     [level.edges],
   );
+  const contentHeight = mobile
+    ? Math.max(canvasSize.height, ...nodes.map((n) => n.position.y + cardHeight + 60))
+    : undefined;
+  const horizontalPositions = nodes.map((n) => n.position);
+  const horizontalOverflow = horizontalPositions.length > 1 &&
+    (Math.max(...horizontalPositions.map((p) => p.x + (level.levelKey === "root" ? 168 : 156))) -
+      Math.min(...horizontalPositions.map((p) => p.x))) * zoom >
+      canvasSize.width - 48;
+  const panRoute = (step: -1 | 1) => {
+    const box = wrapper.current;
+    if (!box) return;
+    const viewport = flow.getViewport();
+    const end = Math.max(0, ...Object.values(points.current).map((p) => p.x + (level.levelKey === "root" ? 168 : 156)));
+    const minX = Math.min(24, box.clientWidth - end * viewport.zoom - 32);
+    const x = Math.max(minX, Math.min(24, viewport.x - step * box.clientWidth * 0.72));
+    void flow.setViewport({ ...viewport, x }, { duration: 170 });
+  };
   return (
-    <div className={styles.canvas} ref={wrapper} data-long-titles={longTitles}>
-      <div className={styles.flow} data-phase={phase}>
+    <div className={styles.canvas} ref={wrapper} data-long-titles={longTitles} data-mobile={mobile}>
+      <div className={styles.flow} data-phase={phase} data-direction={direction} style={contentHeight ? { height: contentHeight } : undefined}>
         <ReactFlow<FlowMapNode>
           nodes={nodes}
           edges={edges}
@@ -371,6 +413,11 @@ export default function LearningMapCanvas({
             queue.enqueue(level.levelKey, { [n.id]: p });
           }}
           onMoveEnd={(_e, v) => saveViewport(v)}
+          panOnDrag={!mobile}
+          panOnScroll={!mobile}
+          panOnScrollMode={PanOnScrollMode.Horizontal}
+          zoomOnScroll={false}
+          zoomOnPinch={!mobile}
           minZoom={0.65}
           maxZoom={1.35}
           zoomOnDoubleClick={false}
@@ -393,6 +440,12 @@ export default function LearningMapCanvas({
           ) : null}
         </ReactFlow>
       </div>
+      {!mobile && horizontalOverflow ? (
+        <div className={styles.routeNavigation} aria-label="Desplazar rutas">
+          <button className={styles.iconButton} aria-label="Rutas anteriores" onClick={() => panRoute(-1)}><CaretLeft size={20} /></button>
+          <button className={styles.iconButton} aria-label="Rutas siguientes" onClick={() => panRoute(1)}><CaretRight size={20} /></button>
+        </div>
+      ) : null}
       <div className={styles.controls} aria-label="Controles del mapa">
         <button
           className={styles.iconButton}

@@ -8,6 +8,7 @@ import styles from "../learning-map.module.css";
 export type MapItemAction = "info" | "rename" | "add" | "remove" | "move";
 export type ItemData = {
   item: MapItem;
+  mobile?: boolean;
   selected: boolean;
   selecting: boolean;
   organizing: boolean;
@@ -61,13 +62,13 @@ export const LearningMapItem = memo(function LearningMapItem({
         <>
           <Handle
             type="target"
-            position={Position.Left}
+            position={data.mobile ? Position.Top : Position.Left}
             isConnectable={false}
             style={{ opacity: 0 }}
           />
           <Handle
             type="source"
-            position={Position.Right}
+            position={data.mobile ? Position.Bottom : Position.Right}
             isConnectable={false}
             style={{ opacity: 0 }}
           />

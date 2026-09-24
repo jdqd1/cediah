@@ -2,6 +2,32 @@ import { test, expect } from "@playwright/test";
 const root = "/visual-fixtures/mapa";
 const node = "b1000000-0000-4000-8000-000000000001",
   block = "b1000000-0000-4000-8000-000000000022";
+test("routes use a horizontal row on desktop and a vertical scroll on mobile", async ({ page, isMobile }) => {
+  await page.goto(`${root}?estado=large`);
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+  if (isMobile) {
+    const canvas = page.locator('[data-mobile="true"]');
+    const first = await page.locator(".react-flow__node").first().boundingBox();
+    const second = await page.locator(".react-flow__node").nth(1).boundingBox();
+    expect(second!.y).toBeGreaterThan(first!.y);
+    expect(Math.abs(second!.x - first!.x)).toBeLessThan(2);
+    await canvas.evaluate((element) => { element.scrollTop = 300; });
+    await expect.poll(() => canvas.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  } else {
+    const nodes = page.locator(".react-flow__node");
+    const first = await nodes.first().boundingBox();
+    const second = await nodes.nth(1).boundingBox();
+    expect(second!.x).toBeGreaterThan(first!.x);
+    expect(Math.abs(second!.y - first!.y)).toBeLessThan(2);
+    const viewport = page.locator(".react-flow__viewport");
+    const before = await viewport.getAttribute("style");
+    await page.getByRole("button", { name: "Rutas siguientes" }).click();
+    await expect(viewport).not.toHaveAttribute("style", before!);
+  }
+  await page.goto(`${root}?node=${node}&item=${block}`);
+  await expect(page.locator(".react-flow__edge-path").first()).toHaveAttribute("d", /M/);
+  expect(await page.locator(".react-flow__edge path[marker-end]").count()).toBe(0);
+});
 test("six visual states and responsive widths remain readable", async ({
   page,
 }, testInfo) => {

@@ -34,8 +34,10 @@ function useWorkspace(account: string, client: MapClient) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<"idle" | "exiting" | "entering">("idle");
+  const [direction, setDirection] = useState<"forward" | "back">("forward");
   const [, render] = useReducer((n) => n + 1, 0);
   const cache = useMemo(() => new MapLevelCache(), []);
+  const inFlight = useRef(new Map<string, Promise<LearningMapLevelResponse>>());
   const queue = useMemo(() => new MapLayoutQueue(client, render), [client]);
   const token = useRef(0),
     prefetchCount = useRef(0),
@@ -47,35 +49,31 @@ function useWorkspace(account: string, client: MapClient) {
     levelRef.current = level;
   }, [level]);
   const load = useCallback(
-    async (route: MapRoute, signal?: AbortSignal, fresh = false) => {
+    async (route: MapRoute, _signal?: AbortSignal, fresh = false) => {
       const key = buildMapHref(route);
       const cached = !fresh && cache.get(key);
       if (cached) return cached;
+      const pending = !fresh && inFlight.current.get(key);
+      if (pending) return pending;
       const generation = cacheGeneration.current;
-      const data = await client.level(route, signal);
-      if (!signal?.aborted && generation === cacheGeneration.current)
-        cache.set(key, data);
-      return data;
+      const request = client.level(route).then((data) => {
+        if (generation === cacheGeneration.current) cache.set(key, data);
+        return data;
+      });
+      if (!fresh) inFlight.current.set(key, request);
+      try {
+        return await request;
+      } finally {
+        if (inFlight.current.get(key) === request) inFlight.current.delete(key);
+      }
     },
-    [cache, client],
+    [cache, client, inFlight],
   );
   useEffect(() => {
     isolateMapAccount(account);
     const controller = new AbortController(),
       current = ++token.current;
     const route = parseMapRoute(new URLSearchParams(routeKey.split("?")[1]));
-    const delay = (ms: number) =>
-      new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, ms);
-        controller.signal.addEventListener(
-          "abort",
-          () => {
-            clearTimeout(timer);
-            resolve();
-          },
-          { once: true },
-        );
-      });
     void (async () => {
       setLoading(true);
       setError("");
@@ -94,19 +92,18 @@ function useWorkspace(account: string, client: MapClient) {
           levelRef.current &&
           data.levelKey !== levelRef.current.levelKey &&
           !matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (animate) {
-          setPhase("exiting");
-          await delay(120);
-        }
-        if (controller.signal.aborted || current !== token.current) return;
         queue.routes.set(data.levelKey, data.route);
         queue.seed(data.levelKey, data.layout.rowVersion);
         setLevel(data);
         setLoading(false);
         setPhase(animate ? "entering" : "idle");
-        if (animate) await delay(120);
-        if (!controller.signal.aborted && current === token.current)
-          setPhase("idle");
+        if (animate) {
+          const timer = window.setTimeout(() => {
+            if (!controller.signal.aborted && current === token.current)
+              setPhase("idle");
+          }, 180);
+          controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+        }
       } catch (e) {
         if (!controller.signal.aborted && current === token.current) {
           setError(
@@ -131,6 +128,7 @@ function useWorkspace(account: string, client: MapClient) {
   const refresh = useCallback(async () => {
     cacheGeneration.current++;
     cache.clear();
+    inFlight.current.clear();
     const route = parseMapRoute(new URLSearchParams(window.location.search));
     if (!route) return;
     const current = token.current;
@@ -155,7 +153,7 @@ function useWorkspace(account: string, client: MapClient) {
     setError("");
     setLoading(false);
     return data;
-  }, [cache, client, load, queue]);
+  }, [cache, client, inFlight, load, queue]);
   useEffect(() => {
     const focus = () => {
       void refresh().catch(() => {});
@@ -166,6 +164,8 @@ function useWorkspace(account: string, client: MapClient) {
   const navigate = useCallback((route: MapRoute, detail = false) => {
     const href = buildMapHref(route, detail);
     const previous = levelRef.current;
+    setDirection(previous?.ancestry.some((ancestor) => buildMapHref(ancestor.route) === buildMapHref(route))
+      && buildMapHref(previous.route) !== buildMapHref(route) ? "back" : "forward");
     const replacingLesson =
       previous?.selectedLesson &&
       route.nodeId === previous.route.nodeId &&
@@ -181,6 +181,7 @@ function useWorkspace(account: string, client: MapClient) {
     }
   }, []);
   const back = useCallback(() => {
+    setDirection("back");
     const r =
       parseMapRoute(new URLSearchParams(window.location.search)) ??
       levelRef.current?.route ??
@@ -195,14 +196,13 @@ function useWorkspace(account: string, client: MapClient) {
   const prefetch = useCallback(
     (route: MapRoute) => {
       if (prefetchCount.current >= 2) return () => {};
-      const c = new AbortController();
       prefetchCount.current++;
-      void load(route, c.signal)
+      void load(route)
         .catch(() => {})
         .finally(() => {
           prefetchCount.current--;
         });
-      return () => c.abort();
+      return () => {};
     },
     [load],
   );
@@ -213,6 +213,7 @@ function useWorkspace(account: string, client: MapClient) {
     loading,
     error,
     phase,
+    direction,
     queue,
     navigate,
     back,

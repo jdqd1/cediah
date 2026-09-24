@@ -8,21 +8,13 @@ export function initialLayout(
 ): Positions {
   const w = root ? 168 : 156,
     h = cardHeight;
-  const cols =
-    root && ids.length === 6 && width >= 768
-      ? 3
-      : Math.max(2, Math.min(4, Math.floor((width + 56) / (w + 56))));
+  if (width < 768)
+    return Object.fromEntries(ids.map((id, i) => [
+      id,
+      { x: Math.max(16, (width - w) / 2), y: 24 + i * (h + 36) },
+    ]));
   return Object.fromEntries(
-    ids.map((id, i) => {
-      const count = Math.min(cols, ids.length - Math.floor(i / cols) * cols);
-      return [
-        id,
-        {
-          x: (i % cols) * (w + 56) + ((cols - count) * (w + 56)) / 2,
-          y: Math.floor(i / cols) * (h + 64),
-        },
-      ];
-    }),
+    ids.map((id, i) => [id, { x: 48 + i * (w + 56), y: 64 }]),
   );
 }
 function overlaps(a: Position, b: Position, root: boolean, cardHeight: number) {
@@ -66,18 +58,24 @@ export function reconcileLayout(
   root = false,
   cardHeight = root ? 184 : 172,
 ) {
+  if (width < 768) return initialLayout(ids, width, root, cardHeight);
   const positions = Object.fromEntries(
     Object.entries(saved).filter(([id]) => ids.includes(id)),
   );
   const initial = initialLayout(ids, width, root, cardHeight);
   for (const id of ids)
-    if (!positions[id])
+    if (!positions[id]) {
+      const existing = Object.values(positions);
+      const anchor = existing.length
+        ? { x: Math.max(...existing.map((p) => p.x)) + (root ? 168 : 156) + 56, y: Math.min(...existing.map((p) => p.y)) }
+        : initial[id]!;
       positions[id] = findFreePosition(
-        initial[id]!,
+        anchor,
         positions,
         root,
         cardHeight,
       );
+    }
   return positions;
 }
 export function resolveDropOverlap(

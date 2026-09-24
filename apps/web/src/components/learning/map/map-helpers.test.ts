@@ -45,10 +45,11 @@ describe("map navigation and layout", () => {
       positions = initialLayout(ids, 1200);
     expect(initialLayout(ids, 1200)).toEqual(positions);
     expect(initialLayout(ids.slice(0, 6), 350, true)["2"]!.y).toBeGreaterThan(
-      0,
+      initialLayout(ids.slice(0, 6), 350, true)["1"]!.y,
     );
-    expect(initialLayout(ids.slice(0, 6), 1200, true)["2"]!.y).toBe(0);
-    const extended = reconcileLayout([...ids, "new"], positions, 700);
+    expect(initialLayout(ids.slice(0, 6), 1200, true)["2"]!.y).toBe(64);
+    expect(initialLayout(ids.slice(0, 6), 1200, true)["2"]!.x).toBeGreaterThan(initialLayout(ids.slice(0, 6), 1200, true)["1"]!.x);
+    const extended = reconcileLayout([...ids, "new"], positions, 1200);
     for (const id of ids) expect(extended[id]).toEqual(positions[id]);
     expect(
       new Set(Object.values(extended).map((p) => `${p.x}:${p.y}`)).size,
