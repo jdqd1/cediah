@@ -5,7 +5,7 @@ import { DotsThree, DotsSixVertical } from "@phosphor-icons/react";
 import type { MapItem } from "@cediah/contracts";
 import { MedicalMapIcon } from "../medical-map-icon";
 import styles from "../learning-map.module.css";
-export type MapItemAction = "info" | "rename" | "add" | "remove" | "move";
+export type MapItemAction = "info" | "select" | "rename" | "add" | "remove" | "move";
 export type ItemData = {
   item: MapItem;
   mobile?: boolean;
@@ -96,6 +96,7 @@ export const LearningMapItem = memo(function LearningMapItem({
           {(
             [
               "info",
+              "select",
               ...(item.kind === "node" ? ["rename", "add"] : []),
               "move",
               ...(item.occurrenceId.startsWith("lesson:") ? [] : ["remove"]),
@@ -112,6 +113,7 @@ export const LearningMapItem = memo(function LearningMapItem({
               {
                 {
                   info: "Ver información",
+                  select: data.selected ? "Deseleccionar" : "Seleccionar",
                   rename: "Renombrar",
                   add: "Agregar contenido",
                   remove: "Quitar del mapa",

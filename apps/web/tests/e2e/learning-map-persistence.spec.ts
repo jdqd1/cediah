@@ -58,7 +58,6 @@ test.describe("disposable API/SQL persistence", () => {
   test("creates, adds contextual content, completes a block and undoes removal", async ({
     page,
     context,
-    isMobile,
   }, testInfo) => {
     await context.addCookies([
       { name: "map_e2e", value: "student", url: "http://localhost:3000" },
@@ -68,7 +67,8 @@ test.describe("disposable API/SQL persistence", () => {
       .getByRole("button", { name: "Vista de lista", exact: true })
       .click();
     const title = `Repaso ${testInfo.project.name}`;
-    await page.getByRole("button", { name: "Nuevo nodo", exact: true }).click();
+    await page.getByRole("button", { name: "Nuevo nodo o agregar contenido", exact: true }).click();
+    await page.getByRole("tab", { name: "Crear nodo" }).click();
     await page.getByRole("textbox", { name: "Nombre del nodo" }).fill(title);
     await page.getByRole("button", { name: "Guardar", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -79,9 +79,10 @@ test.describe("disposable API/SQL persistence", () => {
       page.getByRole("heading", { name: title, exact: true }),
     ).toBeVisible();
     await page
-      .getByRole("button", { name: "Agregar contenido", exact: true })
+      .getByRole("button", { name: "Nuevo nodo o agregar contenido", exact: true })
       .first()
       .click();
+    await page.getByRole("tab", { name: "Contenido existente" }).click();
     await page
       .getByRole("textbox", { name: "Buscar bloques o lecciones" })
       .fill("Lección E2E 1");
@@ -97,17 +98,12 @@ test.describe("disposable API/SQL persistence", () => {
     await expect(
       page.getByRole("button", { name: "Abrir Lección E2E 1", exact: true }),
     ).toBeVisible();
-    if (isMobile)
-      await page
-        .getByRole("button", { name: "Sugerencias", exact: true })
-        .click();
+    await page.getByRole("button", { name: "Nuevo nodo o agregar contenido", exact: true }).click();
+    await page.getByRole("tab", { name: "Contenido existente" }).click();
     await page
       .getByRole("button", { name: "Completar bloque", exact: true })
       .click();
-    if (isMobile)
-      await page
-        .getByRole("button", { name: "Cerrar sugerencias", exact: true })
-        .click();
+    await page.getByRole("button", { name: "Cerrar diálogo", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Abrir Bloque E2E", exact: true }),
     ).toBeVisible();
@@ -203,10 +199,11 @@ test.describe("disposable API/SQL persistence", () => {
       .click();
     await page.keyboard.press("ArrowRight");
     await page.keyboard.press("ArrowDown");
+    const layoutSaved = page.waitForResponse((response) =>
+      response.url().includes("/api/guided-learning/map/layout") && response.ok(),
+    );
     await page.keyboard.press("Enter");
-    await expect(
-      page.getByRole("status").filter({ hasText: "Posiciones guardadas" }),
-    ).toBeVisible();
+    await layoutSaved;
     const card = page.locator(".react-flow__node").filter({
       has: page.getByRole("button", {
         name: "Abrir Mi nodo E2E",

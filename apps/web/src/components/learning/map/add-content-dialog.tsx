@@ -5,6 +5,7 @@ import {
   MapIconKeySchema,
   type MapCatalogItem,
   type MapIconKey,
+  type LearningMapSuggestionsResponse,
 } from "@cediah/contracts";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -13,24 +14,35 @@ import { mapQuery } from "./map-client";
 import styles from "./learning-map.module.css";
 export function MapEditDialog({
   mode,
+  initialTab = "existing",
   initialTitle = "",
   onClose,
   onSubmit,
   onAdd,
+  onCreateNode,
+  onCompleteBlock,
+  suggestions,
+  suggestionError = false,
   targetNodeId,
 }: {
   mode: "add" | "create" | "rename" | "group" | "remove";
+  initialTab?: "existing" | "node";
   initialTitle?: string;
   targetNodeId?: string;
   onClose: () => void;
   onSubmit: (title: string, icon: MapIconKey) => Promise<void>;
   onAdd: (item: MapCatalogItem) => Promise<void>;
+  onCreateNode: (title: string, icon: MapIconKey) => Promise<void>;
+  onCompleteBlock: (pathId: string) => Promise<void>;
+  suggestions?: LearningMapSuggestionsResponse | null;
+  suggestionError?: boolean;
 }) {
   const { client, level } = useMapWorkspace();
   const ref = useDialogFocus();
   useBodyScrollLock(true);
   const input = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(initialTitle),
+    [activeTab, setActiveTab] = useState<"existing" | "node">(initialTab),
     [icon, setIcon] = useState<MapIconKey>("folder"),
     [query, setQuery] = useState(""),
     [kind, setKind] = useState("all");
@@ -39,6 +51,9 @@ export function MapEditDialog({
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [completedBlocks, setCompletedBlocks] = useState<string[]>([]);
+  const addingExisting = mode === "add" && activeTab === "existing";
+  const creatingNode = mode === "add" && activeTab === "node";
   useLayoutEffect(() => {
     const launcher =
       document.activeElement instanceof HTMLElement
@@ -55,9 +70,9 @@ export function MapEditDialog({
   }, []);
   useEffect(() => {
     input.current?.focus();
-  }, []);
+  }, [activeTab]);
   useEffect(() => {
-    if (mode !== "add" || !level) return;
+    if (!addingExisting || !level) return;
     const c = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
@@ -88,12 +103,13 @@ export function MapEditDialog({
       clearTimeout(timer);
       c.abort();
     };
-  }, [client, level, query, kind, mode, targetNodeId]);
+  }, [client, level, query, kind, addingExisting, targetNodeId]);
   async function submit() {
     setBusy(true);
     setError("");
     try {
-      await onSubmit(title.trim(), icon);
+      if (creatingNode) await onCreateNode(title.trim(), icon);
+      else await onSubmit(title.trim(), icon);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No pudimos guardar.");
@@ -127,7 +143,7 @@ export function MapEditDialog({
         tabIndex={-1}
         aria-label={
           {
-            add: "Agregar contenido",
+            add: "Nuevo nodo o agregar contenido",
             create: "Crear nodo",
             rename: "Renombrar nodo",
             group: "Agrupar selección",
@@ -142,7 +158,7 @@ export function MapEditDialog({
           <h2>
             {
               {
-                add: "Agregar contenido",
+                add: "Añadir al mapa",
                 create: "Nuevo nodo",
                 rename: "Renombrar nodo",
                 group: "Crear nodo con selección",
@@ -159,7 +175,13 @@ export function MapEditDialog({
             <X size={18} />
           </button>
         </header>
-        {mode === "add" ? (
+        {mode === "add" && !targetNodeId ? (
+          <div className={styles.dialogModeTabs} role="tablist" aria-label="Qué quieres añadir">
+            <button role="tab" aria-selected={activeTab === "existing"} onClick={() => setActiveTab("existing")}>Contenido existente</button>
+            <button role="tab" aria-selected={activeTab === "node"} onClick={() => setActiveTab("node")}>Crear nodo</button>
+          </div>
+        ) : null}
+        {addingExisting ? (
           <>
             <label>
               Buscar bloques o lecciones
@@ -254,6 +276,36 @@ export function MapEditDialog({
                 Cargar más
               </button>
             ) : null}
+            {suggestionError ? <p className={styles.status}>No pudimos cargar las recomendaciones.</p> : null}
+            {!targetNodeId && !query && suggestions?.items.length ? (
+              <section className={styles.dialogSuggestions} aria-label="Contenido sugerido">
+                <h3>Para seguir aprendiendo</h3>
+                {suggestions.items.map((item) => (
+                  <div className={styles.suggestion} key={item.key}>
+                    <div><strong>{item.title}</strong><small>{item.reason}</small></div>
+                    <button className={styles.iconButton} aria-label={`Añadir ${item.title}`} disabled={busy || item.membership !== "absent"} onClick={() => void add(item)}><Plus size={18} /></button>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+            {!targetNodeId && suggestions?.incompleteBlocks.length ? (
+              <section className={styles.dialogSuggestions} aria-label="Bloques por completar">
+                <h3>Bloques por completar</h3>
+                {suggestions.incompleteBlocks.map((block) => (
+                  <div className={styles.suggestion} key={block.pathId}>
+                    <div><strong>{block.title}</strong><small>{block.addedLessons} de {block.totalLessons} lecciones añadidas</small></div>
+                    <button className={styles.button} disabled={busy || completedBlocks.includes(block.pathId)} onClick={() => {
+                      setBusy(true);
+                      setError("");
+                      void onCompleteBlock(block.pathId)
+                        .then(() => setCompletedBlocks((current) => [...current, block.pathId]))
+                        .catch((e) => setError(e instanceof Error ? e.message : "No pudimos completar el bloque."))
+                        .finally(() => setBusy(false));
+                    }}>Completar bloque</button>
+                  </div>
+                ))}
+              </section>
+            ) : null}
           </>
         ) : mode === "remove" ? (
           <p>
@@ -290,7 +342,7 @@ export function MapEditDialog({
           </>
         )}
         <p role="status">{busy ? "Guardando…" : error}</p>
-        {mode !== "add" ? (
+        {mode !== "add" || creatingNode ? (
           <footer>
             <button className={styles.button} onClick={onClose} disabled={busy}>
               Cancelar

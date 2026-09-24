@@ -1007,6 +1007,10 @@ img {
   padding: 1.65rem 2.5rem 2.1rem;
 }
 
+.app-main.learning-map-main {
+  padding: 0;
+}
+
 .section-heading-row {
   display: flex;
   align-items: center;

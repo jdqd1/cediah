@@ -923,3 +923,172 @@
   .flow[data-phase="entering"],
   .flow[data-direction="back"][data-phase="entering"] { animation: none; }
 }
+
+/* Single map header inside the persistent application shell. */
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 68px;
+  padding: 8px 18px;
+  gap: 16px;
+}
+.headerIdentity {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 8px;
+}
+.headerText {
+  flex: 0 1 auto;
+  min-width: 155px;
+}
+.header h1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.header .breadcrumbs {
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  min-width: 0;
+  margin-bottom: 1px;
+  overflow: hidden;
+  color: var(--map-muted);
+  font-size: 11px;
+}
+.header .breadcrumbs span { display: inline-flex; align-items: center; white-space: nowrap; }
+.header .breadcrumbs button {
+  max-width: 120px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--map-muted);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.header .breadcrumbs button:hover { color: var(--map-primary); text-decoration: underline; }
+.header .backButton {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 50%;
+}
+.header .backButton:hover { background: #edf1fc; box-shadow: 0 2px 8px rgb(41 53 111 / 11%); }
+.headerActions { overflow: visible; }
+.viewSwitcher {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--map-line);
+  border-radius: 11px;
+  background: #f9faff;
+}
+.viewSwitcher a,
+.viewSwitcher span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border-radius: 8px;
+  color: var(--map-muted);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 650;
+}
+.viewSwitcher span[aria-current="page"] { color: var(--map-primary); background: #fff; box-shadow: 0 1px 4px rgb(41 53 111 / 10%); }
+.viewSwitcher a:hover { background: #eef0ff; color: var(--map-primary); }
+.mobileViewsMenu { display: none; }
+.headerActions .viewToggle {
+  gap: 6px;
+  background: #f3f5fc;
+  font-weight: 650;
+}
+.headerActions .viewToggle:hover { background: #e9edfa; }
+.headerActions > .status:empty { display: none; }
+.dialogModeTabs {
+  display: flex;
+  gap: 4px;
+  margin: 18px 0 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background: #f3f5fb;
+}
+.dialogModeTabs button {
+  flex: 1;
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--map-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.dialogModeTabs button[aria-selected="true"] {
+  color: var(--map-primary);
+  background: #fff;
+  box-shadow: 0 1px 5px rgb(41 53 111 / 10%);
+  font-weight: 700;
+}
+.dialogSuggestions { margin-top: 18px; border-top: 1px solid var(--map-line); }
+.dialogSuggestions h3 { margin: 16px 0 0; font-size: 14px; }
+
+@container (max-width: 767px) {
+  .header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    min-height: 0;
+    padding: 8px 10px;
+  }
+  .headerIdentity { min-height: 36px; }
+  .headerText { flex: 1; min-width: 0; }
+  .header h1 { font-size: 16px; }
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .viewSwitcher { display: none; }
+  .mobileViewsMenu { display: block; position: relative; flex-shrink: 0; }
+  .mobileViewsMenu summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 36px;
+    padding: 6px 9px;
+    border: 1px solid var(--map-line);
+    border-radius: 9px;
+    background: #fff;
+    color: var(--map-primary);
+    cursor: pointer;
+    list-style: none;
+  }
+  .mobileViewsMenu summary::-webkit-details-marker { display: none; }
+  .mobileViewsMenu nav {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 5px);
+    left: 0;
+    display: grid;
+    min-width: 130px;
+    padding: 4px;
+    border: 1px solid var(--map-line);
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: var(--map-card-shadow);
+  }
+  .mobileViewsMenu nav a { padding: 9px 10px; border-radius: 7px; color: var(--map-ink); text-decoration: none; }
+  .mobileViewsMenu nav a:hover { background: var(--map-icon-well); }
+  .headerActions .primary { min-height: 36px; padding: 5px 10px; }
+  .headerActions .viewToggle { width: auto; min-width: auto; padding: 5px 10px; }
+}

@@ -35,7 +35,6 @@ function AuthenticatedFrame({ children }: { children: ReactNode }) {
  * Authorization stays in each server layout; this frame contains chrome only. */
 export function PlatformFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname === "/aprendizaje/mapa") return children;
   return isPlatformPath(pathname) ? <AuthenticatedFrame>{children}</AuthenticatedFrame> : children;
 }
 

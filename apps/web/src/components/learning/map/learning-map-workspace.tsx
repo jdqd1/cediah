@@ -12,9 +12,7 @@ import {
   MapTrifold,
   X,
   ArrowsOutCardinal,
-  Lightbulb,
-  CheckSquare,
-  Info,
+  CaretDown,
 } from "@phosphor-icons/react";
 import type {
   MapItem,
@@ -40,6 +38,7 @@ const Canvas = dynamic(() => import("./learning-map-canvas"), {
 type Dialog = {
   mode: "add" | "create" | "rename" | "group" | "remove";
   item?: MapItem;
+  initialTab?: "existing" | "node";
 };
 
 function Workspace() {
@@ -61,7 +60,6 @@ function Workspace() {
   const root = useRef<HTMLDivElement>(null),
     heading = useRef<HTMLHeadingElement>(null);
   const [wide, setWide] = useState(false),
-    [showSuggestions, setShowSuggestions] = useState(false),
     [list, setList] = useState(false),
     [organizing, setOrganizing] = useState(false),
     [organizeToken, setOrganizeToken] = useState(0),
@@ -159,12 +157,18 @@ function Workspace() {
         return;
       }
       setInfo(null);
-      setShowSuggestions(false);
       navigate(routeFor(item));
     },
     [navigate, routeFor, selecting],
   );
   const action = useCallback((item: MapItem, action: MapItemAction) => {
+    if (action === "select") {
+      setSelecting(true);
+      setSelection((current) => current.includes(item.occurrenceId)
+        ? current.filter((id) => id !== item.occurrenceId)
+        : [...current, item.occurrenceId]);
+      return;
+    }
     if (action === "move") {
       setList(false);
       setOrganizing(true);
@@ -188,7 +192,6 @@ function Workspace() {
   const moveFinished = useCallback(() => setMovingId(null), []);
   const closePanel = useCallback(() => {
     setInfo(null);
-    setShowSuggestions(false);
     if (level?.selectedLesson) back();
     else if (detail && level)
       window.history.replaceState(null, "", buildMapHref(level.route));
@@ -443,78 +446,6 @@ function Workspace() {
         )}
       </div>
     </aside>
-  ) : showSuggestions ? (
-    <aside className={styles.panel} aria-label="Sugerencias">
-      <header className={styles.panelHeader}>
-        <div>
-          <h2>Tu próximo descubrimiento</h2>
-          <p>Contenido relacionado con tu mapa.</p>
-        </div>
-        {!wide ? (
-          <button
-            className={styles.iconButton}
-            aria-label="Cerrar sugerencias"
-            onClick={closePanel}
-          >
-            <X size={18} />
-          </button>
-        ) : null}
-      </header>
-      <div className={styles.panelScroll}>
-        {suggestionError ? (
-          <p>
-            No pudimos cargar las sugerencias.{" "}
-            <button className={styles.button} onClick={() => void refresh()}>
-              Reintentar
-            </button>
-          </p>
-        ) : suggestions?.items.length ? (
-          suggestions.items.map((item) => (
-            <div className={styles.suggestion} key={item.key}>
-              <div>
-                <strong>{item.title}</strong>
-                <small>{item.reason}</small>
-              </div>
-              <button
-                className={styles.iconButton}
-                aria-label={`Añadir ${item.title}`}
-                disabled={busy}
-                onClick={() =>
-                  void add(item).catch((e) => setMessage(e.message))
-                }
-              >
-                <Plus size={18} />
-              </button>
-            </div>
-          ))
-        ) : (
-          <p>Añade contenido desde el buscador para construir tu mapa.</p>
-        )}
-        {suggestions?.incompleteBlocks.map((block) => (
-          <div className={styles.suggestion} key={block.pathId}>
-            <div>
-              <strong>{block.title}</strong>
-              <small>
-                Añadiste {block.addedLessons} de {block.totalLessons} lecciones.
-                Completar el bloque añade las restantes y las agrupa.
-              </small>
-              <button
-                className={styles.button}
-                disabled={busy}
-                onClick={() =>
-                  void mutate("complete-block", {
-                    nodeId: level?.route.nodeId,
-                    pathId: block.pathId,
-                  }).catch((e) => setMessage(e.message))
-                }
-              >
-                Completar bloque
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </aside>
   ) : null;
   return (
     <main className={styles.workspace} ref={root}>
@@ -527,124 +458,72 @@ function Workspace() {
           minHeight: 0,
         }}
       >
-        <div className={`${styles.toolbar} ${styles.topbar}`}>
-          <Link className={styles.brand} href="/dashboard" aria-label="Koras, volver al inicio">
-            <MapTrifold size={22} weight="duotone" />
-            <span>KORAS</span>
-          </Link>
-          <nav className={styles.breadcrumbs} aria-label="Ruta del mapa">
+        <header className={styles.header}>
+          <div className={styles.headerIdentity}>
             {level?.route.nodeId ? (
               <button
-                className={styles.iconButton}
+                className={`${styles.iconButton} ${styles.backButton}`}
                 aria-label="Atrás en el mapa"
-                onClick={() => {
-                  setInfo(null);
-                  back();
-                }}
+                onClick={() => { setInfo(null); back(); }}
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={20} />
               </button>
             ) : null}
-            {(
-              level?.ancestry ?? [{ title: "Mi mapa", route: ROOT_MAP_ROUTE }]
-            ).map((a, i) => (
-              <span key={i}>
-                <button
-                  className={styles.button}
-                  onClick={() => {
-                    setInfo(null);
-                    navigate(a.route);
-                  }}
-                >
-                  {a.title}
-                </button>
-                {i < (level?.ancestry.length ?? 1) - 1 ? (
-                  <CaretRight size={14} />
-                ) : null}
-              </span>
-            ))}
-          </nav>
-          <details className={styles.viewsMenu}>
-            <summary className={styles.button}>Vistas <CaretRight size={14} /></summary>
-            <nav aria-label="Vistas de aprendizaje">
+            <div className={styles.headerText}>
+              {level?.route.nodeId ? (
+                <nav className={styles.breadcrumbs} aria-label="Ruta del mapa">
+                  {level.ancestry.slice(0, -1).map((ancestor, index) => (
+                    <span key={index}>
+                      <button onClick={() => { setInfo(null); navigate(ancestor.route); }}>
+                        {ancestor.title}
+                      </button>
+                      <CaretRight size={12} />
+                    </span>
+                  ))}
+                </nav>
+              ) : null}
+              <h1 ref={heading} tabIndex={-1}>
+                {level?.containerSummary.title ?? "Mi mapa de aprendizaje"}
+              </h1>
+              {level ? (
+                <span className={styles.status}>
+                  {level.containerSummary.progress.percentage === null
+                    ? "Sin avance disponible"
+                    : `${level.containerSummary.progress.percentage} % · ${level.containerSummary.progress.completedEssentialSteps}/${level.containerSummary.progress.totalEssentialSteps} esenciales`}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className={styles.headerActions}>
+            <nav className={styles.viewSwitcher} aria-label="Vistas de aprendizaje">
+              <span aria-current="page">Mapa</span>
               <Link href="/aprendizaje?tab=hoy">Hoy</Link>
               <Link href="/aprendizaje?tab=rutas">Rutas</Link>
               <Link href="/aprendizaje?tab=progreso">Progreso</Link>
             </nav>
-          </details>
-          <button
-            className={styles.primary}
-            aria-label="Agregar contenido"
-            onClick={() => setDialog({ mode: "add" })}
-            disabled={!level}
-          >
-            <Plus size={18} />
-            Agregar contenido
-          </button>
-        </div>
-        <header className={styles.header}>
-          <div className={styles.headerText}>
-            <h1 ref={heading} tabIndex={-1}>
-              {level?.containerSummary.title ?? "Mi mapa de aprendizaje"}
-            </h1>
-            <p>
-              {level?.containerSummary.description ??
-                "Tu espacio para conectar y organizar el aprendizaje."}
-            </p>
-            {level ? (
-              <span className={styles.status}>
-                {level.containerSummary.progress.percentage === null
-                  ? "Sin avance disponible"
-                  : `${level.containerSummary.progress.percentage} % · ${level.containerSummary.progress.completedEssentialSteps}/${level.containerSummary.progress.totalEssentialSteps} esenciales`}
-              </span>
-            ) : null}
-          </div>
-          <div className={styles.headerActions}>
-            <button
-              className={styles.button}
-              aria-label="Sugerencias"
-              title="Sugerencias"
-              onClick={() => {
-                setInfo(null);
-                setShowSuggestions(true);
-              }}
-            >
-              <Lightbulb size={18} />
-              <span className={styles.actionLabel}>Sugerencias</span>
+            <details className={styles.mobileViewsMenu}>
+              <summary><MapTrifold size={18} /> Mapa <CaretDown size={14} /></summary>
+              <nav aria-label="Otras vistas de aprendizaje">
+                <Link href="/aprendizaje?tab=hoy">Hoy</Link>
+                <Link href="/aprendizaje?tab=rutas">Rutas</Link>
+                <Link href="/aprendizaje?tab=progreso">Progreso</Link>
+              </nav>
+            </details>
+            <button className={styles.primary} aria-label="Nuevo nodo o agregar contenido" title="Nuevo nodo o agregar contenido" onClick={() => setDialog({ mode: "add", initialTab: "node" })} disabled={!level}>
+              <Plus size={18} />
+              <span>Nodo</span>
             </button>
-          <button
-            className={styles.button}
-            aria-label="Nuevo nodo"
-            title="Nuevo nodo"
-            onClick={() => setDialog({ mode: "create" })}
-            disabled={!level}
-          >
-            <Plus size={18} />
-            <span className={styles.actionLabel}>Nuevo nodo</span>
-          </button>
-          <button
-            className={styles.button}
-            aria-pressed={selecting}
-            aria-label={selecting ? "Terminar selección" : "Seleccionar contenidos"}
-            title={selecting ? "Terminar selección" : "Seleccionar contenidos"}
-            onClick={() => {
-              setSelecting(!selecting);
-              setSelection([]);
-            }}
-          >
-            <CheckSquare size={18} />
-            <span className={styles.actionLabel}>{selecting ? "Terminar selección" : "Seleccionar contenidos"}</span>
-          </button>
-          {selecting ? (
-            <button
-              className={styles.primary}
-              disabled={!selection.length}
-              onClick={() => setDialog({ mode: "group" })}
-            >
-              Crear nodo ({selection.length})
-            </button>
-          ) : (
-            <>
+            {selecting ? (
+              <>
+                <button className={styles.button} disabled={!selection.length} onClick={() => setDialog({ mode: "group" })}>
+                  Crear nodo ({selection.length})
+                </button>
+                <button className={styles.iconButton} aria-label="Cancelar selección" title="Cancelar selección" onClick={() => { setSelecting(false); setSelection([]); }}>
+                  <X size={18} />
+                </button>
+              </>
+            ) : (
+              <>
               <button
                 className={styles.button}
                 aria-pressed={organizing}
@@ -663,27 +542,15 @@ function Workspace() {
                   Ordenar este nivel
                 </button>
               ) : null}
-            </>
-          )}
-          <span className={styles.status} role="status">
-            {loading
-              ? "Abriendo…"
-              : queue.state === "saving"
-                ? "Guardando posiciones…"
-                : queue.state === "saved"
-                  ? "Posiciones guardadas"
-                  : "Posiciones pendientes"}
-          </span>
-          <button
-            className={styles.iconButton}
-            aria-label={list ? "Vista de mapa" : "Vista de lista"}
-            onClick={() => setList(!list)}
-          >
-            {list ? <MapTrifold size={20} /> : <List size={20} />}
-          </button>
-          <button className={styles.iconButton} aria-label="Información" title="Información" onClick={() => setInfo("container")}>
-            <Info size={18} />
-          </button>
+              </>
+            )}
+            <span className={styles.status} role="status">
+              {loading ? "Abriendo…" : queue.state === "saving" ? "Guardando…" : queue.state === "saved" ? "" : "Posiciones pendientes"}
+            </span>
+            <button className={`${styles.button} ${styles.viewToggle}`} aria-label={list ? "Vista de mapa" : "Vista de lista"} onClick={() => setList(!list)}>
+              {list ? <MapTrifold size={18} /> : <List size={18} />}
+              <span>{list ? "Mapa" : "Lista"}</span>
+            </button>
           </div>
         </header>
         {movingId ? (
@@ -776,7 +643,7 @@ function Workspace() {
                 onClick={() => setDialog({ mode: "add" })}
               >
                 <Plus size={18} />
-                Agregar contenido
+                Añadir al mapa
               </button>
             </div>
           ) : list ? (
@@ -829,6 +696,7 @@ function Workspace() {
         <MapEditDialog
           key={`${dialog.mode}:${dialog.item?.occurrenceId ?? ""}`}
           mode={dialog.mode}
+          initialTab={dialog.initialTab}
           initialTitle={dialog.item?.title}
           targetNodeId={
             dialog.item?.kind === "node" ? dialog.item.occurrenceId : undefined
@@ -836,6 +704,14 @@ function Workspace() {
           onClose={() => setDialog(null)}
           onSubmit={submit}
           onAdd={add}
+          onCreateNode={async (title, iconKey) => {
+            await mutate("nodes", { title, iconKey });
+          }}
+          onCompleteBlock={async (pathId) => {
+            await mutate("complete-block", { nodeId: level?.route.nodeId, pathId });
+          }}
+          suggestions={suggestions}
+          suggestionError={suggestionError}
         />
       ) : null}
     </main>

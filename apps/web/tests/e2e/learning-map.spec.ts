@@ -2,6 +2,15 @@ import { test, expect } from "@playwright/test";
 const root = "/visual-fixtures/mapa";
 const node = "b1000000-0000-4000-8000-000000000001",
   block = "b1000000-0000-4000-8000-000000000022";
+test("selecting starts from a card menu", async ({ page }) => {
+  await page.goto(root);
+  await page.getByLabel("Opciones de Anatomía", { exact: true }).click();
+  await page.getByRole("button", { name: "Seleccionar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Crear nodo (1)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Seleccionar contenidos" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Cancelar selección" }).click();
+  await expect(page.getByRole("button", { name: "Crear nodo (1)" })).toHaveCount(0);
+});
 test("routes use a horizontal row on desktop and a vertical scroll on mobile", async ({ page, isMobile }) => {
   await page.goto(`${root}?estado=large`);
   await expect(page.locator(".react-flow__node").first()).toBeVisible();
@@ -48,11 +57,9 @@ test("six visual states and responsive widths remain readable", async ({
         includeHidden: true,
       }),
     ).toBeVisible();
-    await expect(
-      page
-        .locator('[role="status"]')
-        .filter({ hasText: "Posiciones guardadas" }),
-    ).toBeAttached();
+    await expect(page.locator(".app-topbar")).toBeVisible();
+    await expect(page.locator(".app-sidebar")).toBeAttached();
+    await expect(page.getByText("Posiciones guardadas", { exact: true })).toHaveCount(0);
     await expect(page.locator(".react-flow__node").first()).toBeAttached();
     await page.screenshot({
       path: testInfo.outputPath(`${name}.png`),
@@ -190,15 +197,16 @@ test("list, keyboard dialog and document reflow", async ({
   await expect(
     page.getByRole("button", { name: "Abrir Corazón", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Nuevo nodo", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Crear nodo" })).toBeVisible();
+  await page.getByRole("button", { name: "Nuevo nodo o agregar contenido", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Nuevo nodo o agregar contenido" })).toBeVisible();
+  await page.getByRole("tab", { name: "Crear nodo" }).click();
   await expect(
     page.getByRole("textbox", { name: "Nombre del nodo" }),
   ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Nuevo nodo", exact: true }),
+    page.getByRole("button", { name: "Nuevo nodo o agregar contenido", exact: true }),
   ).toBeFocused();
   expect(
     await page.evaluate(
