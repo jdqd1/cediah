@@ -174,15 +174,15 @@ export function GuideDashboardScreen({
         <h2 className="sr-only">Guías de estudio</h2>
 
         <div className="guide-directory-filters" role="search" aria-label="Buscar guías">
-          {hasSelection && (
-            <nav className="compact-navigation-row guide-directory-context" aria-label="Navegación de guías">
+          <nav className={"compact-navigation-row guide-directory-context" + (hasSelection ? "" : " is-placeholder")} aria-label="Navegación de guías">
+            {hasSelection ? (
               <IconBackLink
                 href={selectedTopic ? queryHref(pathname, selectedSlug) : "/guias"}
                 label={selectedTopic ? "Volver a los temas" : "Volver a todas las materias"}
                 onClick={(event) => navigate(event, selectedTopic ? selectedSlug : "")}
               />
-            </nav>
-          )}
+            ) : <span aria-hidden="true" />}
+          </nav>
           <label className="guide-directory-search">
             <MagnifyingGlass aria-hidden="true" size={18} />
             <input

@@ -52,6 +52,7 @@ const supportedModes = new Set([
   "dashboard",
   "dashboard-empty",
   "dashboard-error",
+  "dashboard-no-guide",
   "error",
   "long",
   "new",
@@ -88,7 +89,7 @@ export default async function LearningVisualFixturePage({ searchParams }: {
       <DashboardScreen
         available
         guidedLearningEnabled
-        lastReadGuide={dashboardGuides[1]}
+        lastReadGuide={mode === "dashboard-no-guide" ? null : dashboardGuides[1]}
         recentItems={dashboardGuides}
         learningHome={mode === "dashboard-empty" ? learningVisualNewHome : mode === "dashboard-error" ? null : learningVisualHome}
         learningHomeAvailable={mode !== "dashboard-error"}

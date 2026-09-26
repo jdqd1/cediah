@@ -43,7 +43,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument } from "@/lib/guide-document";
+import { extractGuideOutline, numberGuideOutline, sectionsToRichTextDocument, type NumberedGuideOutlineItem } from "@/lib/guide-document";
 import {
   extractGuideKeyPoints,
   isGuideKeyPointLinked,
@@ -111,7 +111,6 @@ export function ContentDetailScreen({
             <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
           </nav>
           <div className="published-guide-title-row">
-            {isGuideView && <span className="published-guide-file-icon" aria-hidden="true"><BookOpen size={21} weight="regular" /></span>}
             <h2>{item.title}</h2>
           </div>
         </header>
@@ -189,6 +188,25 @@ type VideoResourceTab = {
   label: string;
 };
 
+type OutlineNode = { item: NumberedGuideOutlineItem; children: OutlineNode[] };
+
+function buildOutlineTree(items: readonly NumberedGuideOutlineItem[]): OutlineNode[] {
+  const roots: OutlineNode[] = [];
+  const parents: OutlineNode[] = [];
+  for (const item of items) {
+    const node: OutlineNode = { item, children: [] };
+    let parent = parents.at(-1);
+    while (parent && parent.item.displayLevel >= item.displayLevel) {
+      parents.pop();
+      parent = parents.at(-1);
+    }
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+    parents.push(node);
+  }
+  return roots;
+}
+
 const subscribeToClientEnvironment = () => () => undefined;
 const getClientEnvironmentSnapshot = () => true;
 const getServerEnvironmentSnapshot = () => false;
@@ -263,6 +281,7 @@ export function PublishedGuideReader({
   );
   const outline = useMemo(() => extractGuideOutline(guideDocument), [guideDocument]);
   const numberedOutline = useMemo(() => numberGuideOutline(outline), [outline]);
+  const outlineTree = useMemo(() => buildOutlineTree(numberedOutline), [numberedOutline]);
   const studyKeyPoints = useMemo(
     () => mergeGuideKeyPoints(content.keyPoints, extractGuideKeyPoints(guideDocument)),
     [content.keyPoints, guideDocument],
@@ -271,6 +290,7 @@ export function PublishedGuideReader({
   const [fontScale, setFontScale] = useState(100);
   const [highlightImportant, setHighlightImportant] = useState(false);
   const [outlineExpanded, setOutlineExpanded] = useState(true);
+  const [expandedHeadingIds, setExpandedHeadingIds] = useState<Set<string>>(() => new Set());
   const [supportExpanded, setSupportExpanded] = useState(true);
   const [supportWide, setSupportWide] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -466,6 +486,46 @@ export function PublishedGuideReader({
     setOutlineExpanded((current) => !current);
   }
 
+  function toggleHeading(id: string) {
+    setExpandedHeadingIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function renderOutlineNodes(nodes: OutlineNode[]): ReactNode {
+    return <ul className="outline-tree">
+      {nodes.map(({ item, children }) => {
+        const hasChildren = children.length > 0;
+        const expanded = expandedHeadingIds.has(item.id);
+        return <li className={`outline-node is-level-${item.displayLevel}`} key={item.id}>
+          <div className="outline-node-row">
+            <a
+              aria-current={visibleActiveHeadingId === item.id ? "location" : undefined}
+              className={visibleActiveHeadingId === item.id ? "is-active" : ""}
+              href={`#${item.id}`}
+              onClick={(event) => { event.preventDefault(); goToHeading(item.id); }}
+            >
+              <span aria-hidden="true">{item.number}</span>
+              <span>{item.label}</span>
+            </a>
+            {hasChildren && <button
+              aria-controls={`outline-children-${item.id}`}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? "Contraer" : "Desplegar"} ${item.label}`}
+              className="outline-node-toggle"
+              onClick={() => toggleHeading(item.id)}
+              type="button"
+            ><CaretDown aria-hidden="true" size={16} /></button>}
+          </div>
+          {hasChildren && <div hidden={!expanded} id={`outline-children-${item.id}`} className="outline-node-children">{renderOutlineNodes(children)}</div>}
+        </li>;
+      })}
+    </ul>;
+  }
+
   function toggleSupportPanel() {
     if (window.matchMedia("(max-width: 760px)").matches) {
       setMobileDrawer((current) => (current === "support" ? null : "support"));
@@ -643,7 +703,6 @@ export function PublishedGuideReader({
         >
           <div className="published-rich-guide-outline-heading">
             <span>
-              <ListBullets aria-hidden="true" size={19} />
               <strong>Índice de la guía</strong>
             </span>
             <button
@@ -669,23 +728,7 @@ export function PublishedGuideReader({
             ref={outlineLinksRef}
           >
             <div className="published-rich-guide-outline-links">
-              {numberedOutline.map((outlineItem) => (
-                <a
-                  aria-current={visibleActiveHeadingId === outlineItem.id ? "location" : undefined}
-                  className={`is-level-${outlineItem.displayLevel}${visibleActiveHeadingId === outlineItem.id ? " is-active" : ""}`}
-                  href={`#${outlineItem.id}`}
-                  key={outlineItem.id}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    goToHeading(outlineItem.id);
-                  }}
-                >
-                  <span aria-hidden="true">
-                    {outlineItem.number}
-                  </span>
-                  {outlineItem.label}
-                </a>
-              ))}
+              {renderOutlineNodes(outlineTree)}
               {outline.length === 0 && (
                 <p className="published-rich-guide-outline-empty">La guía no contiene apartados.</p>
               )}

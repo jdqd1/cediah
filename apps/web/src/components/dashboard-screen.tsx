@@ -82,10 +82,11 @@ export function DashboardScreen({
               </span>
             </Link>
           ) : (
-            <div className="dashboard-resume-empty">
+            <Link className="dashboard-resume-empty" href="/guias">
               <span className="dashboard-resume-empty-icon"><BookOpen aria-hidden="true" size={35} /></span>
-              <Link href="/guias">Explorar guías <ArrowRight aria-hidden="true" size={20} /></Link>
-            </div>
+              <span className="dashboard-resume-empty-copy">Descubre una guía para empezar a leer</span>
+              <span className="dashboard-resume-empty-action">Explorar guías <ArrowRight aria-hidden="true" size={20} /></span>
+            </Link>
           )}
         </section>
       </div>

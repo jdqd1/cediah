@@ -28,7 +28,10 @@ export function useContentView(contentId: string | null, {
     function schedule() {
       clearTimeout(timer);
       tracker.resume();
-      if (automatic && document.visibilityState === "visible") timer = setTimeout(tracker.record, delayMs);
+      if (automatic && document.visibilityState === "visible") {
+        if (delayMs <= 0) tracker.record();
+        else timer = setTimeout(tracker.record, delayMs);
+      }
     }
     schedule();
     if (pendingContentIdRef.current === contentId) {

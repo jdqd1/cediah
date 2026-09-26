@@ -55,7 +55,8 @@ export function createContentViewTracker(contentId: string, onRecorded: (result:
     dispose() {
       disposed = true;
       clearTimeout(timer);
-      controller?.abort();
+      // The request uses keepalive so a quick return to the dashboard can
+      // still persist the guide read after this component unmounts.
     },
   };
 }

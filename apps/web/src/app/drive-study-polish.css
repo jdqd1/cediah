@@ -188,16 +188,6 @@
   align-items: center;
   gap: 12px;
 }
-.published-guide-file-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 11px;
-  background: #e7edfb;
-  color: var(--drive-accent);
-}
 .published-content-header.published-rich-guide-header .published-guide-title-row h2 {
   min-width: 0;
   color: var(--drive-ink);
@@ -265,19 +255,6 @@
   height: 64px;
   border-radius: 18px;
   background: #e6edfb;
-}
-.dashboard-resume-empty > a {
-  display: inline-flex;
-  min-height: 44px;
-  width: auto;
-  align-self: flex-end;
-  align-items: center;
-  justify-content: center;
-  border-radius: 22px;
-  background: #dce6fa;
-  padding: 0 20px;
-  color: #263f9a;
-  font-size: .84rem;
 }
 .dashboard-study-home > .dashboard-review-section { margin-top: 24px; }
 .dashboard-study-home > .dashboard-review-section .dashboard-review-card {
@@ -436,7 +413,6 @@
     padding: 10px 14px;
   }
   .published-rich-guide-header .published-guide-title-row { gap: 9px; }
-  .published-guide-file-icon { width: 35px; height: 35px; border-radius: 9px; }
   .published-content-header.published-rich-guide-header .published-guide-title-row h2 { font-size: 1rem; line-height: 1.3; }
   .dashboard-study-home > .dashboard-review-section .dashboard-review-card { min-height: 130px; }
   .dashboard-study-home > .dashboard-review-section :is(.dashboard-review-clear-link, .dashboard-review-button) { margin-left: auto; }
@@ -612,6 +588,141 @@
   .route-loading-main .route-loading-screen {
     background: var(--app-chrome);
   }
+}
+
+/* A steady catalog toolbar lets only the folder and guide lists change. */
+.guide-directory-filters,
+.app-main .guide-directory-filters {
+  gap: 10px;
+  background: transparent;
+  padding: 0;
+}
+.guide-directory-filters .guide-directory-context {
+  width: 44px;
+  min-width: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.guide-directory-filters .guide-directory-context.is-placeholder { visibility: hidden; }
+.guide-directory-search,
+.app-main .guide-directory-search {
+  border-radius: 24px;
+  background: #e3e9f4;
+  padding-inline: 13px;
+}
+.guide-directory-filters:focus-within,
+.app-main .guide-directory-filters:focus-within { outline: 0; }
+.guide-directory-search:focus-within { outline: 2px solid #aabaf0; outline-offset: 1px; }
+
+.app-shell .sidebar-submenu .sidebar-link,
+.app-shell .sidebar-submenu .sidebar-link.is-active {
+  border-left: 0;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.app-shell .sidebar-submenu .sidebar-link.is-active { background: #e2e9f6; color: #304987; }
+.app-shell .sidebar-submenu .sidebar-link:hover { transform: none; }
+
+.published-content-header.published-rich-guide-header .published-guide-title-row h2 {
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  line-height: 1.23;
+  letter-spacing: -0.025em;
+}
+.published-rich-guide-outline-heading strong { font-size: 1rem; font-weight: 750; }
+.published-rich-guide-support-content { padding-top: 20px; }
+
+/* Nested lists keep the hierarchy clear while every parent starts closed. */
+.published-rich-guide-outline-links .outline-tree {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.published-rich-guide-outline-links .outline-node { min-width: 0; }
+.published-rich-guide-outline-links .outline-node-row { display: flex; min-width: 0; align-items: center; }
+.published-rich-guide-outline-links .outline-node-row > a,
+.published-rich-guide-outline-links .outline-node-row > a.is-active {
+  display: grid;
+  min-width: 0;
+  min-height: 42px;
+  flex: 1;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: transparent;
+  color: #41516b;
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.published-rich-guide-outline-links .outline-node.is-level-1 > .outline-node-row > a { color: #293a58; font-size: .83rem; font-weight: 700; }
+.published-rich-guide-outline-links .outline-node.is-level-3 > .outline-node-row > a { color: #69768d; font-size: .74rem; font-weight: 540; }
+.published-rich-guide-outline-links .outline-node-row > a:hover { background: #edf2fa; }
+.published-rich-guide-outline-links .outline-node-row > a.is-active,
+.published-rich-guide-outline-links .outline-node.is-level-1 > .outline-node-row > a.is-active {
+  background: #e6edfa;
+  color: #294b9d;
+}
+.published-rich-guide-outline-links .outline-node-row > a > span:first-child { color: #8190a8; font-size: .7rem; text-align: left; }
+.published-rich-guide-outline-links .outline-node-row > a.is-active > span:first-child { color: #4363a7; }
+.published-rich-guide-outline-links .outline-node-toggle {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #71819a;
+}
+.published-rich-guide-outline-links .outline-node-toggle:hover { background: #e8edf6; color: #344d86; }
+.published-rich-guide-outline-links .outline-node-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.published-rich-guide-outline-links .outline-node-children {
+  margin-left: 16px;
+  border-left: 1px solid #d7e0ee;
+  padding-left: 10px;
+}
+.published-rich-guide-outline-links .outline-node-children[hidden] { display: none; }
+
+.dashboard-resume-empty { color: var(--drive-ink); text-decoration: none; }
+.dashboard-resume-empty-copy { max-width: 25ch; font-size: .92rem; font-weight: 650; line-height: 1.4; }
+.dashboard-resume-empty-action {
+  display: inline-flex;
+  min-height: 44px;
+  align-self: flex-end;
+  align-items: center;
+  gap: 8px;
+  border-radius: 22px;
+  background: #dce6fa;
+  padding: 0 20px;
+  color: #263f9a;
+  font-size: .84rem;
+  font-weight: 700;
+}
+.dashboard-resume-empty:hover { background: #f7f9fe; }
+.dashboard-resume-empty:focus-visible { outline: 3px solid #9fb5e8; outline-offset: 2px; }
+.app-shell .dashboard-shortcuts .study-material-card[data-kind="guide"] .study-material-icon { background: #e1ebff; color: #2856b7; }
+.app-shell .dashboard-shortcuts .study-material-card[data-kind="learning"] .study-material-icon { background: #e0f2e8; color: #218153; }
+
+@media (max-width: 760px) {
+  .app-shell .app-topbar.app-topbar-simplified,
+  .app-shell.dashboard-shell .app-topbar.app-topbar-simplified,
+  .app-shell .app-topbar.app-topbar-simplified:has(+ .guide-catalog-main) {
+    background: rgb(237 240 247 / 72%);
+    backdrop-filter: blur(14px);
+  }
+  .published-content-header.published-rich-guide-header .published-guide-title-row h2 { font-size: 1.25rem; }
+  .published-rich-guide-outline-heading strong { font-size: 1.08rem; }
+  .app-shell:has(.published-rich-guide-reader) .published-rich-guide-support-content { padding-top: 20px; }
+  .published-rich-guide-outline-links { display: block; overflow-x: visible; }
+  .dashboard-recent-control { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

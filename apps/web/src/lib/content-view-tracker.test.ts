@@ -78,6 +78,19 @@ describe("reliable playback receipts", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("lets an in-flight guide read finish after the reader unmounts", async () => {
+    let finishRequest: ((response: Response) => void) | undefined;
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => { finishRequest = resolve; }));
+    const tracker = createContentViewTracker("guide", recorded);
+    tracker.record();
+    const signal = fetchMock.mock.calls[0]?.[1]?.signal as AbortSignal;
+    tracker.dispose();
+    expect(signal.aborted).toBe(false);
+    finishRequest?.(ok());
+    await flush();
+    expect(recorded).not.toHaveBeenCalled();
+  });
+
   it("bounds retries, recovers after reconnecting and cancels on unmount", async () => {
     fetchMock.mockImplementation(async () => new Response("unavailable", { status: 503 }));
     const tracker = createContentViewTracker("video", recorded);
