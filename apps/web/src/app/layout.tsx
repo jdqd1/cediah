@@ -15,6 +15,7 @@ import "./guide-interactive-terms.css";
 import "./interactive-term-polish.css";
 import "./interactive-term-admin.css";
 import "./admin-section-tabs.css";
+import "./dashboard-home.css";
 
 const plusJakartaSans = localFont({
   src: [
@@ -31,7 +32,7 @@ const plusJakartaSans = localFont({
 export const metadata: Metadata = {
   title: "KORAS | Conocimiento que se convierte en vocación",
   description:
-    "Plataforma educativa para aprender con videos, guías y recursos organizados por materia.",
+    "Plataforma educativa para aprender con guías, cuestionarios, flashcards y rutas por materia.",
   icons: {
     icon: "/brand/koras-mark-white-bg.png",
     apple: "/brand/koras-mark-white-bg.png",

@@ -370,6 +370,8 @@ describe("guided-learning catalog and versioning", () => {
     const observedOption = detail?.version.units[1]?.steps[0]?.options
       .find((entry) => entry.projection === "video");
     if (!skippedOption || !observedOption) throw new Error("Expected native video options");
+    expect((await provider.getHome({ userId: videoStudentId })).tasks
+      .some((task) => task.href.includes(skippedOption.id) || task.href.includes(observedOption.id))).toBe(false);
 
     const skippedAttempt = await provider.createAttempt({
       idempotencyKey: "74000000-0000-4000-8000-000000000001",
@@ -400,6 +402,8 @@ describe("guided-learning catalog and versioning", () => {
       userId: videoStudentId,
     });
     if (observedAttempt.status !== "success") throw new Error("Expected observed video attempt");
+    expect((await provider.getHome({ userId: videoStudentId })).tasks
+      .some((task) => task.href.includes(observedOption.id))).toBe(false);
     let current = observedAttempt.value.attempt;
     let finalAwards = observedAttempt.value.awards;
     for (let segment = 0; segment < 9; segment += 1) {

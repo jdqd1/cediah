@@ -5,7 +5,6 @@ import {
   BookOpen,
   CircleNotch,
   MagnifyingGlass,
-  PlayCircle,
   X,
 } from "@phosphor-icons/react";
 import Link from "next/link";
@@ -51,7 +50,7 @@ function SearchResultItem({
   query: string;
   result: ContentSearchResult;
 }) {
-  const contentTypeLabel = result.kind === "guide" ? "Guía" : "Video";
+  const contentTypeLabel = "Guía";
   return (
     <li>
       <Link
@@ -61,7 +60,7 @@ function SearchResultItem({
         onClick={onNavigate}
       >
         <span className={`global-search-result-icon is-${result.kind}`} aria-hidden="true">
-          {result.kind === "guide" ? <BookOpen size={18} /> : <PlayCircle size={18} weight="fill" />}
+          <BookOpen size={18} />
         </span>
         <span className="global-search-result-copy">
           <strong><HighlightedText query={query} value={result.title} /></strong>
@@ -189,7 +188,7 @@ export function GlobalContentSearch() {
   return (
     <div className="global-content-search" ref={containerRef}>
       <form
-        aria-label="Buscar videos y guías"
+        aria-label="Buscar guías"
         className="global-content-search-form"
         onSubmit={handleSubmit}
         role="search"
@@ -199,7 +198,7 @@ export function GlobalContentSearch() {
           aria-controls="global-content-search-panel"
           aria-expanded={panelOpen}
           aria-haspopup="dialog"
-          aria-label="Buscar videos y guías"
+          aria-label="Buscar guías"
           aria-autocomplete="list"
           autoComplete="off"
           onChange={(event) => updateQuery(event.target.value)}
@@ -211,7 +210,7 @@ export function GlobalContentSearch() {
               inputRef.current?.blur();
             }
           }}
-          placeholder="Buscar videos y guías"
+          placeholder="Buscar guías"
           ref={inputRef}
           role="combobox"
           type="search"
@@ -251,17 +250,10 @@ export function GlobalContentSearch() {
           ) : (
             <>
               <p className="global-search-summary">
-                {response.videos.length + response.guides.length === 0
+                {response.guides.length === 0
                   ? "No encontramos coincidencias."
-                  : `${response.videos.length + response.guides.length} coincidencias principales`}
+                  : `${response.guides.length} coincidencias principales`}
               </p>
-              <SearchSection
-                icon={<PlayCircle size={17} weight="fill" />}
-                label="Videos"
-                onNavigate={closeSearch}
-                query={response.query || query}
-                results={response.videos}
-              />
               <SearchSection
                 icon={<BookOpen size={17} />}
                 label="Guías"

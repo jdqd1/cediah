@@ -1,1 +1,5 @@
-export { AuthenticatedAppLayout as default } from "@/components/authenticated-app-layout";
+import { redirect } from "next/navigation";
+
+export default function CoursesLayout() {
+  redirect("/dashboard");
+}

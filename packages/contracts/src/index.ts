@@ -1155,6 +1155,7 @@ export interface ContentProvider {
     roles: PlatformRole[];
   }): Promise<ContentMutationResult<ContentAsset>>;
   getPublishedBySlug(slug: string): Promise<ContentItem | null>;
+  getLastReadGuide?(userId: string): Promise<ContentItem | null>;
   getRoles(userId: string): Promise<PlatformRole[]>;
   getWorkspace(input: {
     actorUserId: string;
@@ -1170,6 +1171,7 @@ export interface ContentProvider {
   recordView?(input: {
     contentId: string;
     viewerKey: string;
+    userId?: string;
   }): Promise<ContentMutationResult<ContentViewResponse>>;
   getReaction?(input: {
     contentId: string;

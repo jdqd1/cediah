@@ -1,107 +1,43 @@
-import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  CardsThree,
-  ClipboardText,
-  Notebook,
-  PlayCircle,
-} from "@phosphor-icons/react/dist/ssr";
-import type { ContentItem, ContentKind, LearningHome } from "@cediah/contracts";
-import { publishedContentHref, subjectDirectoryHref } from "@/lib/content-navigation";
-import { mostViewedFirst, newestContentFirst } from "@/lib/content-order";
-import { formatVideoViews } from "@/lib/video-views";
+import { ArrowRight, BookOpen, CardsThree, ClipboardText, Notebook, Path } from "@phosphor-icons/react/dist/ssr";
+import type { ContentItem, LearningHome } from "@cediah/contracts";
+import { publishedContentHref } from "@/lib/content-navigation";
+import { newestContentFirst } from "@/lib/content-order";
 import { AppShell } from "./app-shell";
 import { BrandFooter } from "./brand-footer";
+import { LearningDashboardReview } from "./learning/learning-dashboard-review";
 import { LearningDashboardSummary } from "./learning/learning-dashboard-summary";
 
-const kindImages: Record<ContentKind, string> = {
-  flashcards: "/anatomy/thigh.png",
-  guide: "/anatomy/guide-cover-default.png",
-  quiz: "/anatomy/heart.png",
-  topic: "/anatomy/skull.png",
-  video: "/anatomy/video-cover-default.png",
-};
-
-function contentCover(item: ContentItem) {
-  return item.kind === "video" && item.content.coverImageUrl
-    ? item.content.coverImageUrl
-    : kindImages[item.kind];
-}
+type Guide = Extract<ContentItem, { kind: "guide" }>;
 
 const materialDefinitions = [
-  {
-    href: "/asignaturas?tipo=video",
-    icon: PlayCircle,
-    kind: "video" as const,
-    title: "Videos",
-  },
-  {
-    href: "/guias",
-    icon: Notebook,
-    kind: "guide" as const,
-    title: "Guías",
-  },
-  {
-    href: "/asignaturas?tipo=flashcards",
-    icon: CardsThree,
-    kind: "flashcards" as const,
-    title: "Flashcards",
-  },
-  {
-    href: "/asignaturas?tipo=quiz",
-    icon: ClipboardText,
-    kind: "quiz" as const,
-    title: "Cuestionarios",
-  },
+  { href: "/guias", icon: Notebook, kind: "guide", title: "Guías", description: "Lee y profundiza" },
+  { href: "/asignaturas?tipo=quiz", icon: ClipboardText, kind: "quiz", title: "Cuestionarios", description: "Pon a prueba lo aprendido" },
+  { href: "/asignaturas?tipo=flashcards", icon: CardsThree, kind: "flashcards", title: "Flashcards", description: "Repasa conceptos clave" },
 ] as const;
 
-function contentHref(item: ContentItem) {
-  return publishedContentHref(item);
-}
-
-function formatDuration(item: ContentItem) {
-  if (item.kind === "video" && item.content.durationSeconds) {
-    const minutes = Math.max(1, Math.round(item.content.durationSeconds / 60));
-    return minutes + " min";
-  }
-  if (item.estimatedMinutes) return item.estimatedMinutes + " min";
-  return null;
-}
-
-function VideoCard({ item, eager = false }: { item: ContentItem & { kind: "video" }; eager?: boolean }) {
-  const duration = formatDuration(item);
-
+function GuideCard({ guide, index }: { guide: Guide; index: number }) {
   return (
-    <Link className="dashboard-video-card" href={contentHref(item)}>
-      <div className="dashboard-video-media">
-        <Image
-          src={contentCover(item)}
-          alt=""
-          fill
-          loading={eager ? "eager" : "lazy"}
-          sizes="(max-width: 600px) 216px, (max-width: 1000px) 25vw, 20vw"
-          unoptimized={Boolean(item.content.coverImageUrl)}
-        />
-        <span className="dashboard-video-shade" />
-        <span className="dashboard-play-button" aria-hidden="true">
-          <PlayCircle size={49} weight="thin" />
+    <li>
+      <Link className="dashboard-guide-card" href={publishedContentHref(guide)}>
+        <span className="dashboard-guide-card-icon" aria-hidden="true"><BookOpen size={25} weight="duotone" /></span>
+        <span className="dashboard-guide-card-position">{String(index + 1).padStart(2, "0")}</span>
+        <span className="dashboard-guide-card-copy">
+          <small>{guide.topic || "Guía de estudio"}</small>
+          <strong>{guide.title}</strong>
+          <span>{guide.summary || "Explora esta nueva guía de estudio."}</span>
         </span>
-        {duration && <span className="dashboard-video-duration">{duration}</span>}
-      </div>
-      <div className="dashboard-video-copy">
-        <h3 title={item.title}>{item.title}</h3>
-        <span className="dashboard-video-views">{formatVideoViews(item.viewCount)}</span>
-      </div>
-    </Link>
+        <span className="dashboard-guide-card-action" aria-hidden="true"><ArrowRight size={18} /></span>
+      </Link>
+    </li>
   );
 }
 
 export function DashboardScreen({
   available,
-  items,
-  highlightedItems = items,
-  recentItems = items,
+  recentItems = [],
+  lastReadGuide = null,
+  lastReadAvailable = true,
   isAdministrator = false,
   guidedLearningEnabled = false,
   learningHome = null,
@@ -109,23 +45,20 @@ export function DashboardScreen({
   viewer,
 }: {
   available: boolean;
-  items: ContentItem[];
-  highlightedItems?: ContentItem[];
   recentItems?: ContentItem[];
+  lastReadGuide?: ContentItem | null;
+  lastReadAvailable?: boolean;
   isAdministrator?: boolean;
   guidedLearningEnabled?: boolean;
   learningHome?: LearningHome | null;
   learningHomeAvailable?: boolean;
   viewer?: { email: string };
 }) {
-  const videos = recentItems
-    .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
+  const recentGuides = recentItems
+    .filter((item): item is Guide => item.kind === "guide")
     .sort(newestContentFirst)
-    .slice(0, 4);
-  const highlighted = highlightedItems
-    .filter((item): item is ContentItem & { kind: "video" } => item.kind === "video")
-    .sort(mostViewedFirst)
-    .slice(0, 8);
+    .slice(0, 5);
+  const resumeGuide = lastReadGuide?.kind === "guide" ? lastReadGuide : null;
 
   return (
     <AppShell
@@ -134,99 +67,85 @@ export function DashboardScreen({
       viewer={viewer}
       headerTitle=""
       guidedLearningEnabled={guidedLearningEnabled}
-      mainClassName="dashboard-main"
+      mainClassName="dashboard-main dashboard-study-home"
     >
-      <LearningDashboardSummary
-        available={learningHomeAvailable}
-        enabled={guidedLearningEnabled}
-        home={learningHome}
-      />
-      <nav className="study-material-grid dashboard-shortcuts" aria-label="Accesos directos de estudio">
-        {materialDefinitions.map(({ title, icon: Icon, kind, href }) => {
-          return (
-            <Link className="study-material-card" data-kind={kind} href={href} key={kind}>
-              <span className="study-material-icon" aria-hidden="true">
-                <Icon size={22} weight="regular" />
-              </span>
-              <span className="study-material-copy">
-                <strong>{title}</strong>
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="dashboard-layout">
-        <div className="dashboard-primary">
-          <section className="dashboard-section dashboard-recent" aria-labelledby="recent-title">
-            <div className="section-heading-row">
-              <h2 id="recent-title">Videos recientes</h2>
-              <Link href={subjectDirectoryHref("video")}>
-                Ver todo <ArrowRight size={17} />
-              </Link>
-            </div>
-            {videos.length > 0 ? (
-              <div className="dashboard-video-grid">
-                {videos.map((item, index) => <VideoCard key={item.id} item={item} eager={index === 0} />)}
-              </div>
-            ) : (
-              <div className="dynamic-empty-state" role="status">
-                <PlayCircle size={30} />
-                <div>
-                  <strong>
-                    {available ? "Aún no hay videos publicados." : "No pudimos cargar el catálogo."}
-                  </strong>
-                  <span>
-                    {available
-                      ? "Los videos aprobados aparecerán aquí automáticamente."
-                      : "La interfaz sigue disponible; intenta actualizar en unos minutos."}
-                  </span>
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
+      <header className="dashboard-home-intro">
+        <span>Tu espacio de estudio</span>
+        <h1>Continúa aprendiendo</h1>
+        <p>Retoma una guía, descubre material nuevo o dedica unos minutos al repaso.</p>
+      </header>
 
-        <aside className="dashboard-most-viewed" aria-labelledby="featured-content-title">
-          <div className="section-heading-row">
-            <h2 id="featured-content-title">Destacados</h2>
-            <Link href={subjectDirectoryHref("video")}>
-              Ver todo <ArrowRight size={17} />
+      <div className={"dashboard-focus-grid" + (guidedLearningEnabled ? " has-review" : "")}>
+        <section className="dashboard-resume-section" aria-labelledby="dashboard-resume-title">
+          <div className="section-heading-row"><h2 id="dashboard-resume-title">Seguir leyendo</h2></div>
+          {resumeGuide ? (
+            <Link className="dashboard-resume-card" href={publishedContentHref(resumeGuide)}>
+              <span className="dashboard-resume-art" aria-hidden="true"><BookOpen size={66} weight="duotone" /></span>
+              <span className="dashboard-resume-copy">
+                <span className="dashboard-resume-kicker"><BookOpen size={16} /> Tu última guía</span>
+                <strong>{resumeGuide.title}</strong>
+                <span>{resumeGuide.summary || "Continúa donde dejaste la lectura."}</span>
+                <span className="dashboard-resume-action">Continuar lectura <ArrowRight size={18} /></span>
+              </span>
             </Link>
-          </div>
-          <div className="dashboard-featured-content">
-            {highlighted.length > 0 ? (
-              <ol className="most-viewed-list">
-                {highlighted.map((item, index) => {
-                  return (
-                    <li key={item.id}>
-                      <span className="most-viewed-rank">{index + 1}</span>
-                      <Link href={contentHref(item)} className="most-viewed-link">
-                        <span className="most-viewed-image">
-                          <Image
-                            src={contentCover(item)}
-                            alt=""
-                            fill
-                            sizes="64px"
-                            unoptimized={Boolean(item.kind === "video" && item.content.coverImageUrl)}
-                          />
-                        </span>
-                        <span className="most-viewed-copy">
-                          <strong title={item.title}>{item.title}</strong>
-                          <small className="most-viewed-views">{formatVideoViews(item.viewCount)}</small>
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : (
-              <p className="dynamic-aside-empty">
-                Aquí aparecerán los videos más vistos.
-              </p>
-            )}
-          </div>
-        </aside>
+          ) : (
+            <div className="dashboard-resume-empty">
+              <span className="dashboard-resume-empty-icon"><BookOpen aria-hidden="true" size={26} /></span>
+              <div>
+                <strong>{lastReadAvailable ? "Tu próxima lectura empieza aquí" : "No pudimos cargar tu última guía"}</strong>
+                <p>{lastReadAvailable
+                  ? "Cuando leas una guía, podrás retomarla fácilmente desde este espacio."
+                  : "Puedes explorar las guías mientras recuperamos tu historial."}</p>
+              </div>
+              <Link href="/guias">Explorar guías <ArrowRight aria-hidden="true" size={17} /></Link>
+            </div>
+          )}
+        </section>
+        <LearningDashboardReview available={learningHomeAvailable} enabled={guidedLearningEnabled} home={learningHome} />
       </div>
+
+      <section className="dashboard-section dashboard-recent" aria-labelledby="recent-title">
+        <div className="section-heading-row">
+          <h2 id="recent-title">Agregadas recientemente</h2>
+          <Link href="/guias">Ver todas <ArrowRight aria-hidden="true" size={17} /></Link>
+        </div>
+        <p className="dashboard-section-description">Las cinco guías publicadas más recientes, en orden.</p>
+        {recentGuides.length > 0 ? (
+          <ol className="dashboard-guide-grid">
+            {recentGuides.map((guide, index) => <GuideCard key={guide.id} guide={guide} index={index} />)}
+          </ol>
+        ) : (
+          <div className="dynamic-empty-state" role="status">
+            <BookOpen size={30} aria-hidden="true" />
+            <div>
+              <strong>{available ? "Aún no hay guías publicadas." : "No pudimos cargar las guías."}</strong>
+              <span>{available ? "Las nuevas guías aparecerán aquí." : "Intenta actualizar en unos minutos."}</span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="dashboard-section dashboard-materials" aria-labelledby="dashboard-materials-title">
+        <div className="section-heading-row"><h2 id="dashboard-materials-title">Explora tu material</h2></div>
+        <nav className="study-material-grid dashboard-shortcuts" aria-label="Accesos directos de estudio">
+          {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => (
+            <Link className="study-material-card" data-kind={kind} href={href} key={kind}>
+              <span className="study-material-icon" aria-hidden="true"><Icon size={23} weight="regular" /></span>
+              <span className="study-material-copy"><strong>{title}</strong><small>{description}</small></span>
+              <ArrowRight className="dashboard-shortcut-arrow" aria-hidden="true" size={18} />
+            </Link>
+          ))}
+          {guidedLearningEnabled && (
+            <Link className="study-material-card" data-kind="learning" href="/aprendizaje">
+              <span className="study-material-icon" aria-hidden="true"><Path size={23} weight="regular" /></span>
+              <span className="study-material-copy"><strong>Rutas de aprendizaje</strong><small>Avanza a tu ritmo</small></span>
+              <ArrowRight className="dashboard-shortcut-arrow" aria-hidden="true" size={18} />
+            </Link>
+          )}
+        </nav>
+      </section>
+
+      <LearningDashboardSummary available={learningHomeAvailable} enabled={guidedLearningEnabled} home={learningHome} />
 
       <BrandFooter />
     </AppShell>

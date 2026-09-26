@@ -97,8 +97,9 @@ const kinds: { label: string; value: ContentKind }[] = [
 ];
 
 const primaryKinds = [
-  { label: "Video", value: "video" },
   { label: "Guía", value: "guide" },
+  { label: "Cuestionario", value: "quiz" },
+  { label: "Flashcards", value: "flashcards" },
   { label: "Tema", value: "topic" },
 ] satisfies { label: string; value: ContentKind }[];
 
@@ -907,7 +908,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
   const [progress, setProgress] = useState(0);
   const [guideEditing, setGuideEditing] = useState(false);
   const [guideCreateOpen, setGuideCreateOpen] = useState(false);
-  const [linkedVideoId, setLinkedVideoId] = useState("");
   const [archiveConfirmationOpen, setArchiveConfirmationOpen] = useState(false);
   const [publicationsCollapsed, setPublicationsCollapsed] = useState(true);
   const coverFileRef = useRef<HTMLInputElement>(null);
@@ -951,26 +951,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
     () => linkableVideos.filter((video) => !findVideoLinkedGuide(items, video.id)),
     [items, linkableVideos],
   );
-  const guideVideoOptions = useMemo(() => {
-    if (draft?.kind !== "guide") return linkableVideos;
-    const selectedSubjects = new Set(draft.subjectIds);
-    const candidates = linkableVideos.filter((video) => {
-      const linkedGuide = findVideoLinkedGuide(items, video.id);
-      return (!linkedGuide || linkedGuide.id === editingId) &&
-        (selectedSubjects.size === 0 || video.subjectIds.some((id) => selectedSubjects.has(id)));
-    });
-    const current = draft.content.linkedVideoId
-      ? items.find((value): value is ContentItem & { kind: "video" } =>
-          value.kind === "video" && value.id === draft.content.linkedVideoId)
-      : undefined;
-    if (current && !candidates.some((video) => video.id === current.id)) candidates.push(current);
-    return candidates.sort((left, right) => left.title.localeCompare(right.title, "es"));
-  }, [draft, editingId, items, linkableVideos]);
-
   const {
     hasMorePublications,
     loadMorePublications,
-    publicationCount,
     publicationIndexBusy,
     publicationIndexError,
     visibleItems,
@@ -981,6 +964,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
     query,
     statusFilter,
   });
+  const launchVisibleItems = visibleItems.filter((current) => current.kind !== "video");
 
   const editable =
     Boolean(draft) &&
@@ -1099,14 +1083,13 @@ export function ContentStudio({ initialWorkspace }: Props) {
     }
   }
 
-  function create(kind: ContentKind = "video") {
+  function create(kind: ContentKind = "guide") {
     if (busy) return;
     if (!confirmDiscard()) return;
     guideReturnRef.current = null;
     if (kind === "guide") {
       guideChoiceTriggerRef.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setLinkedVideoId("");
       setGuideCreateOpen(true);
       return;
     }
@@ -1978,8 +1961,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
           <div className="studio-kind-filters" role="group" aria-label="Filtrar por tipo">
             {([
               { label: "Todo", value: "all" },
-              { label: "Videos", value: "video" },
               { label: "Guías", value: "guide" },
+              { label: "Cuestionarios", value: "quiz" },
+              { label: "Flashcards", value: "flashcards" },
               { label: "Temas", value: "topic" },
             ] as const).map((option) => (
               <button
@@ -2002,8 +1986,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
             onChange={(event) => setKindFilter(event.target.value as "all" | ContentKind)}
           >
             <option value="all">Todos los tipos</option>
-            <option value="video">Videos</option>
             <option value="guide">Guías</option>
+            <option value="quiz">Cuestionarios</option>
+            <option value="flashcards">Flashcards</option>
             <option value="topic">Temas</option>
           </select>
         </label>
@@ -2027,7 +2012,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
           <header className="studio-publications-heading">
             <div>
               <strong>Publicaciones</strong>
-              <small>{publicationCount}</small>
             </div>
             <button
               aria-controls="studio-publications"
@@ -2040,7 +2024,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
               {publicationsCollapsed ? <CaretRight size={17} /> : <CaretLeft size={17} />}
             </button>
           </header>
-          {visibleItems.map((current) => {
+          {launchVisibleItems.map((current) => {
             const ItemIcon = kindIcons[current.kind];
             return (
               <button
@@ -2065,10 +2049,10 @@ export function ContentStudio({ initialWorkspace }: Props) {
               </button>
             );
           })}
-          {publicationIndexBusy && visibleItems.length === 0 && (
+          {publicationIndexBusy && launchVisibleItems.length === 0 && (
             <p className="studio-empty">Buscando publicaciones…</p>
           )}
-          {!publicationIndexBusy && visibleItems.length === 0 && (
+          {!publicationIndexBusy && launchVisibleItems.length === 0 && (
             <p className="studio-empty">No hay contenido con estos filtros.</p>
           )}
           {publicationIndexError && (
@@ -2435,28 +2419,6 @@ export function ContentStudio({ initialWorkspace }: Props) {
                           } as ContentDraft)
                         }
                       />
-                      {draft.kind === "guide" && (
-                        <label className="studio-field studio-field-wide studio-linked-video-field">
-                          <span>Video relacionado</span>
-                          <select
-                            value={draft.content.linkedVideoId ?? ""}
-                            onChange={(event) => setDraft({
-                              ...draft,
-                              content: {
-                                ...draft.content,
-                                linkedVideoId: event.target.value || null,
-                              },
-                            })}
-                          >
-                            <option value="">Sin video relacionado</option>
-                            {guideVideoOptions.map((video) => (
-                              <option key={video.id} value={video.id}>
-                                {video.title} · {labelOf(statuses, video.status)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
                     </div>
                   </section>
 
@@ -2563,7 +2525,7 @@ export function ContentStudio({ initialWorkspace }: Props) {
               <div>
                 <small>Nueva guía</small>
                 <h3 id="guide-choice-title">¿Dónde se publicará?</h3>
-                <p id="guide-choice-description">Puedes crear una guía independiente o convertirla en la guía principal de un video.</p>
+                <p id="guide-choice-description">Crea una guía de estudio para compartirla en el catálogo.</p>
               </div>
               <button aria-label="Cerrar" type="button" onClick={closeGuideCreationChoice}><X size={18} /></button>
             </header>
@@ -2576,32 +2538,9 @@ export function ContentStudio({ initialWorkspace }: Props) {
               >
                 <span><Notebook size={22} /></span>
                 <strong>Guía independiente</strong>
-                <small>Se mostrará en el catálogo de guías sin depender de un video.</small>
+                <small>Se mostrará en el catálogo de guías.</small>
                 <CaretRight size={18} />
               </button>
-              <div className="studio-guide-choice-card studio-guide-choice-linked">
-                <span><PlayCircle size={22} /></span>
-                <strong>Guía principal de un video</strong>
-                <small>Se administrará desde el editor de guía y recursos del video elegido.</small>
-                <label>
-                  <span className="sr-only">Video relacionado</span>
-                  <select value={linkedVideoId} onChange={(event) => setLinkedVideoId(event.target.value)}>
-                    <option value="">
-                      {guideCreationVideos.length > 0
-                        ? "Selecciona un video…"
-                        : "No hay videos sin guía enlazada"}
-                    </option>
-                    {guideCreationVideos.map((video) => (
-                      <option key={video.id} value={video.id}>
-                        {video.title} · {labelOf(statuses, video.status)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button disabled={!linkedVideoId} type="button" onClick={() => void beginGuideCreation(linkedVideoId)}>
-                  Continuar <CaretRight size={16} />
-                </button>
-              </div>
             </div>
             <button className="studio-guide-choice-cancel" type="button" onClick={closeGuideCreationChoice}>
               <ArrowLeft size={16} /> Cancelar

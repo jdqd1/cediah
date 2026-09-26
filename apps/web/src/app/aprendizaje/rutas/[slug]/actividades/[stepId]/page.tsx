@@ -22,7 +22,7 @@ export default async function LearningActivityPage({
   const step = pathResult.path.version.units.flatMap((unit) => unit.steps)
     .find((entry) => entry.id === stepId);
   const option = step?.options.find((entry) => entry.id === query.opcion);
-  if (!step || !option) notFound();
+  if (!step || !option || option.projection === "video") notFound();
 
   const progressResult = await getLearningProgress(pathResult.path.enrollment.id);
   if (progressResult.status !== "ready") {

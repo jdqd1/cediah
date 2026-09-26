@@ -31,13 +31,17 @@ const evidenceLabels = {
 } as const;
 
 export function LearningPathScreen({ path, progress, upgrade, focusUnit }: { path: LearningPathDetail; progress: LearningEnrollmentProgress | null; upgrade: LearningEnrollmentUpgradePreviewResponse | null; focusUnit?: string }) {
+  const visibleUnits = path.version.units.map((unit) => ({
+    ...unit,
+    steps: unit.steps.filter((step) => step.options.some((option) => option.projection !== "video")),
+  })).filter((unit) => unit.steps.length > 0);
   const progressByStep = new Map(progress?.units.flatMap((unit) => unit.steps).map((step) => [step.stepId, step]) ?? []);
   const progressByUnit = new Map(progress?.units.map((unit) => [unit.id, unit]) ?? []);
-  const minutes = path.version.units.flatMap((unit) => unit.steps).reduce((sum, step) => {
-    const selected = step.options.find((option) => option.isDefault) ?? step.options[0];
+  const minutes = visibleUnits.flatMap((unit) => unit.steps).reduce((sum, step) => {
+    const selected = step.options.find((option) => option.isDefault && option.projection !== "video") ?? step.options.find((option) => option.projection !== "video");
     return sum + (selected?.estimatedMinutes ?? 0);
   }, 0);
-  const currentUnitIndex = Math.max(0, path.version.units.findIndex((unit) => {
+  const currentUnitIndex = Math.max(0, visibleUnits.findIndex((unit) => {
     const state = progressByUnit.get(unit.id);
     return !state || state.completedEssentialSteps < state.totalEssentialSteps;
   }));
@@ -61,7 +65,7 @@ export function LearningPathScreen({ path, progress, upgrade, focusUnit }: { pat
           <h1>{path.title}</h1>
           <p>{path.summary}</p>
           <div className="learning-path-facts">
-            <span><CheckCircle aria-hidden="true" size={19} />{path.version.units.length} {path.version.units.length === 1 ? "unidad" : "unidades"}</span>
+            <span><CheckCircle aria-hidden="true" size={19} />{visibleUnits.length} {visibleUnits.length === 1 ? "unidad" : "unidades"}</span>
             {minutes > 0 ? <span><Clock aria-hidden="true" size={19} />{minutes} min orientativos</span> : null}
           </div>
           <LearningEnrollmentActions enrollment={path.enrollment} pathId={path.id} />
@@ -75,7 +79,7 @@ export function LearningPathScreen({ path, progress, upgrade, focusUnit }: { pat
       <section aria-labelledby="learning-map-title" className="learning-route-map">
         <div className="learning-section-heading"><div><span>Mapa de la ruta</span><h2 id="learning-map-title">Todas las unidades están a tu alcance</h2></div><p>El orden es una recomendación, no un bloqueo.</p></div>
         <div className="learning-unit-list">
-          {path.version.units.map((unit, index) => {
+          {visibleUnits.map((unit, index) => {
             const unitProgress = progressByUnit.get(unit.id);
             const completed = Boolean(unitProgress && unitProgress.totalEssentialSteps > 0 && unitProgress.completedEssentialSteps === unitProgress.totalEssentialSteps);
             const active = !completed && index === currentUnitIndex;
@@ -97,7 +101,7 @@ export function LearningPathScreen({ path, progress, upgrade, focusUnit }: { pat
                   <li data-state={stepProgress?.state ?? "not_started"} key={step.id}>
                     <div className="learning-step-heading"><span>{stepProgress?.state === "completed" ? "Completada" : stepProgress?.state === "in_progress" ? "En progreso" : stepProgress?.state === "skipped" ? "Omitida, no completada" : step.isEssential ? "Esencial" : "Opcional"}</span><h3>{step.title}</h3>{path.enrollment && stepProgress?.state !== "completed" ? <LearningStepPreference enrollmentId={path.enrollment.id} rowVersion={stepProgress?.rowVersion ?? 0} skipped={stepProgress?.state === "skipped"} stepId={step.id} /> : null}</div>
                     <div className="learning-option-list">
-                      {step.options.map((option) => {
+                      {step.options.filter((option) => option.projection !== "video").map((option) => {
                         const Icon = projectionIcons[option.projection];
                         const href = `/aprendizaje/rutas/${path.slug}/actividades/${step.id}?opcion=${option.id}`;
                         return path.enrollment ? (

@@ -798,16 +798,40 @@ export function createPostgresContentProvider(
       return hydrateRows(database, rows);
     },
 
+    async getLastReadGuide(userId) {
+      const row = await database
+        .selectFrom("user_recent_guides")
+        .innerJoin("content_items", "content_items.id", "user_recent_guides.content_item_id")
+        .selectAll("content_items")
+        .where("user_recent_guides.user_id", "=", userId)
+        .where("content_items.kind", "=", "guide")
+        .where("content_items.status", "=", "published")
+        .where("content_items.catalog_visibility", "=", "catalog")
+        .orderBy("user_recent_guides.read_at", "desc")
+        .limit(1)
+        .executeTakeFirst();
+      return row ? (await hydrateRows(database, [row]))[0] ?? null : null;
+    },
+
     async recordView(input) {
       return database.transaction().execute(async (transaction) => {
         const item = await transaction.selectFrom("content_items")
-          .select("id")
+          .select(["id", "kind"])
           .where("id", "=", input.contentId)
           .where("status", "=", "published")
           .where("catalog_visibility", "=", "catalog")
           .forShare()
           .executeTakeFirst();
         if (!item) return { status: "not_found" };
+
+        if (item.kind === "guide" && input.userId) {
+          await transaction.insertInto("user_recent_guides")
+            .values({ user_id: input.userId, content_item_id: item.id })
+            .onConflict((conflict) => conflict.columns(["user_id", "content_item_id"]).doUpdateSet({
+              read_at: sql<Date>`now()`,
+            }))
+            .execute();
+        }
 
         const receipt = await transaction.insertInto("content_view_receipts")
           .values({ content_item_id: item.id, viewer_key: input.viewerKey })

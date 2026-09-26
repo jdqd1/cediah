@@ -127,10 +127,10 @@ export function ActivityOptions({
 
         <div className={styles.optionsHeading}>
           <div><h4>Materiales y alternativas</h4><p>El estudiante elige una opción para completar esta misma actividad.</p></div>
-          <FieldHelp family="alternatives" label="Alternativas equivalentes" onOpenFamilyChange={onHelpChange} openFamily={openHelp}>Combina video con guía, o cuestionario con tarjetas. Para cambiar entre explicación y práctica, crea otra actividad.</FieldHelp>
+          <FieldHelp family="alternatives" label="Alternativas equivalentes" onOpenFamilyChange={onHelpChange} openFamily={openHelp}>Combina cuestionarios con tarjetas o distintas guías. Para cambiar entre explicación y práctica, crea otra actividad.</FieldHelp>
         </div>
         <div className={styles.optionCards}>
-          {activity.options.map((option, optionIndex) => (
+          {activity.options.filter((option) => option.projection !== "video").map((option, optionIndex) => (
             <OptionEditor
               activity={activity}
               disabled={disabled}
@@ -146,7 +146,7 @@ export function ActivityOptions({
               unitId={unitId}
             />
           ))}
-          {activity.options.length === 0 ? <p className={styles.inlineMessage}>Esta actividad no tiene material. Elige uno antes de comprobar la ruta.</p> : null}
+          {activity.options.every((option) => option.projection === "video") ? <p className={styles.inlineMessage}>Esta actividad no tiene material disponible. Elige uno antes de comprobar la ruta.</p> : null}
         </div>
         <button className={styles.secondaryButton} disabled={disabled || activity.options.length >= 12} onClick={onAddAlternative} type="button"><Plus aria-hidden size={18} /> Añadir otra forma de completar esta actividad</button>
       </Collapsible.Content>

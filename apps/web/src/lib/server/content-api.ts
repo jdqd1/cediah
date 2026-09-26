@@ -49,6 +49,10 @@ export type PublishedContentItemResult =
   | { item: ContentItem; status: "ready" }
   | { status: "not_found" | "unavailable" };
 
+export type LastReadGuideResult =
+  | { guide: ContentItem | null; status: "ready" }
+  | { status: "unavailable" };
+
 export type ContentWorkspaceResult =
   | { status: "anonymous" }
   | { status: "forbidden" }
@@ -283,6 +287,23 @@ export async function getPublishedContentItem(
   const item = ContentItemSchema.safeParse(response.body);
   return item.success
     ? { item: item.data, status: "ready" }
+    : { status: "unavailable" };
+}
+
+export async function getLastReadGuide(): Promise<LastReadGuideResult> {
+  const session = await getApiRequestCookie();
+  if (session.status === "anonymous") return { guide: null, status: "ready" };
+  const response = await requestContentApi({
+    cookie: session.cookie,
+    method: "GET",
+    path: "/v1/me/last-read-guide",
+  });
+  if (response.status !== 200 || !response.body || typeof response.body !== "object" || !("guide" in response.body)) {
+    return { status: "unavailable" };
+  }
+  const parsed = ContentItemSchema.nullable().safeParse(response.body.guide);
+  return parsed.success && (parsed.data === null || parsed.data.kind === "guide")
+    ? { guide: parsed.data, status: "ready" }
     : { status: "unavailable" };
 }
 

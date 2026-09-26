@@ -1,10 +1,8 @@
 import { notFound } from "next/navigation";
 import { ContentDetailScreen } from "@/components/content-detail-screen";
-import { findVideoLinkedGuide } from "@/lib/content-guide-links";
 import { projectPracticeContent } from "@/lib/content-practice-links";
 import { isStudyContentKind, subjectContentHref } from "@/lib/content-navigation";
 import {
-  getPublishedContent,
   getPublishedContentItem,
   getSubjects,
 } from "@/lib/server/content-api";
@@ -31,6 +29,7 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
   ]);
 
   if (result.status === "ready") {
+    if (result.item.kind === "video") notFound();
     const requestedSubject = firstSearchValue(query.asignatura)?.trim();
     const subjects = subjectsResult.status === "ready" ? subjectsResult.subjects : [];
     const subject = subjects.find((current) => current.slug === requestedSubject) ??
@@ -52,14 +51,8 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
       : subject
         ? `Volver a ${subject.name}`
         : "Volver a materias";
-    const linkedGuideResult = result.item.kind === "video"
-      ? await getPublishedContent({ kind: "guide", linkedVideoId: result.item.id, limit: 100 })
-      : null;
-    const linkedGuide = linkedGuideResult?.status === "ready"
-      ? findVideoLinkedGuide(linkedGuideResult.catalog.items, result.item.id)
-      : undefined;
     const practiceKind = kind === "quiz" || kind === "flashcards" ? kind : undefined;
-    const item = practiceKind ? projectPracticeContent(result.item, practiceKind, linkedGuide) : result.item;
+    const item = practiceKind ? projectPracticeContent(result.item, practiceKind) : result.item;
     if (!item) notFound();
     const guidedSources = [...new Set([result.item.id, item.id])];
     const guidedResults = item.kind === "topic" ? [] : await Promise.all(
@@ -76,7 +69,6 @@ export default async function ContentPage({ params, searchParams }: ContentPageP
         item={item}
         trackView={item.kind === result.item.kind}
         isAdministrator={isAdministrator}
-        linkedGuide={linkedGuide}
         returnHref={returnHref}
         returnLabel={returnLabel}
       />

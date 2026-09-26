@@ -1,22 +1,22 @@
 import { DashboardScreen } from "@/components/dashboard-screen";
-import { getPublishedContent } from "@/lib/server/content-api";
+import { getLastReadGuide, getPublishedContent } from "@/lib/server/content-api";
 import { getCurrentUser } from "@/lib/server/current-user";
 import { getLearningHome } from "@/lib/server/guided-learning-api";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const resultPromise = getPublishedContent({ limit: 100 });
-  const recentPromise = getPublishedContent({ kind: "video", limit: 4 });
-  const highlightedPromise = getPublishedContent({ kind: "video", sort: "views", limit: 8 });
+  const recentPromise = getPublishedContent({ kind: "guide", limit: 5 });
   const current = await getCurrentUser();
+  const lastReadPromise = current.status === "authenticated"
+    ? getLastReadGuide()
+    : Promise.resolve({ guide: null, status: "ready" } as const);
   const learningPromise = current.status === "authenticated" && current.features.guidedLearning
     ? getLearningHome()
     : Promise.resolve(null);
-  const [result, recent, highlighted, learning] = await Promise.all([
-    resultPromise,
+  const [recent, lastRead, learning] = await Promise.all([
     recentPromise,
-    highlightedPromise,
+    lastReadPromise,
     learningPromise,
   ]);
   let isAdministrator = false;
@@ -26,10 +26,10 @@ export default async function DashboardPage() {
 
   return (
     <DashboardScreen
-      available={result.status === "ready"}
-      items={result.status === "ready" ? result.catalog.items : []}
+      available={recent.status === "ready"}
       recentItems={recent.status === "ready" ? recent.catalog.items : []}
-      highlightedItems={highlighted.status === "ready" ? highlighted.catalog.items : []}
+      lastReadGuide={lastRead.status === "ready" ? lastRead.guide : null}
+      lastReadAvailable={lastRead.status === "ready"}
       guidedLearningEnabled={current.status === "authenticated" && current.features.guidedLearning}
       isAdministrator={isAdministrator}
       learningHome={learning?.status === "ready" ? learning.home : null}

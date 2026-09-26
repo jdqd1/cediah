@@ -12,7 +12,7 @@ export function BrandPlatformPreview({ className = "" }: BrandPlatformPreviewPro
           <Image src="/brand/koras-mark-dark.png" alt="" width={1254} height={1254} />
           <span className="is-active"><i /> Inicio</span>
           <span><i /> Materias</span>
-          <span><i /> Videos</span>
+          <span><i /> Rutas</span>
           <span><i /> Guías</span>
         </div>
 

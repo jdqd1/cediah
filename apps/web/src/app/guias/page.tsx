@@ -13,7 +13,7 @@ export default async function GuidesPage() {
   ]);
   const guides =
     result.status === "ready"
-      ? getStudySummaryCatalog(result.catalog.items, "guide")
+      ? getStudySummaryCatalog(result.catalog.items.filter((item) => item.kind !== "video"), "guide")
       : [];
 
   return (

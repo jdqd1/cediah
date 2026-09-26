@@ -58,7 +58,8 @@ export function ActivityCard({
   const focusRegistry = useEditorFocusRegistry();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const removeButtonRef = useRef<HTMLButtonElement>(null);
-  const recommended = activity.options.find((option) => option.isDefault) ?? activity.options[0];
+  const recommended = activity.options.find((option) => option.isDefault && option.projection !== "video")
+    ?? activity.options.find((option) => option.projection !== "video");
   const Icon = recommended ? formatIcons[recommended.projection] : BookOpen;
 
   return (

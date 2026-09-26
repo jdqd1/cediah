@@ -555,6 +555,11 @@ export interface CediahDatabase {
     viewer_key: string;
     last_viewed_at: GeneratedTimestamp;
   };
+  user_recent_guides: {
+    user_id: string;
+    content_item_id: string;
+    read_at: GeneratedTimestamp;
+  };
   audit_log: AuditLogTable;
   auth_accounts: AuthAccountTable;
   auth_rate_limits: AuthRateLimitTable;

@@ -13,6 +13,7 @@ import {
 import type { GuideTermManifest } from "@/lib/guide-terms";
 import { sectionsToRichTextDocument } from "@/lib/guide-document";
 import { normalizeMarkdownHighlights } from "@/lib/guide-markdown";
+import { useContentView } from "@/lib/use-content-view";
 import { AppShell } from "./app-shell";
 import { GuideTermProvider } from "./guide-term-context";
 import { RichTextRenderer } from "./rich-text-renderer";
@@ -70,6 +71,7 @@ export function GuideSplitView({
   related: GuideItem;
   relatedManifest: GuideTermManifest | null;
 }) {
+  useContentView(primary.id);
   const [left, setLeft] = useState<Panel | null>({
     item: primary,
     manifest: primaryManifest,

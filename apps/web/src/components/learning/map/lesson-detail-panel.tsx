@@ -103,8 +103,12 @@ export function LessonDetailPanel({
     (a) => a.id === level?.nextActivity?.stepId,
   );
   const recommendedOption = recommended?.options.find(
-    (o) => o.id === level?.nextActivity?.optionId,
+    (o) => o.id === level?.nextActivity?.optionId && o.projection !== "video",
   );
+  const visibleActivities = lesson.activities.map((activity) => ({
+    ...activity,
+    options: activity.options.filter((option) => option.projection !== "video"),
+  })).filter((activity) => activity.options.length > 0);
   return (
     <aside className={styles.panel} aria-label={`Lección ${lesson.title}`}>
       <header className={styles.panelHeader}>
@@ -151,7 +155,7 @@ export function LessonDetailPanel({
       <div className={styles.panelScroll} role="tabpanel">
         {tab === "activities" ? (
           <ol className={styles.roadmap}>
-            {lesson.activities.map((a, i) => (
+            {visibleActivities.map((a, i) => (
               <li key={a.id}>
                 <span className={styles.stepNumber}>
                   {a.state === "completed" ? "✓" : i + 1}
@@ -198,7 +202,7 @@ export function LessonDetailPanel({
               Formatos disponibles para esta lección. Cada alternativa conserva
               el mismo paso académico.
             </p>
-            {lesson.activities.flatMap((a) =>
+            {visibleActivities.flatMap((a) =>
               a.options.map((o) => (
                 <div className={styles.suggestion} key={o.id}>
                   <div>
@@ -218,7 +222,7 @@ export function LessonDetailPanel({
                 </div>
               )),
             )}
-            {!lesson.activities.some((a) => a.options.length) ? (
+            {!visibleActivities.some((a) => a.options.length) ? (
               <p>No hay recursos disponibles.</p>
             ) : null}
           </>

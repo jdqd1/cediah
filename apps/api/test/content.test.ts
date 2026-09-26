@@ -266,9 +266,29 @@ describe("content API", () => {
       await app.inject({ method: "POST", url, headers: auth("student-token") });
       await app.inject({ method: "POST", url: `/v1/content/${linkedVideoId}/views`, headers: auth("student-token") });
       expect(calls[0]?.viewerKey).toMatch(/^[a-f0-9]{64}$/);
+      expect(calls[0]).toHaveProperty("userId", users.student.id);
       expect(calls[0]).toEqual(calls[1]);
       expect(calls[2]?.viewerKey).not.toBe(calls[0]?.viewerKey);
       expect(calls[0]).not.toHaveProperty("viewCount");
+    } finally { await app.close(); }
+  });
+
+  it("returns only the authenticated reader's last published guide", async () => {
+    const calls: string[] = [];
+    const publishedGuide = guideItem({ status: "published", publishedAt });
+    const app = await buildApp(testEnvironment, {
+      identityProvider: identityProvider(),
+      contentProvider: contentProvider([], {
+        getLastReadGuide: async (userId) => { calls.push(userId); return publishedGuide; },
+      }),
+    });
+    try {
+      expect((await app.inject({ url: "/v1/me/last-read-guide" })).statusCode).toBe(401);
+      const response = await app.inject({ url: "/v1/me/last-read-guide", headers: auth("student-token") });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+      expect(response.json().guide).toMatchObject({ id: contentId, kind: "guide", title: "Thorax guide" });
+      expect(calls).toEqual([users.student.id]);
     } finally { await app.close(); }
   });
 

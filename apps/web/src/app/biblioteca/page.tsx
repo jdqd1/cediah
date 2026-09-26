@@ -16,7 +16,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const requestedKind = Array.isArray(params.tipo) ? params.tipo[0] : params.tipo;
   const requestedTopic = Array.isArray(params.tema) ? params.tema[0] : params.tema;
   const requestedSubject = Array.isArray(params.asignatura) ? params.asignatura[0] : params.asignatura;
-  const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
+  const kind = isStudyContentKind(requestedKind) && requestedKind !== "video" ? requestedKind : undefined;
   const subject = requestedSubject?.trim();
   const topic = requestedTopic?.trim();
 

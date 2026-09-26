@@ -9,7 +9,6 @@ import {
   Compass,
   MagnifyingGlass,
   Notebook,
-  PlayCircle,
   X,
 } from "@phosphor-icons/react";
 import type { StudyCatalogItem, Subject } from "@cediah/contracts";
@@ -32,10 +31,9 @@ import { IconBackLink } from "./compact-navigation";
 import { ContentResourceList } from "./content-resource-list";
 
 const sectionDefinitions: Array<{
-  icon: typeof PlayCircle;
+  icon: typeof Notebook;
   kind: StudyContentKind;
 }> = [
-  { icon: PlayCircle, kind: "video" },
   { icon: Notebook, kind: "guide" },
   { icon: CardsThree, kind: "flashcards" },
   { icon: ClipboardText, kind: "quiz" },
@@ -108,11 +106,11 @@ export function SubjectDetailScreen({
     initialContentOrder?.topicOrder ?? [],
   );
   const requestedKind = searchParams.get("tipo");
-  const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
+  const kind = isStudyContentKind(requestedKind) && requestedKind !== "video" ? requestedKind : undefined;
   const topic = searchParams.get("tema")?.trim() ?? "";
   const searching = Boolean(search.trim());
   const catalogs = useMemo(() => Object.fromEntries(
-    sectionDefinitions.map(({ kind }) => [kind, getSubjectStudySummaryCatalog(items, kind, subject.id)]),
+    sectionDefinitions.map(({ kind }) => [kind, getSubjectStudySummaryCatalog(items.filter((item) => item.kind !== "video"), kind, subject.id)]),
   ) as Record<StudyContentKind, StudyCatalogItem[]>, [items, subject.id]);
   const kindItems = useMemo(
     () => kind ? catalogs[kind] : [],

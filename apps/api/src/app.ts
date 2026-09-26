@@ -654,12 +654,26 @@ export async function buildApp(
       const viewerKey = createHmac("sha256", environment.auth.secret)
         .update(`content-view:${params.data.contentId}:${viewer.user.id}`)
         .digest("hex");
-      const result = await contentProvider.recordView({ contentId: params.data.contentId, viewerKey });
+      const result = await contentProvider.recordView({ contentId: params.data.contentId, viewerKey, userId: viewer.user.id });
       if (result.status !== "success") return reply.status(404).send({ error: "not_found" });
       return reply.send(result.value);
     } catch {
       request.log.error("Content-view recording failed");
       return reply.status(503).send({ error: "views_unavailable" });
+    }
+  });
+
+  app.get("/v1/me/last-read-guide", async (request, reply) => {
+    reply.header("Cache-Control", "private, no-store");
+    const viewer = await resolveRequestUser(toIdentityRequest(request.headers), identityProvider);
+    if (viewer.kind !== "authenticated") return sendUserResolutionError(viewer, reply);
+    if (!contentProvider?.getLastReadGuide) return reply.status(503).send({ error: "content_unavailable" });
+    try {
+      const guide = await contentProvider.getLastReadGuide(viewer.user.id);
+      return reply.send({ guide: guide ? ContentItemSchema.parse(guide) : null });
+    } catch {
+      request.log.error("Last-read guide request failed");
+      return reply.status(503).send({ error: "content_unavailable" });
     }
   });
 

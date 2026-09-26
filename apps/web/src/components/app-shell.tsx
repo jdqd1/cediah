@@ -4,14 +4,12 @@ import {
   Bell,
   BookOpen,
   CardsThree,
-  CheckSquareOffset,
   ClipboardText,
   House,
   GraduationCap,
   Path,
   List,
   Notebook,
-  PlayCircle,
   PencilSimpleLine,
   UserCircle,
   ShieldCheck,
@@ -61,16 +59,14 @@ export function PersistentAppShell({ children, guidedLearningEnabled = false, vi
     : pathname.startsWith("/panel") ? "editor"
       : pathname.startsWith("/aprendizaje") ? "learning"
       : pathname.startsWith("/guias") ? "guides"
-        : pathname.startsWith("/contenido") ? kind === "guide" ? "guides" : kind ?? "video"
+        : pathname.startsWith("/contenido") ? kind === "guide" ? "guides" : kind ?? "subjects"
           : pathname.startsWith("/asignaturas") ? kind === "guide" ? "guides" : kind ?? "subjects"
-            : pathname.startsWith("/clases") ? "video"
-              : pathname.startsWith("/cursos") ? "courses"
-              : "dashboard";
+            : "dashboard";
   const visibleMainNavigation = getMainNavigation(guidedLearningEnabled);
   const title = [...visibleMainNavigation, ...studyNavigation].find((item) => item.key === activeKey)?.label ?? "Koras";
   return (
     <PersistentShellContext.Provider value={true}>
-      <ShellChrome activeKey={activeKey} guidedLearningEnabled={guidedLearningEnabled} headerTitle={title} includeCourses={activeKey === "courses"} viewer={viewer} profilePending={profilePending}>
+      <ShellChrome activeKey={activeKey} guidedLearningEnabled={guidedLearningEnabled} headerTitle={title} viewer={viewer} profilePending={profilePending}>
         {children}
       </ShellChrome>
     </PersistentShellContext.Provider>
@@ -101,7 +97,6 @@ function getMainNavigation(guidedLearningEnabled: boolean): NavItem[] {
 }
 
 const studyNavigation: NavItem[] = [
-  { key: "video", label: "Videos", href: "/asignaturas?tipo=video", icon: PlayCircle },
   { key: "guides", label: "Guías", href: "/guias", icon: Notebook },
   { key: "flashcards", label: "Flashcards", href: "/asignaturas?tipo=flashcards", icon: CardsThree },
   { key: "quiz", label: "Cuestionarios", href: "/asignaturas?tipo=quiz", icon: ClipboardText },
@@ -209,7 +204,6 @@ function ShellChrome({
   headerSubtitle,
   headerTitle,
   guidedLearningEnabled = false,
-  includeCourses = false,
   profilePending = false,
   welcome = false,
 }: AppShellProps) {
@@ -404,13 +398,6 @@ function ShellChrome({
             />
 
 
-            {includeCourses && (
-              <NavigationItem
-                item={{ key: "courses", label: "Mis cursos", href: "/cursos", icon: CheckSquareOffset }}
-                activeKey={activeKey}
-                onNavigate={closeSidebar}
-              />
-            )}
             {administrationItems.length > 0 && (
               <NavigationGroup
                 activeKey={activeKey}

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { ContentItem } from "@cediah/contracts";
 import { AppShell } from "@/components/app-shell";
 import { DashboardScreen } from "@/components/dashboard-screen";
 import { LearningCompletionPanel } from "@/components/learning/activities/learning-completion-panel";
@@ -19,6 +20,31 @@ import {
 } from "@/components/learning/learning-visual-fixtures";
 
 export const dynamic = "force-dynamic";
+
+const dashboardGuides: ContentItem[] = [
+  ["Ventilación alveolar", "Fisiología", "Comprende el intercambio de gases y los factores que modifican la ventilación."],
+  ["Músculos del compartimento anterior", "Anatomía", "Origen, inserción y relaciones anatómicas para un repaso claro."],
+  ["Potenciales de acción", "Fisiología", "Repasa las fases y los canales que sostienen la excitabilidad celular."],
+  ["Tejido epitelial", "Histología", "Reconoce sus tipos, funciones y características microscópicas."],
+  ["Ciclo cardíaco", "Cardiología", "Relaciona presiones, válvulas y eventos eléctricos durante cada fase."],
+].map(([title, topic, summary], index) => ({
+  asset: null,
+  authorUserId: "a1000000-0000-4000-8000-000000000001",
+  content: { document: null, keyPoints: [], linkedVideoId: null, quiz: { questions: [] }, regions: [], sections: [] },
+  createdAt: `2026-09-${String(20 + index).padStart(2, "0")}T12:00:00.000Z`,
+  estimatedMinutes: 8 + index * 2,
+  featured: false,
+  id: `a1000000-0000-4000-8000-${String(100 + index).padStart(12, "0")}`,
+  kind: "guide" as const,
+  publishedAt: `2026-09-${String(20 + index).padStart(2, "0")}T12:00:00.000Z`,
+  slug: `guia-visual-${index + 1}`,
+  status: "published" as const,
+  subjectIds: [],
+  summary: summary!,
+  title: title!,
+  topic: topic!,
+  updatedAt: `2026-09-${String(20 + index).padStart(2, "0")}T12:00:00.000Z`,
+}));
 
 const supportedModes = new Set([
   "complete",
@@ -62,7 +88,8 @@ export default async function LearningVisualFixturePage({ searchParams }: {
       <DashboardScreen
         available
         guidedLearningEnabled
-        items={[]}
+        lastReadGuide={dashboardGuides[1]}
+        recentItems={dashboardGuides}
         learningHome={mode === "dashboard-empty" ? learningVisualNewHome : mode === "dashboard-error" ? null : learningVisualHome}
         learningHomeAvailable={mode !== "dashboard-error"}
         viewer={{ email: "estudiante.visual@example.test" }}

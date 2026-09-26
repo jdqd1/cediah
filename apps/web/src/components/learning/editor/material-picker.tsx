@@ -97,7 +97,11 @@ export function MaterialPicker({
     : null;
   const allowedProjections = useMemo(() => selectedResource?.projections
     .map((projection) => projection.projection)
-    .filter((projection) => !allowedFamily || projectionFamily(projection) === allowedFamily) ?? [], [allowedFamily, selectedResource]);
+    .filter((projection) => projection !== "video" && (!allowedFamily || projectionFamily(projection) === allowedFamily)) ?? [], [allowedFamily, selectedResource]);
+  const visibleResources = catalog.resources.filter((resource) =>
+    resource.projections.some((projection) => projection.projection !== "video" &&
+      (!allowedFamily || projectionFamily(projection.projection) === allowedFamily)),
+  );
   const detail = catalog.detail.data;
   const readyDetail = detail?.status === "ready" ? detail : null;
   const canConfirm = Boolean(readyDetail && selectedObjectiveIds.length > 0);
@@ -111,7 +115,7 @@ export function MaterialPicker({
     const resource = catalog.resources.find((entry) => entry.id === resourceId);
     const projections = resource?.projections
       .map((projection) => projection.projection)
-      .filter((projection) => !allowedFamily || projectionFamily(projection) === allowedFamily) ?? [];
+      .filter((projection) => projection !== "video" && (!allowedFamily || projectionFamily(projection) === allowedFamily)) ?? [];
     setSelectedResourceId(resourceId);
     setSelectedProjection(projections.length === 1 ? projections[0]! : "");
   }
@@ -155,7 +159,7 @@ export function MaterialPicker({
                 <span>Formato</span>
                 <select onChange={(event) => catalog.setFilterDraft((filters) => ({ ...filters, projection: event.target.value as typeof filters.projection }))} value={catalog.filterDraft.projection}>
                   <option value="">Todos</option>
-                  {Object.entries(formatLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {Object.entries(formatLabels).filter(([value]) => value !== "video").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </label>
               <label className={styles.field}>
@@ -176,7 +180,7 @@ export function MaterialPicker({
               <div className={styles.pickerMessage}><strong>No pudimos consultar los materiales.</strong><button className={styles.textButton} onClick={() => void catalog.catalog.refetch()} type="button">Reintentar</button></div>
             ) : catalog.catalog.isPending ? (
               <p className={styles.pickerMessage}>Buscando materiales publicados…</p>
-            ) : catalog.resources.length === 0 ? (
+            ) : visibleResources.length === 0 ? (
               <div className={styles.pickerMessage}>
                 {catalog.appliedFilters.q || catalog.appliedFilters.projection || catalog.appliedFilters.topic ? (
                   <><strong>No encontramos materiales con estos filtros.</strong><p>Prueba otro título o quita los filtros.</p><button className={styles.textButton} onClick={() => { setSelectedResourceId(null); setSelectedProjection(""); catalog.clearFilters(); }} type="button">Limpiar filtros</button></>
@@ -186,8 +190,8 @@ export function MaterialPicker({
               </div>
             ) : (
               <ul className={styles.materialList}>
-                {catalog.resources.map((resource) => {
-                  const projections = resource.projections.filter((projection) => !allowedFamily || projectionFamily(projection.projection) === allowedFamily);
+                {visibleResources.map((resource) => {
+                  const projections = resource.projections.filter((projection) => projection.projection !== "video" && (!allowedFamily || projectionFamily(projection.projection) === allowedFamily));
                   if (projections.length === 0) return null;
                   const selected = resource.id === selectedResourceId;
                   return (

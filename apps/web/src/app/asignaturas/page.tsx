@@ -13,12 +13,12 @@ type SubjectsPageProps = {
 export default async function SubjectsPage({ searchParams }: SubjectsPageProps) {
   const params = await searchParams;
   const requestedKind = Array.isArray(params.tipo) ? params.tipo[0] : params.tipo;
-  const kind = isStudyContentKind(requestedKind) ? requestedKind : undefined;
+  const kind = isStudyContentKind(requestedKind) && requestedKind !== "video" ? requestedKind : undefined;
   const [result, isAdministrator, contentResult] = await Promise.all([
     getSubjects(),
     currentUserIsAdministrator(),
     kind
-      ? getPublishedStudyCatalog({ kind: kind === "video" ? kind : undefined, limit: 1_000 })
+      ? getPublishedStudyCatalog({ kind, limit: 1_000 })
       : Promise.resolve(null),
   ]);
 
@@ -28,7 +28,7 @@ export default async function SubjectsPage({ searchParams }: SubjectsPageProps) 
       initialKind={kind}
       isAdministrator={isAdministrator}
       items={contentResult?.status === "ready" && kind
-        ? getStudySummaryCatalog(contentResult.catalog.items, kind)
+        ? getStudySummaryCatalog(contentResult.catalog.items.filter((item) => item.kind !== "video"), kind)
         : []}
       subjects={result.status === "ready" ? result.subjects : []}
     />

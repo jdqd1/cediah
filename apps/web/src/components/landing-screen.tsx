@@ -13,18 +13,15 @@ import {
   ImagesSquare,
   InstagramLogo,
   Lightning,
-  MonitorPlay,
   Sparkle,
-  TiktokLogo,
   X,
-  YoutubeLogo,
 } from "@phosphor-icons/react";
 import { BrandPlatformPreview } from "./brand-platform-preview";
 import { CediahLogo } from "./cediah-logo";
 
 const featureItems = [
   { title: "Materias médicas", icon: BookOpen },
-  { title: "Videos HD", icon: MonitorPlay },
+  { title: "Guías de estudio", icon: BookOpen },
   { title: "Flashcards", icon: ImagesSquare },
   { title: "Cuestionarios", icon: ClipboardText },
   { title: "Seguimiento", icon: ClockCountdown },
@@ -32,7 +29,7 @@ const featureItems = [
 
 const planFeatures = [
   "Materias esenciales",
-  "Videos y guías",
+  "Guías de estudio",
   "Cuestionarios",
   "Seguimiento de progreso",
   "Acceso a todas las materias",
@@ -170,7 +167,7 @@ export function LandingScreen() {
         <div className="marketing-platform-inner">
           <div className="marketing-platform-copy">
             <h2 id="platform-title">Estudia desde cualquier lugar y dispositivo</h2>
-            <p>Tus clases y recursos te acompañan estés donde estés.</p>
+            <p>Tus guías, cuestionarios y rutas te acompañan estés donde estés.</p>
           </div>
           <div className="marketing-devices">
             <BrandPlatformPreview />
@@ -267,11 +264,9 @@ export function LandingScreen() {
         <div className="marketing-footer-inner">
           <div className="marketing-footer-brand">
             <Link href="/" aria-label="Koras, inicio"><CediahLogo variant="light" /></Link>
-            <p>Aprendizaje que se ve,<br />conocimiento que se queda.</p>
+            <p>Aprendizaje que conecta,<br />conocimiento que se queda.</p>
             <div className="marketing-socials" aria-label="Redes sociales" role="group">
               <a href="#instagram" aria-label="Instagram"><InstagramLogo size={16} /></a>
-              <a href="#youtube" aria-label="YouTube"><YoutubeLogo size={16} /></a>
-              <a href="#tiktok" aria-label="TikTok"><TiktokLogo size={16} /></a>
             </div>
           </div>
           <div className="marketing-footer-groups">

@@ -8,6 +8,9 @@ import { createPostgresContentProvider } from "../src/providers/postgres-content
 const pg = new PGlite();
 const author = "10000000-0000-4000-8000-000000000099";
 const video = "10000000-0000-4000-8000-000000000001";
+const firstGuide = "10000000-0000-4000-8000-000000000002";
+const secondGuide = "10000000-0000-4000-8000-000000000003";
+const otherReader = "10000000-0000-4000-8000-000000000098";
 const viewerKey = "a".repeat(64);
 const connection: DatabaseConnection = {
   async executeQuery<R>(query: CompiledQuery): Promise<QueryResult<R>> {
@@ -33,18 +36,35 @@ const record = (key = viewerKey) => provider.recordView!({ contentId: video, vie
 
 beforeAll(async () => {
   await pg.exec("create role cediah_runtime;");
-  for (const file of ["0001_auth.sql", "0002_platform.sql", "0003_content.sql", "0004_subjects.sql", "0006_simplify_platform_roles.sql", "0007_content_views.sql", "0009_learning_content_identity.sql"]) {
+  for (const file of ["0001_auth.sql", "0002_platform.sql", "0003_content.sql", "0004_subjects.sql", "0006_simplify_platform_roles.sql", "0007_content_views.sql", "0009_learning_content_identity.sql", "0029_recent_guide_reading.sql"]) {
     await pg.exec(`begin;\n${await readFile(new URL(`../../../database/migrations/${file}`, import.meta.url), "utf8")}\ncommit;`);
   }
   await pg.query("insert into auth_users (id, name, email) values ($1, 'Test', 'views@example.test')", [author]);
+  await pg.query("insert into auth_users (id, name, email) values ($1, 'Other', 'other-views@example.test')", [otherReader]);
   await pg.query(`insert into content_items (id, kind, slug, title, summary, topic, author_user_id, status, published_by, published_at)
     values ($1, 'video', 'test-video', 'Test', 'Summary', 'Topic', $2, 'published', $2, now())`, [video, author]);
-  await pg.exec("grant select, update on content_items to cediah_runtime;");
+  for (const [id, slug] of [[firstGuide, "first-guide"], [secondGuide, "second-guide"]]) {
+    await pg.query(`insert into content_items (id, kind, slug, title, summary, topic, content, author_user_id, status, published_by, published_at)
+      values ($1, 'guide', $2, $2, 'Study guide', 'Topic', $3::jsonb, $4, 'published', $4, now())`, [id, slug,
+      JSON.stringify({ document: null, keyPoints: [], linkedVideoId: null, quiz: { questions: [] }, regions: [], sections: [{ heading: "Introduction", body: "Guide content" }] }), author]);
+  }
+  await pg.exec("grant select, update on content_items to cediah_runtime; grant select on content_assets, content_subjects to cediah_runtime;");
 }, 30_000);
-beforeEach(async () => { await pg.exec("reset role; truncate content_view_receipts, content_view_counts; set role cediah_runtime;"); });
+beforeEach(async () => { await pg.exec("reset role; truncate user_recent_guides, content_view_receipts, content_view_counts; set role cediah_runtime;"); });
 afterAll(async () => { await database.destroy(); await pg.close(); });
 
 describe("view receipts in PostgreSQL with runtime permissions", () => {
+  it("resumes the latest available guide for each account", async () => {
+    expect(await provider.getLastReadGuide?.(author)).toBeNull();
+    await provider.recordView?.({ contentId: firstGuide, viewerKey: "c".repeat(64), userId: author });
+    await provider.recordView?.({ contentId: secondGuide, viewerKey: "d".repeat(64), userId: author });
+    expect((await provider.getLastReadGuide?.(author))?.id).toBe(secondGuide);
+    expect(await provider.getLastReadGuide?.(otherReader)).toBeNull();
+    await pg.exec("reset role; update content_items set status = 'archived' where id = '" + secondGuide + "'; set role cediah_runtime;");
+    expect((await provider.getLastReadGuide?.(author))?.id).toBe(firstGuide);
+    await pg.exec("reset role; update content_items set status = 'published' where id = '" + secondGuide + "'; set role cediah_runtime;");
+  });
+
   it("counts once, returns current totals on retries and preserves the original receipt", async () => {
     const first = await record();
     expect(first).toMatchObject({ status: "success", value: { counted: true, viewCount: 1 } });

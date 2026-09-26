@@ -8,8 +8,8 @@ function recordingDatabase({ duplicate = false, published = true } = {}) {
   const connection: DatabaseConnection = {
     async executeQuery<R>(query: CompiledQuery): Promise<QueryResult<R>> {
       statements.push(query);
-      const rows = query.sql.startsWith('select "id" from "content_items"')
-        ? published ? [{ id: "content-id" }] : []
+      const rows = query.sql.startsWith('select "id", "kind" from "content_items"')
+        ? published ? [{ id: "content-id", kind: "video" }] : []
         : query.sql.startsWith('insert into "content_view_receipts"') && !duplicate ? [{ content_item_id: "content-id" }]
           : query.sql.startsWith('select "content_view_counts"') ? [{ view_count: "7", retry_after_ms: 1_500_000 }] : [];
       return { rows: rows as R[] };

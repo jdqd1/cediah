@@ -8,7 +8,6 @@ import {
   Compass,
   FlagCheckered,
   Path,
-  Play,
 } from "@phosphor-icons/react/dist/ssr";
 import type { LearningHome, LearningHomeTask } from "@cediah/contracts";
 import { LearningDashboardActivityDetails } from "./learning-dashboard-activity-details";
@@ -16,7 +15,7 @@ import { LearningDashboardActivityDetails } from "./learning-dashboard-activity-
 function TaskIcon({ task }: { task: LearningHomeTask }) {
   return task.kind === "review"
     ? <ClockCounterClockwise aria-hidden="true" size={21} />
-    : <Play aria-hidden="true" size={20} weight="fill" />;
+    : <Path aria-hidden="true" size={20} />;
 }
 
 function taskMeta(task: LearningHomeTask) {
@@ -48,48 +47,32 @@ export function LearningDashboardSummary({
 
   if (!available || !home) {
     return (
-      <section aria-labelledby="dashboard-learning-title" className="dashboard-learning dashboard-learning-error">
-        <span className="dashboard-learning-mark"><Path aria-hidden="true" size={24} /></span>
-        <div>
-          <span>Tu aprendizaje</span>
-          <h2 id="dashboard-learning-title">No pudimos cargar tu progreso</h2>
-          <p>Tu avance guardado no cambió. Puedes reintentar sin perder ninguna actividad.</p>
+      <section aria-labelledby="dashboard-learning-title" className="dashboard-learning-state">
+        <div className="section-heading-row"><h2 id="dashboard-learning-title">Rutas de aprendizaje</h2></div>
+        <div className="dashboard-learning-state-card">
+          <span className="dashboard-learning-mark"><Path aria-hidden="true" size={24} /></span>
+          <div><strong>No pudimos cargar tu progreso</strong><p>Tu avance guardado no cambió. Puedes reintentar sin perder ninguna actividad.</p></div>
+          <Link className="learning-secondary-button" href="/dashboard">Reintentar</Link>
         </div>
-        <Link className="learning-secondary-button" href="/dashboard">Reintentar</Link>
       </section>
     );
   }
 
   if (!home.activePath) {
     return (
-      <section aria-labelledby="dashboard-learning-title" className="dashboard-learning dashboard-learning-empty">
-        <span className="dashboard-learning-mark"><Compass aria-hidden="true" size={25} /></span>
-        <div>
-          <span>Tu aprendizaje</span>
-          <h2 id="dashboard-learning-title">Aprende con una ruta</h2>
-          <p>Elige un tema y recibe una secuencia flexible de comprensión, práctica y repaso.</p>
+      <section aria-labelledby="dashboard-learning-title" className="dashboard-learning-state">
+        <div className="section-heading-row"><h2 id="dashboard-learning-title">Rutas de aprendizaje</h2></div>
+        <div className="dashboard-learning-state-card">
+          <span className="dashboard-learning-mark"><Compass aria-hidden="true" size={25} /></span>
+          <div><strong>Aprende con una ruta</strong><p>Elige un tema y recibe una secuencia flexible de comprensión, práctica y repaso.</p></div>
+          <Link className="learning-primary-button" href="/aprendizaje?tab=rutas">Elegir tema <ArrowRight aria-hidden="true" size={18} /></Link>
         </div>
-        <Link className="learning-primary-button" href="/aprendizaje?tab=rutas">Elegir tema <ArrowRight aria-hidden="true" size={18} /></Link>
       </section>
     );
   }
 
   const activePath = home.activePath;
   const primaryTask = home.tasks.find((task) => task.kind !== "review") ?? null;
-  const reviewTask = home.tasks.find((task) => task.kind === "review") ?? null;
-  const dueReviews = home.counts.dueReviews;
-  const reviewTone = dueReviews === 0
-    ? "complete"
-    : dueReviews <= 5
-      ? "calm"
-      : dueReviews <= 12
-        ? "active"
-        : dueReviews <= 20
-          ? "attention"
-          : "urgent";
-  const reviewAngle = dueReviews === 0
-    ? 360
-    : Math.max(36, Math.min(dueReviews, 20) / 20 * 360);
   const stepProgress = activePath.totalSteps === 1
     ? activePath.completedSteps > 0 ? 100 : 0
     : Math.min(activePath.completedSteps, activePath.totalSteps - 1) / (activePath.totalSteps - 1) * 100;
@@ -101,12 +84,9 @@ export function LearningDashboardSummary({
   const routeProgressRingStyle = {
     "--dashboard-progress-angle": `${activePath.progressPercent * 3.6}deg`,
   } as CSSProperties;
-  const reviewRingStyle = {
-    "--dashboard-review-angle": `${reviewAngle}deg`,
-  } as CSSProperties;
 
   return (
-    <div aria-label="Aprendizaje y repaso" className="dashboard-learning">
+    <div aria-label="Aprendizaje guiado" className="dashboard-learning">
       <section aria-labelledby="dashboard-learning-title" className="dashboard-learning-block dashboard-learning-path-block">
         <div className="dashboard-learning-section-heading section-heading-row">
           <h2 id="dashboard-learning-title">Rutas de aprendizaje</h2>
@@ -214,7 +194,7 @@ export function LearningDashboardSummary({
                   <CalendarCheck aria-hidden="true" size={23} />
                   <p><strong>Ruta completada.</strong><span>Puedes volver a cualquier actividad cuando quieras.</span></p>
                 </div>
-                <Link className="dashboard-learning-activity-button" href={activePath.continueHref}>
+                <Link className="dashboard-learning-activity-button" href={activePathHref(activePath.continueHref)}>
                   Ver la ruta <ArrowRight aria-hidden="true" size={19} />
                 </Link>
               </div>
@@ -223,41 +203,6 @@ export function LearningDashboardSummary({
         </article>
       </section>
 
-      <section aria-labelledby="dashboard-review-title" className="dashboard-learning-block dashboard-learning-review-block">
-        <div className="dashboard-learning-section-heading section-heading-row">
-          <h2 id="dashboard-review-title">Repaso</h2>
-        </div>
-
-        <article className="dashboard-review-card" data-tone={reviewTone}>
-          <header className="dashboard-review-heading">
-            <span className="dashboard-review-icon"><ClockCounterClockwise aria-hidden="true" size={24} /></span>
-            <span className="dashboard-review-copy">
-              <strong>{dueReviews === 0 ? "Repaso al día" : "Repasar flashcards"}</strong>
-              {dueReviews === 0 ? <span>No tienes conceptos pendientes por ahora.</span> : null}
-            </span>
-            <div
-              aria-label={dueReviews === 0 ? "No hay repasos pendientes" : `${dueReviews} repasos pendientes`}
-              className="dashboard-review-ring"
-              role="img"
-              style={reviewRingStyle}
-            >
-              <span aria-hidden="true">
-                {dueReviews === 0 ? <Check size={24} weight="bold" /> : <><strong>{dueReviews}</strong><small>pendientes</small></>}
-              </span>
-            </div>
-          </header>
-
-          {reviewTask ? (
-            <Link className="dashboard-learning-activity-button dashboard-review-button" href={reviewTask.href}>
-              Iniciar <ArrowRight aria-hidden="true" size={19} />
-            </Link>
-          ) : (
-            <Link className="dashboard-learning-route-link dashboard-review-clear-link" href="/aprendizaje">
-              Ver mi aprendizaje <ArrowRight aria-hidden="true" size={18} />
-            </Link>
-          )}
-        </article>
-      </section>
     </div>
   );
 }
