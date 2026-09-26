@@ -83,7 +83,9 @@ export function ContentDetailScreen({
   trackView?: boolean;
 }) {
   // Opening a video's associated guide must not increment its playback count.
-  useContentView(trackView && item.status === "published" && item.kind !== "video" ? item.id : null);
+  useContentView(trackView && item.status === "published" && item.kind !== "video" ? item.id : null, {
+    delayMs: item.kind === "guide" ? 0 : 4_000,
+  });
   const isGuideView = item.kind === "guide" || (guideMode && item.kind === "video");
   const sectionLabel = isGuideView ? "Guías" : contentKindLabel(item.kind);
   const defaultBackHref = guideMode && item.kind === "video"
@@ -109,6 +111,7 @@ export function ContentDetailScreen({
             <IconBackLink className="published-content-back" href={backHref} label={backLabel} />
           </nav>
           <div className="published-guide-title-row">
+            {isGuideView && <span className="published-guide-file-icon" aria-hidden="true"><BookOpen size={21} weight="regular" /></span>}
             <h2>{item.title}</h2>
           </div>
         </header>

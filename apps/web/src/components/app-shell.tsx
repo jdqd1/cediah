@@ -13,6 +13,7 @@ import {
   PencilSimpleLine,
   UserCircle,
   ShieldCheck,
+  X,
 } from "@phosphor-icons/react";
 import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
@@ -258,6 +259,7 @@ function ShellChrome({
       : []),
   ];
 
+  const menuExpanded = isDesktopSidebar ? !sidebarCollapsed : sidebarOpen;
   const menuButtonLabel = isDesktopSidebar
     ? sidebarCollapsed
       ? "Expandir menú principal"
@@ -378,7 +380,9 @@ function ShellChrome({
             type="button"
             onClick={togglePrimaryMenu}
           >
-            <List aria-hidden="true" size={25} />
+            {menuExpanded
+              ? <X aria-hidden="true" size={24} />
+              : <List aria-hidden="true" size={25} />}
           </button>
         </div>
         <nav className="sidebar-nav">
@@ -444,7 +448,9 @@ function ShellChrome({
               title={menuButtonLabel}
               onClick={togglePrimaryMenu}
             >
-              <List size={28} />
+              {menuExpanded
+                ? <X aria-hidden="true" size={25} />
+                : <List aria-hidden="true" size={28} />}
             </button>
           </div>
           <GlobalContentSearch />

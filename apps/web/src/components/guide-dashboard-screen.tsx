@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
-  Books,
+  Folder,
   MagnifyingGlass,
   X,
 } from "@phosphor-icons/react";
@@ -173,19 +173,16 @@ export function GuideDashboardScreen({
       <section className="guide-directory" aria-label="Guías de estudio">
         <h2 className="sr-only">Guías de estudio</h2>
 
-        {hasSelection && (
-          <header className="guide-directory-context">
-            <nav className="compact-navigation-row" aria-label="Navegación de guías">
+        <div className="guide-directory-filters" role="search" aria-label="Buscar guías">
+          {hasSelection && (
+            <nav className="compact-navigation-row guide-directory-context" aria-label="Navegación de guías">
               <IconBackLink
                 href={selectedTopic ? queryHref(pathname, selectedSlug) : "/guias"}
                 label={selectedTopic ? "Volver a los temas" : "Volver a todas las materias"}
                 onClick={(event) => navigate(event, selectedTopic ? selectedSlug : "")}
               />
             </nav>
-          </header>
-        )}
-
-        <div className="guide-directory-filters" role="search" aria-label="Buscar guías">
+          )}
           <label className="guide-directory-search">
             <MagnifyingGlass aria-hidden="true" size={18} />
             <input
@@ -212,7 +209,7 @@ export function GuideDashboardScreen({
                 return (
                   <li key={bucket.id}>
                     <Link href={href} onClick={(event) => navigate(event, bucket.slug)}>
-                      <span className="guide-subject-icon" aria-hidden="true"><Books size={21} /></span>
+                      <span className="guide-subject-icon" aria-hidden="true"><Folder size={21} /></span>
                       <span>
                         <strong>{bucket.name}</strong>
                         <small>{bucket.count === 1 ? "1 guía" : `${bucket.count} guías`}</small>
@@ -251,7 +248,7 @@ export function GuideDashboardScreen({
                   return (
                     <li key={normalize(group.name)}>
                       <Link href={href} onClick={(event) => navigate(event, selectedSlug, group.name)}>
-                        <span className="subject-topic-icon" aria-hidden="true"><BookOpen size={20} /></span>
+                        <span className="subject-topic-icon" aria-hidden="true"><Folder size={20} /></span>
                         <span>
                           <strong>{group.name}</strong>
                           <small>{group.guides.length === 1 ? "1 guía" : `${group.guides.length} guías`}</small>

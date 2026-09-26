@@ -4,11 +4,12 @@ import { useCallback, useEffect, useRef } from "react";
 import type { ContentViewResponse } from "@cediah/contracts";
 import { createContentViewTracker } from "./content-view-tracker";
 
-/** Readers count after four visible seconds; videos activate only on playback. */
+/** Content views use a visible delay; videos activate only on playback. */
 export function useContentView(contentId: string | null, {
   automatic = true,
+  delayMs = 4_000,
   onRecorded,
-}: { automatic?: boolean; onRecorded?: (result: ContentViewResponse) => void } = {}) {
+}: { automatic?: boolean; delayMs?: number; onRecorded?: (result: ContentViewResponse) => void } = {}) {
   const trackerRef = useRef<ReturnType<typeof createContentViewTracker> | null>(null);
   const trackerContentIdRef = useRef<string | null>(null);
   const pendingContentIdRef = useRef<string | null>(null);
@@ -27,7 +28,7 @@ export function useContentView(contentId: string | null, {
     function schedule() {
       clearTimeout(timer);
       tracker.resume();
-      if (automatic && document.visibilityState === "visible") timer = setTimeout(tracker.record, 4_000);
+      if (automatic && document.visibilityState === "visible") timer = setTimeout(tracker.record, delayMs);
     }
     schedule();
     if (pendingContentIdRef.current === contentId) {
@@ -46,7 +47,7 @@ export function useContentView(contentId: string | null, {
       document.removeEventListener("visibilitychange", schedule);
       window.removeEventListener("online", schedule);
     };
-  }, [contentId, automatic]);
+  }, [contentId, automatic, delayMs]);
   return useCallback(() => {
     if (!contentId) return;
     if (trackerContentIdRef.current === contentId) trackerRef.current?.record();

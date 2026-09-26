@@ -1,0 +1,447 @@
+/* Shared Drive-inspired reading, discovery, and dashboard details. */
+:root {
+  --drive-ink: #20283b;
+  --drive-muted: #66738a;
+  --drive-line: #dfe5ef;
+  --drive-hover: #e8edf8;
+  --drive-accent: #3448a5;
+  --drive-canvas: #f7f9fd;
+}
+
+/* Navigation keeps the same quiet row language in both sidebar states. */
+.app-shell .sidebar-nav-group { gap: 2px; }
+.app-shell .sidebar-link,
+.app-shell .sidebar-group-link {
+  min-height: 44px;
+  border-radius: 22px;
+  color: #465570;
+  font-weight: 600;
+}
+.app-shell .sidebar-link.is-active,
+.app-shell .sidebar-group-link.is-active {
+  background: #dce5fb;
+  color: #263e95;
+  box-shadow: none;
+}
+.app-shell .sidebar-link:hover,
+.app-shell .sidebar-group-link:hover { background: #e2e8f4; }
+.app-shell .sidebar-link svg,
+.app-shell .sidebar-group-link svg { flex: 0 0 auto; }
+@media (min-width: 961px) {
+  .app-shell.sidebar-collapsed .sidebar-nav :is(.sidebar-link, .sidebar-group-link) {
+    width: 46px;
+    min-height: 46px;
+    margin-inline: auto;
+    border-radius: 15px;
+  }
+  .app-shell.sidebar-collapsed .sidebar-nav :is(.sidebar-link, .sidebar-group-link).is-active { box-shadow: none; }
+}
+.app-topbar.app-topbar-simplified .menu-trigger,
+.app-shell .sidebar-menu-trigger { border-radius: 13px; }
+
+/* Guide catalog: back control and search occupy one compact toolbar. */
+.app-shell .app-body > .guide-catalog-main { background: var(--app-workspace); }
+.guide-directory-filters,
+.app-main .guide-directory-filters {
+  display: flex;
+  width: min(100%, 38rem);
+  min-height: 48px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 25px;
+  background: #e3e9f4;
+  padding: 4px;
+  box-shadow: none;
+}
+.guide-directory-filters:focus-within,
+.app-main .guide-directory-filters:focus-within {
+  border: 0;
+  outline: 2px solid #aabaf0;
+  outline-offset: 1px;
+  box-shadow: none;
+}
+.guide-directory-filters .guide-directory-context {
+  display: flex;
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+}
+.guide-directory-filters .icon-back-link,
+.app-main .guide-directory-filters a.icon-back-link {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--drive-accent);
+  box-shadow: none;
+}
+.guide-directory-filters .icon-back-link:hover,
+.app-main .guide-directory-filters a.icon-back-link:hover { background: #dbe3f3; }
+.guide-directory-search,
+.app-main .guide-directory-search {
+  min-width: 0;
+  min-height: 40px;
+  flex: 1 1 auto;
+  grid-column: auto;
+  border: 0;
+  background: transparent;
+  color: #69758b;
+  box-shadow: none;
+}
+.guide-directory-search input { font-size: 0.84rem; }
+.guide-subject-browser > ul,
+.guide-topic-browser .subject-topic-list,
+.guide-directory-list {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.guide-subject-browser a { border: 0; box-shadow: none; }
+.guide-subject-browser li + li,
+.guide-topic-browser .subject-topic-list li + li,
+.guide-directory-list > li + li { border-top: 1px solid var(--drive-line); }
+.guide-subject-browser a,
+.guide-topic-browser .subject-topic-list a,
+.guide-directory-list .content-resource-item {
+  min-height: 64px;
+  grid-template-columns: 40px minmax(0, 1fr) 20px;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 7px 10px;
+}
+.guide-subject-browser a:hover,
+.guide-topic-browser .subject-topic-list a:hover,
+.guide-directory-list .content-resource-item:hover { background: #edf2fa; }
+.guide-subject-icon,
+.app-main .subject-topic-list-guide .subject-topic-icon,
+.guide-directory-list .content-type-cover {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 11px;
+  background: #e8eefb;
+  color: #344ca5;
+  box-shadow: none;
+}
+.guide-directory-list .content-type-cover::before,
+.guide-directory-list .content-type-cover::after,
+.guide-directory-list .content-type-cover-accent { display: none; }
+.guide-directory-list .content-type-cover-glyph {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  box-shadow: none;
+}
+.guide-directory-list .content-type-cover-glyph svg { width: 21px; height: 21px; }
+.guide-subject-browser strong,
+.guide-topic-browser .subject-topic-list strong,
+.guide-directory-list .content-resource-copy strong { color: var(--drive-ink); font-size: .85rem; font-weight: 650; }
+.guide-subject-browser small,
+.guide-topic-browser .subject-topic-list small { color: var(--drive-muted); }
+
+/* Reader file header and tools use a single icon scale and understated surfaces. */
+.app-shell:has(.published-rich-guide-reader) .published-content-header.published-rich-guide-header {
+  min-height: 76px;
+  gap: 12px;
+  border-bottom: 1px solid var(--drive-line);
+  background: #fff;
+  padding: 12px clamp(16px, 2.5vw, 30px);
+}
+.published-rich-guide-header .published-content-context { margin: 0; }
+.published-rich-guide-header .published-content-back,
+.published-content-context > a.icon-back-link {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #425472;
+  box-shadow: none;
+}
+.published-content-context > a.icon-back-link:hover { background: #edf2fa; transform: none; }
+.published-rich-guide-header .published-guide-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+.published-guide-file-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: #e7edfb;
+  color: var(--drive-accent);
+}
+.published-content-header.published-rich-guide-header .published-guide-title-row h2 {
+  min-width: 0;
+  color: var(--drive-ink);
+  font-family: inherit;
+  font-size: clamp(1rem, 1.6vw, 1.28rem);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.published-reader-actionbar {
+  border-color: var(--drive-line);
+  background: rgb(255 255 255 / 97%);
+  box-shadow: none;
+}
+.published-reader-actionbar button,
+.published-reader-actionbar a { border-radius: 18px; color: #526078; }
+.published-reader-actionbar button:hover:not(:disabled),
+.published-reader-actionbar button[aria-pressed="true"] { background: #e6ecfa; color: var(--drive-accent); }
+.published-reader-mobile-toolbar-row {
+  border: 1px solid #dfe5ef;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 8px 24px rgb(38 53 92 / 12%);
+}
+.published-reader-mobile-tool.is-active { color: var(--drive-accent); }
+
+/* Dashboard: routes occupy two thirds of the first workspace row. */
+.dashboard-study-home { display: flex; flex-direction: column; }
+.dashboard-study-home .dashboard-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 18px;
+}
+.dashboard-study-home .dashboard-focus-grid.has-routes { grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr); }
+.dashboard-focus-grid > :is(.dashboard-learning, .dashboard-learning-state) { min-width: 0; margin: 0; }
+.dashboard-focus-grid .dashboard-learning-route,
+.dashboard-focus-grid .dashboard-learning-state-card { min-height: 170px; }
+.dashboard-focus-grid .dashboard-learning-today { display: none; }
+.dashboard-focus-grid .dashboard-learning-stepper-scroll { margin-top: 8px; }
+.dashboard-resume-section { display: flex; flex-direction: column; }
+.dashboard-resume-card,
+.dashboard-resume-empty { min-height: 170px; height: 100%; border-color: var(--drive-line); box-shadow: none; }
+.dashboard-resume-card { display: flex; flex-direction: column; padding: 18px; }
+.dashboard-resume-art {
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  border-radius: 12px;
+  background: #e8eefb;
+}
+.dashboard-resume-art::before { display: none; }
+.dashboard-resume-copy { flex: 1; padding: 8px 0 0; }
+.dashboard-resume-copy > strong { font-size: 1rem; }
+.dashboard-resume-action { margin-top: auto; padding-top: 12px; }
+.dashboard-resume-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 17px;
+  text-align: center;
+}
+.dashboard-resume-empty-icon { width: 42px; height: 42px; }
+.dashboard-resume-empty strong { font-size: .9rem; }
+.dashboard-resume-empty > a {
+  display: inline-flex;
+  min-height: 36px;
+  width: auto;
+  align-self: flex-end;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: #dfe7fa;
+  padding: 0 14px;
+  color: #263f9a;
+}
+.dashboard-study-home > .dashboard-review-section { margin-top: 24px; }
+.dashboard-study-home > .dashboard-review-section .dashboard-review-card {
+  min-height: 115px;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  border-color: var(--drive-line);
+  box-shadow: none;
+}
+.dashboard-study-home > .dashboard-review-section .dashboard-review-heading { flex: 1; }
+.dashboard-review-ring { flex: 0 0 auto; }
+.dashboard-study-home > .dashboard-review-section :is(.dashboard-review-clear-link, .dashboard-review-button) {
+  flex: 0 0 auto;
+  margin: 0;
+  padding-inline: 18px;
+}
+.dashboard-review-clear-link { background: #e8eefb; color: #2d459f; }
+
+/* Recent guides peek past the second item and use explicit scroll controls. */
+.dashboard-recent-carousel { position: relative; }
+.dashboard-recent-viewport {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.dashboard-recent-viewport::-webkit-scrollbar { display: none; }
+.dashboard-study-home .dashboard-guide-grid {
+  display: flex;
+  width: max-content;
+  gap: 12px;
+  overflow: visible;
+  margin: 12px 0 0;
+  padding: 0 0 12px;
+}
+.dashboard-guide-grid > li { width: clamp(220px, 32vw, 320px); flex: 0 0 auto; scroll-snap-align: start; }
+.dashboard-study-home .dashboard-guide-card {
+  min-height: 172px;
+  height: 100%;
+  border-color: var(--drive-line);
+  border-radius: 16px;
+  padding: 17px;
+  box-shadow: none;
+}
+.dashboard-guide-card-icon { width: 39px; height: 39px; border-radius: 11px; }
+.dashboard-guide-card-copy { margin-top: 12px; }
+.dashboard-guide-card-copy strong { font-size: .86rem; }
+.dashboard-guide-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 15px;
+  background: #edf1fa;
+  padding: 5px 9px;
+  font-size: .72rem;
+  font-weight: 700;
+}
+.dashboard-recent-controls {
+  position: absolute;
+  right: 5px;
+  bottom: 20px;
+  display: flex;
+  gap: 5px;
+  border: 1px solid var(--drive-line);
+  border-radius: 22px;
+  background: #fff;
+  padding: 3px;
+  box-shadow: 0 3px 12px rgb(30 44 77 / 8%);
+}
+.dashboard-recent-controls button { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 50%; color: var(--drive-accent); }
+.dashboard-recent-controls button:hover { background: #e8eefb; }
+.dashboard-study-home .dashboard-shortcuts {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 2px 0 10px;
+  scrollbar-width: none;
+}
+.dashboard-study-home .dashboard-shortcuts::-webkit-scrollbar { display: none; }
+.app-shell .dashboard-main .dashboard-shortcuts > .study-material-card,
+.dashboard-study-home .study-material-card {
+  min-width: 192px;
+  max-width: 260px;
+  flex: 1 0 192px;
+  border: 1px solid var(--drive-line);
+  background: #fff;
+  box-shadow: none;
+}
+.app-shell .dashboard-main .dashboard-shortcuts > .study-material-card:hover { border-color: #b8c8e8; background: #f7f9fe; }
+
+.dashboard-main > .brand-footer {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 46px;
+  padding-bottom: 20px;
+}
+.dashboard-main > .brand-footer .brand-footer-lockup { min-width: 0; }
+.dashboard-main > .brand-footer .brand-footer-socials { display: flex; flex: 0 0 auto; align-self: center; gap: 12px; }
+
+@media (min-width: 961px) {
+  .app-shell .app-body > .dashboard-main {
+    height: calc(100svh - var(--topbar-height) - 10px);
+    min-height: 0;
+    flex: 0 0 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #c5cde0 transparent;
+  }
+}
+
+@media (max-width: 960px) {
+  .app-shell.sidebar-collapsed .sidebar-nav :is(.sidebar-link, .sidebar-group-link) {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 12px;
+    border-radius: 22px;
+    margin: 0;
+    padding: 9px 12px;
+  }
+  .app-shell.sidebar-collapsed .sidebar-link-label {
+    display: block;
+    max-width: 13rem;
+    flex: 1 1 auto;
+    opacity: 1;
+  }
+  .app-shell.sidebar-collapsed .sidebar-group-caret { display: block; }
+  .app-shell.sidebar-collapsed .sidebar-submenu.is-open { display: grid; }
+  .app-shell .app-body > .guide-catalog-main,
+  .app-shell .app-topbar.app-topbar-simplified:has(+ .guide-catalog-main) {
+    background: var(--app-chrome);
+  }
+  .dashboard-study-home .dashboard-focus-grid.has-routes { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-study-home > .dashboard-review-section .dashboard-review-card { flex-wrap: wrap; }
+}
+
+@media (max-width: 700px) {
+  .app-shell .app-body > .guide-catalog-main { background: var(--app-chrome); }
+  .guide-directory-filters,
+  .app-main .guide-directory-filters { width: 100%; }
+  .guide-subject-browser a,
+  .guide-topic-browser .subject-topic-list a,
+  .guide-directory-list .content-resource-item { grid-template-columns: 40px minmax(0, 1fr) 20px; }
+  .app-shell:has(.published-rich-guide-reader) .published-content-header.published-rich-guide-header {
+    min-height: 74px;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 14px;
+  }
+  .published-rich-guide-header .published-guide-title-row { gap: 9px; }
+  .published-guide-file-icon { width: 35px; height: 35px; border-radius: 9px; }
+  .published-content-header.published-rich-guide-header .published-guide-title-row h2 { font-size: 1rem; line-height: 1.3; }
+  .dashboard-study-home > .dashboard-review-section .dashboard-review-card { min-height: 130px; }
+  .dashboard-study-home > .dashboard-review-section :is(.dashboard-review-clear-link, .dashboard-review-button) { margin-left: auto; }
+  .dashboard-study-home .dashboard-guide-grid { margin: 12px 0 0; padding: 0 0 12px; }
+  .dashboard-guide-grid > li { width: min(72vw, 270px); flex-basis: auto; }
+  .dashboard-recent-controls { bottom: 16px; }
+  .dashboard-study-home .dashboard-shortcuts { display: flex; gap: 9px; margin: 0; padding: 2px 0 10px; }
+  .dashboard-study-home .study-material-card { min-width: 178px; flex-basis: 178px; }
+  .dashboard-main > .brand-footer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 40px 0 18px;
+  }
+  .dashboard-main > .brand-footer .brand-footer-lockup { flex: 1; }
+  .dashboard-main > .brand-footer .brand-footer-lockup p { display: none; }
+  .dashboard-main > .brand-footer .brand-footer-lockup > div > span { display: none; }
+  .dashboard-main > .brand-footer .cediah-logo { display: flex; }
+  .dashboard-resume-art svg { width: 30px; height: 30px; }
+  .dashboard-study-home > .dashboard-review-section .dashboard-review-card { flex-direction: column; align-items: stretch; }
+  .dashboard-study-home > .dashboard-review-section .dashboard-review-heading { width: 100%; }
+  .dashboard-study-home > .dashboard-review-section :is(.dashboard-review-clear-link, .dashboard-review-button) { align-self: flex-end; }
+  .dashboard-main > .brand-footer .brand-footer-socials { align-self: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-recent-viewport { scroll-behavior: auto; }
+}
