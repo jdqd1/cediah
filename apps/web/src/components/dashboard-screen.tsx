@@ -12,9 +12,9 @@ import { DashboardRecentCarousel } from "./dashboard-recent-carousel";
 type Guide = Extract<ContentItem, { kind: "guide" }>;
 
 const materialDefinitions = [
-  { href: "/guias", icon: Notebook, kind: "guide", title: "Guías", description: "Lee y profundiza" },
-  { href: "/asignaturas?tipo=flashcards", icon: CardsThree, kind: "flashcards", title: "Flashcards", description: "Repasa conceptos clave" },
-  { href: "/asignaturas?tipo=quiz", icon: ClipboardText, kind: "quiz", title: "Cuestionarios", description: "Pon a prueba lo aprendido" },
+  { href: "/guias", icon: Notebook, kind: "guide", title: "Guías" },
+  { href: "/asignaturas?tipo=flashcards", icon: CardsThree, kind: "flashcards", title: "Flashcards" },
+  { href: "/asignaturas?tipo=quiz", icon: ClipboardText, kind: "quiz", title: "Cuestionarios" },
 ] as const;
 
 function GuideCard({ guide }: { guide: Guide }) {
@@ -36,7 +36,6 @@ export function DashboardScreen({
   available,
   recentItems = [],
   lastReadGuide = null,
-  lastReadAvailable = true,
   isAdministrator = false,
   guidedLearningEnabled = false,
   learningHome = null,
@@ -84,9 +83,8 @@ export function DashboardScreen({
             </Link>
           ) : (
             <div className="dashboard-resume-empty">
-              <span className="dashboard-resume-empty-icon"><BookOpen aria-hidden="true" size={26} /></span>
-              <strong>{lastReadAvailable ? "Encuentra tu próxima guía" : "Tu última guía no está disponible"}</strong>
-              <Link href="/guias">Explorar guías <ArrowRight aria-hidden="true" size={17} /></Link>
+              <span className="dashboard-resume-empty-icon"><BookOpen aria-hidden="true" size={35} /></span>
+              <Link href="/guias">Explorar guías <ArrowRight aria-hidden="true" size={20} /></Link>
             </div>
           )}
         </section>
@@ -120,14 +118,14 @@ export function DashboardScreen({
           {guidedLearningEnabled && (
             <Link className="study-material-card" data-kind="learning" href="/aprendizaje">
               <span className="study-material-icon" aria-hidden="true"><Path size={23} weight="regular" /></span>
-              <span className="study-material-copy"><strong>Rutas de aprendizaje</strong><small>Avanza a tu ritmo</small></span>
+              <span className="study-material-copy"><strong>Rutas de aprendizaje</strong></span>
               <ArrowRight className="dashboard-shortcut-arrow" aria-hidden="true" size={18} />
             </Link>
           )}
-          {materialDefinitions.map(({ title, description, icon: Icon, kind, href }) => (
+          {materialDefinitions.map(({ title, icon: Icon, kind, href }) => (
             <Link className="study-material-card" data-kind={kind} href={href} key={kind}>
               <span className="study-material-icon" aria-hidden="true"><Icon size={23} weight="regular" /></span>
-              <span className="study-material-copy"><strong>{title}</strong><small>{description}</small></span>
+              <span className="study-material-copy"><strong>{title}</strong></span>
               <ArrowRight className="dashboard-shortcut-arrow" aria-hidden="true" size={18} />
             </Link>
           ))}
